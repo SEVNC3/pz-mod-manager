@@ -800,6 +800,88 @@ fn save_use(mode: String, name: String) -> Res<View> {
     })
 }
 
+// --- maps ---
+
+use pzmm_core::pz::maps::{self, MapMod};
+
+#[derive(Serialize)]
+struct MapsView {
+    /// The build cells are read for (B41 and B42 cells differ in size).
+    build: u8,
+    /// The game's map folders: a `lots=` naming one is always met.
+    vanilla_folders: Vec<String>,
+    /// The game's cells, or None when the install isn't found or isn't `build`.
+    vanilla: Option<Vec<maps::Cell>>,
+    /// Installed mods that add maps.
+    mods: Vec<MapMod>,
+    /// Workshop items checked without installing (and not installed since).
+    checked: Vec<MapMod>,
+}
+
+/// Every map's cells (walks map folders the cache doesn't know yet, so outside the lock).
+#[tauri::command]
+async fn maps_view() -> Res<MapsView> {
+    blocking(|| -> Res<_> {
+        let (mods, build, checked) = reading(|paths| Ok((scan(paths)?, profile::effective_build(paths), maps::checked(paths))))?;
+        let paths = Paths::detect();
+        let mut cache = maps::Cache::load(&paths);
+        let installed = maps::installed(&mods, build, &mut cache);
+        let game = pz::folders::path("game", &settings::load());
+        let (vanilla_folders, vanilla) = game.map(|g| maps::vanilla(&g, build, &mut cache)).unwrap_or_default();
+        let _ = cache.save(&paths); // only a cache: the next view reads the folders again
+        let checked = checked.into_values().flatten().filter(|m| !mods.contains_key(&m.id)).collect();
+        Ok(MapsView { build, vanilla_folders, vanilla, mods: installed, checked })
+    })
+    .await
+}
+
+/// The grid for the shown maps (the UI sends back what `maps_view` gave it).
+#[tauri::command(async)]
+fn map_grid(vanilla: Vec<maps::Cell>, shown: Vec<MapMod>) -> Vec<maps::GridCell> {
+    maps::grid(&vanilla, &shown.iter().collect::<Vec<_>>())
+}
+
+/// Ids of the maps in `all` that conflict with none of `shown` (nor each other).
+#[tauri::command(async)]
+fn map_non_conflicting(all: Vec<MapMod>, shown: Vec<String>) -> Vec<String> {
+    maps::non_conflicting(&all, &shown)
+}
+
+/// The `Map=` list for `folders`, keeping the arrangement in `order` (see `server::map_order`).
+#[tauri::command(async)]
+fn map_line(order: Vec<String>, folders: Vec<String>) -> Vec<String> {
+    pz::server::map_order(&order, &folders)
+}
+
+/// Clipboard text for the shown maps: links, mod ids, requirements and the server lines.
+#[tauri::command(async)]
+fn maps_export(shown: Vec<MapMod>, map_line: Vec<String>) -> Res<String> {
+    reading(|paths| Ok(maps::export(&shown.iter().collect::<Vec<_>>(), &scan(paths)?, &map_line, profile::effective_build(paths) == 41)))
+}
+
+/// Download a Workshop item to read its cells, without installing it (the download is deleted).
+#[tauri::command]
+async fn map_check(id: String) -> Res<Vec<MapMod>> {
+    blocking(move || {
+        if !sources::steam_workshop::valid_id(&id) {
+            anyhow::bail!("{id:?} isn't a Workshop item id");
+        }
+        let build = reading(|paths| {
+            if sources::workshop_available(paths).contains(&id) {
+                anyhow::bail!("workshop:{id} is already installed: if it adds maps, they are in the list");
+            }
+            Ok(profile::effective_build(paths))
+        })
+        .map_err(anyhow::Error::msg)?;
+        let found = maps::check(&Paths::detect(), &id, build)?;
+        if found.is_empty() {
+            pzmm_core::log!("workshop:{id} adds no maps for Build {build}");
+        }
+        Ok(found)
+    })
+    .await
+}
+
 // --- Project Zomboid / Project Viewpoint ---
 
 use pzmm_core::pz::viewpoint as vp;
@@ -1067,6 +1149,7 @@ pub fn run() {
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
             details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, workshop_comments, workshop_author, zb_status, zb_preview, zb_install, zb_uninstall,
             find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_export, server_import, server_start, save_use,
+            maps_view, map_grid, map_non_conflicting, map_line, maps_export, map_check,
             mode_preview, mode_switch, doctor, console_errors, profile_export, profile_import,
             launch_game, settings_get, settings_set, folder_set, pick_folder, github_token_set, backups_clear, diagnostics
         ])

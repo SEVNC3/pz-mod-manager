@@ -10,6 +10,7 @@
   import Workshop from "$lib/Workshop.svelte";
   import ZombieBuddy from "$lib/ZombieBuddy.svelte";
   import ServersSaves from "$lib/ServersSaves.svelte";
+  import Maps from "$lib/Maps.svelte";
   import Links from "$lib/Links.svelte";
   import Icon from "$lib/Icon.svelte";
   import ActivityLog from "$lib/ActivityLog.svelte";
@@ -23,7 +24,7 @@
   import ProfilePicker from "$lib/ProfilePicker.svelte";
   import type { Categories, Finding, ModErrors, Overlap, Save, SettingsView, Stats } from "$lib/api";
 
-  let tab = $state<"mods" | "workshop" | "servers" | "zb" | "settings">("mods");
+  let tab = $state<"mods" | "workshop" | "maps" | "servers" | "zb" | "settings">("mods");
   let updates = $state<Set<string>>(new Set());
   /** settings.json, folders and the rest of the Settings tab (null until read). */
   let cfg = $state<SettingsView | null>(null);
@@ -533,7 +534,7 @@
     commit(next.rows, next.order, false);
   }
 
-  const TAB_IDS = ["mods", "workshop", "servers", "zb", "settings"];
+  const TAB_IDS = ["mods", "workshop", "maps", "servers", "zb", "settings"];
   const FILTER_IDS = ["all", "on", "off", "problems"];
   /** Left/Right arrows step through a tab list or segmented control and move focus along. */
   function arrowPick(e: KeyboardEvent, ids: string[], current: string, set: (v: string) => void) {
@@ -572,6 +573,20 @@
   function toggle(id: string) {
     const on = !mods.get(id)?.on;
     commit(rows.map((r) => (r.kind === "mod" && r.id === id ? { ...r, on } : r)), on ? placeAll([id]) : order);
+  }
+
+  /** Turn mods on or off from the Maps tab; turning one on also turns on the installed mods it needs. */
+  function setMods(ids: string[], on: boolean) {
+    const want = new Set<string>();
+    const visit = (id: string) => {
+      const m = mods.get(id);
+      if (!m || m.missing || want.has(id)) return;
+      want.add(id);
+      if (on) m.requires.forEach(visit);
+    };
+    ids.forEach(visit);
+    const turning = [...want].filter((id) => mods.get(id)!.on !== on);
+    return commit(rows.map((r) => (r.kind === "mod" && turning.includes(r.id) ? { ...r, on } : r)), on ? placeAll(turning) : order);
   }
 
   /** A drag in the load order: the mod at `from` dropped before position `to`. */
@@ -877,7 +892,7 @@
 
   <div class="tabbar">
   <div class="tabs" role="tablist" aria-label="Sections" tabindex="-1" onkeydown={(e) => arrowPick(e, TAB_IDS, tab, (v) => (tab = v as typeof tab))}>
-    {#each [["mods", "My mods"], ["workshop", "Browse Workshop"], ["servers", "Servers & saves"], ["zb", "ZombieBuddy"], ["settings", "Settings"]] as [id, label]}
+    {#each [["mods", "My mods"], ["workshop", "Browse Workshop"], ["maps", "Maps"], ["servers", "Servers & saves"], ["zb", "ZombieBuddy"], ["settings", "Settings"]] as [id, label]}
       <button role="tab" aria-selected={tab === id} class:active={tab === id} onclick={() => (tab = id as typeof tab)}>
         {label}{#if (id === "zb" && zbNeeded) || (id === "settings" && folderTrouble)}<span class="alert" aria-label="needs setup"></span>{/if}
       </button>
@@ -892,6 +907,8 @@
   {/if}
   {#if tab === "workshop"}
     <!-- kept mounted above -->
+  {:else if tab === "maps"}
+    <Maps {busy} {mods} {say} onSetMods={setMods} onInstallWorkshop={installWorkshop} onShowMod={(id) => { selected = id; tab = "mods"; }} />
   {:else if tab === "servers"}
     <ServersSaves {busy} profile={view?.profile ?? ""} enabledIds={order}
       onImport={(name) => run(`Importing ${name}.ini`, () => api.serverImport(name), { showLog: true })}

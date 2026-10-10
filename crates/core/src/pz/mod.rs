@@ -12,6 +12,7 @@ pub mod doctor;
 pub mod files;
 pub mod folders;
 pub mod logs;
+pub mod maps;
 pub mod saves;
 pub mod server;
 pub mod viewpoint;

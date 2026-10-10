@@ -169,6 +169,13 @@ export type Folder = {
   status: "found" | "missing" | "not_pz";
   warnings: string[];
 };
+/** A cell's [x, y]: B41 cells are 300 tiles, B42 cells 256, so only one build's cells compare. */
+export type Cell = [number, number];
+export type MapFolder = { folder: string; title: string; lots: string[]; cells: Cell[] };
+export type MapMod = { id: string; name: string; source: string; requires: string[]; maps: MapFolder[] };
+export type MapsView = { build: 41 | 42; vanilla_folders: string[]; vanilla: Cell[] | null; mods: MapMod[]; checked: MapMod[] };
+export type GridCell = { x: number; y: number; kind: "vanilla" | "map" | "over" | "conflict"; maps: string[] };
+
 export type SettingsView = { settings: Settings; folders: Folder[]; token_saved: boolean; token_env: boolean; backups_size: number };
 
 export const api = {
@@ -210,6 +217,12 @@ export const api = {
   serverStart: (name: string) => invoke<string>("server_start", { name }),
   serverImport: (name: string) => invoke<View>("server_import", { name }),
   saveUse: (mode: string, name: string) => invoke<View>("save_use", { mode, name }),
+  mapsView: () => invoke<MapsView>("maps_view"),
+  mapGrid: (vanilla: Cell[], shown: MapMod[]) => invoke<GridCell[]>("map_grid", { vanilla, shown }),
+  mapNonConflicting: (all: MapMod[], shown: string[]) => invoke<string[]>("map_non_conflicting", { all, shown }),
+  mapLine: (order: string[], folders: string[]) => invoke<string[]>("map_line", { order, folders }),
+  mapsExport: (shown: MapMod[], mapLine: string[]) => invoke<string>("maps_export", { shown, mapLine }),
+  mapCheck: (id: string) => invoke<MapMod[]>("map_check", { id }),
   doctor: () => invoke<Finding[]>("doctor"),
   consoleErrors: () => invoke<ModErrors[]>("console_errors"),
   profileExport: () => invoke<Shared>("profile_export"),
