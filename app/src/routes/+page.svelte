@@ -13,7 +13,8 @@
   import LayerIcon from "$lib/LayerIcon.svelte";
   import Links from "$lib/Links.svelte";
   import Icon, { type IconName } from "$lib/Icon.svelte";
-  import { bisectRound, findProblems, groupByCategory, placeInSections, sortLoadOrder } from "$lib/order";
+  import { autosort, bisectRound, findProblems, placeInSections, sortLoadOrder } from "$lib/order";
+  import LoadOrder from "$lib/LoadOrder.svelte";
   import type { Finding, ModErrors, Overlap, Save, Stats } from "$lib/api";
 
   let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
@@ -245,6 +246,7 @@
     // undo covers list edits only: anything else (installs, profile switches) resets it
     if (!keepHistory) undoStack = redoStack = [];
     const before = new Set(rows.flatMap((r) => (r.kind === "mod" ? [r.id] : [])));
+    const knownProfiles = view?.profiles;
     busy = true;
     busyLabel = label;
     try {
@@ -253,7 +255,10 @@
       rows = v.rows;
       if (v.adopted) say(`Picked up changes made in the game's mod menu (profile "${v.profile}").`);
       if (selected && !v.rows.some((r) => r.kind === "mod" && r.id === selected)) selected = null;
-      if (!keepHistory && before.size) await placeNew(before);
+      // a profile seen for the first time (first run, New, Import, Viewpoint) without separators gets autosorted
+      const fresh = v.created || (knownProfiles && !knownProfiles.includes(v.profile));
+      if (fresh && v.rows.length && !v.rows.some((r) => r.kind === "sep")) await autosortList(false);
+      else if (!keepHistory && before.size) await placeNew(before);
       return true;
     } catch (e) {
       say(String(e), true);
@@ -272,9 +277,10 @@
     }
   }
 
-  /** Regroup the list under a separator per category, from the mods' Workshop tags. */
-  async function sortIntoCategories() {
+  /** Autosort: needed mods on, grouped by category, every load rule satisfied. `record` keeps it undoable. */
+  async function autosortList(record = true) {
     let c: Awaited<ReturnType<typeof api.categories>>;
+    const wasBusy = busy;
     busy = true;
     busyLabel = "Reading Workshop tags";
     try {
@@ -283,11 +289,11 @@
       say(String(e), true);
       return;
     } finally {
-      busy = false;
-      busyLabel = "";
+      busy = wasBusy;
     }
-    const next = groupByCategory(rows, c.of, c.order);
-    if (await commit(next)) say(`Sorted your mods into ${next.filter((r) => r.kind === "sep").length} categories. Ctrl+Z puts the old order back.`);
+    const next = autosort(rows, c.of, c.order);
+    const sections = next.filter((r) => r.kind === "sep").length;
+    if (await commit(next, record)) say(`Autosorted into ${sections} categories.${record ? " Ctrl+Z puts the old order back." : ""}`);
   }
 
   /** In a list sorted into categories, file newly installed mods under theirs. */
@@ -495,8 +501,9 @@
       document.getElementById("mod-search")?.focus();
       return;
     }
-    if (e.key === "Escape" && !typing && picked.size) {
-      picked = new Set();
+    if (e.key === "Escape" && !typing && (picked.size || selected)) {
+      if (picked.size) picked = new Set();
+      else selected = null;
       return;
     }
     if (typing || !(e.ctrlKey || e.metaKey) || tab !== "mods") return;
@@ -536,6 +543,11 @@
     const at = Math.max(0, selected ? rows.findIndex((r) => r.kind === "mod" && r.id === selected) : 0);
     await commit([...rows.slice(0, at), { kind: "sep", name: "New section" }, ...rows.slice(at)]);
     editingSep = at;
+  }
+
+  /** Drop a separator; its mods join the section above. */
+  function removeSep(i: number) {
+    commit(rows.filter((_, j) => j !== i));
   }
 
   function renameSep(i: number, name: string) {
@@ -638,6 +650,8 @@
       anchor = r.id;
     } else if (e.key === "Enter" && r.kind === "sep") {
       editingSep = i;
+    } else if (e.key === "Delete" && r.kind === "sep") {
+      removeSep(i);
     }
   }
 
@@ -889,7 +903,6 @@
     <button class="quiet icon" onclick={undo} disabled={busy || !undoStack.length} title="Undo the last list change (Ctrl+Z)" aria-label="Undo"><Icon name="undo" size={15} /></button>
     <button class="quiet icon" onclick={redo} disabled={busy || !redoStack.length} title="Redo (Ctrl+Y)" aria-label="Redo"><Icon name="redo" size={15} /></button>
     <button class="quiet" onclick={addSeparator} disabled={busy || filtering} title="Add a separator above the selected mod"><Icon name="plus" size={14} />Separator</button>
-    <button class="quiet" onclick={sortIntoCategories} disabled={busy || filtering} title="Group mods under a separator per category, from their Workshop tags. New mods then go under theirs."><Icon name="layers" size={14} />Sort into categories</button>
     </span>
   </div>
 
@@ -941,7 +954,7 @@
       </p>
     </div>
   {/if}
-  <main class:with-details={selected}>
+  <main class:with-details={selected} class:with-panel={!selected && rows.length}>
     <div class="list">
       {#if !view}
         <p class="loading">Loading your mods…</p>
@@ -978,6 +991,8 @@
                         {@const c = sectionCounts.get(r.name)!}
                         <span class="sec-count">{c.on} of {c.total} enabled</span>
                       {/if}
+                      <button class="quiet icon sep-remove" disabled={busy || filtering} title="Remove this separator (Delete). Its mods stay where they are."
+                        aria-label={`Remove separator ${r.name}`} onclick={(e) => { e.stopPropagation(); removeSep(i); }}><Icon name="trash" size={14} /></button>
                     {/if}
                   </td>
                 </tr>
@@ -1040,7 +1055,9 @@
     {#if selected}
       <Details id={selected} {mods} {busy} hasUpdate={updates.has(selected)} onUpdate={(id) => updateMods([id])} onInstallWorkshop={installWorkshop}
         onToggle={toggle} onSelect={(id) => (selected = id)}
-        onRemove={remove} onRollback={(id) => run(`Restoring ${id}`, () => api.rollback(id))} />
+        onRemove={remove} onRollback={(id) => run(`Restoring ${id}`, () => api.rollback(id))} onClose={() => (selected = null)} />
+    {:else if rows.length}
+      <LoadOrder {rows} {problems} {overlaps} {busy} onAutosort={() => autosortList()} onFix={fixLoadOrder} />
     {/if}
   </main>
   </section>
@@ -1364,7 +1381,8 @@
     grid-template-columns: 1fr;
     min-height: 0;
   }
-  main.with-details {
+  main.with-details,
+  main.with-panel {
     grid-template-columns: 1fr minmax(300px, 380px);
   }
   .list {
@@ -1560,6 +1578,23 @@
     clip-path: polygon(0 8%, 3% 0, 6% 10%, 9% 1%, 100% 0, 98% 30%, 100% 55%, 97% 80%, 100% 100%, 4% 100%, 1% 88%, 3% 60%, 0 40%);
     box-shadow: 0 1px 0 rgb(0 0 0 / 0.15);
   }
+  .tape {
+    padding-right: 58px;
+    background: url(/blood.svg) right -12px center / auto 165% no-repeat, var(--tape);
+  }
+  .sep-remove {
+    float: right;
+    margin-top: 6px;
+    color: var(--muted);
+    opacity: 0;
+  }
+  tr.sep:hover .sep-remove,
+  tr.sep:focus-within .sep-remove {
+    opacity: 1;
+  }
+  .sep-remove:hover:not(:disabled) {
+    color: var(--danger);
+  }
   .tape-edit {
     border: 0;
     border-radius: 0;
@@ -1650,6 +1685,12 @@
   }
 
   @media (max-width: 900px) {
+    main.with-panel {
+      grid-template-columns: 1fr;
+    }
+    main.with-panel :global(.panel) {
+      display: none;
+    }
     main.with-details {
       grid-template-columns: 1fr;
       grid-template-rows: 1fr 45%;

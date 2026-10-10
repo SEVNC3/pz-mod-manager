@@ -48,21 +48,7 @@ export function findProblems(rows: Row[]): Map<string, Problem> {
  * Separators and disabled mods stay where they are; enabled mods refill the same slots.
  */
 export function sortLoadOrder(rows: Row[]): Row[] {
-  const next: Row[] = rows.map((r) => ({ ...r }));
-  const byId = new Map(next.filter(isMod).map((r) => [r.id, r]));
-  for (let changed = true; changed; ) {
-    changed = false;
-    for (const r of next) {
-      if (!isMod(r) || !r.on) continue;
-      for (const req of r.requires ?? []) {
-        const dep = byId.get(req);
-        if (dep && !dep.on && !dep.missing) {
-          dep.on = true;
-          changed = true;
-        }
-      }
-    }
-  }
+  const next = enableRequirements(rows);
 
   const slots: number[] = [];
   const enabled: ModRow[] = [];
@@ -96,7 +82,30 @@ export function sortLoadOrder(rows: Row[]): Row[] {
   return next;
 }
 
-/** Move every enabled mod's requirements and loadModAfter targets that sit below it to just above it. */
+/** A copy with the disabled requirements of enabled mods turned on (and theirs, and so on). */
+function enableRequirements(rows: Row[]): Row[] {
+  const next: Row[] = rows.map((r) => ({ ...r }));
+  const byId = new Map(next.filter(isMod).map((r) => [r.id, r]));
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const r of next) {
+      if (!isMod(r) || !r.on) continue;
+      for (const req of r.requires ?? []) {
+        const dep = byId.get(req);
+        if (dep && !dep.on && !dep.missing) {
+          dep.on = true;
+          changed = true;
+        }
+      }
+    }
+  }
+  return next;
+}
+
+/**
+ * Move what each enabled mod needs first (requirements, loadModAfter) from below it to
+ * just above it, and the mod itself above anything it must load before.
+ */
 function pullUp(rows: Row[]): Row[] {
   const next = [...rows];
   for (let pass = 0, moved = true; moved && pass < next.length; pass++) {
@@ -109,6 +118,11 @@ function pullUp(rows: Row[]): Row[] {
         if (j <= i) continue;
         next.splice(i, 0, ...next.splice(j, 1));
         i++;
+        moved = true;
+      }
+      const first = Math.min(...(r.load_before ?? []).map((b) => next.findIndex((x) => isMod(x) && x.on && x.id === b)).filter((j) => j >= 0 && j < i));
+      if (first < i) {
+        next.splice(first, 0, ...next.splice(i, 1));
         moved = true;
       }
     }
@@ -130,6 +144,15 @@ export function groupByCategory(rows: Row[], of: Record<string, string>, order: 
     if (section.length) out.push({ kind: "sep", name }, ...section);
   }
   return pullUp(out);
+}
+
+/**
+ * The most stable order PZMM knows: turn on what enabled mods need, group by category
+ * (frameworks first, translations last), then satisfy every require / loadModAfter /
+ * loadModBefore rule while keeping your order everywhere else.
+ */
+export function autosort(rows: Row[], of: Record<string, string>, order: string[]): Row[] {
+  return groupByCategory(enableRequirements(rows), of, order);
 }
 
 /**

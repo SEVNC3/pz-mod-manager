@@ -14,6 +14,7 @@
     onRemove,
     onRollback,
     onSelect,
+    onClose,
   }: {
     id: string;
     mods: Map<string, ModRow>;
@@ -25,6 +26,7 @@
     onRemove: (id: string) => void;
     onRollback: (id: string) => void;
     onSelect: (id: string) => void;
+    onClose: () => void;
   } = $props();
 
   let d = $state<Details | null>(null);
@@ -94,6 +96,7 @@
 </script>
 
 <aside class="details" aria-label="Mod details">
+  <button class="quiet icon close" onclick={onClose} title="Close (Esc) to see the load order" aria-label="Close details"><Icon name="x" size={16} /></button>
   {#if row?.missing}
     <h2>{id}</h2>
     <p class="warn">
@@ -217,10 +220,19 @@
 
 <style>
   .details {
+    position: relative;
     overflow-y: auto;
     padding: 16px 18px 24px;
     border-left: 1px solid var(--line);
     background: var(--panel);
+  }
+  .close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 4px;
+    color: var(--muted);
+    z-index: 1;
   }
   .poster {
     display: block;

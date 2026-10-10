@@ -22,7 +22,7 @@
   const VIEWPOINT_DISCORD = "https://discord.gg/g83XvPhEgQ";
 
   /** "hot": this week's most popular, ranked. "browse": search and every sort. */
-  let mode = $state<"hot" | "browse">("hot");
+  let mode = $state<"hot" | "browse">("browse");
   let query = $state("");
   let search = $state("");
   let sort = $state("totaluniquesubscribers");
@@ -110,11 +110,11 @@
 <section class="workshop" aria-label="Steam Workshop">
   <form class="bar" onsubmit={submit}>
     <div class="views" role="tablist" aria-label="Workshop view">
-      <button type="button" role="tab" aria-selected={mode === "hot"} class:active={mode === "hot"} onclick={() => show("hot")}>
-        <Icon name="flame" size={15} /> What's hot
-      </button>
       <button type="button" role="tab" aria-selected={mode === "browse"} class:active={mode === "browse"} onclick={() => show("browse")}>
         <Icon name="search" size={15} /> Browse
+      </button>
+      <button type="button" role="tab" aria-selected={mode === "hot"} class:active={mode === "hot"} onclick={() => show("hot")}>
+        <Icon name="flame" size={15} /> What's hot
       </button>
     </div>
     <input type="search" bind:value={query} placeholder="Search the Steam Workshop" aria-label="Search the Steam Workshop" />

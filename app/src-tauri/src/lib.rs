@@ -97,6 +97,8 @@ struct View {
     rows: Vec<Row>,
     /// The game's mod list was changed in-game and the profile picked that up.
     adopted: bool,
+    /// First run: this view created the first profile.
+    created: bool,
     zomboid: String,
     workshop: Option<String>,
     build: Option<u8>,
@@ -107,6 +109,7 @@ struct View {
 }
 
 fn view(paths: &Paths) -> anyhow::Result<View> {
+    let created = profile::list(paths).is_empty();
     let (p, adopted) = profile::sync(paths)?;
     let mut mods = scan(paths)?;
     let row = |m: store::Row, on: bool| Row::Mod {
@@ -154,6 +157,7 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
         profiles: profile::list(paths),
         rows,
         adopted,
+        created,
         zomboid: paths.zomboid.display().to_string(),
         workshop: sources::steam_workshop::content_dir(pz::STEAM_APP).map(|d| d.display().to_string()),
         build: profile::build(paths),

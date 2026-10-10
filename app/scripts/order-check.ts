@@ -1,6 +1,6 @@
 // Self-check for src/lib/order.ts. Run: node scripts/order-check.ts
 import assert from "node:assert/strict";
-import { bisectRound, findProblems, groupByCategory, placeInSections, sortLoadOrder } from "../src/lib/order.ts";
+import { autosort, bisectRound, findProblems, groupByCategory, placeInSections, sortLoadOrder } from "../src/lib/order.ts";
 import type { Row } from "../src/lib/api.ts";
 
 const mod = (id: string, on = true, extra: Partial<Record<"requires" | "incompatible" | "load_after" | "load_before", string[]>> = {}): Row => ({
@@ -54,5 +54,11 @@ assert.equal(findProblems(grouped).size, 0);
 // a new mod goes to the end of its section, or a new section in its place
 const placed = placeInSections([{ kind: "sep", name: "Gameplay" }, mod("A"), { kind: "sep", name: "Other" }, mod("B"), mod("New"), mod("Map1")], { New: "Gameplay", Map1: "Maps" }, order, ["New", "Map1"]);
 assert.equal(ids(placed), "#Gameplay +A +New #Maps +Map1 #Other +B");
+
+// autosort: turns on a needed mod, honours loadModBefore across the list
+const auto = autosort([mod("Ui", true, { load_before: ["Core"] }), mod("Core"), mod("App", true, { requires: ["Dep"] }), mod("Dep", false)],
+  { Ui: "Gameplay", Core: "Libs", App: "Gameplay", Dep: "Gameplay" }, order);
+assert.equal(ids(auto), "#Libs +Ui +Core #Gameplay +Dep +App");
+assert.equal(findProblems(auto).size, 0);
 
 console.log("order-check: ok");

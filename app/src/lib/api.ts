@@ -27,6 +27,8 @@ export type View = {
   kinds: Record<string, Mode>;
   rows: Row[];
   adopted: boolean;
+  /** First run: this load created the first profile. */
+  created: boolean;
   zomboid: string;
   workshop: string | null;
   build: 41 | 42 | null;
