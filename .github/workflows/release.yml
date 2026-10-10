@@ -41,7 +41,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       - run: npm ci && npx tauri build
         working-directory: app
         env: # signs the installers so installed copies accept them as updates
@@ -60,6 +60,7 @@ jobs:
     needs: [cli, app]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -80,12 +81,20 @@ jobs:
           version = re.match(r"PZMM_(.+)_x64-setup\.exe", os.path.basename(win)).group(1)
           if tag != f"v{version}":
               sys.exit(f"tag {tag} doesn't match the app version {version}: bump Cargo.toml first")
+          npm = json.load(open("app/package.json"))["version"]
+          lock = json.load(open("app/package-lock.json"))["version"]
+          if {npm, lock} != {version}:
+              sys.exit(f"app/package.json ({npm}) and package-lock.json ({lock}) must both be {version}")
           json.dump({
               "version": version,
               "notes": f"https://github.com/{repo}/releases/tag/{tag}",
               "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
               "platforms": {"windows-x86_64": win_entry, "linux-x86_64": entry("*.AppImage")[1]},
           }, open("dist/latest.json", "w"), indent=2)
-      - run: find dist -type f && gh release create ${{ github.ref_name }} $(find dist -type f) --repo ${{ github.repository }} --generate-notes
+      # hand-written notes when docs/release-notes/<tag>.md exists, else GitHub's commit list
+      - run: |
+          notes="docs/release-notes/${{ github.ref_name }}.md"
+          if [ -f "$notes" ]; then how=(--notes-file "$notes"); else how=(--generate-notes); fi
+          find dist -type f && gh release create ${{ github.ref_name }} $(find dist -type f) --repo ${{ github.repository }} "${how[@]}"
         env:
           GH_TOKEN: ${{ github.token }}

@@ -9,7 +9,7 @@ Data sources:
 - **Keyless API.** `ISteamRemoteStorage/GetPublishedFileDetails` returns the full BBCode description and counts. `GetCollectionDetails` returns collection members.
 - **Not usable.** `IPublishedFileService/QueryFiles` needs a key.
 
-Code: `browse()` and its helpers in `crates/core/src/sources/steam_workshop.rs`, the `workshop_browse` command in `app/src-tauri/src/lib.rs`, `app/src/lib/api.ts`, and `app/src/lib/Workshop.svelte`.
+Code: `browse()` and its helpers in `crates/core/src/sources/steam_workshop.rs`, the `workshop_browse` command in `app/src-tauri/src/lib.rs`, `app/src/lib/api.ts`, `app/src/lib/Workshop.svelte` (sidebar, Home, results) and `app/src/lib/WorkshopPanel.svelte` (the item panel).
 
 ## P1
 

@@ -1,5 +1,13 @@
 # UI/UX queue (before the next release)
 
+> **Superseded in places.** Later work changed several of these choices:
+> - hover and selection now use a white chevron and white text on blood red
+> - cards lift by shadow, with no borders
+> - the drop line is a feathered glow
+> - the game switch and profile select are one menu
+>
+> The current rules are in the PZMM design system and [RELEASE-1.1-QUEUE.md](RELEASE-1.1-QUEUE.md).
+
 From a contrarian review on 2026-10-10: three critics (typography, visual style,
 uniformity) raised 60 findings; a refuter checked each against the code and
 screenshots, killed 31 and merged the rest into the 18 items below.

@@ -186,6 +186,10 @@ pub fn has_backup(paths: &Paths, id: &str) -> bool {
 
 /// Swap a mod back to the version it had before its last install/update.
 pub fn rollback(paths: &Paths, id: &str) -> Result<()> {
+    // a stale backup must never be swapped onto a folder PZMM doesn't own (a hand-installed copy)
+    if !load(paths)?.contains_key(id) {
+        bail!("{id}: PZMM didn't install this mod, so it has no previous version to restore");
+    }
     let backup = backup_dir(paths, id)?;
     if !backup.exists() {
         bail!("{id}: no previous version to restore");
@@ -210,6 +214,12 @@ pub fn remove(paths: &Paths, ids: &[String]) -> Result<Vec<String>> {
         if index.contains_key(id) && let Ok(dir) = mod_dir(paths, id) {
             if dir.exists() {
                 fs::remove_dir_all(dir)?;
+            }
+            // its backup goes too, so a later install of the same id can't roll back to it
+            if let Ok(backup) = backup_dir(paths, id)
+                && backup.exists()
+            {
+                fs::remove_dir_all(backup)?;
             }
             index.remove(id);
         } else {

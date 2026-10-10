@@ -7,7 +7,7 @@ use pzmm_core::store;
 
 /// PZMM - Project Zomboid Mod Manager
 #[derive(Parser)]
-#[command(version, after_help = "Env: PZ_HOME (default ~/Zomboid), PZMM_DATA, GITHUB_TOKEN")]
+#[command(version, after_help = "Env: PZ_HOME (default ~/Zomboid), PZMM_DATA, PZ_GAME_DIR, PZ_SERVER_DIR, GITHUB_TOKEN")]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,

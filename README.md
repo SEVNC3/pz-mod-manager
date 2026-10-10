@@ -2,14 +2,19 @@
 
 A free, open-source mod manager for **Project Zomboid** (Build 41 and 42), for Windows and Linux.
 
-- **Browse the Workshop** inside the app: search, sort and filter by Build 41/42, then install in one click.
+- **Browse the Workshop** inside the app, with everything Steam's own Workshop offers without logging in:
+  - search titles or descriptions, and sort by popularity over any period from today to a year
+  - require or exclude any of Project Zomboid's tags, and filter by build, posting or update date
+  - browse collections and install a whole one at once
+  - a Home view with this week's popular mods, the most subscribed, the newest and the libraries other mods need
+  - an item panel with screenshots, videos, the full description, change notes and comments, plus the mods that need it, the collections it's in and more by the same author
 - **Install** from the Steam Workshop (link, ID or a whole collection), from GitHub (`owner/repo`, optionally `@tag`) or from a local `.zip` or folder. You don't need to log in to Steam. If a mod lists other mods it requires, PZMM installs those too.
 - **See everything:** Steam Workshop subscriptions and the mods in your `Zomboid/mods` folder, in one list with each mod's poster, author and description.
-- **Load order:** drag to reorder, group mods under separators, and switch mods on and off. **Autosort** groups mods by category from their Workshop tags (frameworks first, translations last) and fixes every `require` / `loadModAfter` / `loadModBefore` rule in one click. PZMM writes the same `mods/default.txt` the game reads.
-- **Profiles:** keep separate mod setups ("Solo", "Friends server") and switch between them in one click. Changes you make in the game's own mod menu are picked up automatically.
+- **Load order:** drag to reorder, group mods under separators, and switch mods on and off. Drag a separator to move its whole section. **Autosort** groups mods by category from their Workshop tags (frameworks first, translations last) and fixes every `require` / `loadModAfter` / `loadModBefore` rule in one click; it asks first when you have sections of your own. Removing a separator leaves its mods where they are. PZMM writes the same `mods/default.txt` the game reads.
+- **Profiles:** keep separate mod setups ("Solo", "Friends server") and switch between them from one menu that groups them by game. Changes you make in the game's own mod menu are picked up automatically, and PZMM never saves over them.
 - **Dependencies:** PZMM flags enabled mods whose required mods are missing, disabled or loading too late. **Install missing mods** finds the missing ones on the Workshop: it checks the "Required items" the author lists, and reads "Mod ID: X" from Workshop descriptions. **Fix load order** sorts the rest.
 - **Conflicts:** each mod's details show which other mods replace the same files, and which copy wins.
-- **Updates:** PZMM checks the Workshop for newer versions of the mods it installed, without downloading them. Every update keeps the previous version, and **Restore previous version** brings it back if an update breaks your save.
+- **Updates:** PZMM checks the Workshop for newer versions of the mods it installed when it starts, and whenever you click **Check for updates**. Every update keeps the previous version, and **Restore previous version** brings it back if an update breaks your save.
 - **Servers and saves:** write a profile into a dedicated server's config (`Mods=`, `WorkshopItems=`, `Map=`), turn a server config into a profile, or load the mods a save was played with.
 - **Project Viewpoint:** switch between plain Project Zomboid and [Project Viewpoint](https://steamcommunity.com/sharedfiles/filedetails/?id=3809306528) (3D first/third person) from the header. The first switch downloads Viewpoint and ZombieBuddy, sets up ZombieBuddy and makes a Viewpoint profile; each side remembers its own mod list.
 - **ZombieBuddy:** one-click setup for [ZombieBuddy](https://github.com/zed-0xff/ZombieBuddy), the loader that Java mods need. PZMM shows each change before applying it and can undo it.
@@ -42,7 +47,7 @@ The Windows installer isn't code-signed yet, so Windows may show a SmartScreen w
 
 1. Paste a Workshop link, a GitHub repo or a zip path into the box at the top, then click **Install**. The mod is installed and enabled.
 2. Tick or untick mods to enable or disable them. Drag rows to change the load order. With a row selected, you can also use the keyboard: **Space** toggles it and **Alt+↑/↓** moves it.
-3. Use **Add separator** to group your list, and double-click a separator to rename it.
+3. Use **Separator** to group your list, or **Autosort** to group it by category. Double-click a separator to rename it, drag it to move its whole section, and press **Delete** to remove it (its mods stay where they are).
 4. Click **Launch game**.
 
 **Build 41 or 42?** PZMM keeps whatever format your `default.txt` already uses. If the file is new, PZMM uses the Build 42 format. To set it yourself, go to **Settings → Game build**. Before each save, the previous file is kept as `default.txt.bak`.
@@ -57,10 +62,13 @@ pzmm disable ModId
 pzmm remove ModId
 pzmm update
 pzmm rollback ModId          # restore the version before the last update
+pzmm add --no-enable 2169435993   # install without enabling
+pzmm profile list
 pzmm profile new Server
 pzmm profile use Server
+pzmm profile delete Server
 pzmm build 41                # force the B41 default.txt format
-pzmm search snow --sort toprated --build 42
+pzmm search snow --sort toprated --build 42 --page 2
 pzmm outdated                # Workshop mods with updates waiting
 pzmm find tsarslib --install # find the Workshop item that provides a mod id
 pzmm server export servertest   # active profile -> Zomboid/Server/servertest.ini
@@ -71,7 +79,7 @@ pzmm doctor                  # check the profile and server configs (exit code 1
 pzmm errors                  # Lua errors per mod in the last game session
 pzmm profile export friends.json   # share a profile; import with: pzmm profile import friends.json
 pzmm server start servertest # start the dedicated server
-pzmm watch servertest --on-update "restart-server.bat"   # react to Workshop updates
+pzmm watch servertest --every 10 --on-update "restart-server.bat"   # check every 10 minutes; run a script on updates
 ```
 
 The command line and the app share the same profiles and data.
@@ -88,7 +96,7 @@ On Linux, SteamCMD needs 32-bit libraries (`lib32gcc-s1` on Debian/Ubuntu).
 
 ## Build from source
 
-This needs [Rust](https://rustup.rs) and Node.js 22 or newer. On Linux it also needs the [Tauri system packages](https://tauri.app/start/prerequisites/).
+This needs [Rust](https://rustup.rs) and Node.js 22.18 or newer (the self-checks run TypeScript directly). On Linux it also needs the [Tauri system packages](https://tauri.app/start/prerequisites/).
 
 ```
 cargo test                                  # core + CLI
@@ -100,11 +108,23 @@ How the code is organised:
 
 | Path | What it is |
 |---|---|
-| `crates/core` | Shared logic. Everything specific to Project Zomboid lives in `pz.rs`. |
+| `crates/core` | Shared logic. Everything specific to Project Zomboid lives in `src/pz/`; downloads (Workshop, GitHub, local) in `src/sources/`. |
 | `crates/cli` | The `pzmm` command line |
 | `app/` | The desktop app: Tauri 2 with Svelte 5 |
 
 The full plan is in [docs/FOUNDATION.md](docs/FOUNDATION.md). To release, set the new `version` in `Cargo.toml` (and `app/package.json`), then push a matching `v*` tag. CI builds every download, signs the installers with the updater key (GitHub secret `TAURI_SIGNING_PRIVATE_KEY`; a copy is in the maintainer's 1Password), and publishes `latest.json`, which installed copies check for updates.
+
+## Community
+
+- [Discord](https://discord.gg/TfS9NwNHrH): help, ideas and bug reports
+- [Ko-fi](https://ko-fi.com/sevnc3): support development
+
+## Credits
+
+- Icons: [Feather](https://feathericons.com) (MIT)
+- Fonts: [Atkinson Hyperlegible](https://brailleinstitute.org/freefont), [IBM Plex Mono](https://github.com/IBM/plex) and [Permanent Marker](https://fonts.google.com/specimen/Permanent+Marker), all under the SIL Open Font License, via [Fontsource](https://fontsource.org)
+- Steam, GitHub, Discord and Ko-fi logos via [Logo.dev](https://logo.dev); they belong to their owners
+- Project Zomboid is a trademark of The Indie Stone, and Project Viewpoint belongs to its team. PZMM is a fan-made tool and isn't affiliated with either.
 
 ## License
 

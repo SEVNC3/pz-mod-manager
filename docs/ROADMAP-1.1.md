@@ -102,6 +102,16 @@ All verified in the code. None have been reported as hitting a user yet.
   12. Keyboard: Enter, `/`, arrow keys on tabs and filters, and a shortcut list.
 - **Quick wins:** the loading state, the server-name default, and the status column width. The empty-state "flash" turned out not to exist: before the first load the list is empty, not the "nothing yet" message.
 
+**Added after this review (also in 1.1.0):**
+- **Autosort and categories** (`pz/category.rs`): sections from Workshop tags, every load rule satisfied, a Load order panel beside the list, new profiles sorted on first run.
+- **Section dragging**, removable separators, and loose mods (removing a separator leaves its mods in place).
+- **Workshop parity** with Steam's anonymous Workshop: see [WORKSHOP-PARITY.md](WORKSHOP-PARITY.md).
+- **Installs** enable only what's needed and compatible.
+- **Look:** a frameless window with its own title-bar buttons, the blood-red theme and logo, blueprint backgrounds with shadowed cards, and one profile menu grouped by game. See [UI-QUEUE.md](UI-QUEUE.md) and the design system.
+- **Steam client:** Workshop pages open in the Steam client when it's running.
+- **Links:** GitHub, Discord and Ko-fi in the tab bar.
+- **The pre-release queue** in [RELEASE-1.1-QUEUE.md](RELEASE-1.1-QUEUE.md): data-loss, security and freeze fixes found by a second round of reviews.
+
 **Deliberately skipped (each with a reason):**
 - **Copying the save folder before updates.** Saves can be gigabytes. Mod rollback plus the save warning cover the risk.
 - **A "not updated since the last game patch" badge.** There's no reliable patch date, and it would flag many stable mods.

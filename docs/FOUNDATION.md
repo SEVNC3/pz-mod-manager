@@ -1,6 +1,6 @@
 # Foundation Plan: PZMM (Project Zomboid Mod Manager)
 
-Status: v1.0 built · 2026-10-10
+Status: v1.0 built; 1.1 in [ROADMAP-1.1.md](ROADMAP-1.1.md) · 2026-10-10
 
 ## 1. Scope
 
@@ -8,7 +8,7 @@ Status: v1.0 built · 2026-10-10
 
 Not in scope: other games, hosting mods, a website, Nexus Mods, a virtual file system, plugins, community themes and translations. Each is revisited only when there's a real need.
 
-**Portability rule:** all Project Zomboid knowledge lives in one module (`pz`). Everything else (mod store, profiles, reconcile, downloads) knows nothing about PZ. A second game means writing its own module first, then extracting the shared interface from the two real examples. We don't design that interface up front.
+**Portability rule:** all Project Zomboid knowledge lives in one module (`pz`). Everything else (mod store, profiles, downloads) knows nothing about PZ. A second game means writing its own module first, then extracting the shared interface from the two real examples. We don't design that interface up front.
 
 ## 2. What we take from MO2 and Relapse's Mod Manager Redux
 
@@ -46,11 +46,11 @@ Only what serves Project Zomboid:
 ```
 crates/core/
   pz/            ALL Project Zomboid knowledge: paths, mod.info, B41/B42 layout,
-                 default.txt, server .ini, saves, Workshop app id
-  store.rs       installed mods, mod.json, ownership, backups
-  profile.rs     modlist.txt (+/- lines, separators), base snapshot
-  reconcile.rs   disk vs records -> proposed repairs
-  sources/       steam_workshop.rs, github.rs, local.rs (zip / 7z / folder)
+                 default.txt, server .ini, saves, categories, doctor, logs,
+                 files (conflicts, maps), Viewpoint, ZombieBuddy
+  store.rs       installed mods, the install index, ownership, backups
+  profile.rs     modlist.txt (+/- lines, separators), state.json, sharing
+  sources/       mod.rs (fetch, install, local zip or folder), steam_workshop.rs, github.rs
 crates/cli/      `pzmm` binary: same commands as v0.1
 app/             Tauri shell + Svelte UI
 ```
@@ -76,7 +76,7 @@ All paths are stored relative to `Zomboid/` or `<data>/`. Applying a profile onl
 
 | Feature | Notes |
 |---|---|
-| **Install** | Workshop item or **collection** URL (SteamCMD anonymous login, collection lookup without an API key). GitHub repo (release asset first, then zipball). Local zip, 7z or folder. |
+| **Install** | Workshop item or **collection** URL (SteamCMD anonymous login, collection lookup without an API key). GitHub repo (release asset first, then zipball). Local zip or folder. |
 | **See everything** | Mods in `Zomboid/mods` and Steam Workshop subscriptions together. Each row shows its source and a status icon. |
 | **Profiles** | Switch mod setups. Drag to set load order. Separators. Return to base. |
 | **Build 41 / 42** | Detect the layout (`42/`, `42.x/`, `common/`) and `versionMin`, write the correct `default.txt` format, and flag mods meant only for the other build. |
@@ -111,8 +111,9 @@ All paths are stored relative to `Zomboid/` or `<data>/`. Applying a profile onl
 
 | Version | Content | Done when |
 |---|---|---|
-| **0.2 · Core** | Cargo workspace, a port of the v0.1 logic into `core` (`pz/`, store, sources), profiles, reconcile, and the `pzmm` command line with v0.1's commands. CI on Windows and Linux. | `cargo test` passes on both systems, and existing v0.1 installs are picked up unchanged. |
+| **0.2 · Core** | Cargo workspace, a port of the v0.1 logic into `core` (`pz/`, store, sources), profiles and the `pzmm` command line with v0.1's commands. CI on Windows and Linux. | `cargo test` passes on both systems, and existing v0.1 installs are picked up unchanged. |
 | **0.3 · App** | Tauri + Svelte: mod table, details pane, install, enable/disable, drag to reorder, profiles, themes. Windows installer and Linux AppImage. | Covers everything v0.1 does in the new interface. |
+| **1.1 · Load order and Workshop** | Autosort, section dragging, full Workshop parity, Viewpoint mode, server start and watch, sharing, doctor, bisect, the new look. See [ROADMAP-1.1.md](ROADMAP-1.1.md). | A player can sort a 100-mod list and browse the Workshop as fully as on Steam, without leaving PZMM. |
 | **1.0 · PZ, done well** | Collections, updates with rollback, dependencies, server export and import, saves, maps, conflicts, launch. | A B42 player can go from a fresh install to 50 mods to a running server without opening a file. |
 
 **v1.0 status:**
@@ -120,7 +121,6 @@ All paths are stored relative to `Zomboid/` or `<data>/`. Applying a profile onl
 - **Not done:**
   - Update checks for GitHub sources.
   - Managing the `maps { }` block in `default.txt`. Servers already get `Map=`.
-  - Launching the dedicated server from the app.
 - **Still unverified in a real B42 game:** the `default.txt` format.
 
-**Later, only if you move into another game:** add `crates/core/<game>/` next to `pz/`, then extract a `Game` trait from the two real modules. The store, profiles, reconcile and sources are already game-neutral.
+**Later, only if you move into another game:** add `crates/core/<game>/` next to `pz/`, then extract a `Game` trait from the two real modules. The store, profiles and sources are already game-neutral.

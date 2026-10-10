@@ -156,7 +156,8 @@ pub fn find_mods(root: &Path, depth: usize) -> Vec<FoundMod> {
     for info in infos {
         let parent = info.parent().unwrap_or(root);
         let dir = match parent.file_name().and_then(|n| n.to_str()) {
-            Some(n) if is_version_dir(n) => parent.parent().unwrap_or(parent),
+            // a numeric root (a Workshop item folder) is the mod itself, never its parent
+            Some(n) if is_version_dir(n) && parent != root => parent.parent().unwrap_or(parent),
             _ => parent,
         }
         .to_path_buf();

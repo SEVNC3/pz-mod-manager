@@ -505,7 +505,14 @@ fn parse_author_items(html: &str) -> (u64, Vec<String>) {
 fn parse_required(html: &str) -> Vec<String> {
     let Some(start) = html.find("id=\"RequiredItems\"") else { return vec![] };
     let block = &html[start..];
-    let block = &block[..block.find("<!-- created by -->").or_else(|| block.find("rightSectionTopTitle")).unwrap_or(block.len().min(20_000))];
+    let block = &block[..block.find("<!-- created by -->").or_else(|| block.find("rightSectionTopTitle")).unwrap_or_else(|| {
+        // no end marker: cap at ~20 KB, on a character boundary (descriptions are often Cyrillic or CJK)
+        let mut n = block.len().min(20_000);
+        while !block.is_char_boundary(n) {
+            n -= 1;
+        }
+        n
+    })];
     let mut ids: Vec<String> = vec![];
     for part in block.split("filedetails/?id=").skip(1) {
         let id: String = part.chars().take_while(char::is_ascii_digit).collect();
