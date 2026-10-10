@@ -1475,7 +1475,7 @@
   tr.mod.selected .meta {
     color: rgb(255 255 255 / 0.72);
   }
-  /* the hover/selection marker: a straight 2px line, inset from the card's rounded corners */
+  /* the hover/selection marker: a solid white chevron at the row's left edge */
   tr.mod td:first-child {
     position: relative;
   }
@@ -1484,11 +1484,13 @@
   tr.mod.selected td:first-child::before {
     content: "";
     position: absolute;
-    left: 0;
-    top: 8px;
-    bottom: 8px;
-    width: 2px;
+    left: 3px;
+    top: 50%;
+    width: 8px;
+    height: 12px;
+    margin-top: -6px;
     background: #fff;
+    clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%);
   }
   tr.mod:hover:not(.picked):not(.selected) td:first-child::before {
     opacity: 0.55;
