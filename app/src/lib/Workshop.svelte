@@ -136,7 +136,7 @@
         <Icon name="layers" size={14} /> Viewpoint add-ons
       </button>
       <button type="button" class="quiet" onclick={() => api.openUrl(VIEWPOINT_DISCORD)} title="Project Viewpoint's community Discord: help, bug reports, news">
-        <Icon name="message" size={14} /> Viewpoint Discord
+        <img src="/brand/discord.png" alt="" width="16" height="16" class="brand-img" /> Viewpoint Discord
       </button>
     {/if}
     <span class="count">
@@ -247,6 +247,9 @@
     background: var(--accent-soft);
     color: var(--accent-text);
     font-weight: 700;
+  }
+  .brand-img {
+    border-radius: 3px;
   }
   .count {
     margin-left: auto;
