@@ -966,7 +966,7 @@
       {:else}
         <table>
           <thead class="visually-hidden">
-            <tr><th>Move</th><th>Enabled</th><th>Load order</th><th>Mod</th><th>Size</th><th>Last changed</th><th>Source</th></tr>
+            <tr><th>Move</th><th>Enabled</th><th>Load order</th><th>Mod</th><th>Size</th><th>Last changed</th><th>Shared files</th><th>Source</th></tr>
           </thead>
           <tbody>
             {#each visible as { r, i } (r.kind === "mod" ? `m:${r.id}` : `s:${i}:${r.name}`)}
@@ -977,7 +977,7 @@
                   ondrop={(e) => { e.preventDefault(); if (dragFrom !== null) move(dragFrom, i); dragFrom = dropAt = null; }}
                   ondblclick={() => (editingSep = i)} onkeydown={(e) => editingSep !== i && rowKey(e, i, r)}>
                   <td class="grip" aria-hidden="true">⠿</td>
-                  <td colspan="6">
+                  <td colspan="7">
                     {#if editingSep === i}
                       <!-- svelte-ignore a11y_autofocus -->
                       <input class="tape-edit" type="text" value={r.name} autofocus aria-label="Separator name (empty removes it)"
@@ -1022,11 +1022,13 @@
                   </td>
                   <td class="meta mono">{stats[r.id] ? fmtSize(stats[r.id].size) : ""}</td>
                   <td class="meta mono">{stats[r.id] ? fmtDate(stats[r.id].modified) : ""}</td>
-                  <td class="src">
+                  <td class="overlap">
                     {#if r.on && overlaps[r.id]}
                       {@const o = overlaps[r.id]}
                       <LayerIcon wins={o.wins_over.length > 0} loses={o.loses_to.length > 0} label={overlapLabel(o)} />
                     {/if}
+                  </td>
+                  <td class="src">
                     {#if r.missing}
                       <span class="missing">Not installed</span>
                     {:else if problems.has(r.id)}
@@ -1044,7 +1046,7 @@
               <tr class="tail" class:drop={dropAt === rows.length} aria-hidden="true"
                 ondragover={(e) => { e.preventDefault(); dropAt = rows.length; }}
                 ondrop={(e) => { e.preventDefault(); if (dragFrom !== null) move(dragFrom, rows.length); dragFrom = dropAt = null; }}>
-                <td colspan="7"></td>
+                <td colspan="8"></td>
               </tr>
             {/if}
           </tbody>
@@ -1522,8 +1524,12 @@
     gap: 6px;
     color: var(--muted);
   }
-  .src :global(.layers) {
-    margin-right: 6px;
+  /* its own column so the icons line up whatever the badge beside them says */
+  .overlap {
+    width: 28px;
+    padding-left: 8px;
+    padding-right: 0;
+    text-align: center;
   }
   .src {
     width: 1%;
