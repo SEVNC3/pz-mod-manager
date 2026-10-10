@@ -147,12 +147,49 @@
   });
   const problemCount = $derived(problems.size + [...mods.values()].filter((m) => m.on && m.missing).length);
   const filtering = $derived(search.trim() !== "" || filter !== "all");
+  // --- sections: separators can be collapsed (remembered per profile on this computer) ---
+  let collapsed = $state<Set<string>>(new Set());
+  const collapsedKey = $derived(`pzmm.collapsed.${view?.profile ?? ""}`);
+  $effect(() => {
+    try {
+      collapsed = new Set(JSON.parse(localStorage.getItem(collapsedKey) ?? "[]"));
+    } catch {
+      collapsed = new Set();
+    }
+  });
+  function toggleSection(name: string) {
+    const next = new Set(collapsed);
+    next.has(name) ? next.delete(name) : next.add(name);
+    collapsed = next;
+    try {
+      localStorage.setItem(collapsedKey, JSON.stringify([...next]));
+    } catch {}
+  }
+  /** For each row, the separator it sits under ("" above the first one). */
+  const sectionOf = $derived.by(() => {
+    let current = "";
+    return rows.map((r) => (r.kind === "sep" ? (current = r.name) : current));
+  });
+  /** Mods / enabled mods under each separator. */
+  const sectionCounts = $derived.by(() => {
+    const out = new Map<string, { total: number; on: number }>();
+    rows.forEach((r, i) => {
+      if (r.kind !== "mod") return;
+      const c = out.get(sectionOf[i]) ?? { total: 0, on: 0 };
+      c.total++;
+      if (r.on) c.on++;
+      out.set(sectionOf[i], c);
+    });
+    return out;
+  });
+
   const visible = $derived.by(() => {
     const q = search.trim().toLowerCase();
     return rows
       .map((r, i) => ({ r, i }))
-      .filter(({ r }) => {
+      .filter(({ r, i }) => {
         if (r.kind === "sep") return !filtering;
+        if (!filtering && sectionOf[i] && collapsed.has(sectionOf[i])) return false;
         if (filter === "on" && !r.on) return false;
         if (filter === "off" && r.on) return false;
         if (filter === "problems" && !problems.has(r.id) && !r.missing) return false;
@@ -373,6 +410,10 @@
 
   function globalKey(e: KeyboardEvent) {
     const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
+    if (e.key === "Escape" && !typing && picked.size) {
+      picked = new Set();
+      return;
+    }
     if (typing || !(e.ctrlKey || e.metaKey) || tab !== "mods") return;
     const k = e.key.toLowerCase();
     if (k === "z" && !e.shiftKey) {
@@ -405,9 +446,11 @@
     await run(`Installing ${sources.length === 1 ? sources[0] : `${sources.length} items`}`, () => api.install(sources));
   }
 
+  /** A new separator above the selected mod (or at the top), ready to rename. */
   async function addSeparator() {
-    await commit([{ kind: "sep", name: "New section" }, ...rows]);
-    editingSep = 0;
+    const at = Math.max(0, selected ? rows.findIndex((r) => r.kind === "mod" && r.id === selected) : 0);
+    await commit([...rows.slice(0, at), { kind: "sep", name: "New section" }, ...rows.slice(at)]);
+    editingSep = at;
   }
 
   function renameSep(i: number, name: string) {
@@ -711,7 +754,7 @@
       <button class="primary" onclick={fixLoadOrder} disabled={busy}
         title="Enable required mods and order mods by their require / loadModAfter / loadModBefore rules">Fix load order</button>
     {/if}
-    {#if picked.size > 1}
+    {#if picked.size >= 1}
       <span class="bulk" role="group" aria-label="Selected mods">
         <strong>{picked.size} selected</strong>
         <button onclick={() => bulkSet(true)} disabled={busy}>Enable</button>
@@ -815,13 +858,19 @@
                         onblur={(e) => renameSep(i, e.currentTarget.value)}
                         onkeydown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") editingSep = null; }} />
                     {:else}
+                      <button class="quiet fold" aria-expanded={!collapsed.has(r.name)} aria-label={`${collapsed.has(r.name) ? "Expand" : "Collapse"} ${r.name}`}
+                        onclick={(e) => { e.stopPropagation(); toggleSection(r.name); }}>{collapsed.has(r.name) ? "▸" : "▾"}</button>
                       <span class="tape" title="Double-click to rename">{r.name}</span>
+                      {#if sectionCounts.get(r.name)}
+                        {@const c = sectionCounts.get(r.name)!}
+                        <span class="sec-count">{c.on} of {c.total} enabled</span>
+                      {/if}
                     {/if}
                   </td>
                 </tr>
               {:else}
                 {@const src = describeSource(r.source)}
-                <tr class="mod" class:off={!r.on} class:selected={selected === r.id} class:picked={picked.size > 1 && picked.has(r.id)} class:drop={dropAt === i} class:dragging={dragFrom === i}
+                <tr class="mod" class:off={!r.on} class:selected={selected === r.id} class:picked={picked.size >= 1 && picked.has(r.id)} class:drop={dropAt === i} class:dragging={dragFrom === i}
                   data-index={i} tabindex="0" draggable={!filtering}
                   aria-selected={selected === r.id}
                   onclick={(e) => rowClick(e, r.id)} onkeydown={(e) => rowKey(e, i, r)}
@@ -1200,6 +1249,16 @@
   }
   tr.mod:hover {
     background: color-mix(in oklab, var(--raised) 70%, transparent);
+  }
+  .fold {
+    padding: 0 6px;
+    margin-right: 4px;
+    color: var(--muted);
+  }
+  .sec-count {
+    margin-left: 12px;
+    color: var(--muted);
+    font-size: 12px;
   }
   tr.mod.picked {
     background: color-mix(in oklab, var(--accent) 10%, transparent);
