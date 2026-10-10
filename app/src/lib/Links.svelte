@@ -1,7 +1,7 @@
 <script lang="ts">
   import { api } from "./api";
 
-  // An empty url hides that link.
+  // An empty url shows the icon as a disabled "coming soon" stub.
   const LINKS = {
     github: "https://github.com/SEVNC3/pz-mod-manager",
     discord: "",
@@ -29,9 +29,11 @@
 </script>
 
 <nav class="links" aria-label="PZMM links">
-  {#each ICONS.filter((i) => LINKS[i.key]) as icon (icon.key)}
-    <button class="quiet" class:kofi={icon.key === "kofi"} title={icon.label} aria-label={icon.label}
-      onclick={() => api.openUrl(LINKS[icon.key])}>
+  {#each ICONS as icon (icon.key)}
+    {@const url = LINKS[icon.key]}
+    {@const label = url ? icon.label : `${icon.label} (coming soon)`}
+    <button class="quiet" class:kofi={icon.key === "kofi"} title={label} aria-label={label}
+      disabled={!url} onclick={() => api.openUrl(url)}>
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d={icon.d} /></svg>
     </button>
   {/each}
@@ -50,10 +52,10 @@
     padding: 6px;
     color: var(--muted);
   }
-  button:hover {
+  button:hover:not(:disabled) {
     color: var(--text);
   }
-  button.kofi:hover {
+  button.kofi:hover:not(:disabled) {
     color: var(--accent-text);
   }
   svg {
