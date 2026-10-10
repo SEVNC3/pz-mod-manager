@@ -59,6 +59,34 @@ pub fn conflicts(mine: &Path, my_pos: usize, others: &[(String, PathBuf, usize)]
     out
 }
 
+/// Which mods a mod beats, and is beaten by, on shared files.
+#[derive(Debug, Default, PartialEq, serde::Serialize)]
+pub struct Overlap {
+    pub wins_over: BTreeSet<String>,
+    pub loses_to: BTreeSet<String>,
+}
+
+/// For enabled mods in load order (`(id, dir)`), who overrides whom: on each shared
+/// path the mod loaded last wins. Mods with no shared files are absent.
+pub fn overlaps(mods: &[(String, PathBuf)]) -> std::collections::HashMap<String, Overlap> {
+    let mut owners: std::collections::HashMap<String, Vec<usize>> = Default::default();
+    for (i, (_, dir)) in mods.iter().enumerate() {
+        for f in media_files(dir) {
+            owners.entry(f).or_default().push(i);
+        }
+    }
+    let mut out: std::collections::HashMap<String, Overlap> = Default::default();
+    for idx in owners.values().filter(|v| v.len() > 1) {
+        let winner = &mods[*idx.last().unwrap()].0;
+        for &i in &idx[..idx.len() - 1] {
+            let loser = &mods[i].0;
+            out.entry(winner.clone()).or_default().wins_over.insert(loser.clone());
+            out.entry(loser.clone()).or_default().loses_to.insert(winner.clone());
+        }
+    }
+    out
+}
+
 /// Map folder names a mod adds (`media/maps/<Name>`).
 pub fn maps(mod_dir: &Path) -> Vec<String> {
     let mut names: Vec<String> = std::iter::once(mod_dir.to_path_buf())
@@ -98,6 +126,14 @@ mod tests {
         assert_eq!(c, [Conflict { other: "B".into(), files: 1, wins: false, examples: vec!["media/lua/shared/items.lua".into()] }]);
         assert!(conflicts(&a, 2, &[("B".into(), b.clone(), 1)])[0].wins);
         assert_eq!(maps(&b), ["Riverside Plus"]);
+
+        let c = t.path().join("C");
+        touch(&c.join("media/lua/shared/Items.lua"));
+        let o = overlaps(&[("A".into(), a.clone()), ("B".into(), b.clone()), ("C".into(), c)]);
+        assert_eq!(o["C"].wins_over.iter().collect::<Vec<_>>(), ["A", "B"]);
+        assert!(o["C"].loses_to.is_empty());
+        assert_eq!(o["A"].loses_to.iter().collect::<Vec<_>>(), ["C"]);
+        assert!(o["A"].wins_over.is_empty(), "A loads first, so it beats no one");
         assert!(maps(&a).is_empty());
     }
 }

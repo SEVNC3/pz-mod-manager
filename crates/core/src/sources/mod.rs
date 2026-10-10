@@ -49,13 +49,22 @@ impl Source {
 }
 
 pub(crate) fn http_get(url: &str) -> Result<Vec<u8>> {
-    let mut req = ureq::get(url).header("User-Agent", "pzmm");
-    if url.starts_with("https://api.github.com/")
-        && let Ok(token) = std::env::var("GITHUB_TOKEN") {
+    // Steam answers 429 when it's asked too often: back off and retry a couple of times
+    for wait in [2, 5, 0] {
+        let mut req = ureq::get(url).header("User-Agent", "pzmm");
+        if url.starts_with("https://api.github.com/")
+            && let Ok(token) = std::env::var("GITHUB_TOKEN")
+        {
             req = req.header("Authorization", &format!("Bearer {token}"));
         }
-    let mut res = req.call().with_context(|| format!("GET {url}"))?;
-    Ok(res.body_mut().with_config().limit(2 << 30).read_to_vec()?)
+        match req.call() {
+            Ok(mut res) => return Ok(res.body_mut().with_config().limit(2 << 30).read_to_vec()?),
+            Err(ureq::Error::StatusCode(429)) if wait > 0 => std::thread::sleep(std::time::Duration::from_secs(wait)),
+            Err(ureq::Error::StatusCode(429)) => bail!("Steam is limiting requests right now (HTTP 429). Wait a minute and try again."),
+            Err(e) => return Err(e).with_context(|| format!("GET {url}")),
+        }
+    }
+    unreachable!()
 }
 
 pub(crate) fn unzip(bytes: &[u8], to: &Path) -> Result<()> {
@@ -191,7 +200,15 @@ pub struct Candidate {
 /// Find Workshop items that provide `mod_id`: the "Required items" of the Workshop item
 /// `needed_by` (if any) plus a Workshop search for the id. Best matches first.
 pub fn find_mod(mod_id: &str, needed_by: Option<&str>) -> Result<Vec<Candidate>> {
-    let required = needed_by.map(steam_workshop::required_items).transpose()?.unwrap_or_default();
+    // the author's list is a bonus: if Steam won't show the page, the search still works
+    let required = needed_by
+        .map(|item| {
+            steam_workshop::required_items(item).unwrap_or_else(|e| {
+                crate::log!("couldn't read workshop:{item}'s required items: {e:#}");
+                vec![]
+            })
+        })
+        .unwrap_or_default();
     let mut ids = required.clone();
     for i in steam_workshop::browse(pz::STEAM_APP, mod_id, "", 1, None)?.items.into_iter().take(10) {
         if !ids.contains(&i.id) {

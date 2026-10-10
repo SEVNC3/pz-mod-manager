@@ -493,6 +493,21 @@ fn conflicts(id: String) -> Res<Vec<pz::files::Conflict>> {
     })
 }
 
+/// For every enabled mod: which enabled mods it overrides, and is overridden by.
+#[tauri::command]
+async fn conflict_summary() -> Res<std::collections::HashMap<String, pz::files::Overlap>> {
+    tauri::async_runtime::spawn_blocking(|| {
+        locked(|paths| {
+            let mods = store::scan(paths)?;
+            let order: Vec<(String, std::path::PathBuf)> =
+                active(paths)?.enabled().into_iter().filter_map(|id| mods.get(&id).map(|m| (id, m.dir.clone()))).collect();
+            Ok(pz::files::overlaps(&order))
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[derive(Serialize)]
 struct ServersAndSaves {
     servers: Vec<String>,
@@ -589,7 +604,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
             details, poster, open_path, open_url, workshop_browse, zb_status, zb_preview, zb_install, zb_uninstall,
-            find_requirement, install_missing, check_updates, update_mods, conflicts, servers_and_saves, server_export, server_import, save_use
+            find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, servers_and_saves, server_export, server_import, save_use
         ])
         .run(tauri::generate_context!())
         .expect("error while running PZMM");

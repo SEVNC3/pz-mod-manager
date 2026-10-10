@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LayerIcon from "./LayerIcon.svelte";
   import { api, describeSource, type Candidate, type Conflict, type Details, type ModRow } from "./api";
 
   let {
@@ -30,10 +31,17 @@
   // Workshop matches for missing requirements, by mod id
   let found = $state<Record<string, Candidate[] | "loading" | string>>({});
 
-  async function find(req: string) {
+  async function download(req: string) {
     found[req] = "loading";
     try {
-      found[req] = await api.findRequirement(req, id);
+      const list = await api.findRequirement(req, id);
+      if (list[0]?.confirmed) {
+        found[req] = [];
+        delete found[req];
+        await onInstallWorkshop(list[0].id);
+      } else {
+        found[req] = list;
+      }
     } catch (e) {
       found[req] = String(e);
     }
@@ -136,11 +144,12 @@
                 <span class={m.on ? "ok" : "bad"}>{m.on ? "enabled" : "disabled"}</span>
               {:else}
                 <span class="bad">not installed</span>
-                {#if !found[r]}<button class="find" onclick={() => find(r)} disabled={busy}>Find</button>{/if}
+                {#if !found[r]}<button class="find" onclick={() => download(r)} disabled={busy}
+                  title="Find it on the Steam Workshop and download it">Download</button>{/if}
               {/if}
             </span>
             {#if !m && found[r] === "loading"}
-              <p class="hint">Searching the Workshop…</p>
+              <p class="hint">Looking for {r} on the Workshop…</p>
             {:else if !m && typeof found[r] === "string"}
               <p class="bad">{found[r]}</p>
             {:else if !m && Array.isArray(found[r])}
@@ -148,6 +157,7 @@
               {#if list.length === 0}
                 <p class="hint">Nothing on the Workshop matches {r}.</p>
               {:else}
+                <p class="hint">No result is clearly {r}. Pick the right one:</p>
                 <ul class="cands">
                   {#each list.slice(0, 5) as c (c.id)}
                     <li class:best={c.confirmed}>
@@ -157,7 +167,7 @@
                           {c.subscriptions.toLocaleString()} subscribers{c.confirmed ? " · Mod ID matches" : ""}{c.required_by_author ? " · listed by the author" : ""}
                         </span>
                       </span>
-                      <button class={c.confirmed ? "primary" : ""} disabled={busy} onclick={() => onInstallWorkshop(c.id)}>Install</button>
+                      <button class={c.confirmed ? "primary" : ""} disabled={busy} onclick={() => onInstallWorkshop(c.id)}>Download</button>
                     </li>
                   {/each}
                 </ul>
@@ -173,7 +183,10 @@
       <ul class="conflicts">
         {#each conflicts as c}
           <li title={c.examples.join(", ")}>
-            <span class="mono">{c.other}</span>
+            <span class="who">
+              <LayerIcon wins={c.wins} loses={!c.wins} label={c.wins ? `This mod's copies win over ${c.other}` : `${c.other}'s copies win`} />
+              <span class="mono">{c.other}</span>
+            </span>
             <span class={c.wins ? "ok" : "bad"}>
               {c.files} {c.files === 1 ? "file" : "files"}, {c.wins ? "this mod's copies win" : `${c.other}'s copies win`}
             </span>
@@ -348,5 +361,13 @@
     display: flex;
     flex-direction: column;
     padding: 3px 0;
+  }
+  .who {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .conflicts li > span:last-child {
+    padding-left: 22px;
   }
 </style>

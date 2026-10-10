@@ -9,9 +9,21 @@
   import Workshop from "$lib/Workshop.svelte";
   import ZombieBuddy from "$lib/ZombieBuddy.svelte";
   import ServersSaves from "$lib/ServersSaves.svelte";
+  import LayerIcon from "$lib/LayerIcon.svelte";
+  import type { Overlap } from "$lib/api";
 
   let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
   let updates = $state<Set<string>>(new Set());
+  // shared files between enabled mods: who overrides whom (refreshed after every change)
+  let overlaps = $state<Record<string, Overlap>>({});
+  const refreshOverlaps = () => api.conflictSummary().then((o) => (overlaps = o)).catch(() => {});
+  const overlapLabel = (o: Overlap) =>
+    [
+      o.wins_over.length && `Overrides files from ${o.wins_over.join(", ")}`,
+      o.loses_to.length && `Some files are overridden by ${o.loses_to.join(", ")}`,
+    ]
+      .filter(Boolean)
+      .join(". ");
 
   // --- PZMM's own updates (signed releases on GitHub) ---
   let appVersion = $state("");
@@ -163,6 +175,7 @@
       busy = false;
       busyLabel = "";
       refreshZb();
+      refreshOverlaps();
     }
   }
 
@@ -461,9 +474,13 @@
       <button class="primary" onclick={fixLoadOrder} disabled={busy}
         title="Enable required mods and move them above the mods that need them">Fix load order</button>
     {/if}
-    <span class="hint">
-      {filtering ? "Clear the search and filter to change load order." : "Drag to reorder · Alt+↑/↓ · Space toggles"}
-    </span>
+    {#if !missingReqs.size && !fixable}
+      <span class="hint">
+        {filtering ? "Clear the search and filter to change load order." : "Drag to reorder · Alt+↑/↓ · Space toggles"}
+      </span>
+    {:else}
+      <span class="spacer"></span>
+    {/if}
     <button class="quiet" onclick={addSeparator} disabled={busy || filtering}>Add separator</button>
   </div>
 
@@ -519,6 +536,10 @@
                     {#if r.name && r.name !== r.id}<span class="id mono">{r.id}</span>{/if}
                   </td>
                   <td class="src">
+                    {#if r.on && overlaps[r.id]}
+                      {@const o = overlaps[r.id]}
+                      <LayerIcon wins={o.wins_over.length > 0} loses={o.loses_to.length > 0} label={overlapLabel(o)} />
+                    {/if}
                     {#if r.missing}
                       <span class="missing">Not installed</span>
                     {:else if problems.has(r.id)}
@@ -761,6 +782,9 @@
     font-size: 12px;
     margin-left: auto;
   }
+  .spacer {
+    margin-left: auto;
+  }
 
   /* --- list + details --- */
   main {
@@ -838,8 +862,11 @@
     margin-left: 10px;
     color: var(--muted);
   }
+  .src :global(.layers) {
+    margin-right: 6px;
+  }
   .src {
-    width: 230px;
+    width: 250px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

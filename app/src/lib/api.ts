@@ -49,6 +49,7 @@ export type ZbStatus = {
 };
 export const zbReady = (s: ZbStatus | null) => !!s && s.have_mod && s.files_current && s.launcher_patched && s.enabled;
 
+export type Overlap = { wins_over: string[]; loses_to: string[] };
 export type Conflict = { other: string; files: number; wins: boolean; examples: string[] };
 export type Save = { mode: string; name: string; mods: string[]; modified: number };
 export type ServersAndSaves = { servers: string[]; server_dir: string; saves: Save[] };
@@ -77,6 +78,7 @@ export const api = {
   installMissing: () => invoke<[View, string[]]>("install_missing"),
   checkUpdates: () => invoke<string[]>("check_updates"),
   updateMods: (ids: string[]) => invoke<View>("update_mods", { ids }),
+  conflictSummary: () => invoke<Record<string, Overlap>>("conflict_summary"),
   conflicts: (id: string) => invoke<Conflict[]>("conflicts", { id }),
   serversAndSaves: () => invoke<ServersAndSaves>("servers_and_saves"),
   serverExport: (name: string) => invoke<string[]>("server_export", { name }),
