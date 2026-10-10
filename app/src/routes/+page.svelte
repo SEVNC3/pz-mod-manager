@@ -1493,8 +1493,31 @@
   tr.mod {
     cursor: default;
   }
+  /* hovered, picked and selected rows look like a selected tab: blood red under white text,
+     with a white bar on the left */
   tr.mod:hover td {
-    background: color-mix(in oklab, var(--raised) 75%, var(--panel));
+    background: color-mix(in oklab, var(--accent) 24%, var(--panel));
+  }
+  tr.mod:hover td,
+  tr.mod.picked td,
+  tr.mod.selected td {
+    color: #fff;
+  }
+  tr.mod:hover .num,
+  tr.mod.picked .num,
+  tr.mod.selected .num {
+    color: #fff;
+  }
+  tr.mod:hover .id,
+  tr.mod:hover .meta,
+  tr.mod.picked .id,
+  tr.mod.picked .meta,
+  tr.mod.selected .id,
+  tr.mod.selected .meta {
+    color: rgb(255 255 255 / 0.72);
+  }
+  tr.mod:hover td:first-child {
+    box-shadow: inset 3px 0 0 rgb(255 255 255 / 0.55);
   }
   .fold {
     padding: 0 6px;
@@ -1511,7 +1534,7 @@
   }
   tr.mod.picked td:first-child,
   tr.mod.selected td:first-child {
-    box-shadow: inset 3px 0 0 var(--accent-text);
+    box-shadow: inset 3px 0 0 #fff;
   }
   .bulk {
     display: flex;
