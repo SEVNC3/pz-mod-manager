@@ -1493,9 +1493,6 @@
     background: #fff;
     clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%);
   }
-  tr.mod:hover:not(.picked):not(.selected) td:first-child::before {
-    opacity: 0.55;
-  }
   .fold {
     padding: 0 6px;
     margin-right: 4px;
