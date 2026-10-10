@@ -11,44 +11,44 @@ This merges their findings. Each item names its source. Work top to bottom; P0 a
 
 ## P0: data loss, security, freezes
 
-1. [ ] **Server export wipes the .ini when it can't read it** (core 1). `server.rs:57`: start empty only on NotFound; any other read error stops the export.
-2. [ ] **An unreadable modlist.txt gets replaced by the game's list** (core 2). `profile.rs:257`: fall back only when the file is missing. Same for state.json (core 20) and default.txt (core 12).
-3. [ ] **A save silently drops changes made in the game's mod menu** (app 1).
+1. [x] **Server export wipes the .ini when it can't read it** (core 1). `server.rs:57`: start empty only on NotFound; any other read error stops the export.
+2. [x] **An unreadable modlist.txt gets replaced by the game's list** (core 2). `profile.rs:257`: fall back only when the file is missing. Same for state.json (core 20) and default.txt (core 12).
+3. [x] **A save silently drops changes made in the game's mod menu** (app 1).
    - `save` takes `adopted` from `sync`; when the game's list changed, reload and say so instead of overwriting.
    - Reload when the window regains focus.
-4. [ ] **Starting a server passes its name to cmd.exe unescaped** (core 5, app 9). Run the .bat directly with CREATE_NEW_CONSOLE, and reject `& ^ % ( ) ! , ;` in server names.
-5. [ ] **Updating a mod while the game has it open half-deletes it, then poisons the backup** (core 3). `move_dir` copies only across devices; otherwise it returns the rename error with "close the game and try again".
-6. [ ] **ZombieBuddy files are overwritten in place** (core 11). Use `write_atomic`, so a jar in use triggers the `.new` fallback.
-7. [ ] **The window freezes on row clicks and after every toggle** (app 2).
+4. [x] **Starting a server passes its name to cmd.exe unescaped** (core 5, app 9). Run the .bat directly with CREATE_NEW_CONSOLE, and reject `& ^ % ( ) ! , ;` in server names.
+5. [x] **Updating a mod while the game has it open half-deletes it, then poisons the backup** (core 3). `move_dir` copies only across devices; otherwise it returns the rename error with "close the game and try again".
+6. [x] **ZombieBuddy files are overwritten in place** (core 11). Use `write_atomic`, so a jar in use triggers the `.new` fallback.
+7. [x] **The window freezes on row clicks and after every toggle** (app 2).
    - Make every sync command `#[tauri::command(async)]`.
    - Walk files for `conflicts` and `conflict_summary` outside the lock.
-8. [ ] **`busy` resets early, so a second install can start mid-install** (app 3). Count pending runs; row keys, drops and renames ignore input while busy.
-9. [ ] **`open_path` opens anything; `opener:default` bypasses the URL allow-list** (app 10). Folders only; drop the permission and the unused npm package.
+8. [x] **`busy` resets early, so a second install can start mid-install** (app 3). Count pending runs; row keys, drops and renames ignore input while busy.
+9. [x] **`open_path` opens anything; `opener:default` bypasses the URL allow-list** (app 10). Folders only; drop the permission and the unused npm package.
 
 ## P1: correctness and must-fix UX
 
-10. [ ] **Profile names are case-sensitive but the folders aren't, so the active profile can be deleted** (core 4).
-11. [ ] **Deleting a profile can switch you into the other game mode** (app 4). Pick the next profile from `modeProfiles`.
-12. [ ] **Mod ids from non-English Workshop descriptions panic or are missed** (core 6). Use `to_ascii_lowercase`.
-13. [ ] **A failed SteamCMD download is reported as success from stale content** (core 7). Require "Success. Downloaded item <id>".
-14. [ ] **One bad Workshop id aborts the whole batch** (core 9). Drop invalid ids with a per-id error.
-15. [ ] **The `search` and `watch` CLI commands sync the profile without the lock** (core 8).
-16. [ ] **The Workshop tab resets every time you leave it** (ux 1, app 8). Keep it mounted after the first visit (`hidden`, plus a global `[hidden]` rule).
-17. [ ] **"Update all" re-downloads everything with no confirm** (ux 2).
+10. [x] **Profile names are case-sensitive but the folders aren't, so the active profile can be deleted** (core 4).
+11. [x] **Deleting a profile can switch you into the other game mode** (app 4). Pick the next profile from `modeProfiles`.
+12. [x] **Mod ids from non-English Workshop descriptions panic or are missed** (core 6). Use `to_ascii_lowercase`.
+13. [x] **A failed SteamCMD download is reported as success from stale content** (core 7). Require "Success. Downloaded item <id>".
+14. [x] **One bad Workshop id aborts the whole batch** (core 9). Drop invalid ids with a per-id error.
+15. [x] **The `search` and `watch` CLI commands sync the profile without the lock** (core 8).
+16. [x] **The Workshop tab resets every time you leave it** (ux 1, app 8). Keep it mounted after the first visit (`hidden`, plus a global `[hidden]` rule).
+17. [x] **"Update all" re-downloads everything with no confirm** (ux 2).
     - Rename it "Re-download all", confirm with a count, and run the latest-save check.
     - Add "Check for updates".
-18. [ ] **Autosort copy says it keeps your order, but it replaces your separators** (ux 3).
+18. [x] **Autosort copy says it keeps your order, but it replaces your separators** (ux 3).
     - Say so, and confirm when there are custom separators.
     - If Workshop tags can't be read, fall back to fixing load rules only (ux 4).
-19. [ ] **Undo after Find the broken mod restores the half-disabled list** (app 5). Clear undo on bisect start and stop.
-20. [ ] **Separators with the same name share collapse, counts and Move to** (app 6). Give new separators unique names; renaming refuses a duplicate.
-21. [ ] **Autosort can hang on cyclic load rules** (app 7). Look rows up through an index map, and cap the passes.
-22. [ ] **Workshop item panel** (ux 5, app 14).
+19. [x] **Undo after Find the broken mod restores the half-disabled list** (app 5). Clear undo on bisect start and stop.
+20. [x] **Separators with the same name share collapse, counts and Move to** (app 6). Give new separators unique names; renaming refuses a duplicate.
+21. [x] **Autosort can hang on cyclic load rules** (app 7). Look rows up through an index map, and cap the passes.
+22. [x] **Workshop item panel** (ux 5, app 14).
     - Add a dialog role, focus handling and a focus trap.
     - Show change notes and comments only for the current item.
     - Give each tab its own error.
-23. [ ] **Light theme: white text on the pale blood-red highlight is unreadable** (ui 1). Add `--on-selected` (white on Charcoal, ink on Daylight) and use it everywhere `#fff` sits on hover or selected states. The blueprint lines also follow the theme.
-24. [ ] **"Update and restart" while busy kills the install** (app 13, ux 21). Disable it while busy, and add a Later button.
+23. [x] **Light theme: white text on the pale blood-red highlight is unreadable** (ui 1). Add `--on-selected` (white on Charcoal, ink on Daylight) and use it everywhere `#fff` sits on hover or selected states. The blueprint lines also follow the theme.
+24. [x] **"Update and restart" while busy kills the install** (app 13, ux 21). Disable it while busy, and add a Later button.
 
 ## P2: consistency and polish
 
@@ -120,7 +120,7 @@ This merges their findings. Each item names its source. Work top to bottom; P0 a
 - [ ] Decide before pushing:
   - Squash the GIF add and remove commits (840 KB in history).
   - Use the GitHub noreply email.
-  - Fill in or hide the Discord and Ko-fi links.
+  - ~~Fill in or hide the Discord and Ko-fi links.~~ Done: both are live.
 
 ## Ideas for after 1.1 (ux 25)
 
