@@ -173,8 +173,22 @@ export type Folder = {
 export type Cell = [number, number];
 export type MapFolder = { folder: string; title: string; lots: string[]; cells: Cell[] };
 export type MapMod = { id: string; name: string; source: string; requires: string[]; maps: MapFolder[] };
-export type MapsView = { build: 41 | 42; vanilla_folders: string[]; vanilla: Cell[] | null; mods: MapMod[]; checked: MapMod[] };
-export type GridCell = { x: number; y: number; kind: "vanilla" | "map" | "over" | "conflict"; maps: string[] };
+/** A Workshop item PZMM read maps from (the Workshop scan or a check). */
+export type MapItem = { title: string; author: string; subscriptions: number; size: number; manual: boolean };
+export type MapsView = {
+  build: 41 | 42;
+  vanilla_folders: string[];
+  vanilla: Cell[] | null;
+  /** Vanilla cells that are mostly river. */
+  water: Cell[];
+  mods: MapMod[];
+  /** Workshop maps read without installing (one per mod id). */
+  checked: MapMod[];
+  items: Record<string, MapItem>;
+};
+export type GridCell = { x: number; y: number; kind: "vanilla" | "water" | "map" | "over" | "conflict"; maps: string[] };
+export type MapScan = { phase: "listing" | "reading" | "done"; done: number; total: number; failed: number };
+export type MapCompare = { only_server: { folder: string; id: string | null; item: string | null }[]; only_you: string[] };
 
 export type SettingsView = { settings: Settings; folders: Folder[]; token_saved: boolean; token_env: boolean; backups_size: number };
 
@@ -218,11 +232,19 @@ export const api = {
   serverImport: (name: string) => invoke<View>("server_import", { name }),
   saveUse: (mode: string, name: string) => invoke<View>("save_use", { mode, name }),
   mapsView: () => invoke<MapsView>("maps_view"),
-  mapGrid: (vanilla: Cell[], shown: MapMod[]) => invoke<GridCell[]>("map_grid", { vanilla, shown }),
-  mapNonConflicting: (all: MapMod[], shown: string[]) => invoke<string[]>("map_non_conflicting", { all, shown }),
+  mapGrid: (vanilla: Cell[], water: Cell[], shown: MapMod[]) => invoke<GridCell[]>("map_grid", { vanilla, water, shown }),
+  mapQuickSelect: (all: MapMod[], fixed: string[], ranks: Record<string, number>) => invoke<string[]>("map_quick_select", { all, fixed, ranks }),
+  /** The Map= list for `folders`; an empty `order` starts from the profile's saved one. */
   mapLine: (order: string[], folders: string[]) => invoke<string[]>("map_line", { order, folders }),
+  mapOrderSave: (maps: string[]) => invoke<void>("map_order_save", { maps }),
   mapsExport: (shown: MapMod[], mapLine: string[]) => invoke<string>("maps_export", { shown, mapLine }),
-  mapCheck: (id: string) => invoke<MapMod[]>("map_check", { id }),
+  mapCheck: (id: string, download: boolean) => invoke<MapMod[]>("map_check", { id, download }),
+  /** Read every Map-tagged Workshop item for the build ("maps-scan" events report progress). */
+  mapScan: () => invoke<MapScan>("map_scan"),
+  mapScanStop: () => invoke<void>("map_scan_stop"),
+  mapPresets: () => invoke<Record<string, string[]>>("map_presets"),
+  mapPresetSet: (name: string, ids: string[] | null) => invoke<Record<string, string[]>>("map_preset_set", { name, ids }),
+  mapServerCompare: (name: string, yours: string[]) => invoke<MapCompare>("map_server_compare", { name, yours }),
   doctor: () => invoke<Finding[]>("doctor"),
   consoleErrors: () => invoke<ModErrors[]>("console_errors"),
   profileExport: () => invoke<Shared>("profile_export"),

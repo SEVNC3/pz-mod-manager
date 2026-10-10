@@ -739,12 +739,16 @@ fn servers_and_saves() -> Res<ServersAndSaves> {
     })
 }
 
-/// The `Map=` list writing to `Server/<name>.ini` would set (empty when no enabled mod adds a map).
+/// The `Map=` list writing to `Server/<name>.ini` would set (empty when no enabled mod adds a
+/// map): in the profile's arranged order, else as the config has them.
 #[tauri::command(async)]
 fn server_maps(name: String) -> Res<Vec<String>> {
     reading(|paths| {
-        let current = pz::server::read(&pz::server::path(paths, &name)?).map(|c| c.maps).unwrap_or_default();
-        Ok(pz::server::map_order(&current, &pz::server::mod_maps(&active(paths)?.enabled(), &scan(paths)?)))
+        let mut order = profile::map_order(paths, &profile::active_name(paths));
+        if order.is_empty() {
+            order = pz::server::read(&pz::server::path(paths, &name)?).map(|c| c.maps).unwrap_or_default();
+        }
+        Ok(pz::server::map_order(&order, &pz::server::mod_maps(&active(paths)?.enabled(), &scan(paths)?)))
     })
 }
 
@@ -753,6 +757,9 @@ fn server_maps(name: String) -> Res<Vec<String>> {
 fn server_export(name: String, maps: Vec<String>) -> Res<Vec<String>> {
     reading(|paths| {
         let notes = pz::server::export(paths, &name, &active(paths)?.enabled(), &scan(paths)?, Some(maps.as_slice()).filter(|m| !m.is_empty()))?;
+        if !maps.is_empty() {
+            profile::set_map_order(paths, &profile::active_name(paths), &maps)?;
+        }
         notes.iter().for_each(|n| pzmm_core::log!("{n}"));
         Ok(notes)
     })
@@ -804,6 +811,17 @@ fn save_use(mode: String, name: String) -> Res<View> {
 
 use pzmm_core::pz::maps::{self, MapMod};
 
+/// A Workshop item PZMM read maps from (by the scan or a check), for search and sorting.
+#[derive(Serialize)]
+struct MapItem {
+    title: String,
+    author: String,
+    subscriptions: u64,
+    size: u64,
+    /// Checked by hand: listed even with the Workshop source off.
+    manual: bool,
+}
+
 #[derive(Serialize)]
 struct MapsView {
     /// The build cells are read for (B41 and B42 cells differ in size).
@@ -812,10 +830,14 @@ struct MapsView {
     vanilla_folders: Vec<String>,
     /// The game's cells, or None when the install isn't found or isn't `build`.
     vanilla: Option<Vec<maps::Cell>>,
+    /// The game's cells that are mostly river (from its world map).
+    water: Vec<maps::Cell>,
     /// Installed mods that add maps.
     mods: Vec<MapMod>,
-    /// Workshop items checked without installing (and not installed since).
+    /// Workshop maps read without installing (and not installed since): one per mod id.
     checked: Vec<MapMod>,
+    /// Those Workshop items (and installed ones the scan saw), by item id.
+    items: BTreeMap<String, MapItem>,
 }
 
 /// Every map's cells (walks map folders the cache doesn't know yet, so outside the lock).
@@ -827,30 +849,57 @@ async fn maps_view() -> Res<MapsView> {
         let mut cache = maps::Cache::load(&paths);
         let installed = maps::installed(&mods, build, &mut cache);
         let game = pz::folders::path("game", &settings::load());
-        let (vanilla_folders, vanilla) = game.map(|g| maps::vanilla(&g, build, &mut cache)).unwrap_or_default();
+        let (vanilla_folders, vanilla) = game.as_ref().map(|g| maps::vanilla(g, build, &mut cache)).unwrap_or_default();
+        let water = match (&game, &vanilla) {
+            (Some(g), Some(_)) => cache.water(g, build),
+            _ => vec![],
+        };
         let _ = cache.save(&paths); // only a cache: the next view reads the folders again
-        let checked = checked.into_values().flatten().filter(|m| !mods.contains_key(&m.id)).collect();
-        Ok(MapsView { build, vanilla_folders, vanilla, mods: installed, checked })
+        // a mod id two items provide (reuploads): the hand-checked one, else the most subscribed
+        let mut ranked: Vec<(&String, &maps::Checked)> = checked.iter().collect();
+        ranked.sort_by_key(|(_, c)| (!c.manual, std::cmp::Reverse(c.subscriptions)));
+        let mut out: Vec<MapMod> = vec![];
+        for (_, c) in ranked {
+            for m in c.builds.get(&build).into_iter().flatten() {
+                if !mods.contains_key(&m.id) && !out.iter().any(|o| o.id == m.id) {
+                    out.push(m.clone());
+                }
+            }
+        }
+        let items = checked
+            .into_iter()
+            .map(|(id, c)| (id, MapItem { title: c.title, author: c.author, subscriptions: c.subscriptions, size: c.size, manual: c.manual }))
+            .collect();
+        Ok(MapsView { build, vanilla_folders, vanilla, water, mods: installed, checked: out, items })
     })
     .await
 }
 
 /// The grid for the shown maps (the UI sends back what `maps_view` gave it).
 #[tauri::command(async)]
-fn map_grid(vanilla: Vec<maps::Cell>, shown: Vec<MapMod>) -> Vec<maps::GridCell> {
-    maps::grid(&vanilla, &shown.iter().collect::<Vec<_>>())
+fn map_grid(vanilla: Vec<maps::Cell>, water: Vec<maps::Cell>, shown: Vec<MapMod>) -> Vec<maps::GridCell> {
+    maps::grid(&vanilla, &water, &shown.iter().collect::<Vec<_>>())
 }
 
-/// Ids of the maps in `all` that conflict with none of `shown` (nor each other).
+/// The most maps from `all` that fit together around the `fixed` (enabled) ones; ties go to
+/// the higher `ranks` entry.
 #[tauri::command(async)]
-fn map_non_conflicting(all: Vec<MapMod>, shown: Vec<String>) -> Vec<String> {
-    maps::non_conflicting(&all, &shown)
+fn map_quick_select(all: Vec<MapMod>, fixed: Vec<String>, ranks: BTreeMap<String, u64>) -> Vec<String> {
+    maps::quick_select(&all, &fixed, |m| ranks.get(&m.id).copied().unwrap_or(0))
 }
 
-/// The `Map=` list for `folders`, keeping the arrangement in `order` (see `server::map_order`).
+/// The `Map=` list for `folders`, keeping the arrangement in `order`, or with none yet, the
+/// profile's saved one (see `server::map_order`).
 #[tauri::command(async)]
-fn map_line(order: Vec<String>, folders: Vec<String>) -> Vec<String> {
-    pz::server::map_order(&order, &folders)
+fn map_line(order: Vec<String>, folders: Vec<String>) -> Res<Vec<String>> {
+    let order = if order.is_empty() { reading(|paths| Ok(profile::map_order(paths, &profile::active_name(paths))))? } else { order };
+    Ok(pz::server::map_order(&order, &folders))
+}
+
+/// Keep an arranged `Map=` list with the active profile.
+#[tauri::command(async)]
+fn map_order_save(maps: Vec<String>) -> Res<()> {
+    reading(|paths| profile::set_map_order(paths, &profile::active_name(paths), &maps))
 }
 
 /// Clipboard text for the shown maps: links, mod ids, requirements and the server lines.
@@ -859,9 +908,10 @@ fn maps_export(shown: Vec<MapMod>, map_line: Vec<String>) -> Res<String> {
     reading(|paths| Ok(maps::export(&shown.iter().collect::<Vec<_>>(), &scan(paths)?, &map_line, profile::effective_build(paths) == 41)))
 }
 
-/// Download a Workshop item to read its cells, without installing it (the download is deleted).
+/// Read a Workshop item's cells from its file list, without installing it; with `download`,
+/// SteamCMD downloads it when Steam won't give the list (the download is deleted).
 #[tauri::command]
-async fn map_check(id: String) -> Res<Vec<MapMod>> {
+async fn map_check(id: String, download: bool) -> Res<Vec<MapMod>> {
     blocking(move || {
         if !sources::steam_workshop::valid_id(&id) {
             anyhow::bail!("{id:?} isn't a Workshop item id");
@@ -873,11 +923,73 @@ async fn map_check(id: String) -> Res<Vec<MapMod>> {
             Ok(profile::effective_build(paths))
         })
         .map_err(anyhow::Error::msg)?;
-        let found = maps::check(&Paths::detect(), &id, build)?;
+        let found = maps::check(&Paths::detect(), &id, download)?.builds.remove(&build).unwrap_or_default();
         if found.is_empty() {
             pzmm_core::log!("workshop:{id} adds no maps for Build {build}");
         }
         Ok(found)
+    })
+    .await
+}
+
+static MAP_SCAN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static MAP_SCAN_STOP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Read every Map-tagged Workshop item for the active build (see `maps::scan_workshop`),
+/// sending "maps-scan" progress events. One scan at a time.
+#[tauri::command]
+async fn map_scan(app: AppHandle) -> Res<maps::Progress> {
+    use std::sync::atomic::Ordering::SeqCst;
+    if MAP_SCAN.swap(true, SeqCst) {
+        return Err("A Workshop map scan is already running.".into());
+    }
+    MAP_SCAN_STOP.store(false, SeqCst);
+    let res = blocking(move || {
+        let build = reading(|paths| Ok(profile::effective_build(paths))).map_err(anyhow::Error::msg)?;
+        maps::scan_workshop(&Paths::detect(), build, &mut |p| {
+            let _ = app.emit("maps-scan", p);
+            !MAP_SCAN_STOP.load(SeqCst)
+        })
+    })
+    .await;
+    MAP_SCAN.store(false, SeqCst);
+    res
+}
+
+#[tauri::command]
+fn map_scan_stop() {
+    MAP_SCAN_STOP.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[tauri::command(async)]
+fn map_presets() -> Res<BTreeMap<String, Vec<String>>> {
+    reading(|paths| Ok(maps::presets(paths)))
+}
+
+/// Save a named set of maps; no `ids` deletes it.
+#[tauri::command(async)]
+fn map_preset_set(name: String, ids: Option<Vec<String>>) -> Res<BTreeMap<String, Vec<String>>> {
+    reading(|paths| {
+        maps::set_preset(paths, &name, ids)?;
+        Ok(maps::presets(paths))
+    })
+}
+
+/// A server config's maps against `yours` (map folders): what each has that the other doesn't.
+#[tauri::command]
+async fn map_server_compare(name: String, yours: Vec<String>) -> Res<maps::Compare> {
+    blocking(move || -> Res<_> {
+        let (server, mods, build, checked) = reading(|paths| {
+            Ok((pz::server::read(&pz::server::path(paths, &name)?)?, scan(paths)?, profile::effective_build(paths), maps::checked(paths)))
+        })?;
+        let paths = Paths::detect();
+        let mut cache = maps::Cache::load(&paths);
+        let mut all = maps::installed(&mods, build, &mut cache);
+        all.extend(checked.into_values().flat_map(|mut c| c.builds.remove(&build).unwrap_or_default()));
+        let game = pz::folders::path("game", &settings::load());
+        let mut vanilla = game.map(|g| maps::vanilla(&g, build, &mut cache).0).unwrap_or_default();
+        vanilla.push(pz::server::BASE_MAP.into());
+        Ok(maps::compare(&server, &yours, &vanilla, &all))
     })
     .await
 }
@@ -1149,7 +1261,7 @@ pub fn run() {
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
             details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, workshop_comments, workshop_author, zb_status, zb_preview, zb_install, zb_uninstall,
             find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_export, server_import, server_start, save_use,
-            maps_view, map_grid, map_non_conflicting, map_line, maps_export, map_check,
+            maps_view, map_grid, map_quick_select, map_line, map_order_save, maps_export, map_check, map_scan, map_scan_stop, map_presets, map_preset_set, map_server_compare,
             mode_preview, mode_switch, doctor, console_errors, profile_export, profile_import,
             launch_game, settings_get, settings_set, folder_set, pick_folder, github_token_set, backups_clear, diagnostics
         ])

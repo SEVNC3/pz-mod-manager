@@ -559,7 +559,7 @@
       else selected = null;
       return;
     }
-    if (typing || !(e.ctrlKey || e.metaKey) || tab !== "mods") return;
+    if (typing || !(e.ctrlKey || e.metaKey) || (tab !== "mods" && tab !== "maps")) return;
     const k = e.key.toLowerCase();
     if (k === "z" && !e.shiftKey) {
       e.preventDefault();
@@ -908,7 +908,8 @@
   {#if tab === "workshop"}
     <!-- kept mounted above -->
   {:else if tab === "maps"}
-    <Maps {busy} {mods} {say} onSetMods={setMods} onInstallWorkshop={installWorkshop} onShowMod={(id) => { selected = id; tab = "mods"; }} />
+    <Maps {busy} {mods} {say} onSetMods={setMods} onInstallWorkshop={installWorkshop} onShowMod={(id) => { selected = id; tab = "mods"; }}
+      canUndo={undoStack.length > 0} onUndo={undo} />
   {:else if tab === "servers"}
     <ServersSaves {busy} profile={view?.profile ?? ""} enabledIds={order}
       onImport={(name) => run(`Importing ${name}.ini`, () => api.serverImport(name), { showLog: true })}

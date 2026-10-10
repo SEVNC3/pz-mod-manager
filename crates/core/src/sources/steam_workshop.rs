@@ -95,6 +95,9 @@ pub struct Item {
     pub author: String,
     /// A collection rather than a mod.
     pub collection: bool,
+    /// Its depot manifest (`hcontent_file`): the file list Steam serves. Too big for JS numbers.
+    #[serde(skip)]
+    pub hcontent: u64,
 }
 
 #[derive(Debug, Default, serde::Serialize)]
@@ -137,6 +140,7 @@ impl Item {
             creator: text(v, "creator"),
             author: String::new(),
             collection: num(v, "file_type") == 2,
+            hcontent: num(v, "hcontent_file"),
         }
     }
 }

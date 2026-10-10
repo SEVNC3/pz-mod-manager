@@ -20,6 +20,7 @@
   /* the Maps grid: a map's cells, and a map over a vanilla area (conflicts use --danger) */
   --map-cell: #5b9bd5;
   --map-over: #d8b443;
+  --map-water: #4fa3a5;
   /* the accent is dark (1.3-1.5:1 on charcoal): big fills use it as is; text and thin
      indicators (tab underline, selection bars, stars) use --accent-text, ~5.8:1 on raised */
   --accent-soft: color-mix(in oklab, var(--accent) 32%, transparent);
@@ -58,6 +59,7 @@
     --grid-minor: rgb(27 33 36 / 0.035);
     --map-cell: #2f6fae;
     --map-over: #a47c0c;
+    --map-water: #2c8587;
     --line: #cdd4ce;
     --text: #1b2124;
     --muted: #59665f;
@@ -80,6 +82,7 @@
   --grid-minor: rgb(27 33 36 / 0.035);
   --map-cell: #2f6fae;
   --map-over: #a47c0c;
+  --map-water: #2c8587;
   --line: #cdd4ce;
   --text: #1b2124;
   --muted: #59665f;

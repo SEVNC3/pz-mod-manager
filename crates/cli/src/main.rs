@@ -103,6 +103,13 @@ enum Cmd {
         #[arg(default_value = "status")]
         action: String,
     },
+    /// Read the map cells of every Map-tagged Workshop item from Steam's file lists (nothing is
+    /// downloaded or installed); only new and updated items are read again
+    MapScan {
+        /// 41 or 42 (default: the active build)
+        #[arg(long)]
+        build: Option<u8>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -129,7 +136,7 @@ fn main() {
 fn run(cli: Cli) -> Result<()> {
     let paths = Paths::detect();
     // read-only commands skip the lock; the rest wait for the app to finish its change
-    let read_only = matches!(cli.cmd, Cmd::Search { .. } | Cmd::Watch { .. });
+    let read_only = matches!(cli.cmd, Cmd::Search { .. } | Cmd::Watch { .. } | Cmd::MapScan { .. });
     let _lock = if read_only { None } else { Some(pzmm_core::lock_data(&paths)?) };
     // sync can save the profile, so only commands holding the lock run it
     let (mut p, adopted) = if read_only { (profile::peek(&paths), false) } else { profile::sync(&paths)? };
@@ -175,6 +182,21 @@ fn run(cli: Cli) -> Result<()> {
             println!("{id}: restored previous version");
         }
         Cmd::List => list(&paths, &p)?,
+        Cmd::MapScan { build } => {
+            let build = build.unwrap_or_else(|| profile::effective_build(&paths));
+            let start = std::time::Instant::now();
+            let mut last = "";
+            let p = pzmm_core::pz::maps::scan_workshop(&paths, build, &mut |p| {
+                if p.phase != last || p.done % 25 == 0 {
+                    eprintln!("{:>6.0}s {} {}/{} ({} failed)", start.elapsed().as_secs_f32(), p.phase, p.done, p.total, p.failed);
+                    last = p.phase;
+                }
+                true
+            })?;
+            let all = pzmm_core::pz::maps::checked(&paths);
+            let with_maps = all.values().filter(|c| c.builds.get(&build).is_some_and(|m| !m.is_empty())).count();
+            println!("Build {build}: read {} items in {:.0}s ({} failed); {with_maps} Workshop items with maps known", p.done, start.elapsed().as_secs_f32(), p.failed);
+        }
         Cmd::Search { query, sort, page, build } => {
             let tag = build.map(|b| format!("Build {b}"));
             let q = sources::steam_workshop::Query { search: query.join(" "), sort, page, required: tag.into_iter().collect(), ..Default::default() };

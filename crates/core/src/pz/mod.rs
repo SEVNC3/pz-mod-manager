@@ -49,7 +49,11 @@ pub fn workshop_dir() -> Option<PathBuf> {
 }
 
 pub fn read_info(path: &Path) -> HashMap<String, String> {
-    let text = fs::read(path).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
+    parse_info(&fs::read(path).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default())
+}
+
+/// mod.info's `key=value` lines.
+pub fn parse_info(text: &str) -> HashMap<String, String> {
     text.trim_start_matches('\u{feff}') // a UTF-8 BOM would otherwise hide the first key (usually `id`)
         .lines()
         .filter_map(|l| l.split_once('='))

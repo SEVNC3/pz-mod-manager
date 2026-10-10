@@ -250,6 +250,22 @@ pub fn save(paths: &Paths, profile: &Profile) -> Result<()> {
     Ok(())
 }
 
+/// The profile's arranged `Map=` order (`maporder.txt`, beside loadorder.txt): what the Maps
+/// tab and the server card start from. Empty until maps are arranged.
+pub fn map_order(paths: &Paths, name: &str) -> Vec<String> {
+    let file = dir(paths).join(on_disk(paths, name)).join("maporder.txt");
+    fs::read_to_string(file).map(|t| t.lines().map(str::trim).filter(|l| !l.is_empty()).map(String::from).collect()).unwrap_or_default()
+}
+
+pub fn set_map_order(paths: &Paths, name: &str, maps: &[String]) -> Result<()> {
+    valid_name(name)?;
+    let d = dir(paths).join(on_disk(paths, name));
+    fs::create_dir_all(&d)?;
+    crate::write_atomic(&d.join("maporder.txt"), maps.iter().map(|m| format!("{m}
+")).collect::<String>())?;
+    Ok(())
+}
+
 pub fn delete(paths: &Paths, name: &str) -> Result<()> {
     valid_name(name)?;
     let name = &on_disk(paths, name);
@@ -280,7 +296,7 @@ fn save_state(paths: &Paths, s: &State) -> Result<()> {
     Ok(())
 }
 
-fn active_name(paths: &Paths) -> String {
+pub fn active_name(paths: &Paths) -> String {
     Some(state(paths).active).filter(|s| !s.is_empty()).unwrap_or_else(|| "Default".into())
 }
 
@@ -439,6 +455,20 @@ mod tests {
         let (p, _) = sync(&paths).unwrap();
         assert_eq!(p.lines.len(), 3, "separator and disabled entry kept: {:?}", p.lines);
         assert!(matches!(&p.lines[2], Line::Mod { id, on: false } if id == "B"));
+    }
+
+    #[test]
+    fn map_order_is_kept_per_profile() {
+        let (_t, paths) = temp_paths();
+        apply(&paths, &Profile::parse("Default", "+A\n")).unwrap();
+        assert!(map_order(&paths, "Default").is_empty(), "never arranged");
+        set_map_order(&paths, "default", &ids(&["Town", "Muldraugh, KY"])).unwrap();
+        // saving the profile (a toggle) leaves it alone; other profiles have their own
+        apply(&paths, &Profile::parse("Default", "+A\n+B\n")).unwrap();
+        assert_eq!(map_order(&paths, "Default"), ids(&["Town", "Muldraugh, KY"]));
+        apply(&paths, &Profile::parse("Other", "+A\n")).unwrap();
+        assert!(map_order(&paths, "Other").is_empty());
+        assert!(set_map_order(&paths, "../x", &[]).is_err());
     }
 
     #[test]

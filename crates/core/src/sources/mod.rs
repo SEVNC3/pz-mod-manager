@@ -1,6 +1,7 @@
 //! Where mods come from: Steam Workshop, GitHub, or a local zip/folder.
 
 pub mod github;
+pub mod steam_manifest;
 pub mod steam_workshop;
 
 use std::collections::HashSet;
