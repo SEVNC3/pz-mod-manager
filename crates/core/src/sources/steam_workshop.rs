@@ -49,6 +49,25 @@ pub fn library_path(rel: &str) -> Option<PathBuf> {
     None
 }
 
+/// Whether the Steam client is running (Steam records its pid while it runs).
+pub fn client_running() -> bool {
+    #[cfg(windows)]
+    {
+        use winreg::{RegKey, enums::HKEY_CURRENT_USER};
+        RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey(r"Software\Valve\Steam\ActiveProcess")
+            .and_then(|k| k.get_value::<u32, _>("pid"))
+            .is_ok_and(|pid| pid != 0)
+    }
+    #[cfg(not(windows))]
+    {
+        dirs::home_dir()
+            .and_then(|h| std::fs::read_to_string(h.join(".steam/steam.pid")).ok())
+            .and_then(|pid| pid.trim().parse::<u32>().ok())
+            .is_some_and(|pid| std::path::Path::new(&format!("/proc/{pid}")).exists())
+    }
+}
+
 // --- Workshop web data (no API key needed) ---
 
 /// One Workshop item as shown in the browser.

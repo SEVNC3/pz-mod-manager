@@ -812,6 +812,10 @@ fn open_url(app: AppHandle, url: String) -> Res<()> {
     if !(url.starts_with("https://") || url == format!("steam://rungameid/{}", pz::STEAM_APP)) {
         return Err(format!("refusing to open {url}"));
     }
+    // Workshop pages open in the Steam client when it's running (Subscribe works there);
+    // otherwise in the browser, since a steam:// link would start Steam
+    let workshop = ["https://steamcommunity.com/sharedfiles/", "https://steamcommunity.com/workshop/"].iter().any(|p| url.starts_with(p));
+    let url = if workshop && sources::steam_workshop::client_running() { format!("steam://openurl/{url}") } else { url };
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
 
