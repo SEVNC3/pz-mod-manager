@@ -5,7 +5,32 @@ on:
 permissions:
   contents: write
 jobs:
-  build:
+  cli:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            out: pzmm-windows-x64.exe
+            bin: pzmm.exe
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl # static: runs on any Linux server
+            out: pzmm-linux-x64
+            bin: pzmm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: rustup target add ${{ matrix.target }}
+      - run: cargo test
+      - run: cargo build --release --target ${{ matrix.target }} -p pzmm
+      - run: mv target/${{ matrix.target }}/release/${{ matrix.bin }} ${{ matrix.out }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.out }}
+          path: ${{ matrix.out }}
+  gui:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,6 +40,17 @@ jobs:
       - run: python test_pzmm.py
       - run: pip install pyinstaller
       - run: pyinstaller --onefile --windowed --name PZMM gui.py
-      - run: gh release create ${{ github.ref_name }} dist/PZMM.exe --generate-notes
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PZMM.exe
+          path: dist/PZMM.exe
+  publish:
+    needs: [cli, gui]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - run: gh release create ${{ github.ref_name }} PZMM.exe pzmm-windows-x64.exe pzmm-linux-x64 --repo ${{ github.repository }} --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}

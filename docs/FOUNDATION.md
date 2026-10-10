@@ -56,11 +56,13 @@ app/             Tauri shell + Svelte UI
 ```
 
 **On disk:**
-- **Mods** go where the game already loads them: `Zomboid/mods/<ModId>/`, with a `.pzmm/mod.json` beside each one recording the source, version, update status and owned files.
-- **The app's own data** lives in a per-user folder (`%APPDATA%` on Windows, `~/.local/share` on Linux):
+- **Mods** go where the game already loads them: `Zomboid/mods/<ModId>/`. Mod folders are left untouched; what PZMM owns is recorded in `<data>/installed.json`.
+- **The app's own data** lives in a per-user folder (`%LOCALAPPDATA%\pzmm` on Windows, `~/.local/share/pzmm` on Linux):
 
 ```
 <data>/
+  installed.json                mod id -> source (ours to update/remove)
+  state.json                    active profile, forced build format
   profiles/<name>/modlist.txt   "+ModA" "-ModB" "# --- Maps"
   profiles/<name>/profile.json  build (41/42), linked server .ini
   backups/                      previous mod versions + default.txt snapshots

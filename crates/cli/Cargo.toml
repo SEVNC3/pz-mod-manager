@@ -1,0 +1,12 @@
+[package]
+name = "pzmm"
+description = "PZMM - Project Zomboid Mod Manager (command line)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.6.7", features = ["derive"] }
+pzmm-core = { path = "../core" }
