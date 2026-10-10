@@ -1,4 +1,4 @@
-"""PZ Mod Manager - Tkinter front end for pzmm."""
+"""PZMM - Tkinter front end for pzmm."""
 import os, queue, subprocess, sys, threading, tkinter as tk
 from tkinter import messagebox, ttk
 
@@ -19,7 +19,7 @@ class Log:
 
 def main():
     root = tk.Tk()
-    root.title("PZ Mod Manager")
+    root.title("PZMM: Project Zomboid Mod Manager")
     root.geometry("960x620")
     q = queue.Queue()
     sys.stdout = sys.stderr = Log(q)

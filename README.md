@@ -1,4 +1,4 @@
-# PZ Mod Manager
+# PZMM: Project Zomboid Mod Manager
 
 A small, open-source mod manager for **Project Zomboid** (Build 41 and Build 42).
 
@@ -11,7 +11,7 @@ No Python, no account, no Steam login needed. Workshop downloads use Valve's [St
 
 ## Download
 
-Get `PZModManager.exe` from the [latest release](../../releases/latest) and run it. Windows may show a SmartScreen warning because the exe isn't code-signed. Click **More info → Run anyway**, or run from source (below).
+Get `PZMM.exe` from the [latest release](../../releases/latest) and run it. Windows may show a SmartScreen warning because the exe isn't code-signed. Click **More info → Run anyway**, or run from source (below).
 
 ## Use
 
@@ -63,7 +63,7 @@ python gui.py
 python test_pzmm.py
 ```
 
-To build the exe: `pip install pyinstaller` then `pyinstaller --onefile --windowed --name PZModManager gui.py`. Pushing a `v*` tag builds the exe and publishes a release automatically.
+To build the exe: `pip install pyinstaller` then `pyinstaller --onefile --windowed --name PZMM gui.py`. Pushing a `v*` tag builds the exe and publishes a release automatically.
 
 ## License
 
