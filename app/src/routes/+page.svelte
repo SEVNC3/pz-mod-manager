@@ -219,7 +219,7 @@
     return rows
       .map((r, i) => ({ r, i }))
       .filter(({ r, i }) => {
-        if (r.kind === "sep") return !filtering;
+        if (r.kind === "sep") return !filtering && r.name !== "";
         if (!filtering && sectionOf[i] && collapsed.has(sectionOf[i])) return false;
         if (filter === "on" && !r.on) return false;
         if (filter === "off" && r.on) return false;
@@ -586,15 +586,21 @@
     editingSep = at;
   }
 
-  /** Drop a separator; its mods move to Uncategorised (above the first separator), never into the section above. */
+  /** Drop a separator. Its mods stay where they are as loose mods (a nameless break ends the section above). */
   function removeSep(i: number) {
-    let end = i + 1;
-    while (end < rows.length && rows[end].kind !== "sep") end++;
-    const mods = rows.slice(i + 1, end);
-    const rest = [...rows.slice(0, i), ...rows.slice(end)];
-    const first = rest.findIndex((r) => r.kind === "sep");
-    rest.splice(first < 0 ? rest.length : first, 0, ...mods);
-    commit(rest);
+    commit(tidyBreaks(rows.map((r, j) => (j === i ? { kind: "sep", name: "" } : r))));
+  }
+
+  /** Keep a break only where it ends a named section and loose mods follow. */
+  function tidyBreaks(list: Row[]): Row[] {
+    let section = "";
+    return list.filter((r, j) => {
+      if (r.kind !== "sep") return true;
+      if (r.name) return (section = r.name), true;
+      const keep = section !== "" && list[j + 1]?.kind === "mod";
+      if (keep) section = "";
+      return keep;
+    });
   }
 
   function renameSep(i: number, name: string) {
@@ -656,13 +662,13 @@
     }
   }
 
-  /** Mods above the first separator, shown as their own card once the list has sections. */
-  const uncategorised = $derived.by(() => {
-    if (filtering || !rows.some((r) => r.kind === "sep") || visible[0]?.r.kind !== "mod") return null;
-    const top = rows.slice(0, rows.findIndex((r) => r.kind === "sep")).filter((r): r is ModRow => r.kind === "mod");
-    return { on: top.filter((m) => m.on).length, total: top.length };
-  });
-  const separators = $derived(rows.filter((r) => r.kind === "sep").map((r) => (r as { name: string }).name));
+  /** Once the list has sections, mods outside them are loose: each is a card of its own, in place. */
+  const hasSections = $derived(!filtering && rows.some((r) => r.kind === "sep" && r.name));
+  const loose = (k: number) => {
+    const v = visible[k];
+    return hasSections && !!v && v.r.kind === "mod" && !sectionOf[v.i];
+  };
+  const separators = $derived(rows.flatMap((r) => (r.kind === "sep" && r.name ? [r.name] : [])));
 
   function remove(id: string) {
     if (confirm(`Remove ${id}? Its files are deleted from your Zomboid mods folder.`)) run(`Removing ${id}`, () => api.remove([id]));
@@ -1012,19 +1018,10 @@
             <tr><th>Move</th><th>Enabled</th><th>Load order</th><th>Mod</th><th>Size</th><th>Last changed</th><th>Shared files</th><th>Source</th></tr>
           </thead>
           <tbody>
-            {#if uncategorised}
-              <tr class="sep start uncat" class:end={visible[0]?.r.kind === "sep"}>
-                <td class="grip"></td>
-                <td colspan="7">
-                  <span class="tape plain" title="Mods that aren't in a section. Removing a separator moves its mods here.">Uncategorised</span>
-                  <span class="sec-count">{uncategorised.on} of {uncategorised.total} enabled</span>
-                </td>
-              </tr>
-            {/if}
             {#each visible as { r, i }, k (r.kind === "mod" ? `m:${r.id}` : `s:${i}:${r.name}`)}
               <!-- each section is a card: a separator starts one, the row before the next separator ends it -->
-              {@const start = (k === 0 && !uncategorised) || r.kind === "sep"}
-              {@const end = k === visible.length - 1 || visible[k + 1].r.kind === "sep"}
+              {@const start = k === 0 || r.kind === "sep" || loose(k) || loose(k - 1)}
+              {@const end = k === visible.length - 1 || visible[k + 1].r.kind === "sep" || loose(k) || loose(k + 1)}
               {#if start && k > 0}<tr class="gap" aria-hidden="true"><td colspan="8"></td></tr>{/if}
               {#if r.kind === "sep"}
                 <tr class="sep" class:start class:end class:drop={dropShown === i} class:dragging={dragFrom === i} data-index={i} tabindex="0" draggable={!filtering && editingSep !== i}
@@ -1700,11 +1697,6 @@
   }
   .sep-remove:hover:not(:disabled) {
     color: var(--danger);
-  }
-  /* Uncategorised: plain tape, no blood (nothing has been sorted here yet) */
-  .tape.plain {
-    padding-right: 16px;
-    background: color-mix(in oklab, var(--tape) 55%, var(--panel));
   }
   .tape-edit {
     border: 0;

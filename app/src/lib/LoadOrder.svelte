@@ -18,13 +18,15 @@
   const sections = $derived.by(() => {
     const out: { name: string; on: number; total: number }[] = [];
     for (const r of rows) {
-      if (r.kind === "sep") out.push({ name: r.name, on: 0, total: 0 });
-      else if (out.length) {
+      if (r.kind === "sep") {
+        if (r.name) out.push({ name: r.name, on: 0, total: 0 });
+        else out.push({ name: "", on: 0, total: 0 }); // a break: loose mods, not listed
+      } else if (out.length) {
         out[out.length - 1].total++;
         if (r.on) out[out.length - 1].on++;
       }
     }
-    return out;
+    return out.filter((s) => s.name);
   });
 </script>
 
