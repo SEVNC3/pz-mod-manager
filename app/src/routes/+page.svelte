@@ -976,7 +976,7 @@
     </div>
   {/if}
   <main class:with-details={selected} class:with-panel={!selected && rows.length}>
-    <div class="list">
+    <div class="list blueprint">
       {#if !view}
         <p class="loading">Loading your mods…</p>
       {:else if rows.length === 0}
@@ -990,9 +990,13 @@
             <tr><th>Move</th><th>Enabled</th><th>Load order</th><th>Mod</th><th>Size</th><th>Last changed</th><th>Shared files</th><th>Source</th></tr>
           </thead>
           <tbody>
-            {#each visible as { r, i } (r.kind === "mod" ? `m:${r.id}` : `s:${i}:${r.name}`)}
+            {#each visible as { r, i }, k (r.kind === "mod" ? `m:${r.id}` : `s:${i}:${r.name}`)}
+              <!-- each section is a card: a separator starts one, the row before the next separator ends it -->
+              {@const start = k === 0 || r.kind === "sep"}
+              {@const end = k === visible.length - 1 || visible[k + 1].r.kind === "sep"}
+              {#if start && k > 0}<tr class="gap" aria-hidden="true"><td colspan="8"></td></tr>{/if}
               {#if r.kind === "sep"}
-                <tr class="sep" class:drop={dropAt === i} data-index={i} tabindex="0" draggable={!filtering && editingSep !== i}
+                <tr class="sep" class:start class:end class:drop={dropAt === i} data-index={i} tabindex="0" draggable={!filtering && editingSep !== i}
                   ondragstart={() => (dragFrom = i)} ondragend={() => { dragFrom = dropAt = null; }}
                   ondragover={(e) => { e.preventDefault(); dropAt = i; }}
                   ondrop={(e) => { e.preventDefault(); if (dragFrom !== null) move(dragFrom, i); dragFrom = dropAt = null; }}
@@ -1019,7 +1023,7 @@
                 </tr>
               {:else}
                 {@const src = describeSource(r.source)}
-                <tr class="mod" class:off={!r.on} class:selected={selected === r.id} class:picked={picked.size >= 1 && picked.has(r.id)} class:drop={dropAt === i} class:dragging={dragFrom === i}
+                <tr class="mod" class:start class:end class:off={!r.on} class:selected={selected === r.id} class:picked={picked.size >= 1 && picked.has(r.id)} class:drop={dropAt === i} class:dragging={dragFrom === i}
                   data-index={i} tabindex="0" draggable={!filtering}
                   aria-selected={selected === r.id}
                   onclick={(e) => rowClick(e, r.id)} onkeydown={(e) => rowKey(e, i, r)}
@@ -1419,10 +1423,48 @@
   .list {
     overflow-y: auto;
     min-height: 0;
+    padding: 14px 16px 0;
   }
+  /* sections are cards lifted off the blueprint: rows paint the card, gap rows space them */
   table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  tr.mod td,
+  tr.sep td {
+    background: var(--panel);
+  }
+  tr.mod td:first-child,
+  tr.sep td:first-child {
+    border-left: 1px solid var(--line);
+  }
+  tr.mod td:last-child,
+  tr.sep td:last-child {
+    border-right: 1px solid var(--line);
+  }
+  tr.start td {
+    border-top: 1px solid var(--line);
+  }
+  tr.start td:first-child {
+    border-top-left-radius: 8px;
+  }
+  tr.start td:last-child {
+    border-top-right-radius: 8px;
+  }
+  tr.end td {
+    border-bottom: 1px solid var(--line);
+  }
+  tr.end td:first-child {
+    border-bottom-left-radius: 8px;
+  }
+  tr.end td:last-child {
+    border-bottom-right-radius: 8px;
+  }
+  tr.gap td {
+    height: 14px;
+    padding: 0;
+    border: 0;
   }
   td {
     padding: 0 8px;
@@ -1432,8 +1474,8 @@
   tr.mod {
     cursor: default;
   }
-  tr.mod:hover {
-    background: color-mix(in oklab, var(--raised) 70%, transparent);
+  tr.mod:hover td {
+    background: color-mix(in oklab, var(--raised) 75%, var(--panel));
   }
   .fold {
     padding: 0 6px;
@@ -1445,8 +1487,11 @@
     color: var(--muted);
     font-size: 12px;
   }
-  tr.mod.picked {
-    background: color-mix(in oklab, var(--accent) 22%, transparent);
+  tr.mod.picked td {
+    background: color-mix(in oklab, var(--accent) 22%, var(--panel));
+  }
+  tr.mod.picked td:first-child,
+  tr.mod.selected td:first-child {
     box-shadow: inset 3px 0 0 var(--accent-text);
   }
   .bulk {
@@ -1456,9 +1501,8 @@
     margin-left: auto;
     flex-wrap: wrap;
   }
-  tr.mod.selected {
-    background: var(--accent-soft);
-    box-shadow: inset 3px 0 0 var(--accent-text);
+  tr.mod.selected td {
+    background: color-mix(in oklab, var(--accent) 32%, var(--panel));
   }
   tr.off .title,
   tr.off .num {
@@ -1612,7 +1656,6 @@
   /* signature: separators are masking-tape labels, like crates in a safehouse */
   tr.sep td {
     height: 46px;
-    border-bottom: 0;
   }
   .tape,
   .tape-edit {

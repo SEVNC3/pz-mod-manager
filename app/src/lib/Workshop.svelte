@@ -377,7 +377,7 @@
     </div>
   {/if}
 
-  <div class="results" aria-busy={loading}>
+  <div class="results blueprint" aria-busy={loading}>
     {#if error}
       <div class="message">
         <p>Couldn't reach the Steam Workshop: {error}</p>
@@ -582,22 +582,11 @@
     border-bottom: 1px solid var(--line);
     background: color-mix(in oklab, var(--accent) 14%, var(--panel));
   }
-  /* blueprint paper on the app's charcoal (like Spiffo's Workshop on Steam, minus its blue) */
   .results {
     flex: 1;
     overflow-y: auto;
     min-height: 0;
     padding: 16px;
-    background-color: var(--bg);
-    background-image:
-      radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / 0.04), transparent 60%),
-      linear-gradient(rgb(255 255 255 / 0.09) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(255 255 255 / 0.09) 1px, transparent 1px),
-      linear-gradient(rgb(255 255 255 / 0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(255 255 255 / 0.035) 1px, transparent 1px);
-    background-size: 100% 100%, 96px 96px, 96px 96px, 24px 24px, 24px 24px;
-    background-position: 0 0, -1px -1px, -1px -1px, -1px -1px, -1px -1px;
-    background-attachment: local;
   }
   .row h2,
   .count,
