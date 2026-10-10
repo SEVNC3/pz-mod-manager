@@ -52,7 +52,12 @@ pub fn read_info(path: &Path) -> HashMap<String, String> {
 
 /// Mod ids listed in mod.info's `require=` (B42 writes them as `\Id`).
 pub fn requires(info: &HashMap<String, String>) -> Vec<String> {
-    info.get("require")
+    id_list(info, "require")
+}
+
+/// A mod.info list of mod ids (`key=\\A,\\B` or `A;B`).
+pub fn id_list(info: &HashMap<String, String>, key: &str) -> Vec<String> {
+    info.get(key)
         .map(|r| r.split([',', ';']).map(|s| s.trim().trim_start_matches('\\').to_string()).filter(|s| !s.is_empty()).collect())
         .unwrap_or_default()
 }
@@ -101,6 +106,11 @@ pub struct FoundMod {
     pub info: PathBuf,
     /// Mod ids it lists in `require=`.
     pub requires: Vec<String>,
+    /// `incompatible=`: mods that must not be enabled with it.
+    pub incompatible: Vec<String>,
+    /// `loadModAfter=` / `loadModBefore=`: ordering hints the game reads.
+    pub load_after: Vec<String>,
+    pub load_before: Vec<String>,
 }
 
 fn walk(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
@@ -153,6 +163,8 @@ pub fn find_mods(root: &Path, depth: usize) -> Vec<FoundMod> {
         {
             let mut i = read_info(&info);
             let requires = requires(&i);
+            let (incompatible, load_after, load_before) =
+                (id_list(&i, "incompatible"), id_list(&i, "loadModAfter"), id_list(&i, "loadModBefore"));
             let fallback = dir.file_name().unwrap_or_default().to_string_lossy().into_owned();
             out.push(FoundMod {
                 id: i.remove("id").filter(|s| !s.is_empty()).unwrap_or(fallback),
@@ -160,6 +172,9 @@ pub fn find_mods(root: &Path, depth: usize) -> Vec<FoundMod> {
                 dir,
                 info,
                 requires,
+                incompatible,
+                load_after,
+                load_before,
             });
         }
     }

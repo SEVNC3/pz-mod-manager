@@ -73,6 +73,12 @@ enum Row {
         missing: bool,
         #[serde(default)]
         requires: Vec<String>,
+        #[serde(default)]
+        incompatible: Vec<String>,
+        #[serde(default)]
+        load_after: Vec<String>,
+        #[serde(default)]
+        load_before: Vec<String>,
     },
     Sep {
         name: String,
@@ -98,20 +104,41 @@ struct View {
 fn view(paths: &Paths) -> anyhow::Result<View> {
     let (p, adopted) = profile::sync(paths)?;
     let mut mods = scan(paths)?;
+    let row = |m: store::Row, on: bool| Row::Mod {
+        id: m.id,
+        name: m.name,
+        source: m.source,
+        on,
+        missing: false,
+        requires: m.requires,
+        incompatible: m.incompatible,
+        load_after: m.load_after,
+        load_before: m.load_before,
+    };
     let mut rows = vec![];
-    for line in p.lines {
+    for line in &p.lines {
         match line {
-            Line::Separator(name) => rows.push(Row::Sep { name }),
-            Line::Mod { id, on } => match mods.remove(&id) {
-                Some(m) => rows.push(Row::Mod { id, name: m.name, source: m.source, on, missing: false, requires: m.requires }),
-                None if on => rows.push(Row::Mod { id, name: String::new(), source: String::new(), on, missing: true, requires: vec![] }),
+            Line::Separator(name) => rows.push(Row::Sep { name: name.clone() }),
+            Line::Mod { id, on } => match mods.remove(id) {
+                Some(m) => rows.push(row(m, *on)),
+                None if *on => rows.push(Row::Mod {
+                    id: id.clone(),
+                    name: String::new(),
+                    source: String::new(),
+                    on: true,
+                    missing: true,
+                    requires: vec![],
+                    incompatible: vec![],
+                    load_after: vec![],
+                    load_before: vec![],
+                }),
                 None => {} // disabled and gone: drop it
             },
         }
     }
     let mut rest: Vec<store::Row> = mods.into_values().collect();
     rest.sort_by_key(|m| (if m.name.is_empty() { &m.id } else { &m.name }).to_lowercase());
-    rows.extend(rest.into_iter().map(|m| Row::Mod { id: m.id, name: m.name, source: m.source, on: false, missing: false, requires: m.requires }));
+    rows.extend(rest.into_iter().map(|m| row(m, false)));
     let mode = profile::kind_of(paths, &p.name);
     Ok(View {
         profile: p.name,

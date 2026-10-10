@@ -1,7 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
 
 export type Mode = "zomboid" | "viewpoint";
-export type ModRow = { kind: "mod"; id: string; name: string; source: string; on: boolean; missing: boolean; requires: string[] };
+export type ModRow = {
+  kind: "mod";
+  id: string;
+  name: string;
+  source: string;
+  on: boolean;
+  missing: boolean;
+  requires: string[];
+  incompatible: string[];
+  load_after: string[];
+  load_before: string[];
+};
 export type SepRow = { kind: "sep"; name: string };
 export type Row = ModRow | SepRow;
 

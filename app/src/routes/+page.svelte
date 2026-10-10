@@ -11,6 +11,7 @@
   import ServersSaves from "$lib/ServersSaves.svelte";
   import LayerIcon from "$lib/LayerIcon.svelte";
   import Links from "$lib/Links.svelte";
+  import { findProblems, sortLoadOrder } from "$lib/order";
   import type { Overlap } from "$lib/api";
 
   let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
@@ -136,23 +137,7 @@
     rows.forEach((r, i) => r.kind === "mod" && r.on && o.set(i, ++n));
     return o;
   });
-  const problems = $derived.by(() => {
-    const pos = new Map<string, number>();
-    rows.forEach((r, i) => r.kind === "mod" && pos.set(r.id, i));
-    const out = new Map<string, { text: string; fixable: boolean }>();
-    rows.forEach((r, i) => {
-      if (r.kind !== "mod" || !r.on || r.missing) return;
-      for (const req of r.requires) {
-        const dep = mods.get(req);
-        if (!dep || dep.missing) out.set(r.id, { text: `Needs ${req} (not installed)`, fixable: false });
-        else if (!dep.on) out.set(r.id, { text: `Needs ${req} (disabled)`, fixable: true });
-        else if ((pos.get(req) ?? 0) > i) out.set(r.id, { text: `${req} must load first`, fixable: true });
-        else continue;
-        break;
-      }
-    });
-    return out;
-  });
+  const problems = $derived(findProblems(rows));
   const fixable = $derived([...problems.values()].filter((p) => p.fixable).length);
   const missingReqs = $derived.by(() => {
     const out = new Set<string>();
@@ -209,33 +194,9 @@
     }
   }
 
-  /** Enable disabled requirements and move each requirement above the first mod needing it. */
+  /** Enable disabled requirements and reorder so requirements and load hints hold. */
   function fixLoadOrder() {
-    const next = [...rows];
-    for (let pass = 0; pass < 50; pass++) {
-      let changed = false;
-      outer: for (let i = 0; i < next.length; i++) {
-        const m = next[i];
-        if (m.kind !== "mod" || !m.on) continue;
-        for (const req of m.requires) {
-          const j = next.findIndex((r) => r.kind === "mod" && r.id === req);
-          if (j < 0) continue;
-          const dep = next[j] as ModRow;
-          if (!dep.on) {
-            next[j] = { ...dep, on: true };
-            changed = true;
-          }
-          if (j > i) {
-            const [item] = next.splice(j, 1);
-            next.splice(i, 0, item);
-            changed = true;
-            break outer;
-          }
-        }
-      }
-      if (!changed) break;
-    }
-    commit(next);
+    commit(sortLoadOrder(rows));
   }
 
   async function checkUpdates() {
@@ -576,7 +537,7 @@
     {/if}
     {#if fixable}
       <button class="primary" onclick={fixLoadOrder} disabled={busy}
-        title="Enable required mods and move them above the mods that need them">Fix load order</button>
+        title="Enable required mods and order mods by their require / loadModAfter / loadModBefore rules">Fix load order</button>
     {/if}
     {#if !missingReqs.size && !fixable}
       <span class="hint">
