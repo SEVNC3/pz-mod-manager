@@ -463,7 +463,7 @@
   .views button.active,
   .seg button.active {
     background: var(--accent-soft);
-    color: var(--accent-text);
+    color: #fff;
     font-weight: 700;
   }
   .search {

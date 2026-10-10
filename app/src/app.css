@@ -107,6 +107,7 @@ button {
 button:hover:not(:disabled) {
   background: var(--hover);
   border-color: var(--hover-line);
+  color: #fff;
 }
 button:disabled {
   opacity: 0.5;
@@ -131,6 +132,7 @@ button.quiet:hover:not(:disabled),
 button:not(.primary):hover:not(:disabled) {
   background: var(--hover);
   border-color: var(--hover-line);
+  color: #fff;
 }
 button.danger {
   color: var(--danger);
@@ -182,11 +184,11 @@ select {
   option:hover,
   option:focus-visible {
     background: var(--hover);
+    color: #fff;
     outline: none;
   }
   option:checked {
     font-weight: 700;
-    color: var(--accent-text);
   }
 }
 
