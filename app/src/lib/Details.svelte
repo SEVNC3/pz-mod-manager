@@ -214,6 +214,9 @@
       </div>
     {:else if d.source.startsWith("steam:")}
       <p class="note">This mod comes from your Steam subscriptions. Unsubscribe in Steam to remove it.</p>
+      {#if source.url}
+        <button onclick={() => api.openUrl(source.url!)}><Icon name="steam" size={14} />Unsubscribe on the Workshop page</button>
+      {/if}
     {/if}
   {/if}
 </aside>
