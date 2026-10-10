@@ -60,7 +60,7 @@
     if (busy) return;
     api.details(target).then((r) => {
       if (target === id) d = r;
-    });
+    }).catch(() => {});
     api.conflicts(target).then((c) => {
       if (target === id) conflicts = c;
     }).catch(() => (conflicts = []));
@@ -71,7 +71,7 @@
       poster = null;
       api.poster(target).then((buf) => {
         if (target === id && buf.byteLength) poster = URL.createObjectURL(new Blob([buf]));
-      });
+      }).catch(() => {});
     }
   });
 

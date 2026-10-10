@@ -886,21 +886,29 @@ async fn mode_switch(mode: String) -> Res<View> {
 fn open_path(app: AppHandle, path: String) -> Res<()> {
     // folders only: a file path here could launch a program
     if !std::path::Path::new(&path).is_dir() {
+        pzmm_core::log!("error: not a folder: {path}");
         return Err(format!("not a folder: {path}"));
     }
-    app.opener().open_path(path, None::<&str>).map_err(|e| e.to_string())
+    app.opener().open_path(&path, None::<&str>).map_err(|e| {
+        pzmm_core::log!("error: couldn't open {path}: {e}");
+        e.to_string()
+    })
 }
 
 #[tauri::command(async)]
 fn open_url(app: AppHandle, url: String) -> Res<()> {
     if !(url.starts_with("https://") || url == format!("steam://rungameid/{}", pz::STEAM_APP)) {
+        pzmm_core::log!("error: PZMM only opens https links: {url}");
         return Err(format!("refusing to open {url}"));
     }
     // Workshop pages open in the Steam client when it's running (Subscribe works there);
     // otherwise in the browser, since a steam:// link would start Steam
     let workshop = ["https://steamcommunity.com/sharedfiles/", "https://steamcommunity.com/workshop/"].iter().any(|p| url.starts_with(p));
     let url = if workshop && sources::steam_workshop::client_running() { format!("steam://openurl/{url}") } else { url };
-    app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
+    app.opener().open_url(&url, None::<&str>).map_err(|e| {
+        pzmm_core::log!("error: couldn't open {url}: {e} (is Steam installed?)");
+        e.to_string()
+    })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -179,8 +179,9 @@ export const api = {
   profileImport: (shared: Shared) => invoke<View>("profile_import", { shared }),
   modePreview: (mode: Mode) => invoke<string[]>("mode_preview", { mode }),
   modeSwitch: (mode: Mode) => invoke<View>("mode_switch", { mode }),
-  openPath: (path: string) => invoke<void>("open_path", { path }),
-  openUrl: (url: string) => invoke<void>("open_url", { url }),
+  // failures are logged by the backend (they reach the activity log), so callers needn't handle them
+  openPath: (path: string) => invoke<void>("open_path", { path }).catch(() => {}),
+  openUrl: (url: string) => invoke<void>("open_url", { url }).catch(() => {}),
 };
 
 /** Human label + page URL for a source string from the backend. */

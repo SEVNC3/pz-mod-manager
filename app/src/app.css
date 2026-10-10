@@ -216,6 +216,12 @@ select {
   color: #fff;
 }
 
+input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+
 [hidden] {
   display: none !important;
 }

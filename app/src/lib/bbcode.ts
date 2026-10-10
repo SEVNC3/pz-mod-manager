@@ -3,7 +3,7 @@
 // opened by the app (never navigated in the window); only http(s) URLs survive.
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const safeUrl = (u: string) => (/^https?:\/\/[^\s"<>]+$/i.test(u) ? u : null);
+const safeUrl = (u: string) => (/^https?:\/\/[^\s"<>]+$/i.test(u) ? u.replace(/^http:/i, "https:") : null);
 
 export function bbcode(src: string): string {
   // [noparse] and [code] keep their contents verbatim
@@ -28,7 +28,7 @@ export function bbcode(src: string): string {
     [/\[spoiler\]([\s\S]*?)\[\/spoiler\]/gi, '<span class="spoiler">$1</span>'],
     [/\[quote(?:=[^\]]*)?\]([\s\S]*?)\[\/quote\]/gi, "<blockquote>$1</blockquote>"],
     [/\[hr\]\s*(?:\[\/hr\])?/gi, "<hr>"],
-    [/\[img\]\s*([^\[\s]+?)\s*\[\/img\]/gi, (_m, u) => (safeUrl(u.replace(/&amp;/g, "&")) ? `<img src="${u}" alt="" loading="lazy">` : "")],
+    [/\[img\]\s*([^\[\s]+?)\s*\[\/img\]/gi, (_m, u) => (safeUrl(u.replace(/&amp;/g, "&")) ? `<img src="${u.replace(/^http:/i, "https:")}" alt="" loading="lazy">` : "")],
     [/\[url=([^\]]+)\]([\s\S]*?)\[\/url\]/gi, (_m, u, label) => link(u.trim(), label)],
     [/\[url\]([\s\S]*?)\[\/url\]/gi, (_m, u) => link(u.trim(), u)],
     [/\[\*\]([\s\S]*?)(?=\[\*\]|\[\/list\]|\[\/olist\]|$)/gi, "<li>$1</li>"],

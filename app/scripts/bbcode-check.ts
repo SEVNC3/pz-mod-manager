@@ -12,4 +12,5 @@ assert.equal(bbcode("[img]https://i.png[/img]"), '<img src="https://i.png" alt="
 assert.equal(bbcode("[img]file:///c:/x[/img]"), "");
 assert.equal(bbcode("[code]<b>[b]x[/b]</b>[/code]"), "<pre>&lt;b&gt;[b]x[/b]&lt;/b&gt;</pre>");
 assert.equal(bbcode("[h1]Title[/h1]\nline\n[unknowntag]kept[/unknowntag]"), "<h3>Title</h3>line<br>kept");
+assert.equal(bbcode("[url=http://a.b/c]x[/url]"), '<a href="#" data-href="https://a.b/c">x</a>', "http links are upgraded");
 console.log("bbcode-check: ok");

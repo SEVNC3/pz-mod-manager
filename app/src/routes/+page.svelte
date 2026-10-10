@@ -93,6 +93,7 @@
       if (modePlan?.target === target) modePlan.lines = lines;
     } catch (e) {
       if (modePlan?.target === target) modePlan.error = String(e);
+      else say(String(e), true);
     }
   }
 
@@ -984,7 +985,7 @@
       <button class="primary" onclick={fixLoadOrder} disabled={busy}
         title="Enable required mods and order mods by their require / loadModAfter / loadModBefore rules"><Icon name="wand" size={14} />Fix load order</button>
     {/if}
-    {#if picked.size >= 1}
+    {#if picked.size >= 2}
       <span class="bulk" role="group" aria-label="Selected mods">
         <strong>{picked.size} selected</strong>
         <button onclick={() => bulkSet(true)} disabled={busy}>Enable</button>
@@ -1022,8 +1023,8 @@
         Start the game, check whether the problem happens, then come back here.
       </p>
       <div class="row">
-        <button class="primary" onclick={() => bisectAnswer(true)} disabled={busy}>The problem still happens</button>
-        <button class="primary" onclick={() => bisectAnswer(false)} disabled={busy}>The problem is gone</button>
+        <button onclick={() => bisectAnswer(true)} disabled={busy}><Icon name="alert" size={14} />The problem still happens</button>
+        <button onclick={() => bisectAnswer(false)} disabled={busy}><Icon name="check" size={14} />The problem is gone</button>
         <button class="quiet" onclick={bisectStop} disabled={busy}>Stop and restore my list</button>
       </div>
     </div>
@@ -1110,7 +1111,7 @@
                 </tr>
               {:else}
                 {@const src = describeSource(r.source)}
-                <tr class="mod" class:start class:end class:off={!r.on} class:selected={selected === r.id} class:picked={picked.size >= 1 && picked.has(r.id)} class:drop={dropShown === i} class:dragging={dragFrom === i || (sectionDrag && dragFrom !== null && i > dragFrom && i < dragEnd)}
+                <tr class="mod" class:start class:end class:off={!r.on} class:selected={selected === r.id} class:picked={picked.size >= 2 && picked.has(r.id)} class:drop={dropShown === i} class:dragging={dragFrom === i || (sectionDrag && dragFrom !== null && i > dragFrom && i < dragEnd)}
                   data-index={i} tabindex="0" draggable={!filtering}
                   aria-selected={selected === r.id}
                   onclick={(e) => rowClick(e, r.id)} onkeydown={(e) => rowKey(e, i, r)}
@@ -1281,8 +1282,8 @@
     flex: 1;
   }
   .app-update progress {
+    accent-color: var(--accent-text);
     width: 220px;
-    accent-color: var(--accent);
   }
   .version {
     color: var(--muted);
@@ -1579,6 +1580,11 @@
   tr.off .num {
     color: var(--muted);
   }
+  tr.mod:hover .title,
+  tr.mod.picked .title,
+  tr.mod.selected .title {
+    color: var(--on-selected);
+  }
   tr.dragging {
     opacity: 0.4;
   }
@@ -1601,7 +1607,6 @@
     width: 28px;
   }
   .check input {
-    accent-color: var(--accent);
     width: 16px;
     height: 16px;
   }
@@ -1809,9 +1814,11 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--line);
+    background: var(--muted);
+    opacity: 0.6;
   }
   .dot.busy {
+    opacity: 1;
     background: var(--accent-text);
     animation: pulse 1s ease-in-out infinite alternate;
   }

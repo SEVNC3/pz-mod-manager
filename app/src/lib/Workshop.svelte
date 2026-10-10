@@ -544,7 +544,8 @@
     border-radius: 3px;
   }
   .chip.in {
-    color: var(--text);
+    background: var(--accent-soft);
+    color: var(--on-selected);
   }
   .chip.in .box {
     background: var(--accent);
