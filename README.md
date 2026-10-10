@@ -10,7 +10,11 @@ A free, open-source mod manager for **Project Zomboid** (Build 41 and 42), for W
   - an item panel with screenshots, videos, the full description, change notes and comments, plus the mods that need it, the collections it's in and more by the same author
 - **Install** from the Steam Workshop (link, ID or a whole collection), from GitHub (`owner/repo`, optionally `@tag`) or from a local `.zip` or folder. You don't need to log in to Steam. If a mod lists other mods it requires, PZMM installs those too.
 - **See everything:** Steam Workshop subscriptions and the mods in your `Zomboid/mods` folder, in one list with each mod's poster, author and description.
-- **Load order:** drag to reorder, group mods under separators, and switch mods on and off. Drag a separator to move its whole section. **Autosort** groups mods by category from their Workshop tags (frameworks first, translations last) and fixes every `require` / `loadModAfter` / `loadModBefore` rule in one click; it asks first when you have sections of your own. Removing a separator leaves its mods where they are. PZMM writes the same `mods/default.txt` the game reads.
+- **Library and load order**, kept apart like Mod Organizer 2:
+  - the library on the left is yours to organise: separators, dragging whole sections, **Group by category** from Workshop tags, and switching mods on and off
+  - the load order beside it is what the game loads: drag it, or **Autosort** it (frameworks first, translations last, every `require` / `loadModAfter` / `loadModBefore` rule satisfied)
+  - PZMM writes the same `mods/default.txt` the game reads, and a map order for dedicated servers
+- **Settings:** every folder PZMM uses with Browse and Detect, update checks, Recycle Bin removal, backup limits and launch arguments.
 - **Profiles:** keep separate mod setups ("Solo", "Friends server") and switch between them from one menu that groups them by game. Changes you make in the game's own mod menu are picked up automatically, and PZMM never saves over them.
 - **Dependencies:** PZMM flags enabled mods whose required mods are missing, disabled or loading too late. **Install missing mods** finds the missing ones on the Workshop: it checks the "Required items" the author lists, and reads "Mod ID: X" from Workshop descriptions. **Fix load order** sorts the rest.
 - **Conflicts:** each mod's details show which other mods replace the same files, and which copy wins.
@@ -47,7 +51,7 @@ The Windows installer isn't code-signed yet, so Windows may show a SmartScreen w
 
 1. Paste a Workshop link, a GitHub repo or a zip path into the box at the top, then click **Install**. The mod is installed and enabled.
 2. Tick or untick mods to enable or disable them. Drag rows to change the load order. With a row selected, you can also use the keyboard: **Space** toggles it and **Alt+↑/↓** moves it.
-3. Use **Separator** to group your list, or **Autosort** to group it by category. Double-click a separator to rename it, drag it to move its whole section, and press **Delete** to remove it (its mods stay where they are).
+3. Use **Separator** to group your library, or **Group by category** to sort it into sections, and **Autosort** to fix the load order. Double-click a separator to rename it, drag it to move its whole section, and press **Delete** to remove it (its mods stay where they are).
 4. Click **Launch game**.
 
 **Build 41 or 42?** PZMM keeps whatever format your `default.txt` already uses. If the file is new, PZMM uses the Build 42 format. To set it yourself, go to **Settings → Game build**. Before each save, the previous file is kept as `default.txt.bak`.
