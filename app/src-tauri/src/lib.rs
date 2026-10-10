@@ -150,7 +150,9 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
     }
     let mut rest: Vec<store::Row> = mods.into_values().collect();
     rest.sort_by_key(|m| (if m.name.is_empty() { &m.id } else { &m.name }).to_lowercase());
-    rows.extend(rest.into_iter().map(|m| row(m, false)));
+    // mods the profile doesn't mention yet go above the first separator: the Uncategorised card
+    let at = rows.iter().position(|r| matches!(r, Row::Sep { .. })).unwrap_or(rows.len());
+    rows.splice(at..at, rest.into_iter().map(|m| row(m, false)));
     let mode = profile::kind_of(paths, &p.name);
     Ok(View {
         profile: p.name,

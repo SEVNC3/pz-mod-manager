@@ -16,6 +16,7 @@
   import { autosort, bisectRound, findProblems, moveSection, placeInSections, sectionDrop, sortLoadOrder } from "$lib/order";
   import LoadOrder from "$lib/LoadOrder.svelte";
   import WindowControls from "$lib/WindowControls.svelte";
+  import ProfilePicker from "$lib/ProfilePicker.svelte";
   import type { Finding, ModErrors, Overlap, Save, Stats } from "$lib/api";
 
   let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
@@ -73,29 +74,33 @@
   let rows = $state<Row[]>([]);
 
   // --- Project Zomboid / Project Viewpoint ---
-  const MODES: [Mode, string][] = [["zomboid", "Project Zomboid"], ["viewpoint", "Project Viewpoint"]];
-  let modePlan = $state<{ target: Mode; lines: string[]; error: string } | null>(null);
+  let modePlan = $state<{ target: Mode; profile?: string; lines: string[]; error: string } | null>(null);
   const modeProfiles = $derived(
     (view?.profiles ?? []).filter((p) => p === view?.profile || (view?.kinds[p] ?? "zomboid") === (view?.mode ?? "zomboid")),
   );
 
-  async function planMode(target: Mode) {
+  /** Show what switching game does; `profile` is the one picked in the profile menu, if any. */
+  async function planMode(target: Mode, profile?: string) {
     if (!view || target === view.mode) return;
-    modePlan = { target, lines: [], error: "" };
+    modePlan = { target, profile, lines: [], error: "" };
     try {
-      modePlan.lines = await api.modePreview(target);
+      const lines = await api.modePreview(target);
+      if (modePlan?.target === target) modePlan.lines = lines;
     } catch (e) {
-      modePlan.error = String(e);
+      if (modePlan?.target === target) modePlan.error = String(e);
     }
   }
 
   async function switchMode() {
     if (!modePlan) return;
-    const target = modePlan.target;
+    const { target, profile } = modePlan;
     modePlan = null;
     logOpen = true;
     const label = target === "viewpoint" ? "Setting up Project Viewpoint" : "Switching to Project Zomboid";
-    if (await run(label, () => api.modeSwitch(target))) await settleOrder();
+    if (!(await run(label, () => api.modeSwitch(target)))) return;
+    // the switch lands on that game's last profile; go on to the one that was picked
+    if (profile && view && profile !== view.profile && view.profiles.includes(profile)) await run(`Switching to "${profile}"`, () => api.profileUse(profile));
+    await settleOrder();
   }
   let selected = $state<string | null>(null);
   let busy = $state(false);
@@ -581,16 +586,23 @@
     editingSep = at;
   }
 
-  /** Drop a separator; its mods join the section above. */
+  /** Drop a separator; its mods move to Uncategorised (above the first separator), never into the section above. */
   function removeSep(i: number) {
-    commit(rows.filter((_, j) => j !== i));
+    let end = i + 1;
+    while (end < rows.length && rows[end].kind !== "sep") end++;
+    const mods = rows.slice(i + 1, end);
+    const rest = [...rows.slice(0, i), ...rows.slice(end)];
+    const first = rest.findIndex((r) => r.kind === "sep");
+    rest.splice(first < 0 ? rest.length : first, 0, ...mods);
+    commit(rest);
   }
 
   function renameSep(i: number, name: string) {
     editingSep = null;
     const r = rows[i];
     if (r?.kind !== "sep") return;
-    commit(name.trim() ? rows.map((x, j) => (j === i ? { kind: "sep", name: name.trim() } : x)) : rows.filter((_, j) => j !== i));
+    if (!name.trim()) removeSep(i);
+    else commit(rows.map((x, j) => (j === i ? { kind: "sep", name: name.trim() } : x)));
   }
 
   async function createProfile(e: Event) {
@@ -644,6 +656,12 @@
     }
   }
 
+  /** Mods above the first separator, shown as their own card once the list has sections. */
+  const uncategorised = $derived.by(() => {
+    if (filtering || !rows.some((r) => r.kind === "sep") || visible[0]?.r.kind !== "mod") return null;
+    const top = rows.slice(0, rows.findIndex((r) => r.kind === "sep")).filter((r): r is ModRow => r.kind === "mod");
+    return { on: top.filter((m) => m.on).length, total: top.length };
+  });
   const separators = $derived(rows.filter((r) => r.kind === "sep").map((r) => (r as { name: string }).name));
 
   function remove(id: string) {
@@ -713,17 +731,7 @@
     <WindowControls />
     <img class="brand" src="/brand/pzmm.png" alt="PZMM" width="44" height="44" />
 
-    <div class="modes" role="radiogroup" aria-label="Game">
-      {#each MODES as [m, label]}
-        <button role="radio" aria-checked={view?.mode === m} class:active={(view?.mode ?? "zomboid") === m}
-          disabled={busy} onclick={() => planMode(m)} title={label}>
-          <img src={m === "zomboid" ? "/brand/project-zomboid.png" : "/brand/project-viewpoint.png"} alt={label} height="26" />
-        </button>
-      {/each}
-    </div>
-
     <div class="profile">
-      <label for="profile">Profile</label>
       {#if newProfile !== null}
         <form onsubmit={createProfile} class="inline">
           <!-- svelte-ignore a11y_autofocus -->
@@ -732,13 +740,8 @@
           <button type="submit" disabled={!newProfile.trim()}>Create</button>
         </form>
       {:else}
-        <select id="profile" value={view?.profile} disabled={busy}
-          onchange={(e) => run("Switching profile", () => api.profileUse(e.currentTarget.value))}>
-          {#each modeProfiles as p}
-            <option value={p}>{p}</option>
-          {/each}
-        </select>
-        <button class="quiet" onclick={() => (newProfile = "")} disabled={busy} title="New profile from the current one"><Icon name="plus" size={14} />New</button>
+        <ProfilePicker {view} {busy} onUse={(p) => run("Switching profile", () => api.profileUse(p))}
+          onSwitchGame={planMode} onNew={() => (newProfile = "")} />
         <button class="quiet" onclick={shareProfile} disabled={busy} title="Copy a code others can import"><Icon name="share" size={14} />Share</button>
         <button class="quiet" onclick={() => (importText = "")} disabled={busy} title="Import a profile from a share code"><Icon name="upload" size={14} />Import</button>
         {#if modeProfiles.length > 1}
@@ -1009,9 +1012,18 @@
             <tr><th>Move</th><th>Enabled</th><th>Load order</th><th>Mod</th><th>Size</th><th>Last changed</th><th>Shared files</th><th>Source</th></tr>
           </thead>
           <tbody>
+            {#if uncategorised}
+              <tr class="sep start uncat" class:end={visible[0]?.r.kind === "sep"}>
+                <td class="grip"></td>
+                <td colspan="7">
+                  <span class="tape plain" title="Mods that aren't in a section. Removing a separator moves its mods here.">Uncategorised</span>
+                  <span class="sec-count">{uncategorised.on} of {uncategorised.total} enabled</span>
+                </td>
+              </tr>
+            {/if}
             {#each visible as { r, i }, k (r.kind === "mod" ? `m:${r.id}` : `s:${i}:${r.name}`)}
               <!-- each section is a card: a separator starts one, the row before the next separator ends it -->
-              {@const start = k === 0 || r.kind === "sep"}
+              {@const start = (k === 0 && !uncategorised) || r.kind === "sep"}
               {@const end = k === visible.length - 1 || visible[k + 1].r.kind === "sep"}
               {#if start && k > 0}<tr class="gap" aria-hidden="true"><td colspan="8"></td></tr>{/if}
               {#if r.kind === "sep"}
@@ -1178,44 +1190,6 @@
     margin-left: 6px;
     vertical-align: 2px;
   }
-  .modes {
-    display: flex;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    overflow: hidden;
-  }
-  .modes button {
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    padding: 4px 10px;
-    color: var(--muted);
-  }
-  .modes img {
-    display: block;
-    height: 26px;
-    width: auto;
-    opacity: 0.45;
-    transition: opacity 0.15s;
-  }
-  .modes button:hover img {
-    opacity: 0.75;
-  }
-  .modes button.active {
-    background: var(--accent-soft);
-  }
-  .modes button.active img {
-    opacity: 1;
-  }
-  /* the wordmarks are white: darken them on the light theme */
-  :global(:root[data-theme="light"]) .modes img {
-    filter: invert(1);
-  }
-  @media (prefers-color-scheme: light) {
-    :global(:root:not([data-theme="dark"])) .modes img {
-      filter: invert(1);
-    }
-  }
   .mode-plan {
     padding: 10px 16px;
     background: var(--panel);
@@ -1326,9 +1300,6 @@
     display: flex;
     align-items: center;
     gap: 6px;
-  }
-  .profile label {
-    color: var(--muted);
   }
   .install {
     display: flex;
@@ -1729,6 +1700,11 @@
   }
   .sep-remove:hover:not(:disabled) {
     color: var(--danger);
+  }
+  /* Uncategorised: plain tape, no blood (nothing has been sorted here yet) */
+  .tape.plain {
+    padding-right: 16px;
+    background: color-mix(in oklab, var(--tape) 55%, var(--panel));
   }
   .tape-edit {
     border: 0;
