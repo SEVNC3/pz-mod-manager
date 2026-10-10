@@ -52,29 +52,29 @@ This merges their findings. Each item names its source. Work top to bottom; P0 a
 
 ## P2: consistency and polish
 
-25. [ ] **One selected state** (ui 4-8).
+25. [x] **One selected state** (ui 4-8).
     - Add a `--sel` token used by tabs, segmented controls, rows and the item panel's tabs.
     - Hover is lighter than selected, not identical.
     - Hover and selected text is always `--on-selected`, including disabled rows.
     - A required tag chip uses the selected style.
-26. [ ] **Servers & saves and ZombieBuddy on the blueprint with cards** (ui 3). Centre them.
-27. [ ] **Banners, the mode plan, import, findings, settings and the app-update strip as one card style** (ui 18). Lay out Settings as a grid (ui 19).
-28. [ ] **Icons** (ui 11, 12, 14, 15, 25).
+26. [x] **Servers & saves and ZombieBuddy on the blueprint with cards** (ui 3). Centre them.
+27. [x] **Banners, the mode plan, import, findings, settings and the app-update strip as one card style** (ui 18). Lay out Settings as a grid (ui 19).
+28. [x] **Icons** (ui 11, 12, 14, 15, 25).
     - Missing icons: Details Disable, the bulk bar, Fix N problems, the banners, ZombieBuddy apply, Write .ini, Import.
     - Chevron icons on pagers; grip and chevron icons instead of `⠿` and `▸▾`; Feather checks in ZombieBuddy.
     - Sizes: 14 in buttons, 16 icon-only, 12 inline.
-29. [ ] **Headings** (ui 16). A global h2 (20) and h3 (12 uppercase label); remove the per-file copies.
-30. [ ] **Native controls** (ui 2, 21).
+29. [x] **Headings** (ui 16). A global h2 (20) and h3 (12 uppercase label); remove the per-file copies.
+30. [x] **Native controls** (ui 2, 21).
     - Checkbox `accent-color` everywhere.
     - Date inputs like the other inputs.
     - Replace the datalist with the styled select.
-31. [ ] **Progress bar and idle activity dot are invisible** (ui 17, 25).
-32. [ ] **The bulk bar wraps the toolbar; show it only for 2+ picked rows** (ui 9, ux 9). Hide the hint on narrow windows (ui 10).
-33. [ ] **Workshop count, pager and messages sit on a panel strip, not on bare blueprint** (ui 13). Add a loading state and per-row retry on Home; load the rows in parallel (ux 13). Map 429 to plain words, and add Clear filters to the empty state (ux 14).
-34. [ ] **Two filled buttons in the bisect panel** (ui 24). Tiles get borders (ui 22).
-35. [ ] **Plain `http://` links in descriptions** (app 11). Rewrite them to https.
-36. [ ] **Collapsed sections swallow moved rows** (app 12, ux 20). Step over hidden rows; dropping onto a separator puts the row under it.
-37. [ ] **Unhandled rejections** (app 15): planMode after Esc, Details loads, openUrl failures go to the activity log, and "Update all" clears updates only on success.
+31. [x] **Progress bar and idle activity dot are invisible** (ui 17, 25).
+32. [x] **The bulk bar wraps the toolbar; show it only for 2+ picked rows** (ui 9, ux 9). Hide the hint on narrow windows (ui 10).
+33. [x] **Workshop count, pager and messages sit on a panel strip, not on bare blueprint** (ui 13). Add a loading state and per-row retry on Home; load the rows in parallel (ux 13). Map 429 to plain words, and add Clear filters to the empty state (ux 14).
+34. [x] **Two filled buttons in the bisect panel** (ui 24). Tiles get borders (ui 22).
+35. [x] **Plain `http://` links in descriptions** (app 11). Rewrite them to https.
+36. [x] **Collapsed sections swallow moved rows** (app 12, ux 20). Step over hidden rows; dropping onto a separator puts the row under it.
+37. [x] **Unhandled rejections** (app 15): planMode after Esc, Details loads, openUrl failures go to the activity log, and "Update all" clears updates only on success.
 
 ## P3: refactor (after P0-P2, behaviour unchanged)
 
