@@ -287,17 +287,20 @@ pub fn map_start(paths: &Paths, profile: &Profile, mods: &std::collections::BTre
 
 /// default.txt's `maps` block for `profile`: its enabled mods' maps on `build`, in the order
 /// `map_start` gives (so a never-arranged profile keeps the block's order but drops other
-/// profiles' maps), without Muldraugh (`write_default` keeps it last). None (the mods can't
-/// be read) keeps the block as it is.
-fn game_maps(paths: &Paths, profile: &Profile, build: u8) -> Option<Vec<String>> {
-    let mods = crate::store::scan(paths).ok()?;
-    let mut allowed = pz::server::mod_maps(&profile.enabled(), &mods, build);
+/// profiles' maps), without Muldraugh (`write_default` keeps it last), from the mod scan `mods`.
+fn game_maps(paths: &Paths, profile: &Profile, mods: &std::collections::BTreeMap<String, crate::store::Row>, build: u8) -> Vec<String> {
+    let mut allowed = pz::server::mod_maps(&profile.enabled(), mods, build);
     // folders no installed mod provides (a mod outside PZMM's view) aren't PZMM's to drop
     let ids: Vec<String> = mods.keys().cloned().collect();
-    let known = pz::server::mod_maps(&ids, &mods, build);
-    allowed.extend(pz::read_default(&paths.default_txt()).map_folders().into_iter().filter(|f| !known.contains(f)));
-    let line = pz::server::map_order(&map_start(paths, profile, &mods, build), &allowed);
-    Some(line.into_iter().filter(|m| m != pz::server::BASE_MAP).collect())
+    let known = pz::server::mod_maps(&ids, mods, build);
+    let block = pz::read_default(&paths.default_txt()).map_folders();
+    let unknown: Vec<String> = block.iter().filter(|f| !known.contains(f)).cloned().collect();
+    allowed.extend(unknown.iter().cloned());
+    let start = map_start(paths, profile, mods, build);
+    // ...and keep their place in the block (after the map they followed), arranged or not
+    let anchors: Vec<String> = block.into_iter().filter(|f| unknown.contains(f) || start.contains(f)).collect();
+    let line = pz::server::map_order(&pz::server::merge_order(&anchors, &start), &allowed);
+    line.into_iter().filter(|m| m != pz::server::BASE_MAP).collect()
 }
 
 pub fn delete(paths: &Paths, name: &str) -> Result<()> {
@@ -372,15 +375,16 @@ pub fn sync(paths: &Paths) -> Result<(Profile, bool)> {
     Ok((p, changed))
 }
 
-/// Save `profile`, make it active and write it to the game's mod list.
-pub fn apply(paths: &Paths, profile: &Profile) -> Result<()> {
+/// Save `profile`, make it active and write it to the game's mod list, its maps from the mod
+/// scan `mods` (None: the mods couldn't be read, so the `maps` block is kept as it is).
+pub fn apply(paths: &Paths, profile: &Profile, mods: Option<&std::collections::BTreeMap<String, crate::store::Row>>) -> Result<()> {
     save(paths, profile)?;
     let mut s = state(paths);
     if let Some(d) = pz::try_read_default(&paths.default_txt()).filter(|d| !d.mods.is_empty()) {
         s.seen_b41 = Some(d.b41);
     }
     let b41 = s.b41.or(s.seen_b41);
-    let maps = game_maps(paths, profile, if b41.unwrap_or(false) { 41 } else { 42 });
+    let maps = mods.map(|m| game_maps(paths, profile, m, if b41.unwrap_or(false) { 41 } else { 42 }));
     pz::write_default(&paths.default_txt(), &profile.enabled(), b41, maps.as_deref())?;
     let kind = s.kinds.get(&profile.name).cloned().unwrap_or_else(|| DEFAULT_KIND.into());
     s.last.insert(kind, profile.name.clone());
@@ -442,13 +446,17 @@ pub fn import(paths: &Paths, shared: &Shared) -> Result<Profile> {
     if !shared.kind.is_empty() && crate::safe_file_name(&shared.kind) {
         set_kind(paths, &name, &shared.kind)?;
     }
-    apply(paths, &p)?;
+    apply(paths, &p, crate::store::scan(paths).ok().as_ref())?;
     Ok(p)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn apply(paths: &Paths, p: &Profile) -> Result<()> {
+        super::apply(paths, p, crate::store::scan(paths).ok().as_ref())
+    }
 
     #[test]
     fn share_round_trip() {
@@ -571,6 +579,9 @@ mod tests {
         fs::write(paths.default_txt(), d).unwrap();
         apply(&paths, &Profile::parse("Small", "+D\n+A\n+B\n")).unwrap();
         assert_eq!(pz::read_default(&paths.default_txt()).map_folders(), ids(&["Town B", "Unknown Map", "Town A", "Town D"]));
+        // ...and in an arranged profile too (not moved to the end or before the game's maps)
+        apply(&paths, &Profile::parse("Big", "+A\n+B\n+C\n")).unwrap();
+        assert_eq!(pz::read_default(&paths.default_txt()).map_folders(), ids(&["Other", "Town B", "Unknown Map", "Town A"]));
     }
 
     #[test]

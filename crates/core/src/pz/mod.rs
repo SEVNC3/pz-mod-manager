@@ -243,7 +243,9 @@ pub struct DefaultTxt {
 impl DefaultTxt {
     /// The map folders the `maps` block lists (`map = <folder>,`), in order.
     pub fn map_folders(&self) -> Vec<String> {
-        self.maps.lines().filter_map(|l| l.trim().strip_prefix("map")?.trim_start().strip_prefix('=')).map(|v| v.trim().trim_end_matches(',').trim().to_string()).filter(|v| !v.is_empty()).collect()
+        // hand edits: any case and spacing (`Map=Fort, KY,`)
+        let key = |l: &&str| l.get(..3).is_some_and(|k| k.eq_ignore_ascii_case("map"));
+        self.maps.lines().map(str::trim).filter(key).filter_map(|l| l[3..].trim_start().strip_prefix('=')).map(|v| v.trim().trim_end_matches(',').trim().to_string()).filter(|v| !v.is_empty()).collect()
     }
 }
 
@@ -310,8 +312,9 @@ pub fn write_default(path: &Path, ids: &[String], b41: Option<bool>, maps: Optio
     let maps = match maps {
         Some(m) => {
             // the vanilla map stays last when the game wrote it there (B41 is unverified: keep what it had)
-            let vanilla = old.maps.lines().any(|l| l.trim() == "map = Muldraugh, KY,");
-            let m = m.iter().filter(|f| f.as_str() != "Muldraugh, KY").map(String::as_str).chain(vanilla.then_some("Muldraugh, KY"));
+            let base = |f: &String| f.eq_ignore_ascii_case(server::BASE_MAP);
+            let vanilla = old.map_folders().iter().any(base);
+            let m = m.iter().filter(|f| !base(f)).map(String::as_str).chain(vanilla.then_some(server::BASE_MAP));
             format!("\n{}", m.map(|f| format!("    map = {f},\n")).collect::<String>())
         }
         None => old.maps,
@@ -417,6 +420,12 @@ mod tests {
         write(&p, "VERSION = 1,\nmods\n{\n}\nmaps\n{\n    map = Muldraugh, KY,\n}\n");
         write_default(&p, &[], None, Some(&maps)).unwrap();
         assert!(fs::read_to_string(&p).unwrap().ends_with("    map = Fort, KY,\n    map = Muldraugh, KY,\n}\n"));
+        // ...hand-edited spacing and case included
+        for line in ["map=Muldraugh, KY,", "Map = muldraugh, ky,", "  MAP =Muldraugh, KY  ,"] {
+            write(&p, &format!("VERSION = 1,\nmods\n{{\n}}\nmaps\n{{\n{line}\n}}\n"));
+            write_default(&p, &[], None, Some(&maps)).unwrap();
+            assert!(fs::read_to_string(&p).unwrap().ends_with("    map = Fort, KY,\n    map = Muldraugh, KY,\n}\n"), "{line}");
+        }
     }
 
     #[test]

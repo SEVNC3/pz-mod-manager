@@ -118,7 +118,7 @@ pub fn enter(paths: &Paths, mods: &BTreeMap<String, Row>) -> Result<Profile> {
         None => with_viewpoint(&profile::sync(paths)?.0, &unique_profile_name(paths, PROFILE)),
     };
     profile::set_kind(paths, &p.name, KIND)?;
-    profile::apply(paths, &p)?;
+    profile::apply(paths, &p, Some(mods))?;
     crate::log!(
         "Switched to Project Viewpoint (profile \"{}\"). The first time the game starts, ZombieBuddy asks you to approve Viewpoint's Java code.",
         p.name
@@ -134,7 +134,7 @@ pub fn leave(paths: &Paths) -> Result<Profile> {
         None => without_viewpoint(&profile::sync(paths)?.0, &unique_profile_name(paths, PLAIN_PROFILE)),
     };
     profile::set_kind(paths, &p.name, profile::DEFAULT_KIND)?;
-    profile::apply(paths, &p)?;
+    profile::apply(paths, &p, crate::store::scan(paths).ok().as_ref())?;
     crate::log!("Switched to Project Zomboid (profile \"{}\").", p.name);
     Ok(p)
 }
@@ -157,10 +157,10 @@ mod tests {
     #[test]
     fn leaving_returns_to_the_last_plain_profile() {
         let (_t, paths) = temp_paths();
-        profile::apply(&paths, &Profile::from_ids("Default", ["A".to_string()])).unwrap();
+        profile::apply(&paths, &Profile::from_ids("Default", ["A".to_string()]), None).unwrap();
         let vp = with_viewpoint(&Profile::from_ids("x", ["A".to_string()]), PROFILE);
         profile::set_kind(&paths, PROFILE, KIND).unwrap();
-        profile::apply(&paths, &vp).unwrap();
+        profile::apply(&paths, &vp, None).unwrap();
         assert_eq!(leave(&paths).unwrap().name, "Default");
         assert_eq!(profile::kind_of(&paths, PROFILE), KIND);
         assert_eq!(unique_profile_name(&paths, "Default"), "Default 2");

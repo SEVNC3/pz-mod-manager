@@ -2,11 +2,12 @@
   import { tick } from "svelte";
   import Icon from "./Icon.svelte";
   import { t } from "./i18n.svelte";
-  import { sortMaps } from "./order";
+  import { autosortMaps, sortMaps } from "./order";
 
-  // a Map= line (Servers & saves, Maps): drag or Alt+arrows to arrange; Muldraugh stays last
+  // a Map= line (Servers & saves, Maps): drag, Alt+arrows or the buttons to arrange; Muldraugh stays last
   // `onarrange`: the player moved something (not called when `maps` is set from outside)
-  let { maps = $bindable(), onarrange }: { maps: string[]; onarrange?: (maps: string[]) => void } = $props();
+  // `lotsOf`: a folder's map.info lots= (the maps it builds on), for Autosort
+  let { maps = $bindable(), onarrange, lotsOf = () => [] }: { maps: string[]; onarrange?: (maps: string[]) => void; lotsOf?: (folder: string) => string[] } = $props();
 
   const BASE = "Muldraugh, KY";
   let mapFrom = $state<number | null>(null);
@@ -53,14 +54,20 @@
       ondrop={(e) => { e.preventDefault(); dropMap(i); }}>
       <span class="num mono">{i + 1}</span>{m}
       {#if fixed}<span class="pin"><Icon name="lock" size={12} />{t("mapOrder.fixed")}</span>
-      {:else if i > 0}<button class="quiet top" onclick={() => moveMap(i, 0)} title={t("mapOrder.topTip")} aria-label={t("mapOrder.topLabel", { name: m })}>{t("mapOrder.top")}</button>{/if}
+      {:else}
+        <span class="moves">
+          {#if i > 0}<button class="quiet" onclick={() => moveMap(i, 0)} title={t("mapOrder.topTip")} aria-label={t("mapOrder.topLabel", { name: m })}>{t("mapOrder.top")}</button>{/if}
+          <button class="quiet" disabled={i === 0} onclick={() => moveMap(i, i - 1)} title={t("mapOrder.upTip")} aria-label={t("mapOrder.upLabel", { name: m })}><Icon name="chevron-up" size={14} /></button>
+          <button class="quiet" disabled={maps[i + 1] === undefined || maps[i + 1] === BASE} onclick={() => moveMap(i, i + 2)} title={t("mapOrder.downTip")} aria-label={t("mapOrder.downLabel", { name: m })}><Icon name="chevron-down" size={14} /></button>
+        </span>
+      {/if}
     </li>
   {/each}
   <li class="tail" class:drop={mapAt === maps.length} aria-hidden="true"
     ondragover={(e) => { e.preventDefault(); mapAt = maps.length; }}
     ondrop={(e) => { e.preventDefault(); dropMap(maps.length); }}></li>
 </ol>
-<button class="quiet" onclick={() => arrange(maps)} title={t("mapOrder.autosortTip")}><Icon name="wand" size={14} />{t("mapOrder.autosort")}</button>
+<button class="quiet" onclick={() => arrange(autosortMaps(maps, lotsOf, BASE))} title={t("mapOrder.autosortTip")}><Icon name="wand" size={14} />{t("mapOrder.autosort")}</button>
 
 <style>
   .maps {
@@ -74,11 +81,20 @@
   .maps li:hover .num {
     color: var(--on-selected);
   }
-  .top,
+  .moves,
   .pin {
     margin-left: auto;
-    padding: 0 6px;
     font-size: 12px;
+  }
+  .moves {
+    display: inline-flex;
+    gap: 2px;
+  }
+  .moves button {
+    padding: 0 6px;
+  }
+  .pin {
+    padding: 0 6px;
   }
   .maps li.fixed {
     cursor: default;

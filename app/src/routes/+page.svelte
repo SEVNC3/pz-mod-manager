@@ -909,7 +909,7 @@
   {#if tab === "workshop"}
     <!-- kept mounted above -->
   {:else if tab === "maps"}
-    <Maps {busy} {mods} {say} onSetMods={setMods} onInstallWorkshop={installWorkshop} onShowMod={(id) => { selected = id; tab = "mods"; }}
+    <Maps {busy} {mods} loadOrder={order} {say} onSetMods={setMods} onInstallWorkshop={installWorkshop} onShowMod={(id) => { selected = id; tab = "mods"; }}
       canUndo={undoStack.length > 0} onUndo={undo} />
   {:else if tab === "servers"}
     <ServersSaves {busy} profile={view?.profile ?? ""} enabledIds={order}

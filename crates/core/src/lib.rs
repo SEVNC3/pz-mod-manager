@@ -30,8 +30,10 @@ macro_rules! log {
 
 /// Write via a temp file + rename, so a crash never leaves a half-written file.
 pub fn write_atomic(path: &std::path::Path, bytes: impl AsRef<[u8]>) -> std::io::Result<()> {
+    // unique per write: two writers of one file (threads or processes) never share a temp file
+    static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let mut tmp = path.as_os_str().to_owned();
-    tmp.push(".pzmm-tmp");
+    tmp.push(format!(".{}-{}.pzmm-tmp", std::process::id(), N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)));
     let tmp = std::path::PathBuf::from(tmp);
     {
         use std::io::Write;
@@ -92,6 +94,26 @@ mod tests {
         for bad in ["", ".", "..", "a/b", r"a\b", "x:", "trail.", "trail ", "CON", "con.txt", "COM1", "lpt9", "tab\t"] {
             assert!(!super::safe_file_name(bad), "{bad:?}");
         }
+    }
+
+    #[test]
+    fn overlapping_writes_never_truncate() {
+        let t = tempfile::tempdir().unwrap();
+        let file = t.path().join("cache.json");
+        let payload = |i: usize| vec![b'a' + i as u8; 100_000];
+        std::thread::scope(|s| {
+            for i in 0..8 {
+                let (file, data) = (&file, payload(i));
+                s.spawn(move || {
+                    for _ in 0..10 {
+                        let _ = super::write_atomic(file, &data); // a rename may lose the race; it never leaves half a file
+                    }
+                });
+            }
+        });
+        let got = std::fs::read(&file).unwrap();
+        assert!((0..8).any(|i| got == payload(i)), "whole file from one writer");
+        assert_eq!(std::fs::read_dir(t.path()).unwrap().count(), 1, "no temp files left");
     }
 
     #[test]

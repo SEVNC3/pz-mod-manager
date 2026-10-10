@@ -208,7 +208,7 @@ fn save(rows: Vec<Row>, order: Vec<String>) -> Res<View> {
             })
             .collect();
         p.order = order;
-        profile::apply(paths, &p)?;
+        profile::apply(paths, &p, scan(paths).ok().as_ref())?;
         view(paths)
     })
 }
@@ -233,7 +233,7 @@ async fn install(sources: Vec<String>) -> Res<View> {
             if !ids.is_empty() {
                 let mut p = active(paths)?;
                 enable_compatible(&mut p, &scan(paths)?, &ids);
-                profile::apply(paths, &p)?;
+                profile::apply(paths, &p, scan(paths).ok().as_ref())?;
             }
             view(paths)
         })
@@ -267,7 +267,7 @@ fn remove(ids: Vec<String>) -> Res<View> {
         }
         let mut p = active(paths)?;
         ids.iter().filter(|i| !refused.contains(i)).for_each(|i| p.forget(i));
-        profile::apply(paths, &p)?;
+        profile::apply(paths, &p, scan(paths).ok().as_ref())?;
         view(paths)
     })
 }
@@ -290,7 +290,7 @@ fn profile_new(name: String) -> Res<View> {
         let current = active(paths)?;
         // a copy of a Viewpoint profile is a Viewpoint profile too
         profile::set_kind(paths, &name, &profile::kind_of(paths, &current.name))?;
-        profile::apply(paths, &Profile { name, ..current })?;
+        profile::apply(paths, &Profile { name, ..current }, scan(paths).ok().as_ref())?;
         view(paths)
     })
 }
@@ -298,7 +298,7 @@ fn profile_new(name: String) -> Res<View> {
 #[tauri::command(async)]
 fn profile_use(name: String) -> Res<View> {
     locked(|paths| {
-        profile::apply(paths, &profile::load(paths, &name)?)?;
+        profile::apply(paths, &profile::load(paths, &name)?, scan(paths).ok().as_ref())?;
         view(paths)
     })
 }
@@ -315,7 +315,7 @@ fn profile_delete(name: String) -> Res<View> {
 fn set_build(build: Option<u8>) -> Res<View> {
     locked(|paths| {
         profile::set_b41(paths, build.map(|b| b == 41))?;
-        profile::apply(paths, &active(paths)?)?;
+        profile::apply(paths, &active(paths)?, scan(paths).ok().as_ref())?;
         view(paths)
     })
 }
@@ -538,7 +538,7 @@ async fn zb_install() -> Res<View> {
             }
             let mut p = active(paths)?;
             p.set(zb::MOD_ID, true);
-            profile::apply(paths, &p)?;
+            profile::apply(paths, &p, scan(paths).ok().as_ref())?;
             pzmm_core::log!("ZombieBuddy is set up. Java mods ask for your approval the first time they load.");
             view(paths)
         })
@@ -626,7 +626,7 @@ async fn install_missing() -> Res<(View, Vec<String>)> {
             }
             enable.reverse();
             enable_compatible(&mut p, &mods, &enable);
-            profile::apply(paths, &p)?;
+            profile::apply(paths, &p, scan(paths).ok().as_ref())?;
             for id in &unresolved {
                 pzmm_core::log!("{id}: no Workshop item clearly provides it. Use Download in the mod's details to pick one.");
             }
@@ -779,7 +779,7 @@ async fn server_import(name: String) -> Res<View> {
             pzmm_core::log!("installing {} Workshop item(s) the server uses", missing.len());
         }
         fetch_then(&missing, false, |paths, _| {
-            profile::apply(paths, &profile::with_list(paths, &format!("Server {name}"), cfg.mods)?)?;
+            profile::apply(paths, &profile::with_list(paths, &format!("Server {name}"), cfg.mods)?, scan(paths).ok().as_ref())?;
             view(paths)
         })
     })
@@ -802,7 +802,7 @@ fn save_use(mode: String, name: String) -> Res<View> {
     locked(|paths| {
         let save = pz::saves::list(paths).into_iter().find(|s| s.mode == mode && s.name == name);
         let Some(save) = save else { anyhow::bail!("save {mode}/{name} not found") };
-        profile::apply(paths, &profile::with_list(paths, &format!("Save {name}"), save.mods)?)?;
+        profile::apply(paths, &profile::with_list(paths, &format!("Save {name}"), save.mods)?, scan(paths).ok().as_ref())?;
         view(paths)
     })
 }
@@ -911,7 +911,7 @@ fn map_order_save(maps: Vec<String>) -> Res<()> {
         let on = pz::server::mod_maps(&p.enabled(), &scan(paths)?, profile::effective_build(paths));
         let maps: Vec<String> = maps.into_iter().filter(|m| on.contains(m) || maps::is_vanilla(m)).collect();
         if profile::set_map_order(paths, &p.name, &maps)? {
-            profile::apply(paths, &p)?;
+            profile::apply(paths, &p, scan(paths).ok().as_ref())?;
         }
         Ok(())
     })
@@ -920,10 +920,12 @@ fn map_order_save(maps: Vec<String>) -> Res<()> {
 /// Clipboard text for the shown maps: links, mod ids, requirements (looked up on the Workshop
 /// when PZMM doesn't know them) and the server lines, worded with `labels` (the UI's language).
 #[tauri::command]
-async fn maps_export(shown: Vec<MapMod>, map_line: Vec<String>, labels: maps::ExportLabels) -> Res<String> {
+async fn maps_export(mut shown: Vec<MapMod>, map_line: Vec<String>, labels: maps::ExportLabels) -> Res<String> {
     blocking(move || -> Res<_> {
-        let (mods, build, checked) = reading(|paths| Ok((scan(paths)?, profile::effective_build(paths), maps::checked(paths))))?;
+        let (mods, build, checked, order) = reading(|paths| Ok((scan(paths)?, profile::effective_build(paths), maps::checked(paths), profile::peek(paths).enabled())))?;
         let known = maps::workshop_maps(&checked, build, &mods).0;
+        // listed, and in Mods=, in the profile's load order (requirements still first), then as shown
+        shown.sort_by_key(|m| order.iter().position(|i| *i == m.id).unwrap_or(usize::MAX));
         let mut find = |id: &str, needed_by: Option<&str>| match sources::find_mod(id, needed_by, build) {
             Ok(c) => c.into_iter().next().filter(|c| c.sure()).map(|c| (c.item.title, c.item.id)),
             Err(e) => {

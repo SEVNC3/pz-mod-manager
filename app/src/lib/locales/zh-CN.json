@@ -299,6 +299,7 @@
       "over": "覆盖原版"
     },
     "sort": {
+      "order": "加载顺序",
       "name": "名称",
       "cells": "单元格最多",
       "conflicts": "冲突最多",
@@ -502,8 +503,12 @@
     "top": "置顶",
     "topTip": "最先加载",
     "topLabel": "将 {name} 移到顶部",
+    "upTip": "提前加载 (Alt+↑)",
+    "upLabel": "将 {name} 上移",
+    "downTip": "延后加载 (Alt+↓)",
+    "downLabel": "将 {name} 下移",
     "autosort": "自动排序地图",
-    "autosortTip": "模组地图在前，保持当前顺序，然后是 Muldraugh, KY",
+    "autosortTip": "基于另一张地图的地图（其 map.info 中的 lots=）排在它前面；其余保持顺序；Muldraugh, KY 最后",
     "fixed": "最后",
     "fixedTip": "游戏自带的地图总是最后加载"
   },

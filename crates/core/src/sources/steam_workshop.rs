@@ -292,7 +292,8 @@ fn parse_browse(html: &str) -> Result<Page> {
 
 fn post_form(url: &str, body: &str) -> Result<Value> {
     let bytes = super::polite(url, || {
-        ureq::post(url)
+        super::agent()
+            .post(url)
             .header("User-Agent", "pzmm")
             .header("Content-Type", "application/x-www-form-urlencoded")
             .send(body)?
@@ -534,9 +535,9 @@ fn steamcmd(paths: &Paths) -> Result<PathBuf> {
         crate::log!("downloading steamcmd...");
         std::fs::create_dir_all(&dir)?;
         if cfg!(windows) {
-            super::unzip(&super::http_get(&format!("{STEAMCMD_URL}steamcmd.zip"))?, &dir)?;
+            super::unzip(&super::download(&format!("{STEAMCMD_URL}steamcmd.zip"))?, &dir)?;
         } else {
-            let gz = super::http_get(&format!("{STEAMCMD_URL}steamcmd_linux.tar.gz"))?;
+            let gz = super::download(&format!("{STEAMCMD_URL}steamcmd_linux.tar.gz"))?;
             tar::Archive::new(flate2::read::GzDecoder::new(&gz[..])).unpack(&dir)?;
         }
     }

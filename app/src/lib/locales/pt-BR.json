@@ -322,6 +322,7 @@
       "over": "Sobre vanilla"
     },
     "sort": {
+      "order": "Ordem de carregamento",
       "name": "Nome",
       "cells": "Mais células",
       "conflicts": "Mais conflitos",
@@ -545,8 +546,12 @@
     "top": "Topo",
     "topTip": "Carregá-lo primeiro",
     "topLabel": "Mover {name} para o topo",
+    "upTip": "Carregar antes (Alt+↑)",
+    "upLabel": "Mover {name} para cima",
+    "downTip": "Carregar depois (Alt+↓)",
+    "downLabel": "Mover {name} para baixo",
     "autosort": "Ordenar mapas automaticamente",
-    "autosortTip": "Mapas de mods primeiro, na ordem atual, depois Muldraugh, KY",
+    "autosortTip": "Um mapa que se baseia em outro (lots= no seu map.info) vem antes dele; os demais mantêm a ordem; Muldraugh, KY por último",
     "fixed": "Por último",
     "fixedTip": "O mapa do próprio jogo sempre carrega por último"
   },

@@ -322,6 +322,7 @@
       "over": "Sur vanilla"
     },
     "sort": {
+      "order": "Ordre de chargement",
       "name": "Nom",
       "cells": "Plus de cellules",
       "conflicts": "Plus de conflits",
@@ -545,8 +546,12 @@
     "top": "En haut",
     "topTip": "La charger en premier",
     "topLabel": "Placer {name} en haut",
+    "upTip": "La charger plus tôt (Alt+↑)",
+    "upLabel": "Monter {name}",
+    "downTip": "La charger plus tard (Alt+↓)",
+    "downLabel": "Descendre {name}",
     "autosort": "Trier les cartes automatiquement",
-    "autosortTip": "Cartes des mods d'abord, dans leur ordre actuel, puis Muldraugh, KY",
+    "autosortTip": "Une carte qui s'appuie sur une autre (lots= dans son map.info) passe avant elle ; les autres gardent leur ordre ; Muldraugh, KY en dernier",
     "fixed": "En dernier",
     "fixedTip": "La carte du jeu se charge toujours en dernier"
   },

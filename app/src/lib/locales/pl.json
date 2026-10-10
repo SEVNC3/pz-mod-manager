@@ -368,6 +368,7 @@
       "over": "Na obszarze vanilla"
     },
     "sort": {
+      "order": "Kolejność ładowania",
       "name": "Nazwa",
       "cells": "Najwięcej komórek",
       "conflicts": "Najwięcej konfliktów",
@@ -631,8 +632,12 @@
     "top": "Na górę",
     "topTip": "Ładuj ją jako pierwszą",
     "topLabel": "Przenieś {name} na górę",
+    "upTip": "Ładuj wcześniej (Alt+↑)",
+    "upLabel": "Przesuń {name} w górę",
+    "downTip": "Ładuj później (Alt+↓)",
+    "downLabel": "Przesuń {name} w dół",
     "autosort": "Sortuj mapy automatycznie",
-    "autosortTip": "Najpierw mapy z modów w obecnej kolejności, potem Muldraugh, KY",
+    "autosortTip": "Mapa oparta na innej (lots= w jej map.info) trafia przed nią; reszta zachowuje kolejność; Muldraugh, KY na końcu",
     "fixed": "Ostatnia",
     "fixedTip": "Mapa samej gry zawsze ładuje się jako ostatnia"
   },

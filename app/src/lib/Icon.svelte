@@ -10,6 +10,7 @@
     "chevron-left": '<polyline points="15 18 9 12 15 6"/>',
     "chevron-right": '<polyline points="9 18 15 12 9 6"/>',
     "chevron-down": '<polyline points="6 9 12 15 18 9"/>',
+    "chevron-up": '<polyline points="18 15 12 9 6 15"/>',
     grip: '<circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>',
     x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
     alert: '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',

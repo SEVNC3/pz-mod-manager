@@ -299,6 +299,7 @@
       "over": "바닐라 위"
     },
     "sort": {
+      "order": "로드 순서",
       "name": "이름",
       "cells": "셀 많은 순",
       "conflicts": "충돌 많은 순",
@@ -502,8 +503,12 @@
     "top": "맨 위",
     "topTip": "가장 먼저 로드",
     "topLabel": "{name} 맨 위로 이동",
+    "upTip": "더 먼저 로드 (Alt+↑)",
+    "upLabel": "{name} 위로 이동",
+    "downTip": "더 나중에 로드 (Alt+↓)",
+    "downLabel": "{name} 아래로 이동",
     "autosort": "맵 자동 정렬",
-    "autosortTip": "모드 맵을 현재 순서대로 먼저, 그다음 Muldraugh, KY",
+    "autosortTip": "다른 맵을 기반으로 하는 맵(map.info의 lots=)은 그 맵보다 앞에, 나머지는 순서를 유지하고 Muldraugh, KY는 마지막",
     "fixed": "마지막",
     "fixedTip": "게임 기본 맵은 항상 마지막에 로드돼요"
   },

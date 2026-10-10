@@ -621,25 +621,29 @@ fn merge_seed(all: &mut BTreeMap<String, Checked>, seed: &BTreeMap<String, Check
     }
 }
 
-/// Workshop items read without installing, by item id, with the seed merged in (see
-/// `merge_seed`). A file that doesn't parse (damaged, or from before builds were kept apart)
-/// is kept as `maps-checked.json.bad` and starts over from the seed; one that can't be read
-/// is an error (saving over it would wipe it).
-fn read_checked(paths: &Paths) -> Result<BTreeMap<String, Checked>> {
-    let file = checked_file(paths);
-    let bytes = match fs::read(&file) {
+/// One of PZMM's JSON files: missing is empty; one that doesn't parse (damaged, or an older
+/// format) is kept as `<file>.bad` and starts over empty; one that can't be read is an error
+/// (saving over it would wipe it).
+fn read_json<T: serde::de::DeserializeOwned + Default>(file: &Path) -> Result<T> {
+    let bytes = match fs::read(file) {
         Ok(b) => b,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(seed().clone()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(T::default()),
         Err(e) => return Err(e).with_context(|| format!("reading {}", file.display())),
     };
-    let mut all = serde_json::from_slice(&bytes).unwrap_or_else(|e| {
+    Ok(serde_json::from_slice(&bytes).unwrap_or_else(|e| {
         let bad = file.with_extension("json.bad");
         if fs::read(&bad).ok().as_deref() != Some(bytes.as_slice()) {
-            let _ = fs::copy(&file, &bad);
-            crate::log!("error: {} is damaged ({e}); kept a copy as {} and started from the built-in map index", file.display(), bad.display());
+            let _ = fs::copy(file, &bad);
+            crate::log!("error: {} is damaged ({e}); kept a copy as {} and started over", file.display(), bad.display());
         }
-        BTreeMap::new()
-    });
+        T::default()
+    }))
+}
+
+/// Workshop items read without installing, by item id, with the seed merged in (see
+/// `merge_seed`; a damaged file starts over from the seed, see `read_json`).
+fn read_checked(paths: &Paths) -> Result<BTreeMap<String, Checked>> {
+    let mut all = read_json(&checked_file(paths))?;
     merge_seed(&mut all, seed());
     Ok(all)
 }
@@ -880,6 +884,22 @@ fn pause(secs: u64, done: impl Fn() -> bool) {
     }
 }
 
+/// `f` on its own thread, given up on (None) once `stop` is set: a web call (and its 429
+/// back-off) can't be interrupted, but it times out, so the thread ends on its own.
+fn unless_stopped<T: Send + 'static>(stop: &AtomicBool, f: impl FnOnce() -> Result<T> + Send + 'static) -> Option<Result<T>> {
+    use std::sync::mpsc::RecvTimeoutError;
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || tx.send(f()));
+    loop {
+        match rx.recv_timeout(std::time::Duration::from_millis(100)) {
+            Ok(v) => return Some(v),
+            Err(RecvTimeoutError::Timeout) if !stop.load(Relaxed) => {}
+            Err(RecvTimeoutError::Timeout) => return None,
+            Err(RecvTimeoutError::Disconnected) => return Some(Err(anyhow::anyhow!("the request failed"))),
+        }
+    }
+}
+
 /// Whether a failed read says Steam (or the connection) is struggling, not that the item can't
 /// be read: only these count towards giving up, and they're read again next scan.
 fn network_error(e: &anyhow::Error) -> bool {
@@ -913,17 +933,19 @@ pub fn scan_workshop(paths: &Paths, stop: &AtomicBool, progress: &mut dyn FnMut(
     let mut items: Vec<Item> = vec![];
     for page in 1.. {
         let q = steam_workshop::Query { required: vec!["Map".into()], sort: "mostrecent".into(), per_page: 50, page, ..Default::default() };
-        let mut got = steam_workshop::browse(super::STEAM_APP, &q);
+        let browse = || {
+            let q = q.clone();
+            unless_stopped(stop, move || steam_workshop::browse(super::STEAM_APP, &q))
+        };
+        let mut got = browse();
         for wait in [20, 40] {
-            if got.is_ok() || stopped() {
+            if !matches!(got, Some(Err(_))) || stopped() {
                 break;
             }
             pause(wait, stopped); // Steam's request limit resets within a minute
-            got = steam_workshop::browse(super::STEAM_APP, &q);
+            got = browse();
         }
-        if stopped() {
-            return Ok(p);
-        }
+        let Some(got) = got.filter(|_| !stopped()) else { return Ok(p) };
         let got = got?;
         let empty = got.items.is_empty();
         for i in got.items {
@@ -1072,14 +1094,17 @@ fn presets_file(paths: &Paths) -> PathBuf {
     paths.data.join("map-presets.json")
 }
 
-/// Named sets of maps (mod ids) saved from the Maps tab.
+/// Named sets of maps (mod ids) saved from the Maps tab (none while the file can't be read).
 pub fn presets(paths: &Paths) -> BTreeMap<String, Vec<String>> {
-    fs::read(presets_file(paths)).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+    read_json(&presets_file(paths)).unwrap_or_else(|e| {
+        crate::log!("error: {e:#}");
+        BTreeMap::new()
+    })
 }
 
-/// Save preset `name` (None deletes it).
+/// Save preset `name` (None deletes it). A file that can't be read is never saved over.
 pub fn set_preset(paths: &Paths, name: &str, ids: Option<Vec<String>>) -> Result<()> {
-    let mut all = presets(paths);
+    let mut all: BTreeMap<String, Vec<String>> = read_json(&presets_file(paths)).context("nothing was saved")?;
     match ids {
         Some(ids) => all.insert(name.trim().to_string(), ids),
         None => all.remove(name),
@@ -1450,6 +1475,24 @@ mod tests {
     }
 
     #[test]
+    fn presets_survive_a_damaged_or_unreadable_file() {
+        let (_t, paths) = store::tests::temp_paths();
+        set_preset(&paths, "Mine", Some(vec!["A".into()])).unwrap();
+        let file = presets_file(&paths);
+        // damaged: kept as .bad, then starts over
+        fs::write(&file, "{ not json").unwrap();
+        assert!(presets(&paths).is_empty());
+        set_preset(&paths, "New", Some(vec!["B".into()])).unwrap();
+        assert_eq!(fs::read_to_string(file.with_extension("json.bad")).unwrap(), "{ not json");
+        assert_eq!(presets(&paths).into_keys().collect::<Vec<_>>(), ["New"]);
+        // unreadable (a folder in its place): never saved over
+        fs::remove_file(&file).unwrap();
+        fs::create_dir(&file).unwrap();
+        assert!(set_preset(&paths, "Other", Some(vec![])).is_err());
+        assert!(file.is_dir());
+    }
+
+    #[test]
     fn an_unreadable_index_is_never_saved_over() {
         let (_t, paths) = store::tests::temp_paths();
         save_checked(&paths, [("111".to_string(), Checked { updated: 1, ..Default::default() })].into()).unwrap();
@@ -1463,6 +1506,28 @@ mod tests {
         fs::remove_dir(&file).unwrap();
         fs::rename(file.with_extension("keep"), &file).unwrap();
         assert_eq!(fs::read(&file).unwrap(), before);
+    }
+
+    #[test]
+    fn stop_ends_a_hung_listing() {
+        let stop = AtomicBool::new(false);
+        assert_eq!(unless_stopped(&stop, || Ok(7)).unwrap().unwrap(), 7);
+        // a server that accepts and never answers: Stop returns at once, not after the timeout
+        let silent = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = silent.local_addr().unwrap();
+        let start = std::time::Instant::now();
+        let got = std::thread::scope(|s| {
+            s.spawn(|| {
+                std::thread::sleep(std::time::Duration::from_millis(200));
+                stop.store(true, Relaxed);
+            });
+            unless_stopped(&stop, move || {
+                let mut c = std::net::TcpStream::connect(addr)?;
+                Ok(std::io::Read::read(&mut c, &mut [0; 1])?)
+            })
+        });
+        assert!(got.is_none());
+        assert!(start.elapsed() < std::time::Duration::from_secs(2));
     }
 
     #[test]

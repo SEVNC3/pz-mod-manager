@@ -74,9 +74,31 @@ pub(crate) fn polite<T>(url: &str, mut send: impl FnMut() -> Result<T, ureq::Err
     unreachable!()
 }
 
+/// Longest wait for one web call (connecting: `CONNECT`); downloads get `DOWNLOAD`.
+const CALL: std::time::Duration = std::time::Duration::from_secs(30);
+const CONNECT: std::time::Duration = std::time::Duration::from_secs(10);
+const DOWNLOAD: std::time::Duration = std::time::Duration::from_secs(15 * 60);
+
+/// The one HTTP agent every web call goes through, so a silent server never hangs PZMM
+/// (ureq waits forever by default).
+pub(crate) fn agent() -> &'static ureq::Agent {
+    static AGENT: std::sync::OnceLock<ureq::Agent> = std::sync::OnceLock::new();
+    AGENT.get_or_init(|| ureq::Agent::config_builder().timeout_connect(Some(CONNECT)).timeout_global(Some(CALL)).build().into())
+}
+
+/// A page or API response (up to `CALL`).
 pub(crate) fn http_get(url: &str) -> Result<Vec<u8>> {
+    get(url, CALL)
+}
+
+/// A file download (zip, SteamCMD): up to `DOWNLOAD`.
+pub(crate) fn download(url: &str) -> Result<Vec<u8>> {
+    get(url, DOWNLOAD)
+}
+
+fn get(url: &str, limit: std::time::Duration) -> Result<Vec<u8>> {
     polite(url, || {
-        let mut req = ureq::get(url).header("User-Agent", "pzmm");
+        let mut req = agent().get(url).config().timeout_global(Some(limit)).build().header("User-Agent", "pzmm");
         if url.starts_with("https://api.github.com/")
             && let Some(token) = crate::settings::github_token()
         {
@@ -350,6 +372,18 @@ fn fetch_local(p: &Path) -> Result<Fetched> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn web_calls_time_out() {
+        let t = agent().config().timeouts();
+        assert_eq!((t.connect, t.global), (Some(CONNECT), Some(CALL)), "every call through the shared agent is bounded");
+        // a server that accepts and never answers
+        let silent = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/", silent.local_addr().unwrap());
+        let start = std::time::Instant::now();
+        assert!(get(&url, std::time::Duration::from_millis(300)).is_err());
+        assert!(start.elapsed() < std::time::Duration::from_secs(5), "gave up after the limit, not never");
+    }
 
     #[test]
     fn unzip_refuses_escaping_paths() {

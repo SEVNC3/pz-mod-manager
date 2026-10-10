@@ -133,6 +133,11 @@ fn main() {
     }
 }
 
+/// Apply `p` with its maps from one fresh mod scan (unreadable mods: the `maps` block is kept).
+fn apply(paths: &Paths, p: &Profile) -> Result<()> {
+    profile::apply(paths, p, store::scan(paths).ok().as_ref())
+}
+
 fn run(cli: Cli) -> Result<()> {
     let paths = Paths::detect();
     // read-only commands skip the lock; the rest wait for the app to finish its change
@@ -149,16 +154,16 @@ fn run(cli: Cli) -> Result<()> {
             let ids = sources::install(&paths, &parsed, true);
             if !no_enable && !ids.is_empty() {
                 ids.iter().for_each(|i| p.set(i, true));
-                profile::apply(&paths, &p)?;
+                apply(&paths, &p)?;
             }
         }
         Cmd::Enable { ids } => {
             ids.iter().for_each(|i| p.set(i, true));
-            profile::apply(&paths, &p)?;
+            apply(&paths, &p)?;
         }
         Cmd::Disable { ids } => {
             ids.iter().for_each(|i| p.set(i, false));
-            profile::apply(&paths, &p)?;
+            apply(&paths, &p)?;
         }
         Cmd::Remove { ids } => {
             let refused = store::remove(&paths, &ids, pzmm_core::settings::load().recycle)?;
@@ -166,7 +171,7 @@ fn run(cli: Cli) -> Result<()> {
                 eprintln!("{id}: not installed by PZMM (Workshop subscription or manual install); left alone");
             }
             ids.iter().filter(|i| !refused.contains(i)).for_each(|i| p.forget(i));
-            profile::apply(&paths, &p)?;
+            apply(&paths, &p)?;
         }
         Cmd::Update => {
             let mut seen = std::collections::HashSet::new();
@@ -223,7 +228,7 @@ fn run(cli: Cli) -> Result<()> {
                 Some(best) if install && best.sure() => {
                     let ids = sources::install(&paths, &[Source::Workshop(best.item.id.clone())], true);
                     ids.iter().for_each(|i| p.set(i, true));
-                    profile::apply(&paths, &p)?;
+                    apply(&paths, &p)?;
                 }
                 _ if install => bail!("no Workshop item clearly provides {mod_id}; install one of the above by id"),
                 _ => {}
@@ -295,7 +300,7 @@ fn run(cli: Cli) -> Result<()> {
             println!("created {name:?} (switch with: pzmm profile use {name})");
         }
         Cmd::Profile(ProfileCmd::Use { name }) => {
-            profile::apply(&paths, &profile::load(&paths, &name)?)?;
+            apply(&paths, &profile::load(&paths, &name)?)?;
             println!("now using {name:?}");
         }
         Cmd::Profile(ProfileCmd::Export { file }) => {
@@ -317,7 +322,7 @@ fn run(cli: Cli) -> Result<()> {
             42 => false,
             _ => bail!("build must be 41 or 42"),
         }))
-        .and_then(|_| profile::apply(&paths, &p))?,
+        .and_then(|_| apply(&paths, &p))?,
     }
     Ok(())
 }
@@ -368,7 +373,7 @@ fn zombiebuddy(paths: &Paths, p: &mut Profile, action: &str) -> Result<()> {
                 println!("{c}");
             }
             p.set(zb::MOD_ID, true);
-            profile::apply(paths, p)?;
+            apply(paths, p)?;
             println!("ZombieBuddy is set up. Java mods will ask for your approval the first time they load.");
         }
         "uninstall" => {
@@ -397,7 +402,7 @@ fn server(paths: &Paths, p: &Profile, action: &str, name: &str) -> Result<()> {
             let missing: Vec<Source> = cfg.workshop.iter().filter(|w| !have.contains(*w)).map(|w| Source::Workshop(w.clone())).collect();
             sources::install(paths, &missing, false);
             let prof = profile::with_list(paths, &format!("Server {name}"), cfg.mods)?;
-            profile::apply(paths, &prof)?;
+            apply(paths, &prof)?;
             println!("now using profile {:?}", prof.name);
         }
         "start" => println!("started {name} with {}", server::start(paths, name)?.display()),

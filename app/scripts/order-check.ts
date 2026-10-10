@@ -1,6 +1,6 @@
 // Self-check for src/lib/order.ts. Run: node scripts/order-check.ts
 import assert from "node:assert/strict";
-import { autosort, bisectRound, findProblems, groupByCategory, loadList, moveSection, orderOf, orphanedRequirements, placeInOrder, placeInSections, sortLoadOrder, sortMaps, syncOrder } from "../src/lib/order.ts";
+import { autosort, bisectRound, findProblems, groupByCategory, loadList, moveSection, orderOf, orphanedRequirements, placeInOrder, placeInSections, sortLoadOrder, sortMaps, autosortMaps, syncOrder } from "../src/lib/order.ts";
 import type { ModRow, Row } from "../src/lib/api.ts";
 
 const mod = (id: string, on = true, extra: Partial<Record<"requires" | "incompatible" | "load_after" | "load_before", string[]>> = {}): Row => ({
@@ -78,6 +78,13 @@ assert.equal(findProblems(auto).size, 0);
 
 // the server's maps: mod maps before Muldraugh, otherwise as arranged
 assert.deepEqual(sortMaps(["B", "Muldraugh, KY", "A"]), ["B", "A", "Muldraugh, KY"]);
+// autosort: a map that builds on another (its lots= lists it) goes before it; the rest keep their order
+const lots: Record<string, string[]> = { "Fort Rock": ["Rosewood Exp"], "Rosewood Exp": ["Muldraugh, KY"], Loop1: ["Loop2"], Loop2: ["Loop1"] };
+const lotsOf = (f: string) => lots[f] ?? [];
+assert.deepEqual(autosortMaps(["Town", "Rosewood Exp", "Other", "Fort Rock", "Muldraugh, KY"], lotsOf), ["Town", "Fort Rock", "Rosewood Exp", "Other", "Muldraugh, KY"]);
+assert.deepEqual(autosortMaps(["Muldraugh, KY", "B", "A"], lotsOf), ["B", "A", "Muldraugh, KY"], "no lots: the order stays, Muldraugh last");
+assert.deepEqual(autosortMaps(["C", "B", "A"], (f) => ({ A: ["B"], B: ["C"] })[f] ?? []), ["A", "B", "C"], "a chain: each before what it builds on");
+assert.deepEqual(autosortMaps(["Loop2", "X", "Loop1"], lotsOf), ["Loop2", "X", "Loop1"], "a loop keeps the order");
 
 // dragging a whole section: it moves with its mods and lands on section boundaries
 const secs: Row[] = [mod("Top"), { kind: "sep", name: "A" }, mod("a1"), mod("a2"), { kind: "sep", name: "B" }, mod("b1"), { kind: "sep", name: "C" }, mod("c1")];

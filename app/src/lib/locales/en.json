@@ -322,6 +322,7 @@
       "over": "Over vanilla"
     },
     "sort": {
+      "order": "Load order",
       "name": "Name",
       "cells": "Most cells",
       "conflicts": "Most conflicts",
@@ -545,8 +546,12 @@
     "top": "Top",
     "topTip": "Load it first",
     "topLabel": "Move {name} to the top",
+    "upTip": "Load it earlier (Alt+↑)",
+    "upLabel": "Move {name} up",
+    "downTip": "Load it later (Alt+↓)",
+    "downLabel": "Move {name} down",
     "autosort": "Autosort maps",
-    "autosortTip": "Mod maps first, in their current order, then Muldraugh, KY",
+    "autosortTip": "A map that builds on another (lots= in its map.info) goes before it; the rest keep their order; Muldraugh, KY last",
     "fixed": "Last",
     "fixedTip": "The game's own map always loads last"
   },

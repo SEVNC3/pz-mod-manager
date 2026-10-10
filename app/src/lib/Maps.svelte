@@ -26,10 +26,12 @@
   import { t, th, type Vars } from "./i18n.svelte";
   import { prefs } from "./prefs.svelte";
 
-  let { busy, mods, say, onSetMods, onInstallWorkshop, onShowMod, canUndo, onUndo }: {
+  let { busy, mods, loadOrder, say, onSetMods, onInstallWorkshop, onShowMod, canUndo, onUndo }: {
     busy: boolean;
     /** The library by mod id: what's installed and on. */
     mods: Map<string, ModRow>;
+    /** The enabled mods' ids in load order. */
+    loadOrder: string[];
     /** A line in the activity log. */
     say: (key: string, vars?: Vars, error?: boolean) => void;
     /** Turn mods on (with what they need) or off, through the load order. */
@@ -151,8 +153,10 @@
   let search = $state("");
   type Filter = "all" | "on" | "installed" | "missing" | "conflict" | "over";
   let filter = $state<Filter>("all");
-  type Sort = "name" | "cells" | "conflicts" | "state" | "subs" | "updated" | "newest";
-  let sortBy = $state<Sort>("name");
+  type Sort = "order" | "name" | "cells" | "conflicts" | "state" | "subs" | "updated" | "newest";
+  let sortBy = $state<Sort>("order");
+  const rank = $derived(new Map(loadOrder.map((id, i) => [id, i])));
+  const orderRank = (m: MapMod) => (isOn(m.id) ? (rank.get(m.id) ?? loadOrder.length) : Infinity);
   const FILTERS: [Filter, string][] = [["all", "maps.filter.all"], ["on", "common.enabled"], ["installed", "common.installed"], ["missing", "maps.notInstalled"], ["conflict", "maps.filter.conflict"], ["over", "maps.filter.over"]];
   const stateRank = (m: MapMod) => (isOn(m.id) ? 0 : mods.has(m.id) ? 1 : 2);
   const listed = $derived.by(() => {
@@ -168,6 +172,8 @@
       return words.every((w) => hay.includes(w));
     });
     const by: Record<Sort, (a: MapMod, b: MapMod) => number> = {
+      // enabled maps in load order, then the rest by name
+      order: (a, b) => (orderRank(a) === orderRank(b) ? 0 : orderRank(a) < orderRank(b) ? -1 : 1),
       name: () => 0,
       cells: (a, b) => cellCount(b) - cellCount(a),
       conflicts: (a, b) => (clashes.get(b.id)?.with.size ?? 0) - (clashes.get(a.id)?.with.size ?? 0),
@@ -343,6 +349,8 @@
 
   // --- Map= order (kept with the profile once arranged) and export ---
   let mapLine = $state<string[]>([]);
+  /** Each map folder's lots= (the maps it builds on), for Autosort. */
+  const lotsByFolder = $derived(new Map(all.flatMap((m) => m.maps.map((f) => [f.folder, f.lots] as const))));
   const folders = $derived(shown.flatMap((m) => m.maps.map((f) => f.folder)));
   let lineFor = 0;
   $effect(() => {
@@ -543,9 +551,19 @@
   let colours = $state(false);
   let help = $state(false);
 
-  /** Per-map colours: hues a golden angle apart, in the order maps are shown. */
-  const hueOf = $derived(new Map(shown.map((m, i) => [m.id, 70 + ((i * 137.508) % 260)])));
-  const swatch = (id: string) => `oklch(0.68 0.13 ${hueOf.get(id) ?? 0})`;
+  /**
+   * Per-map colours, in the order maps are shown: hues a golden angle apart round the whole
+   * wheel except 45° either side of the conflict red (--danger, hue ~32), the first map blue
+   * like a plain map cell; past 10 maps every other map takes a darker band, so maps of near
+   * hues still differ in lightness.
+   */
+  function swatchOf(i: number, n: number) {
+    const [band, j] = n > 10 ? [i % 2, i >> 1] : [0, i];
+    const hue = 77 + (((230 + j * 137.508 + band * 68.75) % 360) * 270) / 360;
+    return `oklch(${n > 10 ? (band ? 0.56 : 0.78) : 0.68} 0.14 ${hue.toFixed(1)})`;
+  }
+  const colourOf = $derived(new Map(shown.map((m, i) => [m.id, swatchOf(i, shown.length)])));
+  const swatch = (id: string) => colourOf.get(id) ?? "transparent";
 
   const bounds = $derived.by(() => {
     if (!grid.length) return null;
@@ -587,7 +605,7 @@
       return getComputedStyle(probe!).color;
     };
     const fill = { vanilla: color("--muted"), water: color("--map-water"), map: color("--map-cell"), over: color("--map-over"), conflict: color("--danger") };
-    const hues = new Map([...hueOf.keys()].map((id) => [id, color(swatch(id))]));
+    const hues = new Map([...colourOf].map(([id, c]) => [id, color(c)]));
     g.fillStyle = color("--bg");
     g.fillRect(0, 0, width, HEIGHT);
     const s = view.scale;
@@ -775,6 +793,7 @@
           {#each FILTERS as [v, label]}<option value={v}>{t(label)}</option>{/each}
         </select>
         <select bind:value={sortBy} aria-label={t("maps.sortLabel")} title={t("maps.sortLabel")}>
+          <option value="order">{t("maps.sort.order")}</option>
           <option value="name">{t("maps.sort.name")}</option>
           <option value="cells">{t("maps.sort.cells")}</option>
           <option value="conflicts">{t("maps.sort.conflicts")}</option>
@@ -936,7 +955,7 @@
       {#if mapLine.length}
         <h3>{t("maps.export.orderTitle")}</h3>
         <p class="hint">{@html th("maps.export.orderHint")}</p>
-        <MapOrder bind:maps={mapLine} onarrange={arranged} />
+        <MapOrder bind:maps={mapLine} onarrange={arranged} lotsOf={(f) => lotsByFolder.get(f) ?? []} />
       {/if}
       <div class="row">
         <button class="primary" onclick={exportMaps} disabled={!shown.length}><Icon name="copy" size={14} />{t("maps.export.copy", { count: shown.length })}</button>

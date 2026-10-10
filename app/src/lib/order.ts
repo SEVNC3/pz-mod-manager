@@ -235,6 +235,28 @@ export function placeInSections(rows: Row[], of: Record<string, string>, order: 
 export const sortMaps = (maps: string[], base = "Muldraugh, KY") => [...maps.filter((m) => m !== base), ...maps.filter((m) => m === base)];
 
 /**
+ * Autosort a Map= list: a map whose map.info `lots=` names another listed map builds on it, so
+ * it moves to just before that map; everything else keeps its order; Muldraugh last. Maps that
+ * build on each other in a loop can't be sorted: the order is kept.
+ */
+export function autosortMaps(maps: string[], lotsOf: (folder: string) => string[], base = "Muldraugh, KY"): string[] {
+  const out = sortMaps(maps, base);
+  for (let pass = 0; pass <= out.length; pass++) {
+    let moved = false;
+    for (let i = 0; i < out.length; i++) {
+      const lots = lotsOf(out[i]);
+      const j = out.findIndex((m, k) => k < i && lots.includes(m));
+      if (j >= 0) {
+        out.splice(j, 0, ...out.splice(i, 1));
+        moved = true;
+      }
+    }
+    if (!moved) return out;
+  }
+  return sortMaps(maps, base);
+}
+
+/**
  * Where a section dragged from `from` lands when dropped on row `to`: past the hovered
  * section when dragging down, before it when dragging up (the index it's inserted before).
  */
