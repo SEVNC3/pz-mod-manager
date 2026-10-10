@@ -3,6 +3,7 @@
 pub mod github;
 pub mod steam_workshop;
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
@@ -63,17 +64,22 @@ pub(crate) fn unzip(bytes: &[u8], to: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Download and install. Workshop items go through one SteamCMD session. Errors are
-/// printed per source so one bad entry doesn't stop the rest. Returns installed ids.
-pub fn install(paths: &Paths, sources: &[Source]) -> Vec<String> {
+/// Download and install. Workshop items go through one SteamCMD session. With `resolve`,
+/// Workshop collections are expanded and required items are added. Errors are logged per
+/// source so one bad entry doesn't stop the rest. Returns installed mod ids.
+pub fn install(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<String> {
     let mut ids = vec![];
     let mut report = |r: Result<Vec<String>>| match r {
         Ok(v) => ids.extend(v),
         Err(e) => crate::log!("error: {e:#}"),
     };
-    let workshop: Vec<&str> = sources.iter().filter_map(|s| if let Source::Workshop(i) = s { Some(i.as_str()) } else { None }).collect();
+    let mut workshop: Vec<String> = sources.iter().filter_map(|s| if let Source::Workshop(i) = s { Some(i.clone()) } else { None }).collect();
+    if resolve && !workshop.is_empty() {
+        workshop = expand_workshop(paths, workshop);
+    }
     if !workshop.is_empty() {
-        match steam_workshop::download(paths, pz::STEAM_APP, &workshop) {
+        let refs: Vec<&str> = workshop.iter().map(String::as_str).collect();
+        match steam_workshop::download(paths, pz::STEAM_APP, &refs) {
             Ok(got) => {
                 for (id, dir) in got {
                     report(dir.with_context(|| format!("workshop:{id}: download failed")).and_then(|d| store::install(paths, &d, &format!("workshop:{id}"))));
@@ -90,6 +96,58 @@ pub fn install(paths: &Paths, sources: &[Source]) -> Vec<String> {
         }
     }
     ids
+}
+
+/// Workshop ids the game can already load: Steam subscriptions and PZMM installs.
+pub fn workshop_available(paths: &Paths) -> HashSet<String> {
+    let mut have: HashSet<String> = steam_workshop::content_dir(pz::STEAM_APP)
+        .and_then(|d| std::fs::read_dir(d).ok())
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    have.extend(store::load(paths).unwrap_or_default().into_values().filter_map(|e| e.source.strip_prefix("workshop:").map(String::from)));
+    have
+}
+
+/// Replace collections with their items, then add required items (recursively) that the
+/// game can't already load. Network failures are logged and skipped.
+fn expand_workshop(paths: &Paths, ids: Vec<String>) -> Vec<String> {
+    let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+    let collections = steam_workshop::collections(&refs).unwrap_or_else(|e| {
+        crate::log!("error: couldn't check for Workshop collections: {e:#}");
+        Default::default()
+    });
+    let mut queue = std::collections::VecDeque::new();
+    for id in ids {
+        match collections.get(&id) {
+            Some(items) => {
+                crate::log!("collection {id}: {} item(s)", items.len());
+                queue.extend(items.iter().cloned());
+            }
+            None => queue.push_back(id),
+        }
+    }
+    let have = workshop_available(paths);
+    let mut seen = HashSet::new();
+    let mut out = vec![];
+    while let Some(id) = queue.pop_front() {
+        if !seen.insert(id.clone()) || out.len() >= 500 {
+            continue;
+        }
+        out.push(id.clone());
+        match steam_workshop::required_items(&id) {
+            Ok(req) => {
+                for r in req.into_iter().filter(|r| !have.contains(r) && !seen.contains(r)) {
+                    crate::log!("workshop:{id} requires workshop:{r}, adding it");
+                    queue.push_back(r);
+                }
+            }
+            Err(e) => crate::log!("error: couldn't check what workshop:{id} requires: {e:#}"),
+        }
+    }
+    out
 }
 
 fn install_local(paths: &Paths, p: &Path) -> Result<Vec<String>> {

@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
+pub mod zombiebuddy;
+
 pub const STEAM_APP: &str = "108600";
 
 pub struct Paths {

@@ -1,8 +1,15 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { listen } from "@tauri-apps/api/event";
-  import { api, describeSource, type ModRow, type Row, type View } from "$lib/api";
+  import { api, describeSource, zbReady, type ModRow, type Row, type View, type ZbStatus } from "$lib/api";
   import Details from "$lib/Details.svelte";
+  import Workshop from "$lib/Workshop.svelte";
+  import ZombieBuddy from "$lib/ZombieBuddy.svelte";
+
+  let tab = $state<"mods" | "workshop" | "zb">("mods");
+  let zb = $state<ZbStatus | null>(null);
+  const zbNeeded = $derived(!!zb && zb.required_by.length > 0 && !zbReady(zb));
+  const refreshZb = () => api.zbStatus().then((s) => (zb = s)).catch(() => {});
 
   let view = $state<View | null>(null);
   let rows = $state<Row[]>([]);
@@ -69,7 +76,8 @@
     if (error) logOpen = true;
   }
 
-  async function run(label: string, job: () => Promise<View>) {
+  /** Run a backend job that returns the new view. Errors go to the activity log; returns success. */
+  async function run(label: string, job: () => Promise<View>): Promise<boolean> {
     busy = true;
     busyLabel = label;
     try {
@@ -78,6 +86,7 @@
       rows = v.rows;
       if (v.adopted) say(`Picked up changes made in the game's mod menu (profile "${v.profile}").`);
       if (selected && !v.rows.some((r) => r.kind === "mod" && r.id === selected)) selected = null;
+      return true;
     } catch (e) {
       say(String(e), true);
       // resync with what's on disk
@@ -85,10 +94,17 @@
         view = await api.load();
         rows = view.rows;
       } catch {}
+      return false;
     } finally {
       busy = false;
       busyLabel = "";
+      refreshZb();
     }
+  }
+
+  function installWorkshop(id: string) {
+    logOpen = true;
+    return run(`Installing workshop item ${id}`, () => api.install([id]));
   }
 
   const commit = (next: Row[]) => {
@@ -214,7 +230,7 @@
     <form class="install" onsubmit={install}>
       <label for="install" class="visually-hidden">Install a mod</label>
       <input id="install" type="text" bind:value={installText} autocomplete="off" spellcheck="false"
-        placeholder="Paste a Workshop link or ID, a GitHub repo (owner/repo), or a .zip path" />
+        placeholder="Paste a Workshop link, collection or ID, a GitHub repo (owner/repo), or a .zip path" />
       <button class="primary" type="submit" disabled={busy || !installText.trim()}>Install</button>
     </form>
 
@@ -226,7 +242,7 @@
   </header>
 
   {#if settingsOpen}
-    <section class="settings" aria-label="Settings">
+    <div class="settings" role="region" aria-label="Settings">
       <label>Theme
         <select bind:value={theme}>
           <option value="system">Match system</option>
@@ -247,9 +263,31 @@
         <span>Zomboid folder <button class="quiet link mono" onclick={() => view && api.openPath(view.zomboid)}>{view?.zomboid}</button></span>
         <span>Steam Workshop folder <span class="mono">{view?.workshop ?? "not found"}</span></span>
       </div>
-    </section>
+    </div>
   {/if}
 
+  <div class="tabs" role="tablist" aria-label="Sections">
+    {#each [["mods", "My mods"], ["workshop", "Browse Workshop"], ["zb", "ZombieBuddy"]] as [id, label]}
+      <button role="tab" aria-selected={tab === id} class:active={tab === id} onclick={() => (tab = id as typeof tab)}>
+        {label}{#if id === "zb" && zbNeeded}<span class="alert" aria-label="needs setup"></span>{/if}
+      </button>
+    {/each}
+  </div>
+
+  {#if tab === "workshop"}
+    <Workshop {busy} defaultBuild={view?.build ?? null} onInstall={installWorkshop} />
+  {:else if tab === "zb"}
+    <ZombieBuddy status={zb} profile={view?.profile ?? ""} {busy}
+      onSetup={async () => { logOpen = true; await run("Setting up ZombieBuddy", api.zbInstall); }}
+      onRemove={async () => { logOpen = true; await run("Removing ZombieBuddy", api.zbUninstall); }} />
+  {:else}
+  <section class="mods">
+  {#if zbNeeded}
+    <div class="banner" role="status">
+      <span>{zb?.required_by.length} enabled {zb?.required_by.length === 1 ? "mod needs" : "mods need"} ZombieBuddy, which isn't set up{zb?.files_current || zb?.launcher_patched ? " completely (a game update may have reset it)" : ""}.</span>
+      <button onclick={() => (tab = "zb")}>Set up ZombieBuddy</button>
+    </div>
+  {/if}
   <div class="filters">
     <input type="search" bind:value={search} placeholder="Search mods" aria-label="Search mods" />
     <div class="seg" role="radiogroup" aria-label="Show">
@@ -342,6 +380,8 @@
         onRemove={remove} onRollback={(id) => run(`Restoring ${id}`, () => api.rollback(id))} />
     {/if}
   </main>
+  </section>
+  {/if}
 
   <footer class="activity" class:open={logOpen}>
     <button class="quiet bar" aria-expanded={logOpen} onclick={() => (logOpen = !logOpen)}>
@@ -363,9 +403,59 @@
 
 <style>
   .app {
-    display: grid;
-    grid-template-rows: auto auto auto 1fr auto;
+    display: flex;
+    flex-direction: column;
     height: 100vh;
+  }
+  .app > :global(section) {
+    flex: 1;
+    min-height: 0;
+  }
+  .mods {
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 2px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+  .tabs button {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 9px 14px 8px;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    position: relative;
+  }
+  .tabs button.active {
+    color: var(--text);
+    font-weight: 700;
+    border-bottom-color: var(--accent);
+  }
+  .alert {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--danger);
+    margin-left: 6px;
+    vertical-align: 2px;
+  }
+  .banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: color-mix(in oklab, var(--danger) 12%, var(--panel));
+    border-bottom: 1px solid var(--line);
+  }
+  .banner span {
+    flex: 1;
   }
 
   /* --- top bar --- */

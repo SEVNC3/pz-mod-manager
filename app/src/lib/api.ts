@@ -24,6 +24,30 @@ export type Details = {
   has_backup: boolean;
 };
 
+export type WorkshopItem = {
+  id: string;
+  title: string;
+  preview_url: string;
+  description: string;
+  subscriptions: number;
+  time_updated: number;
+  file_size: number;
+  tags: string[];
+  num_children: number;
+  have: boolean;
+};
+export type Browse = { total: number; items: WorkshopItem[] };
+
+export type ZbStatus = {
+  game_dir: string | null;
+  have_mod: boolean;
+  files_current: boolean;
+  launcher_patched: boolean;
+  enabled: boolean;
+  required_by: string[];
+};
+export const zbReady = (s: ZbStatus | null) => !!s && s.have_mod && s.files_current && s.launcher_patched && s.enabled;
+
 export const api = {
   load: () => invoke<View>("load"),
   save: (rows: Row[]) => invoke<View>("save", { rows }),
@@ -37,6 +61,12 @@ export const api = {
   setBuild: (build: 41 | 42 | null) => invoke<View>("set_build", { build }),
   details: (id: string) => invoke<Details | null>("details", { id }),
   poster: (id: string) => invoke<ArrayBuffer>("poster", { id }),
+  browse: (search: string, sort: string, page: number, build: number | null) =>
+    invoke<Browse>("workshop_browse", { search, sort, page, build }),
+  zbStatus: () => invoke<ZbStatus>("zb_status"),
+  zbPreview: (remove: boolean) => invoke<string[]>("zb_preview", { remove }),
+  zbInstall: () => invoke<View>("zb_install"),
+  zbUninstall: () => invoke<View>("zb_uninstall"),
   openPath: (path: string) => invoke<void>("open_path", { path }),
   openUrl: (url: string) => invoke<void>("open_url", { url }),
 };

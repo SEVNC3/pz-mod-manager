@@ -110,7 +110,7 @@ async fn install(sources: Vec<String>, enable: bool) -> Res<View> {
     tauri::async_runtime::spawn_blocking(move || {
         locked(|paths| {
             let parsed: Vec<Source> = sources.iter().map(|s| Source::parse(s)).collect();
-            let ids = sources::install(paths, &parsed);
+            let ids = sources::install(paths, &parsed, true);
             if enable && !ids.is_empty() {
                 let mut p = active(paths)?;
                 ids.iter().for_each(|i| p.set(i, true));
@@ -136,7 +136,7 @@ async fn update_all() -> Res<View> {
             if all.is_empty() {
                 pzmm_core::log!("nothing to update: no mods were installed through PZMM");
             }
-            sources::install(paths, &all);
+            sources::install(paths, &all, false);
             view(paths)
         })
     })
@@ -247,6 +247,144 @@ fn poster(id: String) -> Res<tauri::ipc::Response> {
     .map(tauri::ipc::Response::new)
 }
 
+#[derive(Serialize)]
+struct BrowseItem {
+    #[serde(flatten)]
+    item: sources::steam_workshop::Item,
+    /// Already loadable: subscribed in Steam or installed by PZMM.
+    have: bool,
+}
+
+#[derive(Serialize)]
+struct Browse {
+    total: u64,
+    items: Vec<BrowseItem>,
+}
+
+#[tauri::command]
+async fn workshop_browse(search: String, sort: String, page: u32, build: Option<u8>) -> Res<Browse> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let tag = build.map(|b| format!("Build {b}"));
+        let res = sources::steam_workshop::browse(pz::STEAM_APP, &search, &sort, page, tag.as_deref()).map_err(|e| format!("{e:#}"))?;
+        let have = sources::workshop_available(&Paths::detect());
+        Ok(Browse {
+            total: res.total,
+            items: res.items.into_iter().map(|item| BrowseItem { have: have.contains(&item.id), item }).collect(),
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+// --- ZombieBuddy (Java mods) ---
+
+use pzmm_core::pz::zombiebuddy as zb;
+
+#[derive(Serialize)]
+struct ZbStatus {
+    game_dir: Option<String>,
+    /// The ZombieBuddy mod is available (subscribed or installed).
+    have_mod: bool,
+    files_current: bool,
+    launcher_patched: bool,
+    enabled: bool,
+    /// Enabled mods whose mod.info requires ZombieBuddy.
+    required_by: Vec<String>,
+}
+
+/// (launcher folder, ZombieBuddy's libs folder, every mod)
+type ZbPaths = (Option<std::path::PathBuf>, Option<std::path::PathBuf>, BTreeMap<String, store::Row>);
+
+fn zb_paths(paths: &Paths) -> anyhow::Result<ZbPaths> {
+    let mods = store::scan(paths)?;
+    let launcher = zb::game_dir().and_then(|g| zb::launcher_dir(&g));
+    let libs = mods.get(zb::MOD_ID).and_then(|m| zb::libs_dir(&m.dir));
+    Ok((launcher, libs, mods))
+}
+
+#[tauri::command]
+fn zb_status() -> Res<ZbStatus> {
+    locked(|paths| {
+        let (launcher, libs, mods) = zb_paths(paths)?;
+        let enabled = active(paths)?.enabled();
+        let required_by = enabled
+            .iter()
+            .filter(|id| {
+                mods.get(*id).is_some_and(|m| {
+                    pz::read_info(&m.info).get("require").is_some_and(|r| r.split([',', ';']).any(|x| x.trim().trim_start_matches('\\') == zb::MOD_ID))
+                })
+            })
+            .cloned()
+            .collect();
+        Ok(ZbStatus {
+            game_dir: launcher.as_ref().map(|d| d.display().to_string()),
+            have_mod: libs.is_some(),
+            files_current: launcher.as_deref().zip(libs.as_deref()).is_some_and(|(l, s)| zb::files_current(l, s)),
+            launcher_patched: launcher.as_deref().is_some_and(zb::launcher_patched),
+            enabled: enabled.iter().any(|i| i == zb::MOD_ID),
+            required_by,
+        })
+    })
+}
+
+/// What setting up (or removing) ZombieBuddy would change, for the confirmation dialog.
+#[tauri::command]
+fn zb_preview(remove: bool) -> Res<Vec<String>> {
+    locked(|paths| {
+        let (launcher, libs, _) = zb_paths(paths)?;
+        let Some(l) = launcher else { anyhow::bail!("Project Zomboid's game folder wasn't found in your Steam libraries") };
+        if remove {
+            return zb::uninstall(&l, true);
+        }
+        let mut lines = match libs {
+            Some(s) => zb::install(&l, &s, true)?,
+            None => vec![
+                format!("download ZombieBuddy (Workshop item {}) into Zomboid/mods", zb::WORKSHOP_ID),
+                format!("copy its Java agent files to {}", l.display()),
+                format!("add {} to {}", zb::launch_arg(), l.join("ProjectZomboid64.json").display()),
+            ],
+        };
+        lines.push("enable ZombieBuddy in the active profile".into());
+        Ok(lines)
+    })
+}
+
+#[tauri::command]
+async fn zb_install() -> Res<View> {
+    tauri::async_runtime::spawn_blocking(|| {
+        locked(|paths| {
+            let (launcher, mut libs, _) = zb_paths(paths)?;
+            let Some(l) = launcher else { anyhow::bail!("Project Zomboid's game folder wasn't found in your Steam libraries") };
+            if libs.is_none() {
+                sources::install(paths, &[Source::Workshop(zb::WORKSHOP_ID.into())], false);
+                libs = zb_paths(paths)?.1;
+            }
+            let Some(s) = libs else { anyhow::bail!("couldn't get the ZombieBuddy mod from the Workshop") };
+            for c in zb::install(&l, &s, false)? {
+                pzmm_core::log!("{c}");
+            }
+            let mut p = active(paths)?;
+            p.set(zb::MOD_ID, true);
+            profile::apply(paths, &p)?;
+            pzmm_core::log!("ZombieBuddy is set up. Java mods ask for your approval the first time they load.");
+            view(paths)
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn zb_uninstall() -> Res<View> {
+    locked(|paths| {
+        let Some(l) = zb_paths(paths)?.0 else { anyhow::bail!("Project Zomboid's game folder wasn't found in your Steam libraries") };
+        for c in zb::uninstall(&l, false)? {
+            pzmm_core::log!("{c}");
+        }
+        view(paths)
+    })
+}
+
 #[tauri::command]
 fn open_path(app: AppHandle, path: String) -> Res<()> {
     app.opener().open_path(path, None::<&str>).map_err(|e| e.to_string())
@@ -279,7 +417,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
-            details, poster, open_path, open_url
+            details, poster, open_path, open_url, workshop_browse, zb_status, zb_preview, zb_install, zb_uninstall
         ])
         .run(tauri::generate_context!())
         .expect("error while running PZMM");

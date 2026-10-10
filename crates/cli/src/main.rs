@@ -47,6 +47,23 @@ enum Cmd {
     Profile(ProfileCmd),
     /// Force the default.txt format: 41 or 42 (default: keep the file's format)
     Build { build: u8 },
+    /// Search the Steam Workshop (no query: most popular this week)
+    Search {
+        query: Vec<String>,
+        /// trend, toprated, totaluniquesubscribers, mostrecent, lastupdated
+        #[arg(long, default_value = "trend")]
+        sort: String,
+        #[arg(long, default_value_t = 1)]
+        page: u32,
+        /// Only items tagged for this build, e.g. 42
+        #[arg(long)]
+        build: Option<u8>,
+    },
+    /// Set up the ZombieBuddy Java agent (Java mods): status, install or uninstall
+    Zombiebuddy {
+        #[arg(default_value = "status")]
+        action: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -75,7 +92,7 @@ fn run(cli: Cli) -> Result<()> {
     match cli.cmd {
         Cmd::Add { sources: s, no_enable } => {
             let parsed: Vec<Source> = s.iter().map(|s| Source::parse(s)).collect();
-            let ids = sources::install(&paths, &parsed);
+            let ids = sources::install(&paths, &parsed, true);
             if !no_enable && !ids.is_empty() {
                 ids.iter().for_each(|i| p.set(i, true));
                 profile::apply(&paths, &p)?;
@@ -104,13 +121,22 @@ fn run(cli: Cli) -> Result<()> {
                 .filter(|e| seen.insert(e.source.clone()))
                 .filter_map(|e| Source::from_index(&e.source))
                 .collect();
-            sources::install(&paths, &all);
+            sources::install(&paths, &all, false);
         }
         Cmd::Rollback { id } => {
             store::rollback(&paths, &id)?;
             println!("{id}: restored previous version");
         }
         Cmd::List => list(&paths, &p)?,
+        Cmd::Search { query, sort, page, build } => {
+            let tag = build.map(|b| format!("Build {b}"));
+            let res = sources::steam_workshop::browse(pzmm_core::pz::STEAM_APP, &query.join(" "), &sort, page, tag.as_deref())?;
+            println!("{} results (page {page})", res.total);
+            for i in res.items {
+                println!("{:>11}  {:<50} {:>9} subs", i.id, i.title.chars().take(50).collect::<String>(), i.subscriptions);
+            }
+        }
+        Cmd::Zombiebuddy { action } => zombiebuddy(&paths, &mut p, &action)?,
         Cmd::Profile(ProfileCmd::List) => {
             for name in profile::list(&paths) {
                 println!("{} {name}", if name == p.name { '*' } else { ' ' });
@@ -153,6 +179,43 @@ fn list(paths: &Paths, p: &Profile) -> Result<()> {
     }
     for m in mods.values() {
         println!("[ ] {:30} {:40} {}", m.id, m.name, m.source);
+    }
+    Ok(())
+}
+
+fn zombiebuddy(paths: &Paths, p: &mut Profile, action: &str) -> Result<()> {
+    use pzmm_core::pz::zombiebuddy as zb;
+    let launcher = zb::game_dir().and_then(|g| zb::launcher_dir(&g));
+    let libs = || store::scan(paths).ok().and_then(|mut m| m.remove(zb::MOD_ID)).and_then(|m| zb::libs_dir(&m.dir));
+    match action {
+        "status" => {
+            let l = launcher.as_deref();
+            println!("game folder:     {}", l.map_or("not found (set PZ_GAME_DIR)".into(), |d| d.display().to_string()));
+            println!("ZombieBuddy mod: {}", libs().map_or("not installed".into(), |d| d.display().to_string()));
+            println!("agent files:     {}", l.zip(libs()).is_some_and(|(l, s)| zb::files_current(l, &s)));
+            println!("launcher flag:   {}", l.is_some_and(zb::launcher_patched));
+            println!("enabled:         {}", p.enabled().iter().any(|i| i == zb::MOD_ID));
+        }
+        "install" => {
+            let Some(l) = launcher else { bail!("Project Zomboid's game folder wasn't found; set PZ_GAME_DIR") };
+            if libs().is_none() {
+                sources::install(paths, &[Source::Workshop(zb::WORKSHOP_ID.into())], false);
+            }
+            let Some(s) = libs() else { bail!("couldn't get the ZombieBuddy mod") };
+            for c in zb::install(&l, &s, false)? {
+                println!("{c}");
+            }
+            p.set(zb::MOD_ID, true);
+            profile::apply(paths, p)?;
+            println!("ZombieBuddy is set up. Java mods will ask for your approval the first time they load.");
+        }
+        "uninstall" => {
+            let Some(l) = launcher else { bail!("Project Zomboid's game folder wasn't found; set PZ_GAME_DIR") };
+            for c in zb::uninstall(&l, false)? {
+                println!("{c}");
+            }
+        }
+        _ => bail!("expected status, install or uninstall"),
     }
     Ok(())
 }
