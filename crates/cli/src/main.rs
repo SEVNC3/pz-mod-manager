@@ -72,11 +72,23 @@ enum Cmd {
     Errors,
     /// List mods PZMM installed from the Workshop that have updates waiting
     Outdated,
-    /// Write the active profile to Zomboid/Server/<name>.ini, or make a profile from it
+    /// Server configs: export (profile -> Server/<name>.ini), import (ini -> profile) or start
     Server {
-        /// export or import
+        /// export, import or start
         action: String,
         name: String,
+    },
+    /// Watch a server's Workshop items and react when one updates (players get "version is
+    /// different" until the server restarts). Runs until stopped.
+    Watch {
+        /// Server config name (Server/<name>.ini)
+        server: String,
+        /// Minutes between checks
+        #[arg(long, default_value_t = 10)]
+        every: u64,
+        /// Shell command to run when items update, e.g. your restart script
+        #[arg(long)]
+        on_update: Option<String>,
     },
     /// Show or switch the game: zomboid (plain) or viewpoint (Project Viewpoint, 3D)
     Mode {
@@ -117,7 +129,7 @@ fn main() {
 fn run(cli: Cli) -> Result<()> {
     let paths = Paths::detect();
     // read-only commands skip the lock; the rest wait for the app to finish its change
-    let _lock = if matches!(cli.cmd, Cmd::Search { .. }) { None } else { Some(pzmm_core::lock_data(&paths)?) };
+    let _lock = if matches!(cli.cmd, Cmd::Search { .. } | Cmd::Watch { .. }) { None } else { Some(pzmm_core::lock_data(&paths)?) };
     let (mut p, adopted) = profile::sync(&paths)?;
     if adopted {
         println!("picked up mod list changes made in-game (profile {:?})", p.name);
@@ -215,6 +227,7 @@ fn run(cli: Cli) -> Result<()> {
             ids.iter().for_each(|i| println!("{i}: update available (pzmm update)"));
         }
         Cmd::Server { action, name } => server(&paths, &p, &action, &name)?,
+        Cmd::Watch { server, every, on_update } => watch(&paths, &server, every, on_update.as_deref())?,
         Cmd::Mode { to, dry_run } => {
             use pzmm_core::pz::viewpoint as vp;
             let Some(to) = to else {
@@ -351,7 +364,39 @@ fn server(paths: &Paths, p: &Profile, action: &str, name: &str) -> Result<()> {
             profile::apply(paths, &prof)?;
             println!("now using profile {:?}", prof.name);
         }
-        _ => bail!("expected export or import"),
+        "start" => println!("started {name} with {}", server::start(paths, name)?.display()),
+        _ => bail!("expected export, import or start"),
     }
     Ok(())
+}
+
+fn watch(paths: &Paths, name: &str, every: u64, on_update: Option<&str>) -> Result<()> {
+    use pzmm_core::pz::server;
+    use pzmm_core::sources::steam_workshop;
+    let file = server::path(paths, name)?;
+    let mut seen: std::collections::HashMap<String, u64> = Default::default();
+    println!("watching the Workshop items of {} every {every} min (Ctrl+C stops)", file.display());
+    loop {
+        let cfg = server::read(&file)?;
+        let ids: Vec<&str> = cfg.workshop.iter().map(String::as_str).collect();
+        match steam_workshop::details(&ids) {
+            Ok(items) => {
+                let changed: Vec<String> =
+                    steam_workshop::newly_updated(&mut seen, items).into_iter().map(|i| format!("{} ({})", i.title, i.id)).collect();
+                if !changed.is_empty() {
+                    println!("updated on the Workshop: {}", changed.join(", "));
+                    if let Some(cmd) = on_update {
+                        let status = if cfg!(windows) {
+                            std::process::Command::new("cmd").args(["/C", cmd]).status()
+                        } else {
+                            std::process::Command::new("sh").args(["-c", cmd]).status()
+                        };
+                        println!("ran --on-update: {}", status.map_or_else(|e| e.to_string(), |s| s.to_string()));
+                    }
+                }
+            }
+            Err(e) => eprintln!("error: checking the Workshop: {e:#}"),
+        }
+        std::thread::sleep(std::time::Duration::from_secs(every.max(1) * 60));
+    }
 }

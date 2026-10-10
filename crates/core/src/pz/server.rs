@@ -109,6 +109,41 @@ pub fn export(paths: &Paths, name: &str, enabled: &[String], mods: &std::collect
     Ok(notes)
 }
 
+/// The script that starts a dedicated server: the Dedicated Server tool from Steam
+/// (`PZ_SERVER_DIR` overrides), else the server launcher that ships with the game.
+pub fn start_script() -> Option<PathBuf> {
+    let names: &[&str] = if cfg!(windows) { &["StartServer64.bat", "ProjectZomboidServer.bat"] } else { &["start-server.sh"] };
+    let dirs = [
+        std::env::var_os("PZ_SERVER_DIR").map(PathBuf::from),
+        crate::sources::steam_workshop::library_path("steamapps/common/Project Zomboid Dedicated Server"),
+        super::zombiebuddy::game_dir(),
+    ];
+    dirs.into_iter().flatten().flat_map(|d| names.iter().map(move |n| d.join(n))).find(|p| p.is_file())
+}
+
+/// Start the dedicated server with config `name` (Server/<name>.ini). On Windows it gets
+/// its own console window; on Linux its output goes to `<data>/logs/server-<name>.log`.
+pub fn start(paths: &Paths, name: &str) -> Result<PathBuf> {
+    path(paths, name)?; // validates the name
+    let Some(script) = start_script() else {
+        bail!("no server launcher found: install \"Project Zomboid Dedicated Server\" from Steam (Library > Tools), or set PZ_SERVER_DIR")
+    };
+    let dir = script.parent().unwrap_or(Path::new("."));
+    let mut cmd;
+    if cfg!(windows) {
+        cmd = std::process::Command::new("cmd");
+        cmd.args(["/C", "start", "Project Zomboid server", "/D"]).arg(dir).arg(&script).args(["-servername", name]);
+    } else {
+        let logs = paths.data.join("logs");
+        fs::create_dir_all(&logs)?;
+        let log = fs::File::create(logs.join(format!("server-{name}.log")))?;
+        cmd = std::process::Command::new("sh");
+        cmd.arg(&script).args(["-servername", name]).current_dir(dir).stdout(log.try_clone()?).stderr(log);
+    }
+    cmd.spawn().map_err(|e| anyhow::anyhow!("starting {}: {e}", script.display()))?;
+    Ok(script)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

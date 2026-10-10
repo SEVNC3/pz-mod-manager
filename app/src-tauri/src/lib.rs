@@ -639,6 +639,16 @@ async fn server_import(name: String) -> Res<View> {
     .map_err(|e| e.to_string())?
 }
 
+/// Start the dedicated server with config `name`.
+#[tauri::command]
+fn server_start(name: String) -> Res<String> {
+    reading(|paths| {
+        let script = pz::server::start(paths, &name)?;
+        pzmm_core::log!("Started the {name} server ({}).", script.display());
+        Ok(script.display().to_string())
+    })
+}
+
 /// Make a profile from a save's mod list and use it.
 #[tauri::command]
 fn save_use(mode: String, name: String) -> Res<View> {
@@ -769,7 +779,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
             details, poster, open_path, open_url, workshop_browse, zb_status, zb_preview, zb_install, zb_uninstall,
-            find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, servers_and_saves, server_export, server_import, save_use,
+            find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, servers_and_saves, server_export, server_import, server_start, save_use,
             mode_preview, mode_switch, doctor, console_errors, profile_export, profile_import
         ])
         .run(tauri::generate_context!())

@@ -38,6 +38,15 @@
     return [extra && `${extra} not in your profile`, lacking && `${lacking} of yours not in it`].filter(Boolean).join(" · ");
   }
 
+  async function start(name: string) {
+    error = "";
+    try {
+      notes = [`Started the ${name} server with ${await api.serverStart(name)}. Its console window shows progress.`];
+    } catch (e) {
+      error = String(e);
+    }
+  }
+
   const when = (t: number) => new Date(t * 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
   onMount(refresh);
@@ -67,7 +76,10 @@
         {#each data.servers as s}
           <li>
             <span class="name mono">{s}.ini</span>
-            <button disabled={busy} onclick={async () => { if (await onImport(s)) refresh(); }}>Use as profile</button>
+            <span class="btns">
+              <button disabled={busy} onclick={() => start(s)} title="Start this dedicated server">Start server</button>
+              <button disabled={busy} onclick={async () => { if (await onImport(s)) refresh(); }}>Use as profile</button>
+            </span>
           </li>
         {/each}
       </ul>
@@ -144,6 +156,10 @@
   .name {
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+  .btns {
+    display: flex;
+    gap: 6px;
   }
   .hint {
     display: block;

@@ -195,6 +195,12 @@ pub fn details(ids: &[&str]) -> Result<Vec<Item>> {
     Ok(v["response"]["publishedfiledetails"].as_array().into_iter().flatten().filter(|d| d["result"] == 1).map(Item::from_json).collect())
 }
 
+/// Items whose Workshop update time moved past what `seen` recorded; records the new
+/// times. The first sighting of an item only records it (no baseline yet).
+pub fn newly_updated(seen: &mut std::collections::HashMap<String, u64>, items: Vec<Item>) -> Vec<Item> {
+    items.into_iter().filter(|i| seen.insert(i.id.clone(), i.time_updated).is_some_and(|before| before < i.time_updated)).collect()
+}
+
 /// Members of each id that is a collection: `{collection id: [item ids]}`. Plain items are absent.
 pub fn collections(ids: &[&str]) -> Result<std::collections::HashMap<String, Vec<String>>> {
     if ids.is_empty() {
@@ -332,6 +338,16 @@ mod tests {
         assert_eq!(page.items[0].id, "3810071828");
         assert_eq!((page.items[0].file_size, page.items[0].tags.clone()), (1_048_576, vec!["Build 42".to_string()]));
         assert!(parse_browse("<html>maintenance</html>").is_err());
+    }
+
+    #[test]
+    fn reports_updates_after_the_first_look() {
+        let item = |t| Item { id: "1".into(), time_updated: t, ..Default::default() };
+        let mut seen = Default::default();
+        assert!(newly_updated(&mut seen, vec![item(100)]).is_empty(), "first look is the baseline");
+        assert!(newly_updated(&mut seen, vec![item(100)]).is_empty());
+        assert_eq!(newly_updated(&mut seen, vec![item(200)]).len(), 1);
+        assert!(newly_updated(&mut seen, vec![item(200)]).is_empty());
     }
 
     #[test]

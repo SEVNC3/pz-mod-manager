@@ -121,6 +121,7 @@ export const api = {
   conflicts: (id: string) => invoke<Conflict[]>("conflicts", { id }),
   serversAndSaves: () => invoke<ServersAndSaves>("servers_and_saves"),
   serverExport: (name: string) => invoke<string[]>("server_export", { name }),
+  serverStart: (name: string) => invoke<string>("server_start", { name }),
   serverImport: (name: string) => invoke<View>("server_import", { name }),
   saveUse: (mode: string, name: string) => invoke<View>("save_use", { mode, name }),
   doctor: () => invoke<Finding[]>("doctor"),
