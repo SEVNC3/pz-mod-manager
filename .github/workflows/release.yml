@@ -1,0 +1,20 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python test_pzmm.py
+      - run: pip install pyinstaller
+      - run: pyinstaller --onefile --windowed --name PZModManager gui.py
+      - run: gh release create ${{ github.ref_name }} dist/PZModManager.exe --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
