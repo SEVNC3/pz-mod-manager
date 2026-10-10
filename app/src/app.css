@@ -17,7 +17,7 @@
      indicators (tab underline, selection bars, stars) use --accent-text, ~5.8:1 on raised */
   --accent-soft: color-mix(in oklab, var(--accent) 32%, transparent);
   --accent-text: color-mix(in oklab, var(--accent) 45%, white);
-  --focus: color-mix(in oklab, var(--accent) 50%, white);
+  --focus: rgb(255 255 255 / 0.85);
   /* hovering a control lays the blood red over it */
   --hover: color-mix(in oklab, var(--accent) 34%, transparent);
   --hover-line: color-mix(in oklab, var(--accent) 70%, transparent);
@@ -35,7 +35,6 @@
 @supports (color: oklch(from red l c h)) {
   :root {
     --accent-text: oklch(from var(--accent) 0.66 0.22 h);
-    --focus: oklch(from var(--accent) 0.74 0.17 h);
   }
 }
 
@@ -193,6 +192,11 @@ select {
   option:checked {
     font-weight: 700;
   }
+}
+
+::selection {
+  background: var(--accent);
+  color: #fff;
 }
 
 :focus-visible {

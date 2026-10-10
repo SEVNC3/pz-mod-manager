@@ -43,7 +43,8 @@
   let queryText = $state("");
   // svelte-ignore state_referenced_locally
   let build = $state(String(defaultBuild ?? 42));
-  let dates = $state({ createdFrom: "", createdTo: "", updatedFrom: "", updatedTo: "" });
+  /** Posted / updated within the last N days (0 = any time): presets instead of the native date picker. */
+  let within = $state({ posted: 0, updated: 0 });
   /** What a "needs this" / "collections with this" / author list is about. */
   let context = $state<{ kind: "child" | "author"; item: WorkshopItem } | null>(null);
   let authorPage = $state(1);
@@ -55,7 +56,8 @@
   let open = $state<WorkshopItem | null>(null);
   let seq = 0;
 
-  const unix = (d: string, end = false) => (d ? Math.floor(new Date(d + (end ? "T23:59:59" : "T00:00:00")).getTime() / 1000) : 0);
+  const WITHIN: [number, string][] = [[0, "Any time"], [1, "Last 24 hours"], [7, "Last week"], [30, "Last month"], [90, "Last 3 months"], [180, "Last 6 months"], [365, "Last year"]];
+  const since = (days: number) => (days ? Math.floor(Date.now() / 1000) - days * 86400 : 0);
   /** The request as Steam wants it: build in the tags, libraries as a filter, dates as unix times. */
   function request(over: Partial<Query> = {}): Query {
     const required = [...q.required.filter((t) => !t.startsWith("Build ")), ...(build ? [`Build ${build}`] : [])];
@@ -65,10 +67,10 @@
       sort: libraries ? "totaluniquesubscribers" : sortChoice,
       libraries,
       required,
-      created_from: unix(dates.createdFrom),
-      created_to: unix(dates.createdTo, true),
-      updated_from: unix(dates.updatedFrom),
-      updated_to: unix(dates.updatedTo, true),
+      created_from: since(within.posted),
+      created_to: 0,
+      updated_from: since(within.updated),
+      updated_to: 0,
       ...over,
     };
   }
@@ -138,10 +140,10 @@
     q.required = [];
     q.excluded = [];
     q.incompatible = false;
-    dates = { createdFrom: "", createdTo: "", updatedFrom: "", updatedTo: "" };
+    within = { posted: 0, updated: 0 };
     go(1);
   }
-  const filterCount = $derived(q.required.length + q.excluded.length + (q.incompatible ? 1 : 0) + Object.values(dates).filter(Boolean).length);
+  const filterCount = $derived(q.required.length + q.excluded.length + (q.incompatible ? 1 : 0) + (within.posted ? 1 : 0) + (within.updated ? 1 : 0));
 
   function viewAll(over: Partial<Query>) {
     view = "browse";
@@ -341,12 +343,16 @@
           {/each}
         </div>
       </div>
-      <div class="field"><span>Posted</span>
-        <div class="dates"><input type="date" bind:value={dates.createdFrom} onchange={() => go(1)} aria-label="Posted from" /><input type="date" bind:value={dates.createdTo} onchange={() => go(1)} aria-label="Posted to" /></div>
-      </div>
-      <div class="field"><span>Updated</span>
-        <div class="dates"><input type="date" bind:value={dates.updatedFrom} onchange={() => go(1)} aria-label="Updated from" /><input type="date" bind:value={dates.updatedTo} onchange={() => go(1)} aria-label="Updated to" /></div>
-      </div>
+      <label class="field"><span>Posted</span>
+        <select bind:value={within.posted} onchange={() => go(1)}>
+          {#each WITHIN as [d, label]}<option value={d}>{label}</option>{/each}
+        </select>
+      </label>
+      <label class="field"><span>Updated</span>
+        <select bind:value={within.updated} onchange={() => go(1)}>
+          {#each WITHIN as [d, label]}<option value={d}>{label}</option>{/each}
+        </select>
+      </label>
       <label class="check"><input type="checkbox" bind:checked={q.incompatible} onchange={() => go(1)} /> Only mods marked incompatible</label>
       {#if filterCount}<button type="button" class="quiet small" onclick={clearFilters}><Icon name="x" size={12} /> Clear filters</button>{/if}
     {/if}
@@ -549,20 +555,6 @@
   }
   .chip.out .box {
     border-color: var(--danger);
-  }
-  .dates {
-    display: flex;
-    gap: 6px;
-  }
-  .dates input {
-    flex: 1;
-    min-width: 0;
-    background: var(--raised);
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 4px 6px;
-    color: var(--text);
-    font-size: 12px;
   }
   .check {
     display: flex;
