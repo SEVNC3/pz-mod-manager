@@ -181,7 +181,9 @@
   }
 
   /** Run a backend job that returns the new view. Errors go to the activity log; returns success. */
-  async function run(label: string, job: () => Promise<View>): Promise<boolean> {
+  async function run(label: string, job: () => Promise<View>, keepHistory = false): Promise<boolean> {
+    // undo covers list edits only: anything else (installs, profile switches) resets it
+    if (!keepHistory) undoStack = redoStack = [];
     busy = true;
     busyLabel = label;
     try {
@@ -279,10 +281,47 @@
     }
   }
 
-  const commit = (next: Row[]) => {
+  // --- undo/redo for list edits (toggle, reorder, separators, fixes) ---
+  let undoStack = $state<Row[][]>([]);
+  let redoStack = $state<Row[][]>([]);
+
+  const commit = (next: Row[], record = true) => {
+    if (record) {
+      undoStack = [...undoStack.slice(-49), $state.snapshot(rows)];
+      redoStack = [];
+    }
     rows = next;
-    return run("Saving", () => api.save(next));
+    return run("Saving", () => api.save(next), true);
   };
+
+  function undo() {
+    const prev = undoStack.at(-1);
+    if (!prev || busy) return;
+    undoStack = undoStack.slice(0, -1);
+    redoStack = [...redoStack, $state.snapshot(rows)];
+    commit(prev, false);
+  }
+
+  function redo() {
+    const next = redoStack.at(-1);
+    if (!next || busy) return;
+    redoStack = redoStack.slice(0, -1);
+    undoStack = [...undoStack, $state.snapshot(rows)];
+    commit(next, false);
+  }
+
+  function globalKey(e: KeyboardEvent) {
+    const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
+    if (typing || !(e.ctrlKey || e.metaKey) || tab !== "mods") return;
+    const k = e.key.toLowerCase();
+    if (k === "z" && !e.shiftKey) {
+      e.preventDefault();
+      undo();
+    } else if (k === "y" || (k === "z" && e.shiftKey)) {
+      e.preventDefault();
+      redo();
+    }
+  }
 
   function toggle(id: string) {
     commit(rows.map((r) => (r.kind === "mod" && r.id === id ? { ...r, on: !r.on } : r)));
@@ -373,6 +412,8 @@
     };
   });
 </script>
+
+<svelte:window onkeydown={globalKey} />
 
 <div class="app">
   <header class="top">
@@ -544,6 +585,8 @@
     {:else}
       <span class="spacer"></span>
     {/if}
+    <button class="quiet" onclick={undo} disabled={busy || !undoStack.length} title="Undo the last list change (Ctrl+Z)">Undo</button>
+    <button class="quiet" onclick={redo} disabled={busy || !redoStack.length} title="Redo (Ctrl+Y)">Redo</button>
     <button class="quiet" onclick={addSeparator} disabled={busy || filtering}>Add separator</button>
   </div>
 
