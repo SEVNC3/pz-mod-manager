@@ -427,8 +427,25 @@
     commit(next, false);
   }
 
+  const TAB_IDS = ["mods", "workshop", "servers", "zb"];
+  const FILTER_IDS = ["all", "on", "off", "problems"];
+  /** Left/Right arrows step through a tab list or segmented control and move focus along. */
+  function arrowPick(e: KeyboardEvent, ids: string[], current: string, set: (v: string) => void) {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const i = (ids.indexOf(current) + (e.key === "ArrowRight" ? 1 : ids.length - 1)) % ids.length;
+    set(ids[i]);
+    const buttons = (e.currentTarget as HTMLElement).querySelectorAll("button");
+    tick().then(() => (buttons[i] as HTMLElement | undefined)?.focus());
+  }
+
   function globalKey(e: KeyboardEvent) {
     const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
+    if (e.key === "/" && !typing && tab === "mods") {
+      e.preventDefault();
+      document.getElementById("mod-search")?.focus();
+      return;
+    }
     if (e.key === "Escape" && !typing && picked.size) {
       picked = new Set();
       return;
@@ -566,6 +583,10 @@
       e.preventDefault();
       const sib = (e.key === "ArrowUp" ? tr.previousElementSibling : tr.nextElementSibling) as HTMLElement | null;
       sib?.focus();
+    } else if (e.key === "Enter" && r.kind === "mod") {
+      selected = r.id;
+      picked = new Set([r.id]);
+      anchor = r.id;
     } else if (e.key === "Enter" && r.kind === "sep") {
       editingSep = i;
     }
@@ -711,6 +732,11 @@
           <option value="41">Build 41</option>
         </select>
       </label>
+      <span class="keys">
+        Keyboard: <kbd>/</kbd> search · <kbd>↑</kbd><kbd>↓</kbd> move between rows · <kbd>Enter</kbd> details ·
+        <kbd>Space</kbd> enable/disable · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> reorder · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> undo/redo ·
+        <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+click select several · <kbd>Esc</kbd> clear selection
+      </span>
       <span class="version">PZMM {appVersion}
         <button class="quiet" onclick={() => checkAppUpdate(true)}>Check for updates</button></span>
       <div class="paths">
@@ -721,7 +747,7 @@
   {/if}
 
   <div class="tabbar">
-  <div class="tabs" role="tablist" aria-label="Sections">
+  <div class="tabs" role="tablist" aria-label="Sections" tabindex="-1" onkeydown={(e) => arrowPick(e, TAB_IDS, tab, (v) => (tab = v as typeof tab))}>
     {#each [["mods", "My mods"], ["workshop", "Browse Workshop"], ["servers", "Servers & saves"], ["zb", "ZombieBuddy"]] as [id, label]}
       <button role="tab" aria-selected={tab === id} class:active={tab === id} onclick={() => (tab = id as typeof tab)}>
         {label}{#if id === "zb" && zbNeeded}<span class="alert" aria-label="needs setup"></span>{/if}
@@ -761,8 +787,8 @@
     </div>
   {/if}
   <div class="filters">
-    <input type="search" bind:value={search} placeholder="Search mods" aria-label="Search mods" />
-    <div class="seg" role="radiogroup" aria-label="Show">
+    <input id="mod-search" type="search" bind:value={search} placeholder="Search mods  ( / )" aria-label="Search mods" />
+    <div class="seg" role="radiogroup" aria-label="Show" tabindex="-1" onkeydown={(e) => arrowPick(e, FILTER_IDS, filter, (v) => (filter = v as typeof filter))}>
       {#each [["all", "All"], ["on", "Enabled"], ["off", "Disabled"], ["problems", `Problems${problemCount ? ` (${problemCount})` : ""}`]] as [v, label]}
         <button role="radio" aria-checked={filter === v} class:active={filter === v} onclick={() => (filter = v as typeof filter)}>{label}</button>
       {/each}
@@ -863,7 +889,9 @@
   {/if}
   <main class:with-details={selected}>
     <div class="list">
-      {#if view && rows.length === 0}
+      {#if !view}
+        <p class="loading">Loading your mods…</p>
+      {:else if rows.length === 0}
         <div class="empty">
           <p class="marker">Nothing in the stockpile yet.</p>
           <p>Paste a Steam Workshop link above to install a mod, or subscribe to mods in Steam: subscriptions show up here automatically.</p>
@@ -1356,6 +1384,24 @@
     margin-left: 10px;
     color: var(--muted);
   }
+  .loading {
+    padding: 24px 16px;
+    color: var(--muted);
+  }
+  .keys {
+    flex-basis: 100%;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  kbd {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: 0 4px;
+    background: var(--raised);
+  }
   .build-badge {
     margin-left: 8px;
     font-size: 11px;
@@ -1381,7 +1427,8 @@
     margin-right: 6px;
   }
   .src {
-    width: 250px;
+    width: 1%;
+    max-width: 320px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

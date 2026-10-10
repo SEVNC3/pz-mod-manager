@@ -15,7 +15,15 @@
   let notes = $state<string[]>([]);
   let error = $state("");
 
-  const refresh = () => api.serversAndSaves().then((d) => (data = d)).catch((e) => (error = String(e)));
+  const refresh = () =>
+    api
+      .serversAndSaves()
+      .then((d) => {
+        data = d;
+        // default to a config that exists, so "Write to" doesn't create a stray servertest.ini
+        if (d.servers.length && !d.servers.includes(target)) target = d.servers[0];
+      })
+      .catch((e) => (error = String(e)));
 
   async function exportTo(e: Event) {
     e.preventDefault();
