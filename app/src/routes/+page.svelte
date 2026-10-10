@@ -1141,8 +1141,9 @@
     position: relative;
   }
   .tabs button.active {
-    color: var(--text);
-    border-bottom-color: var(--accent-text);
+    color: #fff;
+    background: var(--accent-soft);
+    border-bottom-color: #fff;
   }
   .alert {
     display: inline-block;

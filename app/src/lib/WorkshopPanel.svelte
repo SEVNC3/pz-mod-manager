@@ -413,8 +413,9 @@
     padding: 8px 12px 7px;
   }
   .tabs button.on {
-    color: var(--text);
-    border-bottom-color: var(--accent-text);
+    color: #fff;
+    background: var(--accent-soft);
+    border-bottom-color: #fff;
   }
   .desc {
     overflow-wrap: anywhere;
