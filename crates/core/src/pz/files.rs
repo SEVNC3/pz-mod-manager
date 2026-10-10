@@ -8,22 +8,29 @@ use std::path::{Path, PathBuf};
 use super::is_version_dir;
 
 /// Game-visible paths a mod provides under `media/`, B42 `42/` and `common/` folded together.
+/// The mod folder plus its version folders (`42/`, `42.13/`, `common/`): where `media/` can live.
+fn content_roots(mod_dir: &Path) -> Vec<PathBuf> {
+    std::iter::once(mod_dir.to_path_buf())
+        .chain(
+            fs::read_dir(mod_dir)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()) && e.file_name().to_str().is_some_and(is_version_dir))
+                .map(|e| e.path()),
+        )
+        .collect()
+}
+
 pub fn media_files(mod_dir: &Path) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
-    let roots: Vec<PathBuf> = std::iter::once(mod_dir.to_path_buf())
-        .chain(fs::read_dir(mod_dir).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| {
-            p.is_dir() && p.file_name().and_then(|n| n.to_str()).is_some_and(is_version_dir)
-        }))
-        .collect();
-    for root in roots {
-        let media = root.join("media");
-        let mut stack = vec![media.clone()];
+    for root in content_roots(mod_dir) {
+        let mut stack = vec![root.join("media")];
         while let Some(d) = stack.pop() {
             for e in fs::read_dir(&d).into_iter().flatten().flatten() {
-                let p = e.path();
-                if p.is_dir() {
-                    stack.push(p);
-                } else if let Ok(rel) = p.strip_prefix(&root) {
+                if e.file_type().is_ok_and(|t| t.is_dir()) {
+                    stack.push(e.path());
+                } else if let Ok(rel) = e.path().strip_prefix(&root) {
                     out.insert(rel.to_string_lossy().replace('\\', "/").to_lowercase());
                 }
             }
@@ -89,10 +96,10 @@ pub fn overlaps(mods: &[(String, PathBuf)]) -> std::collections::HashMap<String,
 
 /// Map folder names a mod adds (`media/maps/<Name>`).
 pub fn maps(mod_dir: &Path) -> Vec<String> {
-    let mut names: Vec<String> = std::iter::once(mod_dir.to_path_buf())
-        .chain(["42", "common"].iter().map(|v| mod_dir.join(v)))
+    let mut names: Vec<String> = content_roots(mod_dir)
+        .into_iter()
         .flat_map(|root| fs::read_dir(root.join("media/maps")).into_iter().flatten().flatten())
-        .filter(|e| e.path().is_dir())
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
         .map(|e| e.file_name().to_string_lossy().into_owned())
         .collect::<HashSet<_>>()
         .into_iter()
@@ -126,6 +133,10 @@ mod tests {
         assert_eq!(c, [Conflict { other: "B".into(), files: 1, wins: false, examples: vec!["media/lua/shared/items.lua".into()] }]);
         assert!(conflicts(&a, 2, &[("B".into(), b.clone(), 1)])[0].wins);
         assert_eq!(maps(&b), ["Riverside Plus"]);
+        let m = t.path().join("MapMod");
+        touch(&m.join("42.13/media/maps/Riverside Plus/map.info"));
+        touch(&m.join("common/media/maps/Bedford/map.info"));
+        assert_eq!(maps(&m), ["Bedford", "Riverside Plus"], "any version folder");
 
         let c = t.path().join("C");
         touch(&c.join("media/lua/shared/Items.lua"));

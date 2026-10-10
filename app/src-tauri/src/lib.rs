@@ -16,11 +16,38 @@ static LOCK: Mutex<()> = Mutex::new(());
 
 type Res<T> = Result<T, String>;
 
+/// For commands that may change mods or profiles: takes the locks and drops the scan cache.
 fn locked<T>(f: impl FnOnce(&Paths) -> anyhow::Result<T>) -> Res<T> {
     let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let paths = Paths::detect();
     let _file = pzmm_core::lock_data(&paths).map_err(|e| format!("locking PZMM's data: {e}"))?;
+    *SCAN.lock().unwrap_or_else(|e| e.into_inner()) = None;
     f(&paths).map_err(|e| format!("{e:#}"))
+}
+
+/// For read-only commands (row clicks, status): same locks, but reuses the scan cache.
+fn reading<T>(f: impl FnOnce(&Paths) -> anyhow::Result<T>) -> Res<T> {
+    let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let paths = Paths::detect();
+    let _file = pzmm_core::lock_data(&paths).map_err(|e| format!("locking PZMM's data: {e}"))?;
+    f(&paths).map_err(|e| format!("{e:#}"))
+}
+
+/// The last full mod scan. Scanning walks the Workshop folder and reads every mod.info,
+/// and details/poster/conflicts run on each row click, so reads reuse it for a few
+/// seconds; anything that changes mods goes through `locked`, which clears it.
+static SCAN: Mutex<Option<(std::time::Instant, BTreeMap<String, store::Row>)>> = Mutex::new(None);
+
+fn scan(paths: &Paths) -> anyhow::Result<BTreeMap<String, store::Row>> {
+    let mut cache = SCAN.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((at, mods)) = cache.as_ref()
+        && at.elapsed() < std::time::Duration::from_secs(10)
+    {
+        return Ok(mods.clone());
+    }
+    let mods = store::scan(paths)?;
+    *cache = Some((std::time::Instant::now(), mods.clone()));
+    Ok(mods)
 }
 
 /// Download outside the lock (it can take minutes), then install under it.
@@ -66,7 +93,7 @@ struct View {
 
 fn view(paths: &Paths) -> anyhow::Result<View> {
     let (p, adopted) = profile::sync(paths)?;
-    let mut mods = store::scan(paths)?;
+    let mut mods = scan(paths)?;
     let mut rows = vec![];
     for line in p.lines {
         match line {
@@ -228,8 +255,8 @@ struct Details {
 
 #[tauri::command]
 fn details(id: String) -> Res<Option<Details>> {
-    locked(|paths| {
-        let Some(m) = store::scan(paths)?.remove(&id) else { return Ok(None) };
+    reading(|paths| {
+        let Some(m) = scan(paths)?.remove(&id) else { return Ok(None) };
         let ours = store::load(paths)?.contains_key(&id);
         Ok(Some(Details {
             info: pz::read_info(&m.info).into_iter().collect(),
@@ -246,8 +273,8 @@ fn details(id: String) -> Res<Option<Details>> {
 /// The mod's poster image as raw bytes (empty if none).
 #[tauri::command]
 fn poster(id: String) -> Res<tauri::ipc::Response> {
-    locked(|paths| {
-        let Some(m) = store::scan(paths)?.remove(&id) else { return Ok(vec![]) };
+    reading(|paths| {
+        let Some(m) = scan(paths)?.remove(&id) else { return Ok(vec![]) };
         let name = pz::read_info(&m.info).remove("poster").unwrap_or_else(|| "poster.png".into());
         let base = m.info.parent().unwrap_or(&m.dir);
         // poster names come from mod.info: stay inside the mod folder
@@ -306,7 +333,7 @@ struct ZbStatus {
 type ZbPaths = (Option<std::path::PathBuf>, Option<std::path::PathBuf>, BTreeMap<String, store::Row>);
 
 fn zb_paths(paths: &Paths) -> anyhow::Result<ZbPaths> {
-    let mods = store::scan(paths)?;
+    let mods = scan(paths)?;
     let launcher = zb::game_dir().and_then(|g| zb::launcher_dir(&g));
     let libs = mods.get(zb::MOD_ID).filter(|m| zb::official_source(&m.source)).and_then(|m| zb::libs_dir(&m.dir));
     Ok((launcher, libs, mods))
@@ -314,7 +341,7 @@ fn zb_paths(paths: &Paths) -> anyhow::Result<ZbPaths> {
 
 #[tauri::command]
 fn zb_status() -> Res<ZbStatus> {
-    locked(|paths| {
+    reading(|paths| {
         let (launcher, libs, mods) = zb_paths(paths)?;
         let enabled = active(paths)?.enabled();
         let required_by = enabled
@@ -336,7 +363,7 @@ fn zb_status() -> Res<ZbStatus> {
 /// What setting up (or removing) ZombieBuddy would change, for the confirmation dialog.
 #[tauri::command]
 fn zb_preview(remove: bool) -> Res<Vec<String>> {
-    locked(|paths| {
+    reading(|paths| {
         let (launcher, libs, _) = zb_paths(paths)?;
         let Some(l) = launcher else { anyhow::bail!("Project Zomboid's game folder wasn't found in your Steam libraries") };
         if remove {
@@ -400,7 +427,7 @@ fn workshop_item(row: &store::Row) -> Option<&str> {
 #[tauri::command]
 async fn find_requirement(mod_id: String, needed_by: String) -> Res<Vec<sources::Candidate>> {
     tauri::async_runtime::spawn_blocking(move || {
-        let hint = store::scan(&Paths::detect()).ok().and_then(|m| m.get(&needed_by).and_then(workshop_item).map(String::from));
+        let hint = scan(&Paths::detect()).ok().and_then(|m| m.get(&needed_by).and_then(workshop_item).map(String::from));
         let build = profile::effective_build(&Paths::detect());
         sources::find_mod(&mod_id, hint.as_deref(), build).map_err(|e| format!("{e:#}"))
     })
@@ -415,7 +442,7 @@ async fn install_missing() -> Res<(View, Vec<String>)> {
     tauri::async_runtime::spawn_blocking(|| {
         // (missing id, Workshop item of a mod that needs it), read under the lock
         let (wanted, build) = locked(|paths| {
-            let mods = store::scan(paths)?;
+            let mods = scan(paths)?;
             let mut wanted: Vec<(String, Option<String>)> = vec![];
             for id in active(paths)?.enabled() {
                 let Some(m) = mods.get(&id) else { continue };
@@ -485,8 +512,8 @@ async fn update_mods(ids: Vec<String>) -> Res<View> {
 
 #[tauri::command]
 fn conflicts(id: String) -> Res<Vec<pz::files::Conflict>> {
-    locked(|paths| {
-        let mods = store::scan(paths)?;
+    reading(|paths| {
+        let mods = scan(paths)?;
         let enabled = active(paths)?.enabled();
         let Some(mine) = mods.get(&id) else { return Ok(vec![]) };
         let my_pos = enabled.iter().position(|e| *e == id).unwrap_or(usize::MAX);
@@ -504,8 +531,8 @@ fn conflicts(id: String) -> Res<Vec<pz::files::Conflict>> {
 #[tauri::command]
 async fn conflict_summary() -> Res<std::collections::HashMap<String, pz::files::Overlap>> {
     tauri::async_runtime::spawn_blocking(|| {
-        locked(|paths| {
-            let mods = store::scan(paths)?;
+        reading(|paths| {
+            let mods = scan(paths)?;
             let order: Vec<(String, std::path::PathBuf)> =
                 active(paths)?.enabled().into_iter().filter_map(|id| mods.get(&id).map(|m| (id, m.dir.clone()))).collect();
             Ok(pz::files::overlaps(&order))
@@ -524,7 +551,7 @@ struct ServersAndSaves {
 
 #[tauri::command]
 fn servers_and_saves() -> Res<ServersAndSaves> {
-    locked(|paths| {
+    reading(|paths| {
         Ok(ServersAndSaves {
             servers: pz::server::list(paths),
             server_dir: pz::server::dir(paths).display().to_string(),
@@ -536,8 +563,8 @@ fn servers_and_saves() -> Res<ServersAndSaves> {
 /// Write the active profile into `Server/<name>.ini`. Returns notes for the user.
 #[tauri::command]
 fn server_export(name: String) -> Res<Vec<String>> {
-    locked(|paths| {
-        let notes = pz::server::export(paths, &name, &active(paths)?.enabled(), &store::scan(paths)?)?;
+    reading(|paths| {
+        let notes = pz::server::export(paths, &name, &active(paths)?.enabled(), &scan(paths)?)?;
         notes.iter().for_each(|n| pzmm_core::log!("{n}"));
         Ok(notes)
     })

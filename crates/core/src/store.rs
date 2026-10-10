@@ -214,6 +214,7 @@ pub fn remove(paths: &Paths, ids: &[String]) -> Result<Vec<String>> {
     Ok(refused)
 }
 
+#[derive(Clone)]
 pub struct Row {
     pub id: String,
     pub name: String,

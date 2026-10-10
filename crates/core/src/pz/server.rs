@@ -62,8 +62,8 @@ pub fn write(path: &Path, mods: &[String], workshop: &[String], maps: &[String],
         ("WorkshopItems", workshop.join(";")),
     ];
     if !maps.is_empty() {
-        let mut all = maps.to_vec();
-        all.push("Muldraugh, KY".into());
+        let mut seen = std::collections::HashSet::new();
+        let all: Vec<&str> = maps.iter().map(String::as_str).chain(["Muldraugh, KY"]).filter(|m| seen.insert(*m)).collect();
         set.push(("Map", all.join(";")));
     }
     let mut lines: Vec<String> = old.lines().map(String::from).collect();

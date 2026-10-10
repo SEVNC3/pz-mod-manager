@@ -42,7 +42,8 @@ impl Paths {
 
 pub fn read_info(path: &Path) -> HashMap<String, String> {
     let text = fs::read(path).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
-    text.lines()
+    text.trim_start_matches('\u{feff}') // a UTF-8 BOM would otherwise hide the first key (usually `id`)
+        .lines()
         .filter_map(|l| l.split_once('='))
         .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
         .collect()
@@ -103,15 +104,16 @@ pub struct FoundMod {
 
 fn walk(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
     let Ok(rd) = fs::read_dir(dir) else { return };
-    let mut entries: Vec<PathBuf> = rd.flatten().map(|e| e.path()).collect();
+    // file_type() comes with the directory listing: no extra stat per entry
+    let mut entries: Vec<(PathBuf, bool)> = rd.flatten().map(|e| (e.path(), e.file_type().is_ok_and(|t| t.is_dir()))).collect();
     entries.sort();
-    for p in entries {
-        if p.is_dir() {
+    for (p, is_dir) in entries {
+        if is_dir {
             if depth > 1 {
                 walk(&p, depth - 1, out);
             }
-        } else if p.file_name().is_some_and(|n| n == "mod.info") {
-            out.push(p);
+        } else if p.file_name().is_some_and(|n| n.eq_ignore_ascii_case("mod.info")) {
+            out.push(p); // case-insensitive: Linux filesystems keep authors' `Mod.info`
         }
     }
 }
@@ -247,6 +249,15 @@ mod tests {
     fn write(path: &Path, text: &str) {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, text).unwrap();
+    }
+
+    #[test]
+    fn bom_and_capitalised_mod_info() {
+        let t = tempfile::tempdir().unwrap();
+        write(&t.path().join("A/mod.info"), "\u{feff}id=WithBom\r\nname=Bom\r\n");
+        write(&t.path().join("B/Mod.info"), "id=CapitalM\n");
+        let ids: Vec<String> = find_mods(t.path(), 3).into_iter().map(|m| m.id).collect();
+        assert_eq!(ids, ["WithBom", "CapitalM"]);
     }
 
     #[test]

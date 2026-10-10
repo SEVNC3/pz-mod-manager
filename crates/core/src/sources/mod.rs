@@ -313,6 +313,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn unzip_refuses_escaping_paths() {
+        use std::io::Write;
+        let mut buf = std::io::Cursor::new(Vec::new());
+        {
+            let mut z = zip::ZipWriter::new(&mut buf);
+            let opts = zip::write::SimpleFileOptions::default();
+            z.start_file("Good/mod.info", opts).unwrap();
+            z.write_all(b"id=Good\n").unwrap();
+            z.start_file("../escaped.txt", opts).unwrap();
+            z.write_all(b"x").unwrap();
+            z.finish().unwrap();
+        }
+        let t = tempfile::tempdir().unwrap();
+        let out = t.path().join("out");
+        std::fs::create_dir_all(&out).unwrap();
+        let _ = unzip(buf.get_ref(), &out); // may error on the bad entry; must not write outside
+        assert!(!t.path().join("escaped.txt").exists());
+    }
+
+    #[test]
     fn parses_sources() {
         use Source::*;
         assert_eq!(Source::parse("2169435993"), Workshop("2169435993".into()));
