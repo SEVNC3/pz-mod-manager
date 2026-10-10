@@ -43,9 +43,9 @@
   <button class="primary wide" onclick={onAutosort} disabled={busy}><Icon name="wand" size={15} />Autosort</button>
   <ol class="steps">
     <li>Turns on mods that your enabled mods need.</li>
-    <li>Groups mods under a separator per category, from their Workshop tags: frameworks first, so everything built on them loads after; translations last, so their text wins.</li>
+    <li>Replaces your sections with one per category, from the mods' Workshop tags: frameworks first, so everything built on them loads after; translations last, so their text wins. It asks first if you have sections of your own.</li>
     <li>Moves mods so every <span class="mono">require</span>, <span class="mono">loadModAfter</span> and <span class="mono">loadModBefore</span> rule holds.</li>
-    <li>Keeps your order everywhere else. Ctrl+Z puts the old order back.</li>
+    <li>Keeps your order within each category. Ctrl+Z puts the old order back.</li>
   </ol>
 
   {#if fixable}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { api, type ChangeNote, type Comments, type WorkshopInfo, type WorkshopItem } from "./api";
   import { bbcode } from "./bbcode";
   import Icon from "./Icon.svelte";
@@ -18,7 +19,12 @@
   } = $props();
 
   let info = $state<WorkshopInfo | null>(null);
-  let error = $state("");
+  // one error per tab, so a failed comments load doesn't hide the description
+  let errors = $state({ about: "", changes: "", comments: "" });
+  // answers for an item or page we've moved away from are dropped
+  let req = 0;
+  let reqChanges = 0;
+  let reqComments = 0;
   let tab = $state<"about" | "changes" | "comments">("about");
   let shot = $state(0);
   let changes = $state<ChangeNote[] | null>(null);
@@ -29,14 +35,15 @@
   $effect(() => {
     const id = item.id;
     info = null;
-    error = "";
+    errors = { about: "", changes: "", comments: "" };
     tab = "about";
     shot = 0;
     changes = null;
     comments = null;
     changesPage = 1;
     commentsStart = 0;
-    api.workshopInfo(id).then((r) => item.id === id && (info = r)).catch((e) => item.id === id && (error = String(e)));
+    const mine = ++req;
+    api.workshopInfo(id).then((r) => mine === req && (info = r)).catch((e) => mine === req && (errors.about = String(e)));
   });
 
   // the card's numbers (rating, author) win; the details call adds the full description
@@ -44,21 +51,52 @@
   const images = $derived(info ? (info.screenshots.length ? info.screenshots : [it.preview_url].filter(Boolean)) : [it.preview_url].filter(Boolean));
 
   async function loadChanges(p: number) {
+    const mine = ++reqChanges;
     changesPage = p;
     changes = null;
+    errors.changes = "";
     try {
-      changes = await api.workshopChanges(item.id, p);
+      const r = await api.workshopChanges(item.id, p);
+      if (mine === reqChanges) changes = r;
     } catch (e) {
-      error = String(e);
+      if (mine === reqChanges) errors.changes = String(e);
     }
   }
   async function loadComments(start: number) {
+    const mine = ++reqComments;
     commentsStart = start;
     comments = null;
+    errors.comments = "";
     try {
-      comments = await api.workshopComments(it.creator, item.id, start);
+      const r = await api.workshopComments(it.creator, item.id, start);
+      if (mine === reqComments) comments = r;
     } catch (e) {
-      error = String(e);
+      if (mine === reqComments) errors.comments = String(e);
+    }
+  }
+
+  // a modal dialog: focus moves in, Tab stays inside, Esc closes, focus returns where it was
+  let panel = $state<HTMLElement>();
+  onMount(() => {
+    const back = document.activeElement as HTMLElement | null;
+    panel?.focus();
+    return () => back?.focus?.();
+  });
+  function dialogKey(e: KeyboardEvent) {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      onClose();
+    } else if (e.key === "Tab" && panel) {
+      const f = [...panel.querySelectorAll<HTMLElement>("button:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])")];
+      if (!f.length) return;
+      const [first, last] = [f[0], f[f.length - 1]];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === panel)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
   }
   function pick(t: typeof tab) {
@@ -81,10 +119,8 @@
   const page = (id: string) => api.openUrl(`https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`);
 </script>
 
-<svelte:window onkeydown={(e) => e.key === "Escape" && onClose()} />
-
 <div class="backdrop" onclick={onClose} aria-hidden="true"></div>
-<aside class="panel" aria-label={it.title}>
+<div class="panel" role="dialog" aria-modal="true" aria-label={it.title} tabindex="-1" bind:this={panel} onkeydown={dialogKey}>
   <header>
     <div class="titles">
       <h2>{it.title}</h2>
@@ -182,14 +218,15 @@
       <button role="tab" aria-selected={tab === "comments"} class:on={tab === "comments"} onclick={() => pick("comments")}>Comments ({compact.format(it.comments)})</button>
     </div>
 
-    {#if error}<p class="error">{error}</p>{/if}
+    {#if errors[tab]}<p class="error">{errors[tab]}</p>{/if}
     {#if tab === "about"}
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
       <div class="desc" onclick={linkClick}>
-        {#if info?.item}{@html bbcode(info.item.description)}{:else if !error}<p class="muted">Loading…</p>{/if}
+        {#if info?.item}{@html bbcode(info.item.description)}{:else if !errors.about}<p class="muted">Loading…</p>{/if}
       </div>
     {:else if tab === "changes"}
-      {#if !changes}<p class="muted">Loading…</p>
+      {#if errors.changes}<!-- shown above -->
+      {:else if !changes}<p class="muted">Loading…</p>
       {:else if !changes.length}<p class="muted">{changesPage > 1 ? "No older change notes." : "No change notes."}</p>
       {:else}
         <ol class="notes">
@@ -201,7 +238,8 @@
         <button disabled={!changes || changes.length < 10} onclick={() => loadChanges(changesPage + 1)}>Older</button>
       </nav>
     {:else}
-      {#if !comments}<p class="muted">Loading…</p>
+      {#if errors.comments}<!-- shown above -->
+      {:else if !comments}<p class="muted">Loading…</p>
       {:else if !comments.comments.length}<p class="muted">No comments yet.</p>
       {:else}
         <ol class="notes">
@@ -216,7 +254,7 @@
       <p class="muted small-note">To post a comment, use the Workshop page.</p>
     {/if}
   </div>
-</aside>
+</div>
 
 <style>
   .backdrop {
@@ -224,6 +262,9 @@
     inset: 0;
     background: rgb(0 0 0 / 0.45);
     z-index: 20;
+  }
+  .panel:focus {
+    outline: none;
   }
   .panel {
     position: fixed;
@@ -414,9 +455,9 @@
   }
   .tabs button:hover:not(:disabled),
   .tabs button.on {
-    color: #fff;
+    color: var(--on-selected);
     background: var(--accent-soft);
-    border-bottom-color: #fff;
+    border-bottom-color: var(--on-selected);
   }
   .desc {
     overflow-wrap: anywhere;

@@ -66,6 +66,11 @@
       appProgress = null;
     }
   }
+  let appUpdateLater = $state(false);
+  let workshopSeen = $state(false);
+  $effect(() => {
+    if (tab === "workshop") workshopSeen = true;
+  });
   let zb = $state<ZbStatus | null>(null);
   const zbNeeded = $derived(!!zb && zb.required_by.length > 0 && !zbReady(zb));
   const refreshZb = () => api.zbStatus().then((s) => (zb = s)).catch(() => {});
@@ -324,11 +329,14 @@
     try {
       c = await api.categories();
     } catch (e) {
-      say(String(e), true);
+      // no tags (offline, rate-limited): still fix the load rules, keep the sections as they are
+      if (await commit(sortLoadOrder(rows), record)) say(`Couldn't read Workshop tags, so only the load rules were fixed (${e}).`, true);
       return;
     } finally {
       pending--;
     }
+    const own = separators.filter((s) => !c.order.includes(s));
+    if (record && own.length && !confirm(`Autosort replaces your own sections (${own.slice(0, 4).join(", ")}${own.length > 4 ? ", …" : ""}) with category sections. Ctrl+Z undoes it. Autosort now?`)) return;
     const next = autosort(rows, c.of, c.order);
     const sections = next.filter((r) => r.kind === "sep").length;
     if (await commit(next, record)) say(`Autosorted into ${sections} categories.${record ? " Ctrl+Z puts the old order back." : ""}`);
@@ -356,6 +364,22 @@
     } catch (e) {
       say(`Couldn't check for updates: ${e}`);
     }
+  }
+
+  let checking = $state(false);
+  async function checkUpdatesNow() {
+    checking = true;
+    await checkUpdates();
+    checking = false;
+    if (!updates.size) say("Your mods are up to date.");
+  }
+
+  /** Re-download everything PZMM installed (repairs damaged copies); asks first, like an update. */
+  async function redownloadAll() {
+    const ours = [...mods.values()].filter((m) => /^(workshop|github|local):/.test(m.source)).map((m) => m.id);
+    if (!ours.length) return say("PZMM hasn't installed any mods to re-download (Steam keeps subscriptions up to date).");
+    if (!confirm(`Re-download all ${ours.length} mods PZMM installed? Each keeps its current version as a backup.`)) return;
+    await updateMods(ours);
   }
 
   async function updateMods(ids: string[]) {
@@ -466,6 +490,7 @@
     const suspects = [...mods.values()].filter((m) => m.on && !m.missing).map((m) => m.id);
     if (suspects.length < 2) return say("Enable at least two mods to search for a broken one.", true);
     findings = null;
+    undoStack = redoStack = []; // undoing into a half-disabled test list would be a trap
     bisectApply({ original: $state.snapshot(rows), suspects, testing: [], round: 1 });
   }
 
@@ -475,6 +500,7 @@
     if (suspects.length <= 1) {
       const original = bisect.original;
       bisect = null;
+      undoStack = redoStack = [];
       commit(original, false);
       say(suspects.length ? `Found it: ${suspects[0]} causes the problem. Your mod list is restored.` : "The problem didn't follow any single mod. Your mod list is restored.", !!suspects.length);
       logOpen = true;
@@ -488,6 +514,7 @@
     if (!bisect) return;
     const original = bisect.original;
     bisect = null;
+    undoStack = redoStack = [];
     commit(original, false);
   }
 
@@ -603,7 +630,10 @@
   /** A new separator above the selected mod (or at the top), ready to rename. */
   async function addSeparator() {
     const at = Math.max(0, selected ? rows.findIndex((r) => r.kind === "mod" && r.id === selected) : 0);
-    await commit([...rows.slice(0, at), { kind: "sep", name: "New section" }, ...rows.slice(at)]);
+    const taken = new Set(separators);
+    let name = "New section";
+    for (let n = 2; taken.has(name); n++) name = `New section ${n}`;
+    await commit([...rows.slice(0, at), { kind: "sep", name }, ...rows.slice(at)]);
     editingSep = at;
   }
 
@@ -629,6 +659,7 @@
     const r = rows[i];
     if (r?.kind !== "sep") return;
     if (!name.trim()) removeSep(i);
+    else if (name.trim() !== r.name && separators.includes(name.trim())) say(`There's already a section called "${name.trim()}". Pick another name.`, true);
     else commit(rows.map((x, j) => (j === i ? { kind: "sep", name: name.trim() } : x)));
   }
 
@@ -697,7 +728,7 @@
 
   function deleteProfile() {
     const name = view?.profile;
-    const other = view?.profiles.find((p) => p !== name);
+    const other = modeProfiles.find((p) => p !== name); // stay in this game: switching game goes through the mode plan
     if (!name || !other) return;
     if (confirm(`Delete the profile "${name}"? Your mods stay installed. PZMM will switch to "${other}".`)) {
       run(`Deleting profile "${name}"`, async () => {
@@ -792,8 +823,8 @@
       {#if updates.size}
         <button class="primary" onclick={() => updateMods([...updates])} disabled={busy}><Icon name="refresh" size={14} />Update {updates.size} {updates.size === 1 ? "mod" : "mods"}</button>
       {:else}
-        <button onclick={() => { logOpen = true; run("Updating mods", api.updateAll).then(() => (updates = new Set())); }} disabled={busy}
-          title="Re-download every mod PZMM installed"><Icon name="refresh" size={14} />Update all</button>
+        <button onclick={checkUpdatesNow} disabled={busy || checking} title="Ask the Workshop whether any mod has a newer version">
+          <Icon name="refresh" size={14} />{checking ? "Checking…" : "Check for updates"}</button>
       {/if}
       <button onclick={() => api.openUrl("steam://rungameid/108600")}><Icon name="play" size={14} />Launch game</button>
       <button class="quiet" aria-expanded={settingsOpen} onclick={() => (settingsOpen = !settingsOpen)}><Icon name="settings" size={15} />Settings</button>
@@ -837,12 +868,13 @@
     </div>
   {/if}
 
-  {#if appUpdate}
+  {#if appUpdate && !appUpdateLater}
     <div class="app-update" role="status">
       {#if appProgress === null}
         <span><strong>PZMM {appUpdate.version} is available.</strong> You have {appVersion}.</span>
         <button class="quiet" onclick={() => api.openUrl(`https://github.com/SEVNC3/pz-mod-manager/releases/tag/v${appUpdate?.version}`)}>What's new</button>
-        <button class="primary" onclick={installAppUpdate}>Update and restart</button>
+        <button class="quiet" onclick={() => (appUpdateLater = true)}>Later</button>
+        <button class="primary" onclick={installAppUpdate} disabled={busy} title={busy ? "Wait for the current job to finish" : ""}>Update and restart</button>
       {:else}
         <span>Downloading PZMM {appUpdate.version}… {appProgress}%</span>
         <progress max="100" value={appProgress}></progress>
@@ -868,6 +900,7 @@
           <option value="41">Build 41</option>
         </select>
       </label>
+      <button onclick={redownloadAll} disabled={busy} title="Repairs damaged copies; each keeps its current version as a backup"><Icon name="download" size={14} />Re-download mods PZMM installed</button>
       <span class="keys">
         Keyboard: <kbd>/</kbd> search · <kbd>↑</kbd><kbd>↓</kbd> move between rows · <kbd>Enter</kbd> details ·
         <kbd>Space</kbd> enable/disable · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> reorder · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> undo/redo ·
@@ -894,8 +927,11 @@
   <Links />
   </div>
 
+  {#if workshopSeen}
+    <Workshop hidden={tab !== "workshop"} {busy} defaultBuild={view?.build ?? null} onInstall={installWorkshop} viewpoint={view?.mode === "viewpoint"} />
+  {/if}
   {#if tab === "workshop"}
-    <Workshop {busy} defaultBuild={view?.build ?? null} onInstall={installWorkshop} viewpoint={view?.mode === "viewpoint"} />
+    <!-- kept mounted above -->
   {:else if tab === "servers"}
     <ServersSaves {busy} profile={view?.profile ?? ""} enabledIds={[...mods.values()].filter((m) => m.on).map((m) => m.id)}
       onImport={(name) => { logOpen = true; return run(`Importing ${name}.ini`, () => api.serverImport(name)); }}
@@ -1197,9 +1233,9 @@
   }
   .tabs button:hover:not(:disabled),
   .tabs button.active {
-    color: #fff;
+    color: var(--on-selected);
     background: var(--accent-soft);
-    border-bottom-color: #fff;
+    border-bottom-color: var(--on-selected);
   }
   .alert {
     display: inline-block;
@@ -1399,7 +1435,7 @@
   }
   .seg button.active {
     background: var(--accent-soft);
-    color: #fff;
+    color: var(--on-selected);
     font-weight: 700;
   }
   .count {
@@ -1483,12 +1519,12 @@
   tr.mod:hover td,
   tr.mod.picked td,
   tr.mod.selected td {
-    color: #fff;
+    color: var(--on-selected);
   }
   tr.mod:hover .num,
   tr.mod.picked .num,
   tr.mod.selected .num {
-    color: #fff;
+    color: var(--on-selected);
   }
   tr.mod:hover .id,
   tr.mod:hover .meta,
@@ -1513,7 +1549,7 @@
     height: 14px;
     margin-top: -7px;
     z-index: 1;
-    background: #fff;
+    background: var(--on-selected);
     clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%);
   }
   .fold {

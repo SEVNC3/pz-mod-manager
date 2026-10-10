@@ -4,8 +4,8 @@
   // An empty url shows the icon as a disabled "coming soon" stub.
   const LINKS = {
     github: "https://github.com/SEVNC3/pz-mod-manager",
-    discord: "",
-    kofi: "",
+    discord: "https://discord.gg/TfS9NwNHrH",
+    kofi: "https://ko-fi.com/sevnc3",
   };
 
   // Each brand's own logo (static/brand/*.png, downloaded once from logo.dev).

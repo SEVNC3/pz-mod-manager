@@ -4,8 +4,10 @@
   import Icon from "./Icon.svelte";
   import WorkshopPanel from "./WorkshopPanel.svelte";
 
-  let { busy, defaultBuild, onInstall, viewpoint = false }: {
+  let { busy, defaultBuild, onInstall, viewpoint = false, hidden = false }: {
     busy: boolean;
+    /** Kept mounted while another tab shows, so searches, filters and the open panel survive. */
+    hidden?: boolean;
     defaultBuild: number | null;
     onInstall: (id: string) => Promise<boolean>;
     /** Project Viewpoint mode: offer its add-ons and community. */
@@ -267,7 +269,7 @@
   </li>
 {/snippet}
 
-<section class="workshop" aria-label="Steam Workshop">
+<section class="workshop" aria-label="Steam Workshop" {hidden}>
   <aside class="side" aria-label="Browse options">
     <div class="views" role="tablist" aria-label="Workshop view">
       <button type="button" role="tab" aria-selected={view !== "home"} class:active={view !== "home"} onclick={() => show("browse")}>
@@ -420,7 +422,7 @@
   </div>
 </section>
 
-{#if open}
+{#if open && !hidden}
   <WorkshopPanel item={open} {busy} {installing} onInstall={install} onClose={() => (open = null)}
     onDependents={dependents} onInCollections={inCollections} onAuthor={byAuthor} onOpen={(it) => (open = it)} />
 {/if}
@@ -469,7 +471,7 @@
   .views button.active,
   .seg button.active {
     background: var(--accent-soft);
-    color: #fff;
+    color: var(--on-selected);
     font-weight: 700;
   }
   .search {

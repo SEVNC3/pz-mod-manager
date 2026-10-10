@@ -108,22 +108,31 @@ function enableRequirements(rows: Row[]): Row[] {
  */
 function pullUp(rows: Row[]): Row[] {
   const next = [...rows];
-  for (let pass = 0, moved = true; moved && pass < next.length; pass++) {
-    moved = false; // ponytail: passes capped at the list length so a cycle can't loop forever
+  const at = new Map<string, number>(); // enabled mod id -> index, rebuilt after each move
+  const reindex = () => {
+    at.clear();
+    next.forEach((x, k) => isMod(x) && x.on && at.set(x.id, k));
+  };
+  // ponytail: a cycle (A needs B, B loads after A) would swap forever; 50 passes is plenty for real lists
+  for (let pass = 0, moved = true; moved && pass < 50; pass++) {
+    moved = false;
+    reindex();
     for (let i = 0; i < next.length; i++) {
       const r = next[i];
       if (!isMod(r) || !r.on) continue;
       for (const dep of [...(r.requires ?? []), ...(r.load_after ?? [])]) {
-        const j = next.findIndex((x) => isMod(x) && x.on && x.id === dep);
+        const j = at.get(dep) ?? -1;
         if (j <= i) continue;
         next.splice(i, 0, ...next.splice(j, 1));
         i++;
         moved = true;
+        reindex();
       }
-      const first = Math.min(...(r.load_before ?? []).map((b) => next.findIndex((x) => isMod(x) && x.on && x.id === b)).filter((j) => j >= 0 && j < i));
-      if (first < i) {
-        next.splice(first, 0, ...next.splice(i, 1));
+      const before = (r.load_before ?? []).map((b) => at.get(b) ?? -1).filter((j) => j >= 0 && j < i);
+      if (before.length) {
+        next.splice(Math.min(...before), 0, ...next.splice(i, 1));
         moved = true;
+        reindex();
       }
     }
   }
