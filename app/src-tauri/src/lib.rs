@@ -18,7 +18,18 @@ type Res<T> = Result<T, String>;
 
 fn locked<T>(f: impl FnOnce(&Paths) -> anyhow::Result<T>) -> Res<T> {
     let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    f(&Paths::detect()).map_err(|e| format!("{e:#}"))
+    let paths = Paths::detect();
+    let _file = pzmm_core::lock_data(&paths).map_err(|e| format!("locking PZMM's data: {e}"))?;
+    f(&paths).map_err(|e| format!("{e:#}"))
+}
+
+/// Download outside the lock (it can take minutes), then install under it.
+fn fetch_then<T>(sources: &[Source], resolve: bool, then: impl FnOnce(&Paths, Vec<String>) -> anyhow::Result<T>) -> Res<T> {
+    let fetched = sources::fetch(&Paths::detect(), sources, resolve);
+    locked(|paths| {
+        let ids = sources::install_fetched(paths, &fetched);
+        then(paths, ids)
+    })
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -110,9 +121,8 @@ fn save(rows: Vec<Row>) -> Res<View> {
 #[tauri::command]
 async fn install(sources: Vec<String>, enable: bool) -> Res<View> {
     tauri::async_runtime::spawn_blocking(move || {
-        locked(|paths| {
-            let parsed: Vec<Source> = sources.iter().map(|s| Source::parse(s)).collect();
-            let ids = sources::install(paths, &parsed, true);
+        let parsed: Vec<Source> = sources.iter().map(|s| Source::parse(s)).collect();
+        fetch_then(&parsed, true, |paths, ids| {
             if enable && !ids.is_empty() {
                 let mut p = active(paths)?;
                 ids.iter().for_each(|i| p.set(i, true));
@@ -128,19 +138,17 @@ async fn install(sources: Vec<String>, enable: bool) -> Res<View> {
 #[tauri::command]
 async fn update_all() -> Res<View> {
     tauri::async_runtime::spawn_blocking(|| {
-        locked(|paths| {
-            let mut seen = std::collections::HashSet::new();
-            let all: Vec<Source> = store::load(paths)?
-                .into_values()
-                .filter(|e| seen.insert(e.source.clone()))
-                .filter_map(|e| Source::from_index(&e.source))
-                .collect();
-            if all.is_empty() {
-                pzmm_core::log!("nothing to update: no mods were installed through PZMM");
-            }
-            sources::install(paths, &all, false);
-            view(paths)
-        })
+        let mut seen = std::collections::HashSet::new();
+        let all: Vec<Source> = store::load(&Paths::detect())
+            .map_err(|e| format!("{e:#}"))?
+            .into_values()
+            .filter(|e| seen.insert(e.source.clone()))
+            .filter_map(|e| Source::from_index(&e.source))
+            .collect();
+        if all.is_empty() {
+            pzmm_core::log!("nothing to update: no mods were installed through PZMM");
+        }
+        fetch_then(&all, false, |paths, _| view(paths))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -350,13 +358,11 @@ fn zb_preview(remove: bool) -> Res<Vec<String>> {
 #[tauri::command]
 async fn zb_install() -> Res<View> {
     tauri::async_runtime::spawn_blocking(|| {
-        locked(|paths| {
-            let (launcher, mut libs, _) = zb_paths(paths)?;
+        let need_mod = locked(|paths| Ok(zb_paths(paths)?.1.is_none()))?;
+        let fetch: Vec<Source> = if need_mod { vec![Source::Workshop(zb::WORKSHOP_ID.into())] } else { vec![] };
+        fetch_then(&fetch, false, |paths, _| {
+            let (launcher, libs, _) = zb_paths(paths)?;
             let Some(l) = launcher else { anyhow::bail!("Project Zomboid's game folder wasn't found in your Steam libraries") };
-            if libs.is_none() {
-                sources::install(paths, &[Source::Workshop(zb::WORKSHOP_ID.into())], false);
-                libs = zb_paths(paths)?.1;
-            }
             let Some(s) = libs else { anyhow::bail!("couldn't get the ZombieBuddy mod from the Workshop") };
             for c in zb::install(&l, &s, false)? {
                 pzmm_core::log!("{c}");
@@ -407,11 +413,11 @@ async fn find_requirement(mod_id: String, needed_by: String) -> Res<Vec<sources:
 #[tauri::command]
 async fn install_missing() -> Res<(View, Vec<String>)> {
     tauri::async_runtime::spawn_blocking(|| {
-        locked(|paths| {
+        // (missing id, Workshop item of a mod that needs it), read under the lock
+        let (wanted, build) = locked(|paths| {
             let mods = store::scan(paths)?;
-            let mut p = active(paths)?;
-            let mut wanted: Vec<(String, Option<String>)> = vec![]; // (missing id, hint item)
-            for id in p.enabled() {
+            let mut wanted: Vec<(String, Option<String>)> = vec![];
+            for id in active(paths)?.enabled() {
                 let Some(m) = mods.get(&id) else { continue };
                 for r in &m.requires {
                     if !mods.contains_key(r) && !wanted.iter().any(|(w, _)| w == r) {
@@ -419,27 +425,29 @@ async fn install_missing() -> Res<(View, Vec<String>)> {
                     }
                 }
             }
-            let (mut items, mut unresolved) = (vec![], vec![]);
-            let build = profile::effective_build(paths);
-            for (id, hint) in wanted {
-                match sources::find_mod(&id, hint.as_deref(), build) {
-                    Ok(c) if c.first().is_some_and(|c| c.sure()) => {
-                        pzmm_core::log!("{id}: found on the Workshop as \"{}\" ({})", c[0].item.title, c[0].item.id);
-                        items.push(Source::Workshop(c[0].item.id.clone()));
-                    }
-                    Ok(_) => unresolved.push(id),
-                    Err(e) => {
-                        pzmm_core::log!("error: looking up {id}: {e:#}");
-                        unresolved.push(id);
-                    }
+            Ok((wanted, profile::effective_build(paths)))
+        })?;
+        // look up and download without holding the lock
+        let (mut items, mut unresolved) = (vec![], vec![]);
+        for (id, hint) in wanted {
+            match sources::find_mod(&id, hint.as_deref(), build) {
+                Ok(c) if c.first().is_some_and(|c| c.sure()) => {
+                    pzmm_core::log!("{id}: found on the Workshop as \"{}\" ({})", c[0].item.title, c[0].item.id);
+                    items.push(Source::Workshop(c[0].item.id.clone()));
+                }
+                Ok(_) => unresolved.push(id),
+                Err(e) => {
+                    pzmm_core::log!("error: looking up {id}: {e:#}");
+                    unresolved.push(id);
                 }
             }
-            for id in sources::install(paths, &items, true) {
-                p.set(&id, true);
-            }
+        }
+        fetch_then(&items, true, |paths, ids| {
+            let mut p = active(paths)?;
+            ids.iter().for_each(|id| p.set(id, true));
             profile::apply(paths, &p)?;
             for id in &unresolved {
-                pzmm_core::log!("{id}: no Workshop item clearly provides it. Use Find in the mod's details to pick one.");
+                pzmm_core::log!("{id}: no Workshop item clearly provides it. Use Download in the mod's details to pick one.");
             }
             Ok((view(paths)?, unresolved))
         })
@@ -461,18 +469,15 @@ async fn check_updates() -> Res<Vec<String>> {
 #[tauri::command]
 async fn update_mods(ids: Vec<String>) -> Res<View> {
     tauri::async_runtime::spawn_blocking(move || {
-        locked(|paths| {
-            let index = store::load(paths)?;
-            let mut seen = std::collections::HashSet::new();
-            let todo: Vec<Source> = ids
-                .iter()
-                .filter_map(|id| index.get(id))
-                .filter(|e| seen.insert(e.source.clone()))
-                .filter_map(|e| Source::from_index(&e.source))
-                .collect();
-            sources::install(paths, &todo, false);
-            view(paths)
-        })
+        let index = locked(store::load)?;
+        let mut seen = std::collections::HashSet::new();
+        let todo: Vec<Source> = ids
+            .iter()
+            .filter_map(|id| index.get(id))
+            .filter(|e| seen.insert(e.source.clone()))
+            .filter_map(|e| Source::from_index(&e.source))
+            .collect();
+        fetch_then(&todo, false, |paths, _| view(paths))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -542,14 +547,16 @@ fn server_export(name: String) -> Res<Vec<String>> {
 #[tauri::command]
 async fn server_import(name: String) -> Res<View> {
     tauri::async_runtime::spawn_blocking(move || {
-        locked(|paths| {
+        let (cfg, missing) = locked(|paths| {
             let cfg = pz::server::read(&pz::server::path(paths, &name)?)?;
             let have = sources::workshop_available(paths);
             let missing: Vec<Source> = cfg.workshop.iter().filter(|w| !have.contains(*w)).map(|w| Source::Workshop(w.clone())).collect();
-            if !missing.is_empty() {
-                pzmm_core::log!("installing {} Workshop item(s) the server uses", missing.len());
-                sources::install(paths, &missing, false);
-            }
+            Ok((cfg, missing))
+        })?;
+        if !missing.is_empty() {
+            pzmm_core::log!("installing {} Workshop item(s) the server uses", missing.len());
+        }
+        fetch_then(&missing, false, |paths, _| {
             profile::apply(paths, &Profile::from_ids(&format!("Server {name}"), cfg.mods))?;
             view(paths)
         })

@@ -48,23 +48,41 @@ impl Source {
     }
 }
 
-pub(crate) fn http_get(url: &str) -> Result<Vec<u8>> {
-    // Steam answers 429 when it's asked too often: back off and retry a couple of times
+/// Run an HTTP request with Steam etiquette: at most one Steam request every 350 ms
+/// (shared across threads), and on HTTP 429 back off (2 s, then 5 s) before giving up.
+pub(crate) fn polite<T>(url: &str, mut send: impl FnMut() -> Result<T, ureq::Error>) -> Result<T> {
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+    static LAST_STEAM: Mutex<Option<Instant>> = Mutex::new(None);
+    let steam = url.contains("steamcommunity.com") || url.contains("steampowered.com");
     for wait in [2, 5, 0] {
+        if steam {
+            let mut last = LAST_STEAM.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(gap) = last.and_then(|t| Duration::from_millis(350).checked_sub(t.elapsed())) {
+                std::thread::sleep(gap);
+            }
+            *last = Some(Instant::now());
+        }
+        match send() {
+            Ok(v) => return Ok(v),
+            Err(ureq::Error::StatusCode(429)) if wait > 0 => std::thread::sleep(Duration::from_secs(wait)),
+            Err(ureq::Error::StatusCode(429)) => bail!("Steam is limiting requests right now (HTTP 429). Wait a minute and try again."),
+            Err(e) => return Err(e).with_context(|| format!("requesting {url}")),
+        }
+    }
+    unreachable!()
+}
+
+pub(crate) fn http_get(url: &str) -> Result<Vec<u8>> {
+    polite(url, || {
         let mut req = ureq::get(url).header("User-Agent", "pzmm");
         if url.starts_with("https://api.github.com/")
             && let Ok(token) = std::env::var("GITHUB_TOKEN")
         {
             req = req.header("Authorization", &format!("Bearer {token}"));
         }
-        match req.call() {
-            Ok(mut res) => return Ok(res.body_mut().with_config().limit(2 << 30).read_to_vec()?),
-            Err(ureq::Error::StatusCode(429)) if wait > 0 => std::thread::sleep(std::time::Duration::from_secs(wait)),
-            Err(ureq::Error::StatusCode(429)) => bail!("Steam is limiting requests right now (HTTP 429). Wait a minute and try again."),
-            Err(e) => return Err(e).with_context(|| format!("GET {url}")),
-        }
-    }
-    unreachable!()
+        req.call()?.body_mut().with_config().limit(2 << 30).read_to_vec()
+    })
 }
 
 pub(crate) fn unzip(bytes: &[u8], to: &Path) -> Result<()> {
@@ -73,13 +91,20 @@ pub(crate) fn unzip(bytes: &[u8], to: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Download and install. Workshop items go through one SteamCMD session. With `resolve`,
-/// Workshop collections are expanded and required items are added. Errors are logged per
-/// source so one bad entry doesn't stop the rest. Returns installed mod ids.
-pub fn install(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<String> {
-    let mut ids = vec![];
-    let mut report = |r: Result<Vec<String>>| match r {
-        Ok(v) => ids.extend(v),
+/// A downloaded source ready to install. Temp folders are deleted when it's dropped.
+pub struct Fetched {
+    pub source: String,
+    root: PathBuf,
+    _temp: Option<tempfile::TempDir>,
+}
+
+/// Download (network and SteamCMD only; nothing in Zomboid/mods changes). Workshop items
+/// go through one SteamCMD session; with `resolve`, collections are expanded and required
+/// items added. Errors are logged per source so one bad entry doesn't stop the rest.
+pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
+    let mut out = vec![];
+    let mut report = |r: Result<Fetched>| match r {
+        Ok(f) => out.push(f),
         Err(e) => crate::log!("error: {e:#}"),
     };
     let mut workshop: Vec<String> = sources.iter().filter_map(|s| if let Source::Workshop(i) = s { Some(i.clone()) } else { None }).collect();
@@ -91,20 +116,44 @@ pub fn install(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<String> 
         match steam_workshop::download(paths, pz::STEAM_APP, &refs) {
             Ok(got) => {
                 for (id, dir) in got {
-                    report(dir.with_context(|| format!("workshop:{id}: download failed")).and_then(|d| store::install(paths, &d, &format!("workshop:{id}"))));
+                    report(
+                        dir.with_context(|| format!("workshop:{id}: download failed"))
+                            .map(|root| Fetched { source: format!("workshop:{id}"), root, _temp: None }),
+                    );
                 }
             }
-            Err(e) => report(Err(e)),
+            Err(e) => crate::log!("error: {e:#}"),
         }
     }
     for s in sources {
         match s {
             Source::Workshop(_) => {}
-            Source::GitHub(spec) => report(github::download(spec).and_then(|t| store::install(paths, t.path(), &format!("github:{spec}")))),
-            Source::Local(p) => report(install_local(paths, p)),
+            Source::GitHub(spec) => report(github::download(spec).map(|t| Fetched {
+                source: format!("github:{spec}"),
+                root: t.path().to_path_buf(),
+                _temp: Some(t),
+            })),
+            Source::Local(p) => report(fetch_local(p)),
+        }
+    }
+    out
+}
+
+/// Copy fetched mods into Zomboid/mods. Returns the installed mod ids.
+pub fn install_fetched(paths: &Paths, fetched: &[Fetched]) -> Vec<String> {
+    let mut ids = vec![];
+    for f in fetched {
+        match store::install(paths, &f.root, &f.source) {
+            Ok(v) => ids.extend(v),
+            Err(e) => crate::log!("error: {e:#}"),
         }
     }
     ids
+}
+
+/// Download and install in one go (the CLI; the app splits the two to keep its lock short).
+pub fn install(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<String> {
+    install_fetched(paths, &fetch(paths, sources, resolve))
 }
 
 /// Workshop ids the game can already load: Steam subscriptions and PZMM installs.
@@ -245,16 +294,16 @@ pub fn find_mod(mod_id: &str, needed_by: Option<&str>, build: u8) -> Result<Vec<
     Ok(out)
 }
 
-fn install_local(paths: &Paths, p: &Path) -> Result<Vec<String>> {
+fn fetch_local(p: &Path) -> Result<Fetched> {
     let abs = std::path::absolute(p)?;
     let source = format!("local:{}", abs.display());
     if abs.is_dir() {
-        return store::install(paths, &abs, &source);
+        return Ok(Fetched { source, root: abs, _temp: None });
     }
     if abs.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
         let t = tempfile::tempdir()?;
         unzip(&std::fs::read(&abs)?, t.path())?;
-        return store::install(paths, t.path(), &source);
+        return Ok(Fetched { source, root: t.path().to_path_buf(), _temp: Some(t) });
     }
     bail!("{}: not a folder or .zip", abs.display())
 }

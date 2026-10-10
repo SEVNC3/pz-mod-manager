@@ -66,6 +66,16 @@ pub fn safe_file_name(name: &str) -> bool {
         && !reserved(name.split('.').next().unwrap_or(name))
 }
 
+/// Hold this while changing PZMM's data or the game's mod list. It's an OS file lock on
+/// `<data>/pzmm.lock`, so the CLI and the app (and two app windows) never interleave
+/// read-modify-write cycles. Released when the returned file is dropped.
+pub fn lock_data(paths: &pz::Paths) -> std::io::Result<std::fs::File> {
+    std::fs::create_dir_all(&paths.data)?;
+    let f = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(paths.data.join("pzmm.lock"))?;
+    f.lock()?;
+    Ok(f)
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -76,5 +86,16 @@ mod tests {
         for bad in ["", ".", "..", "a/b", r"a\b", "x:", "trail.", "trail ", "CON", "con.txt", "COM1", "lpt9", "tab\t"] {
             assert!(!super::safe_file_name(bad), "{bad:?}");
         }
+    }
+
+    #[test]
+    fn data_lock_is_exclusive() {
+        let t = tempfile::tempdir().unwrap();
+        let paths = crate::pz::Paths { zomboid: t.path().into(), data: t.path().join("data") };
+        let held = super::lock_data(&paths).unwrap();
+        let other = std::fs::OpenOptions::new().write(true).open(paths.data.join("pzmm.lock")).unwrap();
+        assert!(matches!(other.try_lock(), Err(std::fs::TryLockError::WouldBlock)));
+        drop(held);
+        assert!(other.try_lock().is_ok());
     }
 }

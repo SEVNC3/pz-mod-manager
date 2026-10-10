@@ -165,12 +165,17 @@ fn parse_browse(html: &str) -> Result<Page> {
 }
 
 fn post_form(url: &str, body: &str) -> Result<Value> {
-    let mut res = ureq::post(url)
-        .header("User-Agent", "pzmm")
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .send(body)
-        .with_context(|| format!("POST {url}"))?;
-    Ok(serde_json::from_slice(&res.body_mut().with_config().limit(64 << 20).read_to_vec()?)?)
+    let bytes = super::polite(url, || {
+        ureq::post(url)
+            .header("User-Agent", "pzmm")
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .send(body)?
+            .body_mut()
+            .with_config()
+            .limit(64 << 20)
+            .read_to_vec()
+    })?;
+    Ok(serde_json::from_slice(&bytes)?)
 }
 
 fn id_list(key: &str, ids: &[&str]) -> String {
@@ -210,8 +215,15 @@ pub fn collections(ids: &[&str]) -> Result<std::collections::HashMap<String, Vec
 
 /// The "Required items" an author lists on the item's page (the keyless API doesn't expose them).
 pub fn required_items(id: &str) -> Result<Vec<String>> {
+    // pages rarely change within a session; caching keeps big collections from tripping 429s
+    static CACHE: std::sync::Mutex<Option<std::collections::HashMap<String, Vec<String>>>> = std::sync::Mutex::new(None);
+    if let Some(hit) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|c| c.get(id)) {
+        return Ok(hit.clone());
+    }
     let html = String::from_utf8_lossy(&super::http_get(&format!("https://steamcommunity.com/sharedfiles/filedetails/?id={id}"))?).into_owned();
-    Ok(parse_required(&html))
+    let req = parse_required(&html);
+    CACHE.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(Default::default).insert(id.to_string(), req.clone());
+    Ok(req)
 }
 
 fn parse_required(html: &str) -> Vec<String> {
@@ -268,17 +280,33 @@ pub fn download(paths: &Paths, app: &str, ids: &[&str]) -> Result<Vec<(String, O
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
+    // one SteamCMD at a time: two sessions fight over its folder
+    static STEAMCMD: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _one = STEAMCMD.lock().unwrap_or_else(|e| e.into_inner());
     crate::log!("downloading {} workshop item(s)...", ids.len());
     let mut child = cmd.spawn().with_context(|| format!("running {}", exe.display()))?;
-    if let Some(out) = child.stdout.take() {
-        for line in BufReader::new(out).lines().map_while(Result::ok) {
-            let l = line.to_lowercase();
-            if l.contains("workshop") || l.contains("error") {
-                crate::log!("{}", line.trim());
+    let reader = child.stdout.take().map(|out| {
+        std::thread::spawn(move || {
+            for line in BufReader::new(out).lines().map_while(Result::ok) {
+                let l = line.to_lowercase();
+                if l.contains("workshop") || l.contains("error") {
+                    crate::log!("{}", line.trim());
+                }
             }
+        })
+    });
+    // ponytail: one overall limit; a per-item limit if huge downloads ever need longer
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60 * 60);
+    while child.try_wait()?.is_none() {
+        if std::time::Instant::now() > deadline {
+            let _ = child.kill();
+            bail!("SteamCMD didn't finish within an hour and was stopped");
         }
+        std::thread::sleep(std::time::Duration::from_millis(300));
     }
-    child.wait()?;
+    if let Some(r) = reader {
+        let _ = r.join();
+    }
     let content: &Path = &exe.parent().unwrap().join("steamapps/workshop/content").join(app);
     Ok(ids.iter().map(|id| (id.to_string(), Some(content.join(id)).filter(|d| d.is_dir()))).collect())
 }
