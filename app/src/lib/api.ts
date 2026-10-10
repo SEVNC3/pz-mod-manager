@@ -86,6 +86,7 @@ export function decodeShare(text: string): Shared {
 
 export type ModErrors = { name: string; count: number; example: string; id: string | null };
 export type Finding = { level: "error" | "warning"; subject: string; text: string };
+export type Stats = { size: number; modified: number };
 export type Overlap = { wins_over: string[]; loses_to: string[] };
 export type Conflict = { other: string; files: number; wins: boolean; examples: string[] };
 export type Save = { mode: string; name: string; mods: string[]; modified: number };
@@ -115,6 +116,7 @@ export const api = {
   installMissing: () => invoke<[View, string[]]>("install_missing"),
   checkUpdates: () => invoke<string[]>("check_updates"),
   updateMods: (ids: string[]) => invoke<View>("update_mods", { ids }),
+  modStats: () => invoke<Record<string, Stats>>("mod_stats"),
   conflictSummary: () => invoke<Record<string, Overlap>>("conflict_summary"),
   conflicts: (id: string) => invoke<Conflict[]>("conflicts", { id }),
   serversAndSaves: () => invoke<ServersAndSaves>("servers_and_saves"),

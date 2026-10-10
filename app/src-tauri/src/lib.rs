@@ -562,6 +562,18 @@ fn conflicts(id: String) -> Res<Vec<pz::files::Conflict>> {
     })
 }
 
+/// Folder size and newest file time of every mod (walks all their files, so it's
+/// fetched separately from the list).
+#[tauri::command]
+async fn mod_stats() -> Res<BTreeMap<String, pz::files::Stats>> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let mods = reading(scan)?;
+        Ok(mods.into_iter().map(|(id, m)| (id, pz::files::stats(&m.dir))).collect())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// For every enabled mod: which enabled mods it overrides, and is overridden by.
 #[tauri::command]
 async fn conflict_summary() -> Res<std::collections::HashMap<String, pz::files::Overlap>> {
@@ -757,7 +769,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
             details, poster, open_path, open_url, workshop_browse, zb_status, zb_preview, zb_install, zb_uninstall,
-            find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, servers_and_saves, server_export, server_import, save_use,
+            find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, servers_and_saves, server_export, server_import, save_use,
             mode_preview, mode_switch, doctor, console_errors, profile_export, profile_import
         ])
         .run(tauri::generate_context!())

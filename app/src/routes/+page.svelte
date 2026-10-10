@@ -13,7 +13,7 @@
   import LayerIcon from "$lib/LayerIcon.svelte";
   import Links from "$lib/Links.svelte";
   import { bisectRound, findProblems, sortLoadOrder } from "$lib/order";
-  import type { Finding, ModErrors, Overlap, Save } from "$lib/api";
+  import type { Finding, ModErrors, Overlap, Save, Stats } from "$lib/api";
 
   let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
   let updates = $state<Set<string>>(new Set());
@@ -146,7 +146,15 @@
     return out;
   });
   const problemCount = $derived(problems.size + [...mods.values()].filter((m) => m.on && m.missing).length);
-  const filtering = $derived(search.trim() !== "" || filter !== "all");
+  // --- columns: size and last change, loaded after the list (they walk every file) ---
+  let stats = $state<Record<string, Stats>>({});
+  const refreshStats = () => api.modStats().then((s) => (stats = s)).catch(() => {});
+  let sortBy = $state<"order" | "name" | "size" | "updated" | "status">("order");
+  const fmtSize = (b: number) =>
+    b >= 1 << 30 ? `${(b / (1 << 30)).toFixed(1)} GB` : b >= 1 << 20 ? `${(b / (1 << 20)).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
+  const fmtDate = (s: number) => (s ? new Date(s * 1000).toLocaleDateString(undefined, { year: "2-digit", month: "short", day: "numeric" }) : "");
+
+  const filtering = $derived(search.trim() !== "" || filter !== "all" || sortBy !== "order");
   // --- sections: separators can be collapsed (remembered per profile on this computer) ---
   let collapsed = $state<Set<string>>(new Set());
   const collapsedKey = $derived(`pzmm.collapsed.${view?.profile ?? ""}`);
@@ -194,6 +202,16 @@
         if (filter === "off" && r.on) return false;
         if (filter === "problems" && !problems.has(r.id) && !r.missing) return false;
         return !q || r.id.toLowerCase().includes(q) || r.name.toLowerCase().includes(q);
+      })
+      .sort((a, b) => {
+        if (sortBy === "order" || a.r.kind !== "mod" || b.r.kind !== "mod") return 0;
+        const [x, y] = [a.r, b.r];
+        const name = (m: ModRow) => (m.name || m.id).toLowerCase();
+        if (sortBy === "name") return name(x).localeCompare(name(y));
+        if (sortBy === "size") return (stats[y.id]?.size ?? 0) - (stats[x.id]?.size ?? 0);
+        if (sortBy === "updated") return (stats[y.id]?.modified ?? 0) - (stats[x.id]?.modified ?? 0);
+        const rank = (m: ModRow) => (m.missing || problems.has(m.id) ? 0 : updates.has(m.id) ? 1 : 2);
+        return rank(x) - rank(y) || name(x).localeCompare(name(y));
       });
   });
 
@@ -229,6 +247,7 @@
       busyLabel = "";
       refreshZb();
       refreshOverlaps();
+      if (!keepHistory) refreshStats(); // files may have changed (installs, updates, removals)
     }
   }
 
@@ -554,7 +573,10 @@
 
   onMount(() => {
     const unlisten = listen<string>("log", (e) => say(e.payload, e.payload.startsWith("error:")));
-    run("Loading", api.load).then(checkUpdates);
+    run("Loading", api.load).then(() => {
+      checkUpdates();
+      refreshStats();
+    });
     refreshSave();
     getVersion().then((v) => (appVersion = v));
     checkAppUpdate();
@@ -745,6 +767,15 @@
         <button role="radio" aria-checked={filter === v} class:active={filter === v} onclick={() => (filter = v as typeof filter)}>{label}</button>
       {/each}
     </div>
+    <label class="sort">Sort
+      <select bind:value={sortBy} aria-label="Sort the list">
+        <option value="order">Load order</option>
+        <option value="name">Name</option>
+        <option value="size">Size</option>
+        <option value="updated">Last changed</option>
+        <option value="status">Problems first</option>
+      </select>
+    </label>
     <span class="count">{enabledCount} enabled · {mods.size} mods</span>
     {#if missingReqs.size}
       <button class="primary" onclick={installMissing} disabled={busy}
@@ -771,7 +802,7 @@
       </span>
     {:else if !missingReqs.size && !fixable}
       <span class="hint">
-        {filtering ? "Clear the search and filter to change load order." : "Drag to reorder · Alt+↑/↓ · Space toggles · Ctrl/Shift+click selects several"}
+        {filtering ? "Clear the search and filter, and sort by load order, to reorder." : "Drag to reorder · Alt+↑/↓ · Space toggles · Ctrl/Shift+click selects several"}
       </span>
     {:else}
       <span class="spacer"></span>
@@ -840,7 +871,7 @@
       {:else}
         <table>
           <thead class="visually-hidden">
-            <tr><th>Move</th><th>Enabled</th><th>Load order</th><th>Mod</th><th>Source</th></tr>
+            <tr><th>Move</th><th>Enabled</th><th>Load order</th><th>Mod</th><th>Size</th><th>Last changed</th><th>Source</th></tr>
           </thead>
           <tbody>
             {#each visible as { r, i } (r.kind === "mod" ? `m:${r.id}` : `s:${i}:${r.name}`)}
@@ -851,7 +882,7 @@
                   ondrop={(e) => { e.preventDefault(); if (dragFrom !== null) move(dragFrom, i); dragFrom = dropAt = null; }}
                   ondblclick={() => (editingSep = i)} onkeydown={(e) => editingSep !== i && rowKey(e, i, r)}>
                   <td class="grip" aria-hidden="true">⠿</td>
-                  <td colspan="4">
+                  <td colspan="6">
                     {#if editingSep === i}
                       <!-- svelte-ignore a11y_autofocus -->
                       <input class="tape-edit" type="text" value={r.name} autofocus aria-label="Separator name (empty removes it)"
@@ -887,6 +918,8 @@
                     <span class="title">{r.name || r.id}</span>
                     {#if r.name && r.name !== r.id}<span class="id mono">{r.id}</span>{/if}
                   </td>
+                  <td class="meta mono">{stats[r.id] ? fmtSize(stats[r.id].size) : ""}</td>
+                  <td class="meta mono">{stats[r.id] ? fmtDate(stats[r.id].modified) : ""}</td>
                   <td class="src">
                     {#if r.on && overlaps[r.id]}
                       {@const o = overlaps[r.id]}
@@ -909,7 +942,7 @@
               <tr class="tail" class:drop={dropAt === rows.length} aria-hidden="true"
                 ondragover={(e) => { e.preventDefault(); dropAt = rows.length; }}
                 ondrop={(e) => { e.preventDefault(); if (dragFrom !== null) move(dragFrom, rows.length); dragFrom = dropAt = null; }}>
-                <td colspan="5"></td>
+                <td colspan="7"></td>
               </tr>
             {/if}
           </tbody>
@@ -1316,6 +1349,18 @@
   }
   .name .id {
     margin-left: 10px;
+    color: var(--muted);
+  }
+  .meta {
+    width: 78px;
+    text-align: right;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .sort {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     color: var(--muted);
   }
   .src :global(.layers) {

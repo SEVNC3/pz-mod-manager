@@ -94,6 +94,31 @@ pub fn overlaps(mods: &[(String, PathBuf)]) -> std::collections::HashMap<String,
     out
 }
 
+/// A mod folder's total size in bytes and its newest file time (seconds since 1970).
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize)]
+pub struct Stats {
+    pub size: u64,
+    pub modified: u64,
+}
+
+pub fn stats(dir: &Path) -> Stats {
+    let mut s = Stats::default();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for e in fs::read_dir(&d).into_iter().flatten().flatten() {
+            let Ok(kind) = e.file_type() else { continue };
+            if kind.is_dir() {
+                stack.push(e.path());
+            } else if let Ok(meta) = e.metadata() {
+                s.size += meta.len();
+                let t = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs());
+                s.modified = s.modified.max(t);
+            }
+        }
+    }
+    s
+}
+
 /// Map folder names a mod adds (`media/maps/<Name>`).
 pub fn maps(mod_dir: &Path) -> Vec<String> {
     let mut names: Vec<String> = content_roots(mod_dir)
@@ -128,6 +153,7 @@ mod tests {
         touch(&b.join("media/lua/shared/items.lua")); // B41 layout, different case: same game path
         touch(&b.join("media/maps/Riverside Plus/map.info"));
         assert_eq!(media_files(&a).len(), 2);
+        assert_eq!(stats(&a).size, 3, "three one-byte files");
 
         let c = conflicts(&a, 0, &[("B".into(), b.clone(), 1)]);
         assert_eq!(c, [Conflict { other: "B".into(), files: 1, wins: false, examples: vec!["media/lua/shared/items.lua".into()] }]);
