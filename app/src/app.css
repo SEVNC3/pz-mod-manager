@@ -34,7 +34,7 @@
    clearly not the dark blood of fills (~5:1 on raised) */
 @supports (color: oklch(from red l c h)) {
   :root {
-    --accent-text: oklch(from var(--accent) 0.71 0.19 h);
+    --accent-text: oklch(from var(--accent) 0.66 0.22 h);
     --focus: oklch(from var(--accent) 0.74 0.17 h);
   }
 }

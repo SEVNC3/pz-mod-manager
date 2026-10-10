@@ -1,6 +1,6 @@
 // Self-check for src/lib/order.ts. Run: node scripts/order-check.ts
 import assert from "node:assert/strict";
-import { autosort, bisectRound, findProblems, groupByCategory, placeInSections, sortLoadOrder } from "../src/lib/order.ts";
+import { autosort, bisectRound, findProblems, groupByCategory, moveSection, placeInSections, sortLoadOrder } from "../src/lib/order.ts";
 import type { Row } from "../src/lib/api.ts";
 
 const mod = (id: string, on = true, extra: Partial<Record<"requires" | "incompatible" | "load_after" | "load_before", string[]>> = {}): Row => ({
@@ -60,5 +60,13 @@ const auto = autosort([mod("Ui", true, { load_before: ["Core"] }), mod("Core"), 
   { Ui: "Gameplay", Core: "Libs", App: "Gameplay", Dep: "Gameplay" }, order);
 assert.equal(ids(auto), "#Libs +Ui +Core #Gameplay +Dep +App");
 assert.equal(findProblems(auto).size, 0);
+
+// dragging a whole section: it moves with its mods and lands on section boundaries
+const secs: Row[] = [mod("Top"), { kind: "sep", name: "A" }, mod("a1"), mod("a2"), { kind: "sep", name: "B" }, mod("b1"), { kind: "sep", name: "C" }, mod("c1")];
+assert.equal(ids(moveSection(secs, 1, 5)!), "+Top #B +b1 #A +a1 +a2 #C +c1", "dragged down onto B: lands after B");
+assert.equal(ids(moveSection(secs, 6, 2)!), "+Top #C +c1 #A +a1 +a2 #B +b1", "dropped inside A: lands before A");
+assert.equal(ids(moveSection(secs, 1, 8)!), "+Top #B +b1 #C +c1 #A +a1 +a2", "dropped at the end");
+assert.equal(moveSection(secs, 1, 3), null, "inside itself");
+assert.equal(moveSection(secs, 1, 4), null, "right where it is");
 
 console.log("order-check: ok");

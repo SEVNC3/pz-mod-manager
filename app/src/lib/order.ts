@@ -179,6 +179,29 @@ export function placeInSections(rows: Row[], of: Record<string, string>, order: 
 }
 
 /**
+ * Where a section dragged from `from` lands when dropped on row `to`: past the hovered
+ * section when dragging down, before it when dragging up (the index it's inserted before).
+ */
+export function sectionDrop(rows: Row[], from: number, to: number): number {
+  let t = Math.min(to, rows.length);
+  if (t > from) while (t < rows.length && rows[t].kind !== "sep") t++;
+  else while (t > 0 && rows[t].kind !== "sep") t--;
+  return t;
+}
+
+/** Move the section that starts at separator `from` (it and its mods) to drop row `to`; null when nothing moves. */
+export function moveSection(rows: Row[], from: number, to: number): Row[] | null {
+  let end = from + 1;
+  while (end < rows.length && rows[end].kind !== "sep") end++;
+  const t = sectionDrop(rows, from, to);
+  if (t >= from && t <= end) return null;
+  const block = rows.slice(from, end);
+  const rest = [...rows.slice(0, from), ...rows.slice(end)];
+  rest.splice(t > from ? t - block.length : t, 0, ...block);
+  return rest;
+}
+
+/**
  * One bisect test: everything enabled that isn't a suspect stays on, plus the first half
  * of the suspects and (transitively) what they require. Returns the ids to enable and
  * the half under test.

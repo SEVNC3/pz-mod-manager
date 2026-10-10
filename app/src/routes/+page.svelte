@@ -13,7 +13,7 @@
   import LayerIcon from "$lib/LayerIcon.svelte";
   import Links from "$lib/Links.svelte";
   import Icon, { type IconName } from "$lib/Icon.svelte";
-  import { autosort, bisectRound, findProblems, placeInSections, sortLoadOrder } from "$lib/order";
+  import { autosort, bisectRound, findProblems, moveSection, placeInSections, sectionDrop, sortLoadOrder } from "$lib/order";
   import LoadOrder from "$lib/LoadOrder.svelte";
   import WindowControls from "$lib/WindowControls.svelte";
   import type { Finding, ModErrors, Overlap, Save, Stats } from "$lib/api";
@@ -538,6 +538,25 @@
     commit(rows.map((r) => (r.kind === "mod" && r.id === id ? { ...r, on: !r.on } : r)));
   }
 
+  // dragging a separator carries its whole section, and drops land on section boundaries
+  const sectionDrag = $derived(dragFrom !== null && rows[dragFrom]?.kind === "sep");
+  const dragEnd = $derived.by(() => {
+    if (!sectionDrag || dragFrom === null) return -1;
+    let e = dragFrom + 1;
+    while (e < rows.length && rows[e].kind !== "sep") e++;
+    return e;
+  });
+  const dropShown = $derived(sectionDrag && dragFrom !== null && dropAt !== null ? sectionDrop(rows, dragFrom, dropAt) : dropAt);
+
+  function dropOn(to: number) {
+    if (dragFrom === null) return;
+    if (sectionDrag) {
+      const next = moveSection(rows, dragFrom, to);
+      if (next) commit(next);
+    } else move(dragFrom, to);
+    dragFrom = dropAt = null;
+  }
+
   function move(from: number, to: number) {
     if (from === to || to < 0 || to > rows.length) return;
     const next = [...rows];
@@ -996,10 +1015,10 @@
               {@const end = k === visible.length - 1 || visible[k + 1].r.kind === "sep"}
               {#if start && k > 0}<tr class="gap" aria-hidden="true"><td colspan="8"></td></tr>{/if}
               {#if r.kind === "sep"}
-                <tr class="sep" class:start class:end class:drop={dropAt === i} data-index={i} tabindex="0" draggable={!filtering && editingSep !== i}
+                <tr class="sep" class:start class:end class:drop={dropShown === i} class:dragging={dragFrom === i} data-index={i} tabindex="0" draggable={!filtering && editingSep !== i}
                   ondragstart={() => (dragFrom = i)} ondragend={() => { dragFrom = dropAt = null; }}
                   ondragover={(e) => { e.preventDefault(); dropAt = i; }}
-                  ondrop={(e) => { e.preventDefault(); if (dragFrom !== null) move(dragFrom, i); dragFrom = dropAt = null; }}
+                  ondrop={(e) => { e.preventDefault(); dropOn(i); }}
                   ondblclick={() => (editingSep = i)} onkeydown={(e) => editingSep !== i && rowKey(e, i, r)}>
                   <td class="grip" aria-hidden="true">⠿</td>
                   <td colspan="7">
@@ -1023,13 +1042,13 @@
                 </tr>
               {:else}
                 {@const src = describeSource(r.source)}
-                <tr class="mod" class:start class:end class:off={!r.on} class:selected={selected === r.id} class:picked={picked.size >= 1 && picked.has(r.id)} class:drop={dropAt === i} class:dragging={dragFrom === i}
+                <tr class="mod" class:start class:end class:off={!r.on} class:selected={selected === r.id} class:picked={picked.size >= 1 && picked.has(r.id)} class:drop={dropShown === i} class:dragging={dragFrom === i || (sectionDrag && dragFrom !== null && i > dragFrom && i < dragEnd)}
                   data-index={i} tabindex="0" draggable={!filtering}
                   aria-selected={selected === r.id}
                   onclick={(e) => rowClick(e, r.id)} onkeydown={(e) => rowKey(e, i, r)}
                   ondragstart={() => (dragFrom = i)} ondragend={() => { dragFrom = dropAt = null; }}
                   ondragover={(e) => { e.preventDefault(); dropAt = i; }}
-                  ondrop={(e) => { e.preventDefault(); if (dragFrom !== null) move(dragFrom, i); dragFrom = dropAt = null; }}>
+                  ondrop={(e) => { e.preventDefault(); dropOn(i); }}>
                   <td class="grip" aria-hidden="true">{filtering ? "" : "⠿"}</td>
                   <td class="check">
                     <input type="checkbox" checked={r.on} disabled={busy} aria-label={`Enable ${r.name || r.id}`}
@@ -1068,9 +1087,9 @@
               {/if}
             {/each}
             {#if !filtering}
-              <tr class="tail" class:drop={dropAt === rows.length} aria-hidden="true"
+              <tr class="tail" class:drop={dropShown === rows.length} aria-hidden="true"
                 ondragover={(e) => { e.preventDefault(); dropAt = rows.length; }}
-                ondrop={(e) => { e.preventDefault(); if (dragFrom !== null) move(dragFrom, rows.length); dragFrom = dropAt = null; }}>
+                ondrop={(e) => { e.preventDefault(); dropOn(rows.length); }}>
                 <td colspan="8"></td>
               </tr>
             {/if}
@@ -1511,8 +1530,9 @@
   tr.dragging {
     opacity: 0.4;
   }
+  /* where a drag will land: blood red feathering down from the row's top edge */
   tr.drop td {
-    box-shadow: inset 0 3px 0 var(--accent-text);
+    background-image: linear-gradient(to bottom, color-mix(in oklab, var(--accent) 85%, white) 0, color-mix(in oklab, var(--accent) 55%, transparent) 3px, transparent 20px);
   }
   tr:focus-visible {
     outline: 2px solid var(--focus);
