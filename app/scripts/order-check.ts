@@ -5,7 +5,7 @@ import type { Row } from "../src/lib/api.ts";
 
 const mod = (id: string, on = true, extra: Partial<Record<"requires" | "incompatible" | "load_after" | "load_before", string[]>> = {}): Row => ({
   kind: "mod", id, name: id, source: "", on, missing: false,
-  requires: [], incompatible: [], load_after: [], load_before: [], ...extra,
+  requires: [], incompatible: [], load_after: [], load_before: [], only41: false, only42: false, ...extra,
 });
 const ids = (rows: Row[]) => rows.map((r) => (r.kind === "mod" ? `${r.on ? "+" : "-"}${r.id}` : `#${r.name}`)).join(" ");
 

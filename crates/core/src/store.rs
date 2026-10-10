@@ -226,6 +226,8 @@ pub struct Row {
     pub incompatible: Vec<String>,
     pub load_after: Vec<String>,
     pub load_before: Vec<String>,
+    pub supports_41: bool,
+    pub supports_42: bool,
 }
 
 impl Row {
@@ -240,6 +242,8 @@ impl Row {
             incompatible: m.incompatible,
             load_after: m.load_after,
             load_before: m.load_before,
+            supports_41: m.supports_41,
+            supports_42: m.supports_42,
         }
     }
 }

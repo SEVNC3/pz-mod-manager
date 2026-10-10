@@ -113,6 +113,10 @@ pub struct FoundMod {
     /// `loadModAfter=` / `loadModBefore=`: ordering hints the game reads.
     pub load_after: Vec<String>,
     pub load_before: Vec<String>,
+    /// Builds its folder layout supports: 41 needs a root mod.info, 42 a version folder
+    /// (`42/`, `42.x/`, `common/`). Both are true for mods that ship both.
+    pub supports_41: bool,
+    pub supports_42: bool,
 }
 
 fn walk(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
@@ -165,6 +169,12 @@ pub fn find_mods(root: &Path, depth: usize) -> Vec<FoundMod> {
         {
             let mut i = read_info(&info);
             let requires = requires(&i);
+            let supports_41 = dir.join("mod.info").is_file() || dir.join("Mod.info").is_file();
+            let supports_42 = fs::read_dir(&dir)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .any(|e| e.file_type().is_ok_and(|t| t.is_dir()) && e.file_name().to_str().is_some_and(is_version_dir));
             let (incompatible, load_after, load_before) =
                 (id_list(&i, "incompatible"), id_list(&i, "loadModAfter"), id_list(&i, "loadModBefore"));
             let fallback = dir.file_name().unwrap_or_default().to_string_lossy().into_owned();
@@ -177,6 +187,8 @@ pub fn find_mods(root: &Path, depth: usize) -> Vec<FoundMod> {
                 incompatible,
                 load_after,
                 load_before,
+                supports_41,
+                supports_42,
             });
         }
     }

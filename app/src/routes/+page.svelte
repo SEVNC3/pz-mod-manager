@@ -917,6 +917,11 @@
                   <td class="name">
                     <span class="title">{r.name || r.id}</span>
                     {#if r.name && r.name !== r.id}<span class="id mono">{r.id}</span>{/if}
+                    {#if r.only41 && (view?.build ?? 42) !== 41}
+                      <span class="build-badge" title="Built for Build 41 only (no 42/ or common/ folder): on Build 42 it may error or do nothing">B41 only</span>
+                    {:else if r.only42 && view?.build === 41}
+                      <span class="build-badge" title="Built for Build 42 only">B42 only</span>
+                    {/if}
                   </td>
                   <td class="meta mono">{stats[r.id] ? fmtSize(stats[r.id].size) : ""}</td>
                   <td class="meta mono">{stats[r.id] ? fmtDate(stats[r.id].modified) : ""}</td>
@@ -1350,6 +1355,15 @@
   .name .id {
     margin-left: 10px;
     color: var(--muted);
+  }
+  .build-badge {
+    margin-left: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--danger);
+    border: 1px solid color-mix(in oklab, var(--danger) 50%, transparent);
+    border-radius: 4px;
+    padding: 0 5px;
   }
   .meta {
     width: 78px;

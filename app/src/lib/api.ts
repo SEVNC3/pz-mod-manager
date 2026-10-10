@@ -12,6 +12,8 @@ export type ModRow = {
   incompatible: string[];
   load_after: string[];
   load_before: string[];
+  only41: boolean;
+  only42: boolean;
 };
 export type SepRow = { kind: "sep"; name: string };
 export type Row = ModRow | SepRow;

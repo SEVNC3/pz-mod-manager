@@ -2,9 +2,8 @@
 //! game reports badly or not at all (it skips a mod silently, or kicks players later).
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::path::Path;
 
-use super::{Paths, files, is_version_dir, server};
+use super::{Paths, files, server};
 use crate::store::Row;
 
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize)]
@@ -30,21 +29,6 @@ fn err(subject: &str, text: String) -> Finding {
 
 fn warn(subject: &str, text: String) -> Finding {
     Finding { level: Level::Warning, subject: subject.into(), text }
-}
-
-/// Which builds a mod's folder layout supports: (has a root mod.info, has version folders).
-fn layout(dir: &Path) -> (bool, bool) {
-    let root = std::fs::read_dir(dir)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .any(|e| e.file_name().to_str().is_some_and(|n| n.eq_ignore_ascii_case("mod.info")));
-    let versioned = std::fs::read_dir(dir)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .any(|e| e.file_type().is_ok_and(|t| t.is_dir()) && e.file_name().to_str().is_some_and(is_version_dir));
-    (root, versioned)
 }
 
 /// Check the enabled mods (in load order) for `build` (41/42), against everything
@@ -84,10 +68,9 @@ pub fn check(paths: &Paths, enabled: &[String], mods: &BTreeMap<String, Row>, bu
                 out.push(warn(id, format!("should load before {b}")));
             }
         }
-        let (root, versioned) = layout(&m.dir);
-        if build >= 42 && !versioned {
+        if build >= 42 && !m.supports_42 {
             out.push(warn(id, "is built for Build 41 (no 42/ or common/ folder); on Build 42 it may error or do nothing".into()));
-        } else if build == 41 && !root {
+        } else if build == 41 && !m.supports_41 {
             out.push(warn(id, "is built for Build 42 only (no root mod.info)".into()));
         }
         if !m.source.starts_with("steam:") && subscribed.contains(id) {
@@ -155,6 +138,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn row(id: &str, dir: PathBuf, source: &str, requires: &[&str]) -> Row {
+        let versioned = dir.join("42").is_dir();
         Row {
             id: id.into(),
             name: id.into(),
@@ -165,6 +149,8 @@ mod tests {
             incompatible: vec![],
             load_after: vec![],
             load_before: vec![],
+            supports_41: !versioned,
+            supports_42: versioned,
         }
     }
 

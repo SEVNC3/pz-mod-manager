@@ -79,6 +79,11 @@ enum Row {
         load_after: Vec<String>,
         #[serde(default)]
         load_before: Vec<String>,
+        /// The mod's folders only support Build 41 / only Build 42.
+        #[serde(default)]
+        only41: bool,
+        #[serde(default)]
+        only42: bool,
     },
     Sep {
         name: String,
@@ -114,6 +119,8 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
         incompatible: m.incompatible,
         load_after: m.load_after,
         load_before: m.load_before,
+        only41: m.supports_41 && !m.supports_42,
+        only42: m.supports_42 && !m.supports_41,
     };
     let mut rows = vec![];
     for line in &p.lines {
@@ -131,6 +138,8 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
                     incompatible: vec![],
                     load_after: vec![],
                     load_before: vec![],
+                    only41: false,
+                    only42: false,
                 }),
                 None => {} // disabled and gone: drop it
             },
