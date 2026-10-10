@@ -55,6 +55,37 @@ pub fn requires(info: &HashMap<String, String>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Mod ids a Workshop description declares, by the community convention `Mod ID: X`
+/// (also `Mod IDs:`, BBCode around it, several ids separated by `,` or `;`).
+pub fn workshop_mod_ids(description: &str) -> Vec<String> {
+    let mut plain = String::new();
+    let mut in_tag = false;
+    for c in description.chars() {
+        match c {
+            '[' => in_tag = true,
+            ']' if in_tag => in_tag = false,
+            _ if !in_tag => plain.push(c),
+            _ => {}
+        }
+    }
+    let mut ids = vec![];
+    for line in plain.lines() {
+        let lower = line.to_lowercase();
+        let Some(at) = lower.find("mod id") else { continue };
+        let Some(colon) = line[at..].find(':') else { continue };
+        if line[at..at + colon].len() > 9 {
+            continue; // "Mod ID" must be the label, not part of a sentence
+        }
+        for id in line[at + colon + 1..].split([',', ';']) {
+            let id = id.trim().trim_start_matches('\\').trim();
+            if !id.is_empty() && !ids.iter().any(|x: &String| x == id) {
+                ids.push(id.to_string());
+            }
+        }
+    }
+    ids
+}
+
 /// B42 puts mod.info in `42/`, `42.13/`... and shared files in `common/`.
 pub(crate) fn is_version_dir(name: &str) -> bool {
     name == "common" || name.split('.').all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
@@ -238,6 +269,17 @@ mod tests {
         let info = HashMap::from([("require".to_string(), r"\ZombieBuddy, \ModOptions;tsarslib,".to_string())]);
         assert_eq!(requires(&info), ["ZombieBuddy", "ModOptions", "tsarslib"]);
         assert!(requires(&HashMap::new()).is_empty());
+    }
+
+    #[test]
+    fn reads_mod_ids_from_descriptions() {
+        assert_eq!(workshop_mod_ids("Great mod.
+Workshop ID: 3302128165
+Mod ID: Denseenvironment"), ["Denseenvironment"]);
+        assert_eq!(workshop_mod_ids("[b]Mod ID:[/b] A; B,C
+[h1]Mod ID: A[/h1]"), ["A", "B", "C"]);
+        assert_eq!(workshop_mod_ids(r"Mod IDs: \TLOG_Remaster,TLOG_Remaster Flamethrower"), ["TLOG_Remaster", "TLOG_Remaster Flamethrower"]);
+        assert!(workshop_mod_ids("This mod id is great: really").is_empty());
     }
 
     #[test]

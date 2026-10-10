@@ -114,6 +114,11 @@
     return out;
   });
   const fixable = $derived([...problems.values()].filter((p) => p.fixable).length);
+  const missingReqs = $derived.by(() => {
+    const out = new Set<string>();
+    for (const m of mods.values()) if (m.on && !m.missing) for (const r of m.requires) if (!mods.has(r)) out.add(r);
+    return out;
+  });
   const problemCount = $derived(problems.size + [...mods.values()].filter((m) => m.on && m.missing).length);
   const filtering = $derived(search.trim() !== "" || filter !== "all");
   const visible = $derived.by(() => {
@@ -206,9 +211,31 @@
     }
   }
 
-  function installWorkshop(id: string) {
+  /** After installing requirements, move them above the mods that need them. */
+  async function settleOrder() {
+    await tick();
+    if (fixable) fixLoadOrder();
+  }
+
+  async function installWorkshop(id: string) {
     logOpen = true;
-    return run(`Installing workshop item ${id}`, () => api.install([id]));
+    const ok = await run(`Installing workshop item ${id}`, () => api.install([id]));
+    if (ok) await settleOrder();
+    return ok;
+  }
+
+  async function installMissing() {
+    logOpen = true;
+    let unresolved: string[] = [];
+    const ok = await run(`Finding ${missingReqs.size} missing ${missingReqs.size === 1 ? "mod" : "mods"} on the Workshop`, async () => {
+      const [v, left] = await api.installMissing();
+      unresolved = left;
+      return v;
+    });
+    if (ok) {
+      await settleOrder();
+      if (unresolved.length) say(`Still missing: ${unresolved.join(", ")}. Select a mod that needs one and use Find to pick a match.`, true);
+    }
   }
 
   const commit = (next: Row[]) => {
@@ -426,6 +453,10 @@
       {/each}
     </div>
     <span class="count">{enabledCount} enabled · {mods.size} mods</span>
+    {#if missingReqs.size}
+      <button class="primary" onclick={installMissing} disabled={busy}
+        title={`Find and install from the Workshop: ${[...missingReqs].join(", ")}`}>Install missing mods ({missingReqs.size})</button>
+    {/if}
     {#if fixable}
       <button class="primary" onclick={fixLoadOrder} disabled={busy}
         title="Enable required mods and move them above the mods that need them">Fix load order</button>
@@ -514,7 +545,7 @@
     </div>
 
     {#if selected}
-      <Details id={selected} {mods} {busy} hasUpdate={updates.has(selected)} onUpdate={(id) => updateMods([id])}
+      <Details id={selected} {mods} {busy} hasUpdate={updates.has(selected)} onUpdate={(id) => updateMods([id])} onInstallWorkshop={installWorkshop}
         onToggle={toggle} onSelect={(id) => (selected = id)}
         onRemove={remove} onRollback={(id) => run(`Restoring ${id}`, () => api.rollback(id))} />
     {/if}

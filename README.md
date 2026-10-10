@@ -7,7 +7,7 @@ A free, open-source mod manager for **Project Zomboid** (Build 41 and 42), for W
 - **See everything:** Steam Workshop subscriptions and the mods in your `Zomboid/mods` folder, in one list with each mod's poster, author and description.
 - **Load order:** drag to reorder, group mods under separators, and switch mods on and off. PZMM writes the same `mods/default.txt` the game reads.
 - **Profiles:** keep separate mod setups ("Solo", "Friends server") and switch between them in one click. Changes you make in the game's own mod menu are picked up automatically.
-- **Dependencies:** PZMM flags enabled mods whose required mods are missing, disabled or loading too late. **Fix load order** sorts it out.
+- **Dependencies:** PZMM flags enabled mods whose required mods are missing, disabled or loading too late. **Install missing mods** finds the missing ones on the Workshop: it checks the "Required items" the author lists, and reads "Mod ID: X" from Workshop descriptions. **Fix load order** sorts the rest.
 - **Conflicts:** each mod's details show which other mods replace the same files, and which copy wins.
 - **Updates:** PZMM checks the Workshop for newer versions of the mods it installed, without downloading them. Every update keeps the previous version, and **Restore previous version** brings it back if an update breaks your save.
 - **Servers and saves:** write a profile into a dedicated server's config (`Mods=`, `WorkshopItems=`, `Map=`), turn a server config into a profile, or load the mods a save was played with.
@@ -51,6 +51,7 @@ pzmm profile use Server
 pzmm build 41                # force the B41 default.txt format
 pzmm search snow --sort toprated --build 42
 pzmm outdated                # Workshop mods with updates waiting
+pzmm find tsarslib --install # find the Workshop item that provides a mod id
 pzmm server export servertest   # active profile -> Zomboid/Server/servertest.ini
 pzmm server import servertest   # server config -> profile (installs missing mods)
 pzmm zombiebuddy install     # also: status, uninstall

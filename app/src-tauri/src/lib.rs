@@ -383,6 +383,69 @@ fn zb_uninstall() -> Res<View> {
     })
 }
 
+// --- missing requirements ---
+
+/// The Workshop item a mod came from, if any (`steam:<id>` or `workshop:<id>`).
+fn workshop_item(row: &store::Row) -> Option<&str> {
+    row.source.strip_prefix("steam:").or_else(|| row.source.strip_prefix("workshop:"))
+}
+
+/// Workshop items that may provide `mod_id`, which the installed mod `needed_by` requires.
+#[tauri::command]
+async fn find_requirement(mod_id: String, needed_by: String) -> Res<Vec<sources::Candidate>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let hint = store::scan(&Paths::detect()).ok().and_then(|m| m.get(&needed_by).and_then(workshop_item).map(String::from));
+        sources::find_mod(&mod_id, hint.as_deref()).map_err(|e| format!("{e:#}"))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Install every requirement of enabled mods that isn't installed, when the Workshop
+/// has a confirmed match (its description declares the mod id). Returns ids still missing.
+#[tauri::command]
+async fn install_missing() -> Res<(View, Vec<String>)> {
+    tauri::async_runtime::spawn_blocking(|| {
+        locked(|paths| {
+            let mods = store::scan(paths)?;
+            let mut p = active(paths)?;
+            let mut wanted: Vec<(String, Option<String>)> = vec![]; // (missing id, hint item)
+            for id in p.enabled() {
+                let Some(m) = mods.get(&id) else { continue };
+                for r in &m.requires {
+                    if !mods.contains_key(r) && !wanted.iter().any(|(w, _)| w == r) {
+                        wanted.push((r.clone(), workshop_item(m).map(String::from)));
+                    }
+                }
+            }
+            let (mut items, mut unresolved) = (vec![], vec![]);
+            for (id, hint) in wanted {
+                match sources::find_mod(&id, hint.as_deref()) {
+                    Ok(c) if c.first().is_some_and(|c| c.confirmed) => {
+                        pzmm_core::log!("{id}: found on the Workshop as \"{}\" ({})", c[0].item.title, c[0].item.id);
+                        items.push(Source::Workshop(c[0].item.id.clone()));
+                    }
+                    Ok(_) => unresolved.push(id),
+                    Err(e) => {
+                        pzmm_core::log!("error: looking up {id}: {e:#}");
+                        unresolved.push(id);
+                    }
+                }
+            }
+            for id in sources::install(paths, &items, true) {
+                p.set(&id, true);
+            }
+            profile::apply(paths, &p)?;
+            for id in &unresolved {
+                pzmm_core::log!("{id}: no Workshop item clearly provides it. Use Find in the mod's details to pick one.");
+            }
+            Ok((view(paths)?, unresolved))
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 // --- updates, conflicts, servers, saves ---
 
 #[tauri::command]
@@ -526,7 +589,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
             details, poster, open_path, open_url, workshop_browse, zb_status, zb_preview, zb_install, zb_uninstall,
-            check_updates, update_mods, conflicts, servers_and_saves, server_export, server_import, save_use
+            find_requirement, install_missing, check_updates, update_mods, conflicts, servers_and_saves, server_export, server_import, save_use
         ])
         .run(tauri::generate_context!())
         .expect("error while running PZMM");

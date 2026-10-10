@@ -37,6 +37,7 @@ export type WorkshopItem = {
   have: boolean;
 };
 export type Browse = { total: number; items: WorkshopItem[] };
+export type Candidate = Omit<WorkshopItem, "have"> & { confirmed: boolean; required_by_author: boolean };
 
 export type ZbStatus = {
   game_dir: string | null;
@@ -71,6 +72,9 @@ export const api = {
   zbPreview: (remove: boolean) => invoke<string[]>("zb_preview", { remove }),
   zbInstall: () => invoke<View>("zb_install"),
   zbUninstall: () => invoke<View>("zb_uninstall"),
+  findRequirement: (modId: string, neededBy: string) =>
+    invoke<Candidate[]>("find_requirement", { modId, neededBy }),
+  installMissing: () => invoke<[View, string[]]>("install_missing"),
   checkUpdates: () => invoke<string[]>("check_updates"),
   updateMods: (ids: string[]) => invoke<View>("update_mods", { ids }),
   conflicts: (id: string) => invoke<Conflict[]>("conflicts", { id }),

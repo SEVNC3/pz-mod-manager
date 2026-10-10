@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api, describeSource, type Conflict, type Details, type ModRow } from "./api";
+  import { api, describeSource, type Candidate, type Conflict, type Details, type ModRow } from "./api";
 
   let {
     id,
@@ -7,6 +7,7 @@
     busy,
     hasUpdate,
     onUpdate,
+    onInstallWorkshop,
     onToggle,
     onRemove,
     onRollback,
@@ -17,6 +18,7 @@
     busy: boolean;
     hasUpdate: boolean;
     onUpdate: (id: string) => void;
+    onInstallWorkshop: (workshopId: string) => Promise<boolean>;
     onToggle: (id: string) => void;
     onRemove: (id: string) => void;
     onRollback: (id: string) => void;
@@ -25,6 +27,17 @@
 
   let d = $state<Details | null>(null);
   let conflicts = $state<Conflict[]>([]);
+  // Workshop matches for missing requirements, by mod id
+  let found = $state<Record<string, Candidate[] | "loading" | string>>({});
+
+  async function find(req: string) {
+    found[req] = "loading";
+    try {
+      found[req] = await api.findRequirement(req, id);
+    } catch (e) {
+      found[req] = String(e);
+    }
+  }
   let poster = $state<string | null>(null);
   let loadedFor = "";
 
@@ -42,6 +55,7 @@
     }).catch(() => (conflicts = []));
     if (loadedFor !== target) {
       loadedFor = target;
+      found = {};
       if (poster) URL.revokeObjectURL(poster);
       poster = null;
       api.poster(target).then((buf) => {
@@ -116,8 +130,39 @@
         {#each requires as r}
           {@const m = mods.get(r)}
           <li>
-            <button class="quiet link mono" onclick={() => m && onSelect(r)} disabled={!m}>{r}</button>
-            <span class={m?.on ? "ok" : "bad"}>{m ? (m.on ? "enabled" : "disabled") : "not installed"}</span>
+            <span class="req">
+              <button class="quiet link mono" onclick={() => m && onSelect(r)} disabled={!m}>{r}</button>
+              {#if m}
+                <span class={m.on ? "ok" : "bad"}>{m.on ? "enabled" : "disabled"}</span>
+              {:else}
+                <span class="bad">not installed</span>
+                {#if !found[r]}<button class="find" onclick={() => find(r)} disabled={busy}>Find</button>{/if}
+              {/if}
+            </span>
+            {#if !m && found[r] === "loading"}
+              <p class="hint">Searching the Workshop…</p>
+            {:else if !m && typeof found[r] === "string"}
+              <p class="bad">{found[r]}</p>
+            {:else if !m && Array.isArray(found[r])}
+              {@const list = found[r] as Candidate[]}
+              {#if list.length === 0}
+                <p class="hint">Nothing on the Workshop matches {r}.</p>
+              {:else}
+                <ul class="cands">
+                  {#each list.slice(0, 5) as c (c.id)}
+                    <li class:best={c.confirmed}>
+                      <span>
+                        <button class="quiet link" onclick={() => api.openUrl(`https://steamcommunity.com/sharedfiles/filedetails/?id=${c.id}`)}>{c.title}</button>
+                        <span class="hint">
+                          {c.subscriptions.toLocaleString()} subscribers{c.confirmed ? " · Mod ID matches" : ""}{c.required_by_author ? " · listed by the author" : ""}
+                        </span>
+                      </span>
+                      <button class={c.confirmed ? "primary" : ""} disabled={busy} onclick={() => onInstallWorkshop(c.id)}>Install</button>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            {/if}
           </li>
         {/each}
       </ul>
@@ -220,11 +265,44 @@
     padding: 0;
     margin: 0;
   }
-  .requires li {
+  .requires > li {
+    padding: 3px 0;
+  }
+  .req {
     display: flex;
-    justify-content: space-between;
     gap: 8px;
     align-items: baseline;
+  }
+  .req .link {
+    margin-right: auto;
+  }
+  .find {
+    padding: 1px 10px;
+    font-size: 12px;
+  }
+  .hint {
+    display: block;
+    margin: 2px 0;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .cands {
+    list-style: none;
+    margin: 4px 0 8px;
+    padding: 0 0 0 10px;
+    border-left: 2px solid var(--line);
+  }
+  .cands li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+  }
+  .cands li.best {
+    border-left: 2px solid var(--accent);
+    margin-left: -12px;
+    padding-left: 10px;
   }
   .link {
     padding: 0;

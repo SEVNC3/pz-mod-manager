@@ -59,6 +59,13 @@ enum Cmd {
         #[arg(long)]
         build: Option<u8>,
     },
+    /// Find Workshop items that provide a mod id (e.g. one a mod requires)
+    Find {
+        mod_id: String,
+        /// Install the best confirmed match
+        #[arg(long)]
+        install: bool,
+    },
     /// List mods PZMM installed from the Workshop that have updates waiting
     Outdated,
     /// Write the active profile to Zomboid/Server/<name>.ini, or make a profile from it
@@ -142,6 +149,22 @@ fn run(cli: Cli) -> Result<()> {
             println!("{} results (page {page})", res.total);
             for i in res.items {
                 println!("{:>11}  {:<50} {:>9} subs", i.id, i.title.chars().take(50).collect::<String>(), i.subscriptions);
+            }
+        }
+        Cmd::Find { mod_id, install } => {
+            let found = sources::find_mod(&mod_id, None)?;
+            for c in found.iter().take(8) {
+                let tag = if c.confirmed { "match" } else { "     " };
+                println!("{tag} {:>11}  {:<50} {:>9} subs", c.item.id, c.item.title.chars().take(50).collect::<String>(), c.item.subscriptions);
+            }
+            match found.first() {
+                Some(best) if install && best.confirmed => {
+                    let ids = sources::install(&paths, &[Source::Workshop(best.item.id.clone())], true);
+                    ids.iter().for_each(|i| p.set(i, true));
+                    profile::apply(&paths, &p)?;
+                }
+                _ if install => bail!("no Workshop item clearly provides {mod_id}; install one of the above by id"),
+                _ => {}
             }
         }
         Cmd::Outdated => {

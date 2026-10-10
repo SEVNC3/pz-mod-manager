@@ -177,6 +177,42 @@ pub fn check_updates(paths: &Paths) -> Result<Vec<String>> {
     Ok(ours.into_iter().filter(|(_, item, at)| updated.get(*item).is_some_and(|t| t > at)).map(|(id, ..)| id.clone()).collect())
 }
 
+/// A Workshop item that may provide a missing mod.
+#[derive(Debug, serde::Serialize)]
+pub struct Candidate {
+    #[serde(flatten)]
+    pub item: steam_workshop::Item,
+    /// Its description declares `Mod ID: <the id>`.
+    pub confirmed: bool,
+    /// The dependent mod's author lists it under "Required items".
+    pub required_by_author: bool,
+}
+
+/// Find Workshop items that provide `mod_id`: the "Required items" of the Workshop item
+/// `needed_by` (if any) plus a Workshop search for the id. Best matches first.
+pub fn find_mod(mod_id: &str, needed_by: Option<&str>) -> Result<Vec<Candidate>> {
+    let required = needed_by.map(steam_workshop::required_items).transpose()?.unwrap_or_default();
+    let mut ids = required.clone();
+    for i in steam_workshop::browse(pz::STEAM_APP, mod_id, "", 1, None)?.items.into_iter().take(10) {
+        if !ids.contains(&i.id) {
+            ids.push(i.id);
+        }
+    }
+    let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+    let mut out: Vec<Candidate> = steam_workshop::details(&refs)?
+        .into_iter()
+        .map(|item| Candidate {
+            confirmed: pz::workshop_mod_ids(&item.description).iter().any(|m| m.eq_ignore_ascii_case(mod_id)),
+            required_by_author: required.contains(&item.id),
+            item,
+        })
+        .collect();
+    // author's own list first, then confirmed matches (translations also mention the id,
+    // so the most subscribed wins), then the rest in search order
+    out.sort_by_key(|c| (!(c.required_by_author && c.confirmed), !c.confirmed, std::cmp::Reverse(c.confirmed as u64 * c.item.subscriptions)));
+    Ok(out)
+}
+
 fn install_local(paths: &Paths, p: &Path) -> Result<Vec<String>> {
     let abs = std::path::absolute(p)?;
     let source = format!("local:{}", abs.display());
