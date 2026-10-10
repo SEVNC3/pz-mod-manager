@@ -12,8 +12,8 @@
   import ServersSaves from "$lib/ServersSaves.svelte";
   import LayerIcon from "$lib/LayerIcon.svelte";
   import Links from "$lib/Links.svelte";
-  import { findProblems, sortLoadOrder } from "$lib/order";
-  import type { Finding, Overlap, Save } from "$lib/api";
+  import { bisectRound, findProblems, sortLoadOrder } from "$lib/order";
+  import type { Finding, ModErrors, Overlap, Save } from "$lib/api";
 
   let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
   let updates = $state<Set<string>>(new Set());
@@ -294,12 +294,52 @@
 
   // --- health check ---
   let findings = $state<Finding[] | null>(null);
+  let gameErrors = $state<ModErrors[]>([]);
   async function checkSetup() {
     try {
-      findings = await api.doctor();
+      [findings, gameErrors] = await Promise.all([api.doctor(), api.consoleErrors().catch(() => [])]);
     } catch (e) {
       say(`Couldn't check the setup: ${e}`, true);
     }
+  }
+
+  // --- find a broken mod by halving the suspects each game run ---
+  let bisect = $state<{ original: Row[]; suspects: string[]; testing: string[]; round: number } | null>(null);
+
+  /** Enabled = everything not under suspicion + the half being tested + what those require. */
+  function bisectApply(b: NonNullable<typeof bisect>) {
+    const { on, testing } = bisectRound(b.original, b.suspects, (id) => mods.get(id)?.requires ?? []);
+    bisect = { ...b, testing };
+    commit(b.original.map((r) => (r.kind === "mod" ? { ...r, on: on.has(r.id) } : r)), false);
+  }
+
+  function bisectStart() {
+    const suspects = [...mods.values()].filter((m) => m.on && !m.missing).map((m) => m.id);
+    if (suspects.length < 2) return say("Enable at least two mods to search for a broken one.", true);
+    findings = null;
+    bisectApply({ original: $state.snapshot(rows), suspects, testing: [], round: 1 });
+  }
+
+  function bisectAnswer(stillBroken: boolean) {
+    if (!bisect) return;
+    const suspects = stillBroken ? bisect.testing : bisect.suspects.filter((s) => !bisect!.testing.includes(s));
+    if (suspects.length <= 1) {
+      const original = bisect.original;
+      bisect = null;
+      commit(original, false);
+      say(suspects.length ? `Found it: ${suspects[0]} causes the problem. Your mod list is restored.` : "The problem didn't follow any single mod. Your mod list is restored.", !!suspects.length);
+      logOpen = true;
+      if (suspects.length) selected = suspects[0];
+      return;
+    }
+    bisectApply({ ...bisect, suspects, round: bisect.round + 1 });
+  }
+
+  function bisectStop() {
+    if (!bisect) return;
+    const original = bisect.original;
+    bisect = null;
+    commit(original, false);
   }
 
   // --- undo/redo for list edits (toggle, reorder, separators, fixes) ---
@@ -699,6 +739,21 @@
     <button class="quiet" onclick={addSeparator} disabled={busy || filtering}>Add separator</button>
   </div>
 
+  {#if bisect}
+    <div class="findings" role="region" aria-label="Find the broken mod">
+      <p>
+        <strong>Finding the broken mod, round {bisect.round}:</strong>
+        {bisect.suspects.length} suspects left, {bisect.testing.length} enabled for this test (plus what they need).
+        Start the game, check whether the problem happens, then come back here.
+      </p>
+      <div class="row">
+        <button class="primary" onclick={() => bisectAnswer(true)} disabled={busy}>The problem still happens</button>
+        <button class="primary" onclick={() => bisectAnswer(false)} disabled={busy}>The problem is gone</button>
+        <button class="quiet" onclick={bisectStop} disabled={busy}>Stop and restore my list</button>
+      </div>
+    </div>
+  {/if}
+
   {#if findings}
     <div class="findings" role="region" aria-label="Setup check">
       <div class="findings-head">
@@ -714,6 +769,22 @@
           {/each}
         </ul>
       {/if}
+      {#if gameErrors.length}
+        <p class="findings-sub"><strong>Lua errors in your last game session</strong> (from console.txt):</p>
+        <ul>
+          {#each gameErrors as e}
+            <li class="warning">
+              <button class="quiet link" disabled={!e.id} onclick={() => e.id && (selected = e.id)}>{e.name}</button>:
+              {e.count} {e.count === 1 ? "error" : "errors"}, first at <span class="mono">{e.example}</span>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      <p class="findings-sub">
+        Something breaks but nothing above explains it?
+        <button class="quiet link" onclick={bisectStart} disabled={busy}>Find the broken mod</button>:
+        PZMM halves your enabled mods each time you test the game.
+      </p>
     </div>
   {/if}
   <main class:with-details={selected}>
@@ -943,6 +1014,20 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+  }
+  .findings-sub {
+    margin: 8px 0 0;
+    color: var(--muted);
+  }
+  .findings .row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .link {
+    padding: 0 2px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
   .findings ul {
     margin: 6px 0 0;

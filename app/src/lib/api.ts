@@ -84,6 +84,7 @@ export function decodeShare(text: string): Shared {
   return { name: s.name, kind: s.kind ?? "", list: s.list, workshop: s.workshop ?? {} };
 }
 
+export type ModErrors = { name: string; count: number; example: string; id: string | null };
 export type Finding = { level: "error" | "warning"; subject: string; text: string };
 export type Overlap = { wins_over: string[]; loses_to: string[] };
 export type Conflict = { other: string; files: number; wins: boolean; examples: string[] };
@@ -121,6 +122,7 @@ export const api = {
   serverImport: (name: string) => invoke<View>("server_import", { name }),
   saveUse: (mode: string, name: string) => invoke<View>("save_use", { mode, name }),
   doctor: () => invoke<Finding[]>("doctor"),
+  consoleErrors: () => invoke<ModErrors[]>("console_errors"),
   profileExport: () => invoke<Shared>("profile_export"),
   profileImport: (shared: Shared) => invoke<View>("profile_import", { shared }),
   modePreview: (mode: Mode) => invoke<string[]>("mode_preview", { mode }),

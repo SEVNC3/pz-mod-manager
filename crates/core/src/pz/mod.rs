@@ -9,6 +9,7 @@ use anyhow::Result;
 
 pub mod doctor;
 pub mod files;
+pub mod logs;
 pub mod saves;
 pub mod server;
 pub mod viewpoint;

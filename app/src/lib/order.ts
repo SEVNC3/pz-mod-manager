@@ -95,3 +95,21 @@ export function sortLoadOrder(rows: Row[]): Row[] {
   order.forEach((ei, k) => (next[slots[k]] = enabled[ei]));
   return next;
 }
+
+/**
+ * One bisect test: everything enabled that isn't a suspect stays on, plus the first half
+ * of the suspects and (transitively) what they require. Returns the ids to enable and
+ * the half under test.
+ */
+export function bisectRound(original: Row[], suspects: string[], requires: (id: string) => string[]): { on: Set<string>; testing: string[] } {
+  const testing = suspects.slice(0, Math.ceil(suspects.length / 2));
+  const suspect = new Set(suspects);
+  const on = new Set(original.filter((r): r is ModRow => isMod(r) && r.on && !suspect.has(r.id)).map((r) => r.id));
+  const add = (id: string) => {
+    if (on.has(id)) return;
+    on.add(id);
+    requires(id).forEach(add);
+  };
+  testing.forEach(add);
+  return { on, testing };
+}

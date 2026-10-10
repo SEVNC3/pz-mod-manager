@@ -68,6 +68,8 @@ enum Cmd {
     },
     /// Check the active profile and server configs; exits with 1 if anything is broken
     Doctor,
+    /// Lua errors in the last game session (console.txt), counted per mod
+    Errors,
     /// List mods PZMM installed from the Workshop that have updates waiting
     Outdated,
     /// Write the active profile to Zomboid/Server/<name>.ini, or make a profile from it
@@ -194,6 +196,15 @@ fn run(cli: Cli) -> Result<()> {
             println!("{errors} error(s), {} warning(s)", found.len() - errors);
             if errors > 0 {
                 std::process::exit(1);
+            }
+        }
+        Cmd::Errors => {
+            let errs = pzmm_core::pz::logs::console_errors(&paths.zomboid);
+            if errs.is_empty() {
+                println!("no mod errors in {}", paths.zomboid.join("console.txt").display());
+            }
+            for e in errs {
+                println!("{:>5}  {}  (first: {})", e.count, e.name, e.example);
             }
         }
         Cmd::Outdated => {

@@ -666,6 +666,29 @@ async fn profile_import(shared: profile::Shared) -> Res<View> {
     .map_err(|e| e.to_string())?
 }
 
+#[derive(Serialize)]
+struct ErrorsByMod {
+    #[serde(flatten)]
+    errors: pz::logs::ModErrors,
+    /// The mod id, when an installed mod has that display name.
+    id: Option<String>,
+}
+
+/// Lua errors in the last game session's console.txt, per mod.
+#[tauri::command]
+fn console_errors() -> Res<Vec<ErrorsByMod>> {
+    reading(|paths| {
+        let mods = scan(paths)?;
+        Ok(pz::logs::console_errors(&paths.zomboid)
+            .into_iter()
+            .map(|e| {
+                let id = mods.values().find(|m| m.name == e.name || m.id == e.name).map(|m| m.id.clone());
+                ErrorsByMod { errors: e, id }
+            })
+            .collect())
+    })
+}
+
 /// Health check of the active profile and server configs.
 #[tauri::command]
 fn doctor() -> Res<Vec<pz::doctor::Finding>> {
@@ -735,7 +758,7 @@ pub fn run() {
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
             details, poster, open_path, open_url, workshop_browse, zb_status, zb_preview, zb_install, zb_uninstall,
             find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, servers_and_saves, server_export, server_import, save_use,
-            mode_preview, mode_switch, doctor, profile_export, profile_import
+            mode_preview, mode_switch, doctor, console_errors, profile_export, profile_import
         ])
         .run(tauri::generate_context!())
         .expect("error while running PZMM");

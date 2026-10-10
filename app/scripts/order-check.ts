@@ -1,6 +1,6 @@
 // Self-check for src/lib/order.ts. Run: node scripts/order-check.ts
 import assert from "node:assert/strict";
-import { findProblems, sortLoadOrder } from "../src/lib/order.ts";
+import { bisectRound, findProblems, sortLoadOrder } from "../src/lib/order.ts";
 import type { Row } from "../src/lib/api.ts";
 
 const mod = (id: string, on = true, extra: Partial<Record<"requires" | "incompatible" | "load_after" | "load_before", string[]>> = {}): Row => ({
@@ -36,5 +36,12 @@ assert.deepEqual(findProblems(inc).get("A"), { text: "Incompatible with B", fixa
 // a cycle keeps its order instead of looping
 const cyc = [mod("X", true, { load_after: ["Y"] }), mod("Y", true, { load_after: ["X"] })];
 assert.equal(ids(sortLoadOrder(cyc)), "+X +Y");
+
+// bisect: first half of the suspects plus their requirements; innocent mods stay on
+const list = [mod("Keep"), mod("S1", true, { requires: ["Lib"] }), mod("S2"), mod("S3"), mod("Lib")];
+const req = (id: string) => (id === "S1" ? ["Lib"] : []);
+const r1 = bisectRound(list, ["S1", "S2", "S3", "Lib"], req);
+assert.deepEqual(r1.testing, ["S1", "S2"]);
+assert.deepEqual([...r1.on].sort(), ["Keep", "Lib", "S1", "S2"]);
 
 console.log("order-check: ok");
