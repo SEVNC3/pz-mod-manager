@@ -1412,26 +1412,17 @@
     min-height: 0;
     padding: 14px 16px 0;
   }
-  /* sections are cards lifted off the blueprint: rows paint the card, gap rows space them */
+  /* sections are cards lifted off the blueprint: rows paint the card, gap rows space them, and the
+     table's drop shadow follows each card's shape (box-shadow can't wrap a group of rows) */
   table {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
+    filter: var(--card-drop);
   }
   tr.mod td,
   tr.sep td {
     background: var(--panel);
-  }
-  tr.mod td:first-child,
-  tr.sep td:first-child {
-    border-left: 1px solid var(--line);
-  }
-  tr.mod td:last-child,
-  tr.sep td:last-child {
-    border-right: 1px solid var(--line);
-  }
-  tr.start td {
-    border-top: 1px solid var(--line);
   }
   tr.start td:first-child {
     border-top-left-radius: 8px;
@@ -1440,7 +1431,7 @@
     border-top-right-radius: 8px;
   }
   tr.end td {
-    border-bottom: 1px solid var(--line);
+    border-bottom: 0;
   }
   tr.end td:first-child {
     border-bottom-left-radius: 8px;
@@ -1484,8 +1475,23 @@
   tr.mod.selected .meta {
     color: rgb(255 255 255 / 0.72);
   }
-  tr.mod:hover td:first-child {
-    box-shadow: inset 3px 0 0 rgb(255 255 255 / 0.55);
+  /* the hover/selection marker: a straight 2px line, inset from the card's rounded corners */
+  tr.mod td:first-child {
+    position: relative;
+  }
+  tr.mod:hover td:first-child::before,
+  tr.mod.picked td:first-child::before,
+  tr.mod.selected td:first-child::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: #fff;
+  }
+  tr.mod:hover:not(.picked):not(.selected) td:first-child::before {
+    opacity: 0.55;
   }
   .fold {
     padding: 0 6px;
@@ -1499,10 +1505,6 @@
   }
   tr.mod.picked td {
     background: color-mix(in oklab, var(--accent) 22%, var(--panel));
-  }
-  tr.mod.picked td:first-child,
-  tr.mod.selected td:first-child {
-    box-shadow: inset 3px 0 0 #fff;
   }
   .bulk {
     display: flex;

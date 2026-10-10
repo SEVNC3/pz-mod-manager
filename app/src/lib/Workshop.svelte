@@ -632,8 +632,8 @@
     display: flex;
     flex-direction: column;
     background: var(--panel);
-    border: 1px solid var(--line);
     border-radius: 8px;
+    box-shadow: var(--card-shadow);
     overflow: hidden;
   }
   .thumb {

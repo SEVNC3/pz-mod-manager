@@ -22,6 +22,9 @@
   --hover: color-mix(in oklab, var(--accent) 34%, transparent);
   --hover-line: color-mix(in oklab, var(--accent) 70%, transparent);
   --shadow: 0 8px 28px rgb(0 0 0 / 0.35);
+  /* cards lift off the blueprint by shadow alone (no border: grid plus border reads busy) */
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.55), 0 8px 22px rgb(0 0 0 / 0.55);
+  --card-drop: drop-shadow(0 1px 2px rgb(0 0 0 / 0.55)) drop-shadow(0 8px 14px rgb(0 0 0 / 0.5));
 
   --font-body: "Atkinson Hyperlegible", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -50,6 +53,8 @@
     --accent-text: color-mix(in oklab, var(--accent) 70%, black);
     --focus: color-mix(in oklab, var(--accent) 75%, black);
     --shadow: 0 8px 28px rgb(20 30 30 / 0.15);
+    --card-shadow: 0 1px 2px rgb(20 30 30 / 0.12), 0 6px 18px rgb(20 30 30 / 0.14);
+    --card-drop: drop-shadow(0 1px 2px rgb(20 30 30 / 0.12)) drop-shadow(0 6px 12px rgb(20 30 30 / 0.14));
     color-scheme: light;
   }
 }
@@ -65,6 +70,8 @@
   --accent-text: color-mix(in oklab, var(--accent) 70%, black);
   --focus: color-mix(in oklab, var(--accent) 75%, black);
   --shadow: 0 8px 28px rgb(20 30 30 / 0.15);
+  --card-shadow: 0 1px 2px rgb(20 30 30 / 0.12), 0 6px 18px rgb(20 30 30 / 0.14);
+  --card-drop: drop-shadow(0 1px 2px rgb(20 30 30 / 0.12)) drop-shadow(0 6px 12px rgb(20 30 30 / 0.14));
   color-scheme: light;
 }
 
