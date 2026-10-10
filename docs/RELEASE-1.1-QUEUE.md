@@ -119,6 +119,18 @@ This merges their findings. Each item names its source. Work top to bottom; P0 a
 58. [x] **Launch**: extra game arguments (`-debug`, `-nosteam`) and autosort on first run of a new profile.
 59. [x] **About**: version, check for updates, the GitHub, Discord and Ko-fi links, Open log folder, and **Copy diagnostics** (version, folders, profile, mod count and Check setup results, with your user name masked) for bug reports.
 
+## P6: Maps view (the Map Mod Manager mod's features, rebuilt)
+
+Rebuilt from scratch: the Workshop mod (3360392628) forbids redistributing its code or its map database, so cells come from the map files themselves.
+
+60. [ ] **Cells from the files**: every installed map's cells from `media/maps/<folder>/` (`world_X_Y.lotpack` in B42, `X_Y.lotheader` in B41), and vanilla's from the game install. Cached by folder time.
+61. [ ] **A Maps tab with a cell grid**: vanilla areas, your maps, cells two maps share (conflict) and maps over vanilla areas, each in its own colour; hover a cell to see which maps use it; zoom and pan.
+62. [ ] **Map list**: installed map mods with on/off (turning one on also turns on what it needs), preview without enabling, **Select maps that don't conflict**, and click a cell to filter to the maps that cover it.
+63. [ ] **Requirements**: each map's required mods and maps (`require=`, map.info `lots=`), marked on, off or not installed (with Install), and which map needs each one.
+64. [ ] **Check a Workshop map before installing**: download it to a cache without installing, read its cells, keep only the cell list.
+65. [ ] **Export**: the selected maps' Workshop links, mod IDs, `Mods=`, `WorkshopItems=` and `Map=` lines, to the clipboard.
+66. [ ] **Map order** in the same tab as the server card's list.
+
 ## Lower-priority core fixes (all done in 1.1.0)
 
 - Updates continue for mods shadowed by a later Steam subscription (core 10).
