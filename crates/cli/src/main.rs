@@ -98,6 +98,10 @@ enum ProfileCmd {
     New { name: String },
     /// Switch to a profile and apply it to the game
     Use { name: String },
+    /// Write the active profile as a shareable JSON file (stdout without a file)
+    Export { file: Option<std::path::PathBuf> },
+    /// Install what a shared profile needs from the Workshop, then use it
+    Import { file: std::path::PathBuf },
     Delete { name: String },
 }
 
@@ -237,6 +241,19 @@ fn run(cli: Cli) -> Result<()> {
         Cmd::Profile(ProfileCmd::Use { name }) => {
             profile::apply(&paths, &profile::load(&paths, &name)?)?;
             println!("now using {name:?}");
+        }
+        Cmd::Profile(ProfileCmd::Export { file }) => {
+            let json = serde_json::to_string_pretty(&profile::export(&paths, &store::scan(&paths)?)?)?;
+            match file {
+                Some(f) => std::fs::write(&f, json)?,
+                None => println!("{json}"),
+            }
+        }
+        Cmd::Profile(ProfileCmd::Import { file }) => {
+            let shared: profile::Shared = serde_json::from_str(&std::fs::read_to_string(&file)?)?;
+            sources::install(&paths, &profile::import_needs(&shared, &store::scan(&paths)?), false);
+            let p = profile::import(&paths, &shared)?;
+            println!("now using {:?}", p.name);
         }
         Cmd::Profile(ProfileCmd::Delete { name }) => profile::delete(&paths, &name)?,
         Cmd::Build { build } => profile::set_b41(&paths, Some(match build {

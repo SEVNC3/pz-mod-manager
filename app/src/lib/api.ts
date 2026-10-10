@@ -65,6 +65,25 @@ export type ZbStatus = {
 };
 export const zbReady = (s: ZbStatus | null) => !!s && s.have_mod && s.files_current && s.launcher_patched && s.enabled;
 
+export type Shared = { name: string; kind: string; list: string; workshop: Record<string, string> };
+
+/** A share code: "PZMM1:" + base64 of the JSON, so it pastes cleanly into chat. */
+export function encodeShare(s: Shared): string {
+  const bytes = new TextEncoder().encode(JSON.stringify(s));
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return "PZMM1:" + btoa(bin);
+}
+
+/** Accepts a share code or the raw JSON. */
+export function decodeShare(text: string): Shared {
+  const t = text.trim();
+  const json = t.startsWith("PZMM1:") ? new TextDecoder().decode(Uint8Array.from(atob(t.slice(6)), (c) => c.charCodeAt(0))) : t;
+  const s = JSON.parse(json);
+  if (typeof s?.name !== "string" || typeof s?.list !== "string") throw new Error("That isn't a PZMM profile code.");
+  return { name: s.name, kind: s.kind ?? "", list: s.list, workshop: s.workshop ?? {} };
+}
+
 export type Finding = { level: "error" | "warning"; subject: string; text: string };
 export type Overlap = { wins_over: string[]; loses_to: string[] };
 export type Conflict = { other: string; files: number; wins: boolean; examples: string[] };
@@ -102,6 +121,8 @@ export const api = {
   serverImport: (name: string) => invoke<View>("server_import", { name }),
   saveUse: (mode: string, name: string) => invoke<View>("save_use", { mode, name }),
   doctor: () => invoke<Finding[]>("doctor"),
+  profileExport: () => invoke<Shared>("profile_export"),
+  profileImport: (shared: Shared) => invoke<View>("profile_import", { shared }),
   modePreview: (mode: Mode) => invoke<string[]>("mode_preview", { mode }),
   modeSwitch: (mode: Mode) => invoke<View>("mode_switch", { mode }),
   openPath: (path: string) => invoke<void>("open_path", { path }),

@@ -4,6 +4,7 @@
   import { getVersion } from "@tauri-apps/api/app";
   import { check, type Update } from "@tauri-apps/plugin-updater";
   import { relaunch } from "@tauri-apps/plugin-process";
+  import { decodeShare, encodeShare } from "$lib/api";
   import { api, describeSource, zbReady, type Mode, type ModRow, type Row, type View, type ZbStatus } from "$lib/api";
   import Details from "$lib/Details.svelte";
   import Workshop from "$lib/Workshop.svelte";
@@ -265,6 +266,32 @@
     return missing.length || extra.length ? { missing, extra } : null;
   });
 
+  // --- share a profile ---
+  let importText = $state<string | null>(null);
+
+  async function shareProfile() {
+    try {
+      await navigator.clipboard.writeText(encodeShare(await api.profileExport()));
+      say(`Copied a share code for "${view?.profile}". Paste it to a friend; they use Import in PZMM.`);
+      logOpen = true;
+    } catch (e) {
+      say(`Couldn't copy the share code: ${e}`, true);
+    }
+  }
+
+  async function importProfile(e: Event) {
+    e.preventDefault();
+    const text = importText ?? "";
+    importText = null;
+    try {
+      const shared = decodeShare(text);
+      logOpen = true;
+      await run(`Importing "${shared.name}"`, () => api.profileImport(shared));
+    } catch (err) {
+      say(String(err), true);
+    }
+  }
+
   // --- health check ---
   let findings = $state<Finding[] | null>(null);
   async function checkSetup() {
@@ -484,6 +511,8 @@
           {/each}
         </select>
         <button class="quiet" onclick={() => (newProfile = "")} disabled={busy} title="New profile from the current one">New</button>
+        <button class="quiet" onclick={shareProfile} disabled={busy} title="Copy a code others can import">Share</button>
+        <button class="quiet" onclick={() => (importText = "")} disabled={busy} title="Import a profile from a share code">Import</button>
         {#if modeProfiles.length > 1}
           <button class="quiet" onclick={deleteProfile} disabled={busy}>Delete</button>
         {/if}
@@ -508,6 +537,18 @@
       <button class="quiet" aria-expanded={settingsOpen} onclick={() => (settingsOpen = !settingsOpen)}>Settings</button>
     </div>
   </header>
+
+  {#if importText !== null}
+    <form class="mode-plan" onsubmit={importProfile}>
+      <label for="import-code"><strong>Import a profile</strong>: paste the share code someone sent you. Missing Workshop mods are installed.</label>
+      <div class="row">
+        <!-- svelte-ignore a11y_autofocus -->
+        <input id="import-code" type="text" bind:value={importText} placeholder="PZMM1:…" autofocus spellcheck="false" style="flex: 1" />
+        <button class="primary" type="submit" disabled={!importText.trim()}>Import</button>
+        <button class="quiet" type="button" onclick={() => (importText = null)}>Cancel</button>
+      </div>
+    </form>
+  {/if}
 
   {#if modePlan}
     <div class="mode-plan" role="region" aria-label="Switch game">

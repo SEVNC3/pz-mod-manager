@@ -274,9 +274,81 @@ pub fn apply(paths: &Paths, profile: &Profile) -> Result<()> {
     save_state(paths, &State { active: profile.name.clone(), ..s })
 }
 
+/// A profile to share with friends or a server: its list plus where each mod comes
+/// from on the Workshop, so the receiver can install what they're missing.
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct Shared {
+    pub name: String,
+    #[serde(default)]
+    pub kind: String,
+    /// The profile in modlist.txt form (`+Id`, `-Id`, `# --- Separator`).
+    pub list: String,
+    /// Mod id -> Workshop item id, for mods that come from the Workshop.
+    #[serde(default)]
+    pub workshop: std::collections::BTreeMap<String, String>,
+}
+
+/// Package the active profile for sharing (`mods`: the current scan, for Workshop ids).
+pub fn export(paths: &Paths, mods: &std::collections::BTreeMap<String, crate::store::Row>) -> Result<Shared> {
+    let p = sync(paths)?.0;
+    let workshop = p
+        .lines
+        .iter()
+        .filter_map(|l| if let Line::Mod { id, .. } = l { Some(id) } else { None })
+        .filter_map(|id| {
+            let src = &mods.get(id)?.source;
+            let item = src.strip_prefix("steam:").or_else(|| src.strip_prefix("workshop:"))?;
+            Some((id.clone(), item.to_string()))
+        })
+        .collect();
+    Ok(Shared { kind: kind_of(paths, &p.name), list: p.to_text(), name: p.name, workshop })
+}
+
+/// Workshop items a shared profile needs that aren't installed (`mods`: the current scan).
+pub fn import_needs(shared: &Shared, mods: &std::collections::BTreeMap<String, crate::store::Row>) -> Vec<crate::sources::Source> {
+    let mut items: Vec<&String> = shared
+        .workshop
+        .iter()
+        .filter(|(id, item)| !mods.contains_key(*id) && crate::sources::steam_workshop::valid_id(item))
+        .map(|(_, item)| item)
+        .collect();
+    items.sort();
+    items.dedup();
+    items.into_iter().map(|i| crate::sources::Source::Workshop(i.clone())).collect()
+}
+
+/// Save a shared profile under a free name (`<name>`, `<name> 2`...), keep its kind, and
+/// switch to it. Returns the profile.
+pub fn import(paths: &Paths, shared: &Shared) -> Result<Profile> {
+    let base = if crate::safe_file_name(shared.name.trim()) { shared.name.trim().to_string() } else { "Shared".to_string() };
+    let name = if exists(paths, &base) { (2..).map(|i| format!("{base} {i}")).find(|n| !exists(paths, n)).unwrap() } else { base };
+    let p = Profile::parse(&name, &shared.list);
+    if !shared.kind.is_empty() && crate::safe_file_name(&shared.kind) {
+        set_kind(paths, &name, &shared.kind)?;
+    }
+    apply(paths, &p)?;
+    Ok(p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn share_round_trip() {
+        let (_t, paths) = temp_paths();
+        apply(&paths, &Profile::parse("Friends", "# --- Core\n+A\n-B\n")).unwrap();
+        let shared = export(&paths, &Default::default()).unwrap();
+        assert_eq!(shared.list, "# --- Core\n+A\n-B\n");
+        let back: Shared = serde_json::from_str(&serde_json::to_string(&shared).unwrap()).unwrap();
+        let p = import(&paths, &back).unwrap();
+        assert_eq!((p.name.as_str(), p.to_text().as_str()), ("Friends 2", "# --- Core\n+A\n-B\n"));
+        let needs = import_needs(
+            &Shared { workshop: [("X".into(), "123".into()), ("Y".into(), "+bad".into())].into(), ..back },
+            &Default::default(),
+        );
+        assert_eq!(needs, [crate::sources::Source::Workshop("123".into())]);
+    }
     use crate::store::tests::temp_paths;
 
     fn ids(v: &[&str]) -> Vec<String> {

@@ -642,6 +642,30 @@ fn save_use(mode: String, name: String) -> Res<View> {
 
 use pzmm_core::pz::viewpoint as vp;
 
+/// The active profile packaged for sharing.
+#[tauri::command]
+fn profile_export() -> Res<profile::Shared> {
+    reading(|paths| profile::export(paths, &scan(paths)?))
+}
+
+/// Install what a shared profile needs from the Workshop, then save and use it.
+#[tauri::command]
+async fn profile_import(shared: profile::Shared) -> Res<View> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let needs = reading(|paths| Ok(profile::import_needs(&shared, &scan(paths)?)))?;
+        if !needs.is_empty() {
+            pzmm_core::log!("installing {} Workshop item(s) the shared profile uses", needs.len());
+        }
+        fetch_then(&needs, false, |paths, _| {
+            let p = profile::import(paths, &shared)?;
+            pzmm_core::log!("Imported the profile as \"{}\".", p.name);
+            view(paths)
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Health check of the active profile and server configs.
 #[tauri::command]
 fn doctor() -> Res<Vec<pz::doctor::Finding>> {
@@ -711,7 +735,7 @@ pub fn run() {
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
             details, poster, open_path, open_url, workshop_browse, zb_status, zb_preview, zb_install, zb_uninstall,
             find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, servers_and_saves, server_export, server_import, save_use,
-            mode_preview, mode_switch, doctor
+            mode_preview, mode_switch, doctor, profile_export, profile_import
         ])
         .run(tauri::generate_context!())
         .expect("error while running PZMM");
