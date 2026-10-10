@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 pub mod category;
 pub mod doctor;
@@ -257,7 +257,12 @@ pub fn try_read_default(path: &Path) -> Option<DefaultTxt> {
 /// Rewrite default.txt with `ids` in order. `b41: None` keeps the file's current format
 /// (B42 when unknown). The file as it was before PZMM's first write is kept as `default.txt.bak`.
 pub fn write_default(path: &Path, ids: &[String], b41: Option<bool>) -> Result<()> {
-    let old = read_default(path);
+    // an existing file we can't read keeps its maps block and format unknown: don't overwrite it blind
+    let old = if path.exists() {
+        try_read_default(path).with_context(|| format!("can't read {} (is the game running?)", path.display()))?
+    } else {
+        read_default(path)
+    };
     let prefix = if b41.unwrap_or(old.b41) { "" } else { "\\" };
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;

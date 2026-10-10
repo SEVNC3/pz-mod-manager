@@ -82,11 +82,17 @@ fn move_dir(from: &Path, to: &Path) -> Result<()> {
     if let Some(parent) = to.parent() {
         fs::create_dir_all(parent)?;
     }
-    if fs::rename(from, to).is_err() {
-        copy_dir(from, to)?;
-        fs::remove_dir_all(from)?;
+    match fs::rename(from, to) {
+        Ok(()) => Ok(()),
+        // only a move across drives needs a copy; anything else (a file the game has open) must
+        // fail cleanly, or the copy succeeds and the delete stops halfway
+        Err(e) if e.kind() == std::io::ErrorKind::CrossesDevices => {
+            copy_dir(from, to)?;
+            fs::remove_dir_all(from)?;
+            Ok(())
+        }
+        Err(e) => Err(e).with_context(|| format!("moving {} (close the game and try again)", from.display())),
     }
-    Ok(())
 }
 
 /// Same files with the same bytes (so an "update" would change nothing).

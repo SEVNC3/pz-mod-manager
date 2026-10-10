@@ -199,7 +199,8 @@ pub fn load(paths: &Paths, name: &str) -> Result<Profile> {
     if !p.exists() {
         bail!("no profile named {name:?}");
     }
-    Ok(Profile::parse(name, &fs::read_to_string(p)?))
+    // lossy: a separator saved as ANSI by Notepad still loads (one odd character) rather than failing
+    Ok(Profile::parse(name, &String::from_utf8_lossy(&fs::read(p)?)))
 }
 
 pub fn save(paths: &Paths, profile: &Profile) -> Result<()> {
@@ -223,7 +224,14 @@ pub fn delete(paths: &Paths, name: &str) -> Result<()> {
 }
 
 fn state(paths: &Paths) -> State {
-    fs::read_to_string(paths.data.join("state.json")).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+    let path = paths.data.join("state.json");
+    let Ok(text) = fs::read_to_string(&path) else { return State::default() };
+    serde_json::from_str(&text).unwrap_or_else(|e| {
+        // keep the broken file for inspection instead of silently overwriting it on the next save
+        let _ = fs::copy(&path, paths.data.join("state.json.bad"));
+        crate::log!("error: {} is damaged ({e}); kept a copy as state.json.bad and started fresh", path.display());
+        State::default()
+    })
 }
 
 fn save_state(paths: &Paths, s: &State) -> Result<()> {
@@ -254,7 +262,8 @@ pub fn set_b41(paths: &Paths, b41: Option<bool>) -> Result<()> {
 /// adopt any changes made in-game. Returns the profile and whether it adopted changes.
 pub fn sync(paths: &Paths) -> Result<(Profile, bool)> {
     let name = active_name(paths);
-    let mut p = load(paths, &name).unwrap_or_else(|_| Profile { name, lines: vec![] });
+    // a profile that exists but can't be read is an error: starting empty would replace it with the game's list
+    let mut p = if dir(paths).join(&name).join("modlist.txt").exists() { load(paths, &name)? } else { Profile { name, lines: vec![] } };
     // a missing or unreadable default.txt (game running, odd encoding) says nothing about
     // what's enabled: adopting it would switch the whole profile off
     let changed = pz::try_read_default(&paths.default_txt()).is_some_and(|game| p.adopt(&game.mods));
@@ -353,6 +362,18 @@ mod tests {
 
     fn ids(v: &[&str]) -> Vec<String> {
         v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn unreadable_profile_is_not_replaced() {
+        let (_t, paths) = temp_paths();
+        apply(&paths, &Profile::parse("Default", "# --- Maps\n+A\n-B\n")).unwrap();
+        // Notepad re-saved it as ANSI: the separator is no longer valid UTF-8
+        let file = dir(&paths).join("Default").join("modlist.txt");
+        fs::write(&file, b"# --- V\xe9g\n+A\n-B\n").unwrap();
+        let (p, _) = sync(&paths).unwrap();
+        assert_eq!(p.lines.len(), 3, "separator and disabled entry kept: {:?}", p.lines);
+        assert!(matches!(&p.lines[2], Line::Mod { id, on: false } if id == "B"));
     }
 
     #[test]

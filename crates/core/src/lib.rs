@@ -32,7 +32,12 @@ pub fn write_atomic(path: &std::path::Path, bytes: impl AsRef<[u8]>) -> std::io:
     let mut tmp = path.as_os_str().to_owned();
     tmp.push(".pzmm-tmp");
     let tmp = std::path::PathBuf::from(tmp);
-    std::fs::write(&tmp, bytes)?;
+    {
+        use std::io::Write;
+        let mut f = std::fs::File::create(&tmp)?;
+        f.write_all(bytes.as_ref())?;
+        f.sync_all()?;
+    }
     std::fs::rename(&tmp, path).inspect_err(|_| {
         let _ = std::fs::remove_file(&tmp);
     })

@@ -108,7 +108,7 @@ pub fn install(launcher: &Path, libs: &Path, dry_run: bool) -> Result<Vec<String
         }
         if dry_run {
             changes.push(format!("copy {f} to {}", launcher.display()));
-        } else if fs::write(&dst, &new).is_ok() {
+        } else if crate::write_atomic(&dst, &new).is_ok() {
             changes.push(format!("copied {f} to {}", launcher.display()));
         } else if *f == "ZombieBuddy.jar" {
             // the game has it open: zbNative swaps in ZombieBuddy.jar.new on next launch

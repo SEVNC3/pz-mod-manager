@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 
 use super::Paths;
 
@@ -24,7 +24,8 @@ pub fn list(paths: &Paths) -> Vec<String> {
 }
 
 pub fn path(paths: &Paths, name: &str) -> Result<PathBuf> {
-    if name.is_empty() || name.contains(['/', '\\', ':', '*', '?', '"', '<', '>', '|']) || name.starts_with('.') {
+    // beyond file-name rules, nothing a shell would treat specially (the name reaches the launcher's command line)
+    if !crate::safe_file_name(name) || name.starts_with('.') || name.contains(['&', '^', '%', '!', '(', ')', ';', ',', '=', '`', '$']) {
         bail!("invalid server name: {name:?}");
     }
     Ok(dir(paths).join(format!("{name}.ini")))
@@ -54,7 +55,12 @@ pub fn read(path: &Path) -> Result<ServerMods> {
 /// Set `Mods=`, `WorkshopItems=` and, when any mod adds maps, `Map=` (mod maps first,
 /// then the base map). Every other line is kept. The file as it was before PZMM's first write is kept as `.ini.bak`.
 pub fn write(path: &Path, mods: &[String], workshop: &[String], maps: &[String], b41: bool) -> Result<()> {
-    let old = fs::read_to_string(path).unwrap_or_default();
+    // only a missing file starts empty: rewriting one we couldn't read would wipe every other setting
+    let old = match fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(e).with_context(|| format!("reading {} (nothing was changed)", path.display())),
+    };
     crate::backup_once(path)?;
     let prefix = if b41 { "" } else { "\\" };
     let mut set = vec![
@@ -131,8 +137,15 @@ pub fn start(paths: &Paths, name: &str) -> Result<PathBuf> {
     let dir = script.parent().unwrap_or(Path::new("."));
     let mut cmd;
     if cfg!(windows) {
-        cmd = std::process::Command::new("cmd");
-        cmd.args(["/C", "start", "Project Zomboid server", "/D"]).arg(dir).arg(&script).args(["-servername", name]);
+        // run the .bat itself in a new console (no cmd.exe /C string to inject into; Rust quotes .bat arguments)
+        cmd = std::process::Command::new(&script);
+        cmd.args(["-servername", name]).current_dir(dir);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
+            cmd.creation_flags(CREATE_NEW_CONSOLE);
+        }
     } else {
         let logs = paths.data.join("logs");
         fs::create_dir_all(&logs)?;
@@ -163,5 +176,25 @@ mod tests {
         write(&p, &ids(&["A"]), &[], &[], true).unwrap();
         let text = fs::read_to_string(&p).unwrap();
         assert!(text.contains("Mods=A\n") && text.contains("Map=Riverside Plus;Muldraugh, KY"), "no maps: Map= untouched");
+    }
+
+    #[test]
+    fn unreadable_ini_is_left_alone() {
+        let t = tempfile::tempdir().unwrap();
+        let p = t.path().join("servertest.ini");
+        let ansi = b"PVP=true\nPublicDescription=Caf\xe9\nMods=Old\n"; // saved as ANSI: not UTF-8
+        fs::write(&p, ansi).unwrap();
+        assert!(write(&p, &["A".into()], &[], &[], false).is_err());
+        assert_eq!(fs::read(&p).unwrap(), ansi, "settings kept");
+    }
+
+    #[test]
+    fn server_names_carry_no_shell_syntax() {
+        let paths = crate::pz::Paths { zomboid: "Z".into(), data: "D".into() };
+        assert!(path(&paths, "servertest").is_ok());
+        assert!(path(&paths, "My Server").is_ok());
+        for bad in ["R&D", "x&calc", "a^b", "%PATH%", "x(1)", "..", "a/b", ""] {
+            assert!(path(&paths, bad).is_err(), "{bad}");
+        }
     }
 }
