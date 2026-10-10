@@ -10,6 +10,7 @@
   import ZombieBuddy from "$lib/ZombieBuddy.svelte";
   import ServersSaves from "$lib/ServersSaves.svelte";
   import LayerIcon from "$lib/LayerIcon.svelte";
+  import Links from "$lib/Links.svelte";
   import type { Overlap } from "$lib/api";
 
   let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
@@ -432,12 +433,15 @@
     </div>
   {/if}
 
+  <div class="tabbar">
   <div class="tabs" role="tablist" aria-label="Sections">
     {#each [["mods", "My mods"], ["workshop", "Browse Workshop"], ["servers", "Servers & saves"], ["zb", "ZombieBuddy"]] as [id, label]}
       <button role="tab" aria-selected={tab === id} class:active={tab === id} onclick={() => (tab = id as typeof tab)}>
         {label}{#if id === "zb" && zbNeeded}<span class="alert" aria-label="needs setup"></span>{/if}
       </button>
     {/each}
+  </div>
+  <Links />
   </div>
 
   {#if tab === "workshop"}
@@ -607,12 +611,16 @@
     grid-template-rows: auto auto 1fr;
   }
 
-  .tabs {
+  .tabbar {
     display: flex;
-    gap: 2px;
+    align-items: center;
     padding: 0 12px;
     border-bottom: 1px solid var(--line);
     background: var(--panel);
+  }
+  .tabs {
+    display: flex;
+    gap: 2px;
   }
   .tabs button {
     border: 0;
