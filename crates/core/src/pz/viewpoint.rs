@@ -31,13 +31,14 @@ pub const PLAIN_PROFILE: &str = "Project Zomboid";
 pub fn with_viewpoint(base: &Profile, name: &str) -> Profile {
     let mut lines: Vec<Line> = MODS.iter().map(|id| Line::Mod { id: id.to_string(), on: true }).collect();
     lines.extend(base.lines.iter().filter(|l| !matches!(l, Line::Mod { id, .. } if MODS.contains(&id.as_str()))).cloned());
-    Profile { name: name.into(), lines }
+    let order = MODS.iter().map(|id| id.to_string()).chain(base.enabled()).collect();
+    Profile { name: name.into(), lines, order }
 }
 
 /// `base` without Viewpoint (ZombieBuddy stays: other Java mods may need it).
 pub fn without_viewpoint(base: &Profile, name: &str) -> Profile {
     let lines = base.lines.iter().filter(|l| !matches!(l, Line::Mod { id, .. } if id == MOD_ID)).cloned().collect();
-    Profile { name: name.into(), lines }
+    Profile { name: name.into(), lines, order: base.enabled() }
 }
 
 /// `base`, or `base 2`, `base 3`... whichever profile name is free.
@@ -148,7 +149,9 @@ mod tests {
         let base = Profile::parse("Default", "# --- Maps\n+A\n-Viewpoint\n+ZombieBuddy\n");
         let vp = with_viewpoint(&base, "Viewpoint");
         assert_eq!(vp.to_text(), "+ZombieBuddy\n+Viewpoint\n# --- Maps\n+A\n");
-        assert_eq!(without_viewpoint(&vp, "Plain").to_text(), "+ZombieBuddy\n# --- Maps\n+A\n");
+        assert_eq!(vp.enabled(), ["ZombieBuddy", "Viewpoint", "A"]);
+        let plain = without_viewpoint(&vp, "Plain");
+        assert_eq!((plain.to_text().as_str(), plain.enabled()), ("+ZombieBuddy\n# --- Maps\n+A\n", vec!["ZombieBuddy".to_string(), "A".into()]));
     }
 
     #[test]

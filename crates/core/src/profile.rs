@@ -1,10 +1,12 @@
-//! Profiles: named mod setups stored as `<data>/profiles/<name>/modlist.txt`.
+//! Profiles: named mod setups stored in `<data>/profiles/<name>/`. `modlist.txt` is the
+//! library, organised by the player (its order doesn't change what loads):
 //!
 //! ```text
 //! # --- Maps
-//! +Muldraugh_Expanded      enabled; line order is load order
+//! +Muldraugh_Expanded      enabled
 //! -SomeMod                 known but disabled
 //! ```
+//! `loadorder.txt` is the load order: one enabled mod id per line, as written to the game.
 //! The active profile is applied to the game's mod list; changes made in-game are
 //! adopted back on the next sync, so the two never drift.
 
@@ -12,7 +14,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::pz::{self, Paths};
@@ -27,6 +29,9 @@ pub enum Line {
 pub struct Profile {
     pub name: String,
     pub lines: Vec<Line>,
+    /// The load order (`loadorder.txt`). Only a preference: [`Profile::enabled`] drops ids
+    /// that aren't enabled and adds enabled ones it lacks at the end.
+    pub order: Vec<String>,
 }
 
 impl Profile {
@@ -50,14 +55,14 @@ impl Profile {
                 Line::Separator(_) => true,
             })
             .collect();
-        Profile { name: name.into(), lines }
+        Profile { name: name.into(), lines, order: vec![] }
     }
 
     /// A profile enabling `ids` in order (duplicates and empty ids dropped).
     pub fn from_ids(name: &str, ids: impl IntoIterator<Item = String>) -> Profile {
         let mut seen = HashSet::new();
         let lines = ids.into_iter().filter(|id| !id.is_empty() && seen.insert(id.clone())).map(|id| Line::Mod { id, on: true }).collect();
-        Profile { name: name.into(), lines }
+        Profile { name: name.into(), lines, order: vec![] }
     }
 
     pub fn to_text(&self) -> String {
@@ -70,11 +75,14 @@ impl Profile {
             .collect()
     }
 
+    /// The enabled mods in load order: `order`, then enabled mods it doesn't list in library order.
     pub fn enabled(&self) -> Vec<String> {
-        self.lines.iter().filter_map(|l| if let Line::Mod { id, on: true } = l { Some(id.clone()) } else { None }).collect()
+        let on: Vec<&String> = self.lines.iter().filter_map(|l| if let Line::Mod { id, on: true } = l { Some(id) } else { None }).collect();
+        let (set, mut seen): (HashSet<&String>, _) = (on.iter().copied().collect(), HashSet::new());
+        self.order.iter().filter(|id| set.contains(id)).chain(on.iter().copied()).filter(|id| seen.insert(*id)).cloned().collect()
     }
 
-    /// Enable or disable; unknown ids are appended (so newly enabled mods load last).
+    /// Enable or disable; unknown ids join the library at the end. Newly enabled mods load last.
     pub fn set(&mut self, id: &str, on: bool) {
         match self.lines.iter_mut().find(|l| matches!(l, Line::Mod { id: i, .. } if i == id)) {
             Some(Line::Mod { on: o, .. }) => *o = on,
@@ -87,27 +95,29 @@ impl Profile {
     }
 
     /// Take on the game's current enabled list (it changes when players use the in-game
-    /// mod menu). Separators and disabled entries keep their places; enabled slots are
-    /// refilled in the game's order. Returns whether anything changed.
+    /// mod menu): its order becomes the load order. The library keeps its order; mods it
+    /// doesn't know yet go at the bottom, after a break if it ends in a named section.
+    /// Returns whether anything changed.
     pub fn adopt(&mut self, game: &[String]) -> bool {
         let mut seen = HashSet::new();
-        let game: Vec<&String> = game.iter().filter(|i| !i.is_empty() && seen.insert(*i)).collect();
-        if self.enabled().iter().eq(game.iter().copied()) {
+        let game: Vec<String> = game.iter().filter(|i| !i.is_empty() && seen.insert(*i)).cloned().collect();
+        if self.enabled() == game {
             return false;
         }
-        let known: HashSet<String> = self.lines.iter().filter_map(|l| if let Line::Mod { id, .. } = l { Some(id.clone()) } else { None }).collect();
-        let mut order = game.iter().filter(|i| known.contains(**i));
+        let mut known = HashSet::new();
         for line in &mut self.lines {
             if let Line::Mod { id, on } = line {
-                *on = game.contains(&&*id);
-                if *on {
-                    *id = order.next().map(|s| s.to_string()).unwrap_or_default();
-                }
+                *on = game.contains(id);
+                known.insert(id.clone());
             }
         }
-        for id in game.iter().filter(|i| !known.contains(**i)) {
-            self.lines.push(Line::Mod { id: id.to_string(), on: true });
+        let new: Vec<&String> = game.iter().filter(|i| !known.contains(*i)).collect();
+        let in_section = self.lines.iter().rev().find_map(|l| if let Line::Separator(s) = l { Some(!s.is_empty()) } else { None });
+        if in_section == Some(true) && !new.is_empty() {
+            self.lines.push(Line::Separator(String::new()));
         }
+        self.lines.extend(new.into_iter().map(|id| Line::Mod { id: id.clone(), on: true }));
+        self.order = game;
         true
     }
 }
@@ -206,7 +216,15 @@ pub fn load(paths: &Paths, name: &str) -> Result<Profile> {
         bail!("no profile named {name:?}");
     }
     // lossy: a separator saved as ANSI by Notepad still loads (one odd character) rather than failing
-    Ok(Profile::parse(name, &String::from_utf8_lossy(&fs::read(p)?)))
+    let mut profile = Profile::parse(name, &String::from_utf8_lossy(&fs::read(p)?));
+    // no load order yet (made before 1.1): the library's order was the load order, so nothing moves
+    profile.order = match fs::read(dir(paths).join(name).join("loadorder.txt")) {
+        Ok(b) => String::from_utf8_lossy(&b).lines().map(str::trim).filter(|l| !l.is_empty()).map(String::from).collect(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => profile.enabled(),
+        // unreadable is not missing: guessing would overwrite the player's order on the next save
+        Err(e) => return Err(e).with_context(|| format!("couldn't read the load order of {name:?}")),
+    };
+    Ok(profile)
 }
 
 pub fn save(paths: &Paths, profile: &Profile) -> Result<()> {
@@ -214,6 +232,7 @@ pub fn save(paths: &Paths, profile: &Profile) -> Result<()> {
     let d = dir(paths).join(&profile.name);
     fs::create_dir_all(&d)?;
     crate::write_atomic(&d.join("modlist.txt"), profile.to_text())?;
+    crate::write_atomic(&d.join("loadorder.txt"), profile.enabled().iter().map(|id| format!("{id}\n")).collect::<String>())?;
     Ok(())
 }
 
@@ -269,7 +288,7 @@ pub fn set_b41(paths: &Paths, b41: Option<bool>) -> Result<()> {
 /// hold the data lock and so must not write).
 pub fn peek(paths: &Paths) -> Profile {
     let name = active_name(paths);
-    load(paths, &name).unwrap_or(Profile { name, lines: vec![] })
+    load(paths, &name).unwrap_or(Profile { name, ..Default::default() })
 }
 
 /// Load the active profile (creating "Default" from the game's list on first run) and
@@ -277,7 +296,7 @@ pub fn peek(paths: &Paths) -> Profile {
 pub fn sync(paths: &Paths) -> Result<(Profile, bool)> {
     let name = active_name(paths);
     // a profile that exists but can't be read is an error: starting empty would replace it with the game's list
-    let mut p = if dir(paths).join(&name).join("modlist.txt").exists() { load(paths, &name)? } else { Profile { name, lines: vec![] } };
+    let mut p = if dir(paths).join(&name).join("modlist.txt").exists() { load(paths, &name)? } else { Profile { name, ..Default::default() } };
     // a missing or unreadable default.txt (game running, odd encoding) says nothing about
     // what's enabled: adopting it would switch the whole profile off
     let changed = pz::try_read_default(&paths.default_txt()).is_some_and(|game| p.adopt(&game.mods));
@@ -306,6 +325,9 @@ pub struct Shared {
     pub kind: String,
     /// The profile in modlist.txt form (`+Id`, `-Id`, `# --- Separator`).
     pub list: String,
+    /// The load order (codes made before 1.1 lack it: then `list`'s order is used).
+    #[serde(default)]
+    pub order: Vec<String>,
     /// Mod id -> Workshop item id, for mods that come from the Workshop.
     #[serde(default)]
     pub workshop: std::collections::BTreeMap<String, String>,
@@ -324,7 +346,7 @@ pub fn export(paths: &Paths, mods: &std::collections::BTreeMap<String, crate::st
             Some((id.clone(), item.to_string()))
         })
         .collect();
-    Ok(Shared { kind: kind_of(paths, &p.name), list: p.to_text(), name: p.name, workshop })
+    Ok(Shared { kind: kind_of(paths, &p.name), list: p.to_text(), order: p.enabled(), name: p.name, workshop })
 }
 
 /// Workshop items a shared profile needs that aren't installed (`mods`: the current scan).
@@ -345,7 +367,7 @@ pub fn import_needs(shared: &Shared, mods: &std::collections::BTreeMap<String, c
 pub fn import(paths: &Paths, shared: &Shared) -> Result<Profile> {
     let base = if crate::safe_file_name(shared.name.trim()) { shared.name.trim().to_string() } else { "Shared".to_string() };
     let name = if exists(paths, &base) { (2..).map(|i| format!("{base} {i}")).find(|n| !exists(paths, n)).unwrap() } else { base };
-    let p = Profile::parse(&name, &shared.list);
+    let p = Profile { order: shared.order.clone(), ..Profile::parse(&name, &shared.list) };
     if !shared.kind.is_empty() && crate::safe_file_name(&shared.kind) {
         set_kind(paths, &name, &shared.kind)?;
     }
@@ -360,12 +382,13 @@ mod tests {
     #[test]
     fn share_round_trip() {
         let (_t, paths) = temp_paths();
-        apply(&paths, &Profile::parse("Friends", "# --- Core\n+A\n-B\n")).unwrap();
+        let friends = Profile { order: ids(&["C", "A"]), ..Profile::parse("Friends", "# --- Core\n+A\n-B\n+C\n") };
+        apply(&paths, &friends).unwrap();
         let shared = export(&paths, &Default::default()).unwrap();
-        assert_eq!(shared.list, "# --- Core\n+A\n-B\n");
+        assert_eq!((shared.list.as_str(), &shared.order), ("# --- Core\n+A\n-B\n+C\n", &ids(&["C", "A"])));
         let back: Shared = serde_json::from_str(&serde_json::to_string(&shared).unwrap()).unwrap();
         let p = import(&paths, &back).unwrap();
-        assert_eq!((p.name.as_str(), p.to_text().as_str()), ("Friends 2", "# --- Core\n+A\n-B\n"));
+        assert_eq!((p.name.as_str(), p.to_text().as_str(), p.enabled()), ("Friends 2", "# --- Core\n+A\n-B\n+C\n", ids(&["C", "A"])));
         let needs = import_needs(
             &Shared { workshop: [("X".into(), "123".into()), ("Y".into(), "+bad".into())].into(), ..back },
             &Default::default(),
@@ -406,14 +429,50 @@ mod tests {
     }
 
     #[test]
-    fn adopt_keeps_separators_and_disabled() {
+    fn adopt_takes_the_game_order_and_keeps_the_library() {
         let mut p = Profile::parse("x", "# --- Maps\n+A\n-B\n+C\n");
         assert!(!p.adopt(&ids(&["A", "C"])));
         // in-game: C moved before A, B enabled, D added, duplicates ignored
         assert!(p.adopt(&ids(&["C", "A", "B", "D", "A"])));
-        assert_eq!(p.to_text(), "# --- Maps\n+C\n+A\n+B\n+D\n");
+        assert_eq!(p.enabled(), ids(&["C", "A", "B", "D"]));
+        assert_eq!(p.to_text(), "# --- Maps\n+A\n+B\n+C\n# --- \n+D\n", "library order kept; D after a break");
         assert!(p.adopt(&ids(&["B"])));
-        assert_eq!(p.to_text(), "# --- Maps\n-C\n-A\n+B\n-D\n");
+        assert_eq!(p.to_text(), "# --- Maps\n-A\n+B\n-C\n# --- \n-D\n");
+    }
+
+    #[test]
+    fn upgrade_without_a_load_order_keeps_the_library_order() {
+        let (_t, paths) = temp_paths();
+        let d = dir(&paths).join("Default");
+        fs::create_dir_all(&d).unwrap();
+        fs::write(d.join("modlist.txt"), "# --- Maps\n+B\n-C\n+A\n").unwrap();
+        let p = load(&paths, "Default").unwrap();
+        assert_eq!(p.enabled(), ids(&["B", "A"]));
+        save(&paths, &p).unwrap();
+        assert_eq!(fs::read_to_string(d.join("loadorder.txt")).unwrap(), "B\nA\n");
+    }
+
+    #[test]
+    fn enabling_appends_to_the_load_order_and_disabling_drops() {
+        let mut p = Profile { order: ids(&["A", "B"]), ..Profile::parse("x", "-C\n+B\n+A\n") };
+        p.set("C", true);
+        p.set("D", true);
+        assert_eq!(p.enabled(), ids(&["A", "B", "C", "D"]), "newly enabled mods load last, whatever their library place");
+        p.set("B", false);
+        p.forget("D");
+        assert_eq!(p.enabled(), ids(&["A", "C"]));
+    }
+
+    #[test]
+    fn sync_adopts_the_game_order() {
+        let (_t, paths) = temp_paths();
+        apply(&paths, &Profile::parse("Default", "# --- Mine\n+A\n+B\n-C\n")).unwrap();
+        pz::write_default(&paths.default_txt(), &ids(&["C", "B", "A"]), None).unwrap();
+        let (p, adopted) = sync(&paths).unwrap();
+        assert!(adopted);
+        assert_eq!(p.enabled(), ids(&["C", "B", "A"]));
+        assert_eq!(p.to_text(), "# --- Mine\n+A\n+B\n+C\n");
+        assert_eq!(load(&paths, "Default").unwrap().enabled(), ids(&["C", "B", "A"]), "saved");
     }
 
     #[test]
@@ -463,7 +522,7 @@ mod tests {
         apply(&paths, &p).unwrap();
         assert_eq!(pz::read_default(&paths.default_txt()).mods, ids(&["B", "C"]));
 
-        let solo = Profile { name: "Solo".into(), lines: vec![Line::Mod { id: "A".into(), on: true }] };
+        let solo = Profile { name: "Solo".into(), lines: vec![Line::Mod { id: "A".into(), on: true }], order: ids(&["A"]) };
         apply(&paths, &solo).unwrap();
         assert_eq!(sync(&paths).unwrap().0, solo);
         assert_eq!(list(&paths), ids(&["Default", "Solo"]));

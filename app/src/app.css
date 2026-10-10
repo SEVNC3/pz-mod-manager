@@ -321,6 +321,65 @@ input[type="checkbox"] {
   justify-content: center;
 }
 
+/* a draggable list (load order, server maps): rows like the library's (ModTable.svelte). Rows
+   take .selected, .dragging and .drop; a last li.tail is the drop zone for the end */
+.drag-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.drag-list > li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 8px;
+  cursor: grab;
+  border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+}
+/* hovered and selected rows look like a selected tab: blood red under white text */
+.drag-list > li:not(.tail):hover {
+  background: color-mix(in oklab, var(--accent) 24%, var(--panel));
+}
+.drag-list > li.selected {
+  background: color-mix(in oklab, var(--accent) 32%, var(--panel));
+}
+.drag-list > li:not(.tail):hover,
+.drag-list > li.selected {
+  color: var(--on-selected);
+}
+/* the hover/selection marker: a solid white chevron on the row's left edge */
+.drag-list > li:not(.tail):hover::before,
+.drag-list > li.selected::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: 50%;
+  width: 10px;
+  height: 14px;
+  margin-top: -7px;
+  z-index: 1;
+  background: var(--on-selected);
+  clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%);
+}
+.drag-list > li.dragging {
+  opacity: 0.4;
+}
+/* where a drag will land: blood red feathering down from the row's top edge */
+.drag-list > li.drop {
+  background-image: linear-gradient(to bottom, color-mix(in oklab, var(--accent) 85%, white) 0, color-mix(in oklab, var(--accent) 55%, transparent) 3px, transparent 20px);
+}
+.drag-list > li:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.drag-list > li.tail {
+  height: 28px;
+  border: 0;
+  cursor: default;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

@@ -2,12 +2,13 @@
   import { describeSource, type ModRow, type Overlap, type Row, type Stats } from "./api";
   import { fmtDate, fmtSize } from "./format";
   import Icon from "./Icon.svelte";
-  import LayerIcon from "./LayerIcon.svelte";
+  import LayerIcon, { overlapLabel } from "./LayerIcon.svelte";
   import { sectionDrop, type Problem } from "./order";
 
-  // The mod list: rows, separators as section cards, drag and drop. Edits go back through the callbacks.
+  // The library: rows, separators as section cards, drag and drop. Edits go back through the callbacks.
   let {
     rows,
+    order,
     visible,
     sectionOf,
     filtering,
@@ -31,6 +32,8 @@
     onRemoveSep,
   }: {
     rows: Row[];
+    /** The load order (enabled mod ids): the number column shows each mod's place in it. */
+    order: string[];
     /** The rows shown (search, filter, sort, collapsed sections) with their index in `rows`. */
     visible: { r: Row; i: number }[];
     /** For each row, the separator it sits under ("" above the first one). */
@@ -65,20 +68,8 @@
     github: "Installed from GitHub by PZMM",
     local: "Installed from a file by PZMM",
   };
-  const overlapLabel = (o: Overlap) =>
-    [
-      o.wins_over.length && `Overrides files from ${o.wins_over.join(", ")}`,
-      o.loses_to.length && `Some files are overridden by ${o.loses_to.join(", ")}`,
-    ]
-      .filter(Boolean)
-      .join(". ");
 
-  const order = $derived.by(() => {
-    const o = new Map<number, number>();
-    let n = 0;
-    rows.forEach((r, i) => r.kind === "mod" && r.on && o.set(i, ++n));
-    return o;
-  });
+  const place = $derived(new Map(order.map((id, i) => [id, i + 1])));
   /** Mods / enabled mods under each separator. */
   const sectionCounts = $derived.by(() => {
     const out = new Map<string, { total: number; on: number }>();
@@ -165,7 +156,7 @@
             <input type="checkbox" checked={r.on} disabled={busy} aria-label={`Enable ${r.name || r.id}`}
               onclick={(e) => e.stopPropagation()} onchange={() => onToggle(r.id)} />
           </td>
-          <td class="num mono">{order.get(i) ?? ""}</td>
+          <td class="num mono">{place.get(r.id) ?? ""}</td>
           <td class="name">
             <span class="title" title={r.name || r.id}>{r.name || r.id}</span>
             {#if r.name && r.name !== r.id}<span class="id mono">{r.id}</span>{/if}

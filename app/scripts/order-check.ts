@@ -1,7 +1,7 @@
 // Self-check for src/lib/order.ts. Run: node scripts/order-check.ts
 import assert from "node:assert/strict";
-import { autosort, bisectRound, findProblems, groupByCategory, moveSection, placeInSections, sortLoadOrder } from "../src/lib/order.ts";
-import type { Row } from "../src/lib/api.ts";
+import { autosort, bisectRound, findProblems, groupByCategory, loadList, moveSection, orderOf, placeInOrder, placeInSections, sortLoadOrder, sortMaps, syncOrder } from "../src/lib/order.ts";
+import type { ModRow, Row } from "../src/lib/api.ts";
 
 const mod = (id: string, on = true, extra: Partial<Record<"requires" | "incompatible" | "load_after" | "load_before", string[]>> = {}): Row => ({
   kind: "mod", id, name: id, source: "", on, missing: false,
@@ -44,22 +44,40 @@ const r1 = bisectRound(list, ["S1", "S2", "S3", "Lib"], req);
 assert.deepEqual(r1.testing, ["S1", "S2"]);
 assert.deepEqual([...r1.on].sort(), ["Keep", "Lib", "S1", "S2"]);
 
-// categories: sections in order, own separators dropped, a later-section requirement moves up
+// the library and the load order: the order follows the library's on/off, never its positions
+const lib: Row[] = [{ kind: "sep", name: "S" }, mod("A"), mod("B", false), mod("C"), mod("D")];
+assert.deepEqual(syncOrder(lib, ["D", "B", "X", "C", "D"]), ["D", "C", "A"], "disabled and unknown ids dropped, missing ones appended");
+assert.equal(ids(loadList(lib, ["C", "A"])), "+C +A +D -B");
+assert.equal(findProblems(loadList([mod("App", true, { requires: ["Lib"] }), mod("Lib")], ["Lib", "App"])).size, 0, "rules follow the load order, not the library");
+
+// enabling places the id where Autosort would: after what it needs, before what needs it, by tier
+const known = [mod("New", true, { requires: ["Lib"] }), mod("User", true, { load_after: ["New"] })] as ModRow[];
+const look = (id: string) => known.find((m) => m.id === id);
+assert.deepEqual(placeInOrder(["A", "Lib", "B", "User", "C"], "New", look), ["A", "Lib", "B", "New", "User", "C"]);
+assert.deepEqual(placeInOrder(["A", "B"], "X", look), ["A", "B", "X"], "no rules: last");
+const tier = (id: string) => (id === "Fw" ? 0 : id === "Tr" ? 2 : 1);
+assert.deepEqual(placeInOrder(["Fw", "A", "Tr"], "B", look, tier), ["Fw", "A", "B", "Tr"], "before translations");
+assert.deepEqual(placeInOrder(["Fw", "A", "Tr"], "Fw2", look, (id) => (id.startsWith("Fw") ? 0 : tier(id))), ["Fw", "Fw2", "A", "Tr"], "with the frameworks");
+
+// categories: sections in order, own separators dropped; the library ignores load rules
 const order = ["Libs", "Gameplay", "Maps", "Other"];
 const of = { App: "Gameplay", Lib: "Maps", Town: "Maps", Off: "Gameplay" };
 const grouped = groupByCategory([{ kind: "sep", name: "Mine" }, mod("Town"), mod("Off", false), mod("App", true, { requires: ["Lib"] }), mod("Lib"), mod("Gone")], of, order);
-assert.equal(ids(grouped), "#Gameplay -Off +Lib +App #Maps +Town #Other +Gone");
-assert.equal(findProblems(grouped).size, 0);
+assert.equal(ids(grouped), "#Gameplay -Off +App #Maps +Town +Lib #Other +Gone");
 
 // a new mod goes to the end of its section, or a new section in its place
 const placed = placeInSections([{ kind: "sep", name: "Gameplay" }, mod("A"), { kind: "sep", name: "Other" }, mod("B"), mod("New"), mod("Map1")], { New: "Gameplay", Map1: "Maps" }, order, ["New", "Map1"]);
 assert.equal(ids(placed), "#Gameplay +A +New #Maps +Map1 #Other +B");
 
-// autosort: turns on a needed mod, honours loadModBefore across the list
-const auto = autosort([mod("Ui", true, { load_before: ["Core"] }), mod("Core"), mod("App", true, { requires: ["Dep"] }), mod("Dep", false)],
-  { Ui: "Gameplay", Core: "Libs", App: "Gameplay", Dep: "Gameplay" }, order);
-assert.equal(ids(auto), "#Libs +Ui +Core #Gameplay +Dep +App");
+// autosort (a load list): turns on a needed mod, frameworks first, translations last, loadModBefore honoured
+const auto = autosort([mod("Tr"), mod("Ui", true, { load_before: ["Core"] }), mod("Core"), mod("App", true, { requires: ["Dep"] }), mod("Dep", false), mod("Off", false)],
+  { Tr: "Translations", Ui: "Gameplay", Core: "Libs", App: "Gameplay", Dep: "Gameplay" }, order);
+assert.equal(ids(auto), "+Ui +Core +Dep +App +Tr -Off");
+assert.deepEqual(orderOf(auto), ["Ui", "Core", "Dep", "App", "Tr"]);
 assert.equal(findProblems(auto).size, 0);
+
+// the server's maps: mod maps before Muldraugh, otherwise as arranged
+assert.deepEqual(sortMaps(["B", "Muldraugh, KY", "A"]), ["B", "A", "Muldraugh, KY"]);
 
 // dragging a whole section: it moves with its mods and lands on section boundaries
 const secs: Row[] = [mod("Top"), { kind: "sep", name: "A" }, mod("a1"), mod("a2"), { kind: "sep", name: "B" }, mod("b1"), { kind: "sep", name: "C" }, mod("c1")];

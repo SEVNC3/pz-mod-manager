@@ -196,7 +196,7 @@
           </li>
         {/each}
       </ul>
-      <p class="note small">The mod lower in the load order wins. Drag to change which one's files are used.</p>
+      <p class="note small">The mod lower in the load order wins. Drag it in the load order (close this panel) to change which one's files are used.</p>
     {/if}
 
     {#if description}

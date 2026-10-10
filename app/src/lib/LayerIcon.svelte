@@ -1,3 +1,16 @@
+<script lang="ts" module>
+  import type { Overlap } from "./api";
+
+  /** What an overlap means, for the icon's label. */
+  export const overlapLabel = (o: Overlap) =>
+    [
+      o.wins_over.length && `Overrides files from ${o.wins_over.join(", ")}`,
+      o.loses_to.length && `Some files are overridden by ${o.loses_to.join(", ")}`,
+    ]
+      .filter(Boolean)
+      .join(". ");
+</script>
+
 <script lang="ts">
   /** Two stacked layers, like files stacked by load order: the top layer is filled when
       this mod's copies win, the bottom one when another mod's copies win. */

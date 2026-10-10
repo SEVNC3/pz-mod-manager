@@ -262,7 +262,7 @@ fn run(cli: Cli) -> Result<()> {
             if profile::exists(&paths, &name) {
                 bail!("profile {name:?} already exists");
             }
-            profile::save(&paths, &Profile { name: name.clone(), lines: p.lines })?;
+            profile::save(&paths, &Profile { name: name.clone(), ..p })?;
             println!("created {name:?} (switch with: pzmm profile use {name})");
         }
         Cmd::Profile(ProfileCmd::Use { name }) => {
@@ -293,17 +293,21 @@ fn run(cli: Cli) -> Result<()> {
     Ok(())
 }
 
+/// Enabled mods in load order, then the rest of the library.
 fn list(paths: &Paths, p: &Profile) -> Result<()> {
     let mut mods = store::scan(paths)?;
     println!("profile: {}", p.name);
+    for id in p.enabled() {
+        match mods.remove(&id) {
+            Some(m) => println!("[x] {:30} {:40} {}", m.id, m.name, m.source),
+            None => println!("[x] {id:30} {:40}", "(missing)"),
+        }
+    }
     for line in &p.lines {
-        match line {
-            profile::Line::Separator(s) => println!("    --- {s} ---"),
-            profile::Line::Mod { id, on } => match mods.remove(id) {
-                Some(m) => println!("[{}] {:30} {:40} {}", if *on { 'x' } else { ' ' }, m.id, m.name, m.source),
-                None if *on => println!("[x] {id:30} {:40}", "(missing)"),
-                None => {}
-            },
+        if let profile::Line::Mod { id, on: false } = line
+            && let Some(m) = mods.remove(id)
+        {
+            println!("[ ] {:30} {:40} {}", m.id, m.name, m.source);
         }
     }
     for m in mods.values() {
@@ -354,7 +358,7 @@ fn server(paths: &Paths, p: &Profile, action: &str, name: &str) -> Result<()> {
     let file = server::path(paths, name)?;
     match action {
         "export" => {
-            for note in server::export(paths, name, &p.enabled(), &store::scan(paths)?)? {
+            for note in server::export(paths, name, &p.enabled(), &store::scan(paths)?, None)? {
                 println!("{note}");
             }
         }

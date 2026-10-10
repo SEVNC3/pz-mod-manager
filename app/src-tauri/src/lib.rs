@@ -99,7 +99,10 @@ enum Row {
 struct View {
     profile: String,
     profiles: Vec<String>,
+    /// The library: what's installed, organised by the player.
     rows: Vec<Row>,
+    /// The load order: enabled mod ids, as written to the game.
+    order: Vec<String>,
     /// The game's mod list was changed in-game and the profile picked that up.
     adopted: bool,
     /// First run: this view created the first profile.
@@ -164,6 +167,7 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
     rows.extend(rest.into_iter().map(|m| row(m, false)));
     let mode = profile::kind_of(paths, &p.name);
     Ok(View {
+        order: p.enabled(),
         profile: p.name,
         profiles: profile::list(paths),
         rows,
@@ -186,9 +190,9 @@ fn load() -> Res<View> {
     locked(view)
 }
 
-/// Save the whole list (order, on/off, separators) to the active profile and the game.
+/// Save the library (order, on/off, separators) and the load order to the active profile and the game.
 #[tauri::command(async)]
-fn save(rows: Vec<Row>) -> Res<View> {
+fn save(rows: Vec<Row>, order: Vec<String>) -> Res<View> {
     locked(|paths| {
         let (mut p, adopted) = profile::sync(paths)?;
         if adopted {
@@ -202,6 +206,7 @@ fn save(rows: Vec<Row>) -> Res<View> {
                 Row::Sep { name } => Line::Separator(name),
             })
             .collect();
+        p.order = order;
         profile::apply(paths, &p)?;
         view(paths)
     })
@@ -284,7 +289,7 @@ fn profile_new(name: String) -> Res<View> {
         let current = active(paths)?;
         // a copy of a Viewpoint profile is a Viewpoint profile too
         profile::set_kind(paths, &name, &profile::kind_of(paths, &current.name))?;
-        profile::apply(paths, &Profile { name, lines: current.lines })?;
+        profile::apply(paths, &Profile { name, ..current })?;
         view(paths)
     })
 }
@@ -733,11 +738,20 @@ fn servers_and_saves() -> Res<ServersAndSaves> {
     })
 }
 
-/// Write the active profile into `Server/<name>.ini`. Returns notes for the user.
+/// The `Map=` list writing to `Server/<name>.ini` would set (empty when no enabled mod adds a map).
 #[tauri::command(async)]
-fn server_export(name: String) -> Res<Vec<String>> {
+fn server_maps(name: String) -> Res<Vec<String>> {
     reading(|paths| {
-        let notes = pz::server::export(paths, &name, &active(paths)?.enabled(), &scan(paths)?)?;
+        let current = pz::server::read(&pz::server::path(paths, &name)?).map(|c| c.maps).unwrap_or_default();
+        Ok(pz::server::map_order(&current, &pz::server::mod_maps(&active(paths)?.enabled(), &scan(paths)?)))
+    })
+}
+
+/// Write the active profile into `Server/<name>.ini`, its maps in `maps` order (empty: as the config has them). Returns notes for the user.
+#[tauri::command(async)]
+fn server_export(name: String, maps: Vec<String>) -> Res<Vec<String>> {
+    reading(|paths| {
+        let notes = pz::server::export(paths, &name, &active(paths)?.enabled(), &scan(paths)?, Some(maps.as_slice()).filter(|m| !m.is_empty()))?;
         notes.iter().for_each(|n| pzmm_core::log!("{n}"));
         Ok(notes)
     })
@@ -918,7 +932,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
             details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, workshop_comments, workshop_author, zb_status, zb_preview, zb_install, zb_uninstall,
-            find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_export, server_import, server_start, save_use,
+            find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_export, server_import, server_start, save_use,
             mode_preview, mode_switch, doctor, console_errors, profile_export, profile_import
         ])
         .run(tauri::generate_context!())

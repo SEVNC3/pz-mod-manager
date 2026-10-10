@@ -26,7 +26,10 @@ export type View = {
   mode: Mode;
   /** Profile name -> kind. */
   kinds: Record<string, Mode>;
+  /** The library: what's installed, organised by the player (its order doesn't change what loads). */
   rows: Row[];
+  /** The load order: enabled mod ids, as written to the game. */
+  order: string[];
   adopted: boolean;
   /** First run: this load created the first profile. */
   created: boolean;
@@ -113,7 +116,7 @@ export type ZbStatus = {
 };
 export const zbReady = (s: ZbStatus | null) => !!s && s.have_mod && s.files_current && s.launcher_patched && s.enabled;
 
-export type Shared = { name: string; kind: string; list: string; workshop: Record<string, string> };
+export type Shared = { name: string; kind: string; list: string; order: string[]; workshop: Record<string, string> };
 
 /** A share code: "PZMM1:" + base64 of the JSON, so it pastes cleanly into chat. */
 export function encodeShare(s: Shared): string {
@@ -129,7 +132,7 @@ export function decodeShare(text: string): Shared {
   const json = t.startsWith("PZMM1:") ? new TextDecoder().decode(Uint8Array.from(atob(t.slice(6)), (c) => c.charCodeAt(0))) : t;
   const s = JSON.parse(json);
   if (typeof s?.name !== "string" || typeof s?.list !== "string") throw new Error("That isn't a PZMM profile code.");
-  return { name: s.name, kind: s.kind ?? "", list: s.list, workshop: s.workshop ?? {} };
+  return { name: s.name, kind: s.kind ?? "", list: s.list, order: Array.isArray(s.order) ? s.order : [], workshop: s.workshop ?? {} };
 }
 
 export type ModErrors = { name: string; count: number; example: string; id: string | null };
@@ -143,7 +146,8 @@ export type ServersAndSaves = { servers: string[]; server_dir: string; saves: Sa
 export const api = {
   load: () => invoke<View>("load"),
   // the backend only stores order, on/off and separators
-  save: (rows: Row[]) => invoke<View>("save", { rows: rows.map((r) => (r.kind === "mod" ? { kind: r.kind, id: r.id, on: r.on } : { kind: r.kind, name: r.name })) }),
+  save: (rows: Row[], order: string[]) =>
+    invoke<View>("save", { rows: rows.map((r) => (r.kind === "mod" ? { kind: r.kind, id: r.id, on: r.on } : { kind: r.kind, name: r.name })), order }),
   install: (sources: string[]) => invoke<View>("install", { sources }),
   updateAll: () => invoke<View>("update_all"),
   remove: (ids: string[]) => invoke<View>("remove", { ids }),
@@ -173,7 +177,8 @@ export const api = {
   conflictSummary: () => invoke<Record<string, Overlap>>("conflict_summary"),
   conflicts: (id: string) => invoke<Conflict[]>("conflicts", { id }),
   serversAndSaves: () => invoke<ServersAndSaves>("servers_and_saves"),
-  serverExport: (name: string) => invoke<string[]>("server_export", { name }),
+  serverMaps: (name: string) => invoke<string[]>("server_maps", { name }),
+  serverExport: (name: string, maps: string[]) => invoke<string[]>("server_export", { name, maps }),
   serverStart: (name: string) => invoke<string>("server_start", { name }),
   serverImport: (name: string) => invoke<View>("server_import", { name }),
   saveUse: (mode: string, name: string) => invoke<View>("save_use", { mode, name }),

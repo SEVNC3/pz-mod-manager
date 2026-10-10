@@ -16,7 +16,7 @@
   import Findings from "$lib/Findings.svelte";
   import SettingsPanel from "$lib/SettingsPanel.svelte";
   import ModTable from "$lib/ModTable.svelte";
-  import { autosort, bisectRound, findProblems, moveSection, placeInSections, sortLoadOrder } from "$lib/order";
+  import { autosort, bisectRound, findProblems, groupByCategory, loadList, moveSection, orderOf, placeInOrder, placeInSections, sortLoadOrder, syncOrder, tiers } from "$lib/order";
   import LoadOrder from "$lib/LoadOrder.svelte";
   import WindowControls from "$lib/WindowControls.svelte";
   import ProfilePicker from "$lib/ProfilePicker.svelte";
@@ -72,7 +72,12 @@
   const refreshZb = () => api.zbStatus().then((s) => (zb = s)).catch(() => {});
 
   let view = $state<View | null>(null);
+  /** The library (left list): its order and sections are the player's organisation only. */
   let rows = $state<Row[]>([]);
+  /** The load order: enabled mod ids, as the game loads them (the side panel's list). */
+  let order = $state<string[]>([]);
+  /** Workshop categories, once fetched: Enable uses them to place mods like Autosort would. */
+  let cats = $state<Categories | null>(null);
 
   // --- Project Zomboid / Project Viewpoint ---
   let modePlan = $state<{ target: Mode; profile?: string; lines: string[]; error: string } | null>(null);
@@ -121,7 +126,9 @@
   // --- derived ---
   const mods = $derived(new Map(rows.filter((r): r is ModRow => r.kind === "mod").map((r) => [r.id, r])));
   const enabledCount = $derived([...mods.values()].filter((m) => m.on).length);
-  const problems = $derived(findProblems(rows));
+  /** Every mod, enabled ones first in load order: load rules are checked and sorted on this. */
+  const list = $derived(loadList(rows, order));
+  const problems = $derived(findProblems(list));
   const fixable = $derived([...problems.values()].filter((p) => p.fixable).length);
   const missingReqs = $derived.by(() => {
     const out = new Set<string>();
@@ -193,6 +200,7 @@
       if (busy) return;
       view = v;
       rows = v.rows;
+      order = v.order;
       if (v.adopted) {
         undoStack = redoStack = [];
         say(`Picked up changes made in the game's mod menu (profile "${v.profile}").`);
@@ -222,11 +230,12 @@
       const v = await job();
       view = v;
       rows = v.rows;
+      order = v.order;
       if (v.adopted) say(`Picked up changes made in the game's mod menu (profile "${v.profile}").`);
       if (selected && !v.rows.some((r) => r.kind === "mod" && r.id === selected)) selected = null;
       // a profile seen for the first time (first run, New, Import, Viewpoint) without separators gets autosorted
       const fresh = v.created || (knownProfiles && !knownProfiles.includes(v.profile));
-      if (fresh && v.rows.length && !v.rows.some((r) => r.kind === "sep")) await autosortList(false);
+      if (fresh && v.rows.length && !v.rows.some((r) => r.kind === "sep")) await groupLibrary(false);
       else if (!keepHistory && before.size) await placeNew(before);
       return true;
     } catch (e) {
@@ -235,6 +244,7 @@
       try {
         view = await api.load();
         rows = view.rows;
+        order = view.order;
       } catch {}
       return false;
     } finally {
@@ -246,40 +256,58 @@
     }
   }
 
-  /** Autosort: needed mods on, grouped by category, every load rule satisfied. `record` keeps it undoable. */
-  async function autosortList(record = true) {
-    let c: Categories;
+  /** The Workshop categories (kept for placing enabled mods), behind the busy label. */
+  async function categories(): Promise<Categories> {
     pending++;
     busyLabel = "Reading Workshop tags";
     try {
-      c = await api.categories();
-    } catch (e) {
-      // no tags (offline, rate-limited): still fix the load rules, keep the sections as they are
-      if (await commit(sortLoadOrder(rows), record)) say(`Couldn't read Workshop tags, so only the load rules were fixed (${e}).`, true);
-      return;
+      return (cats = await api.categories());
     } finally {
       pending--;
     }
-    const own = separators.filter((s) => !c.order.includes(s));
-    if (record && own.length && !confirm(`Autosort replaces your own sections (${own.slice(0, 4).join(", ")}${own.length > 4 ? ", …" : ""}) with category sections. Ctrl+Z undoes it. Autosort now?`)) return;
-    const next = autosort(rows, c.of, c.order);
-    const sections = next.filter((r) => r.kind === "sep").length;
-    if (await commit(next, record)) say(`Autosorted into ${sections} categories.${record ? " Ctrl+Z puts the old order back." : ""}`);
   }
 
-  /** In a list sorted into categories, file newly installed mods under theirs. */
+  /** Autosort the load order: needed mods on, frameworks first, translations last, every load rule satisfied. */
+  async function autosortList() {
+    let c: Categories;
+    try {
+      c = await categories();
+    } catch (e) {
+      // no tags (offline, rate-limited): still fix the load rules
+      if (await commitList(sortLoadOrder(list))) say(`Couldn't read Workshop tags, so only the load rules were fixed (${e}).`, true);
+      return;
+    }
+    if (await commitList(autosort(list, c.of, c.order))) say("Autosorted the load order. Ctrl+Z puts the old order back.");
+  }
+
+  /** Group the library into one section per category. `record` keeps it undoable (and asks before replacing your own sections). */
+  async function groupLibrary(record = true) {
+    let c: Categories;
+    try {
+      c = await categories();
+    } catch (e) {
+      return say(`Couldn't read Workshop tags (${e}).`, true);
+    }
+    const own = separators.filter((s) => !c.order.includes(s));
+    if (record && own.length && !confirm(`Group by category replaces your own sections (${own.slice(0, 4).join(", ")}${own.length > 4 ? ", …" : ""}) with category sections. Ctrl+Z undoes it. Group now?`)) return;
+    const next = groupByCategory(rows, c.of, c.order);
+    const sections = next.filter((r) => r.kind === "sep").length;
+    if (await commit(next, order, record)) say(`Grouped your mods into ${sections} categories.${record ? " Ctrl+Z puts your sections back." : ""}`);
+  }
+
+  /** In a library sorted into categories, file newly installed mods under theirs. */
   async function placeNew(before: Set<string>) {
     const fresh = rows.flatMap((r) => (r.kind === "mod" && !before.has(r.id) ? [r.id] : []));
     if (!fresh.length || !rows.some((r) => r.kind === "sep")) return;
     try {
-      const c = await api.categories();
-      if (rows.some((r) => r.kind === "sep" && c.order.includes(r.name))) await commit(placeInSections(rows, c.of, c.order, fresh), false);
+      const c = (cats = await api.categories());
+      if (rows.some((r) => r.kind === "sep" && c.order.includes(r.name))) await commit(placeInSections(rows, c.of, c.order, fresh), order, false);
     } catch {}
   }
 
-  /** Enable disabled requirements and reorder so requirements and load hints hold. */
+  /** Enable disabled requirements and reorder the load order so requirements and load hints hold. */
   function fixLoadOrder() {
-    commit(sortLoadOrder(rows));
+    commitList(sortLoadOrder(list));
   }
 
   async function checkUpdates() {
@@ -328,9 +356,12 @@
     if (fixable) fixLoadOrder();
   }
 
-  /** Every install: run it with the log open, then settle the order of what came in. */
+  /** Every install: run it with the log open, place what it enabled (the backend appends it) like Autosort would, then settle the order. */
   async function installAndSettle(label: string, job: () => Promise<View>) {
+    const before = new Set(order);
     const ok = await run(label, job, { showLog: true });
+    const added = order.filter((id) => !before.has(id));
+    if (ok && added.length) await commit(rows, placeAll(added), false);
     if (ok) await settleOrder();
     return ok;
   }
@@ -398,13 +429,14 @@
   }
 
   // --- find a broken mod by halving the suspects each game run ---
-  let bisect = $state<{ original: Row[]; suspects: string[]; testing: string[]; round: number } | null>(null);
+  let bisect = $state<{ original: Lists; suspects: string[]; testing: string[]; round: number } | null>(null);
 
   /** Enabled = everything not under suspicion + the half being tested + what those require. */
   function bisectApply(b: NonNullable<typeof bisect>) {
-    const { on, testing } = bisectRound(b.original, b.suspects, (id) => mods.get(id)?.requires ?? []);
+    const { on, testing } = bisectRound(b.original.rows, b.suspects, (id) => mods.get(id)?.requires ?? []);
     bisect = { ...b, testing };
-    commit(b.original.map((r) => (r.kind === "mod" ? { ...r, on: on.has(r.id) } : r)), false);
+    const o = placeAll([...on].filter((id) => !b.original.order.includes(id)), b.original.order); // a requirement that was off
+    commit(b.original.rows.map((r) => (r.kind === "mod" ? { ...r, on: on.has(r.id) } : r)), o, false);
   }
 
   function bisectStart() {
@@ -412,7 +444,7 @@
     if (suspects.length < 2) return say("Enable at least two mods to search for a broken one.", true);
     findings = null;
     undoStack = redoStack = []; // undoing into a half-disabled test list would be a trap
-    bisectApply({ original: $state.snapshot(rows), suspects, testing: [], round: 1 });
+    bisectApply({ original: $state.snapshot({ rows, order }), suspects, testing: [], round: 1 });
   }
 
   function bisectAnswer(stillBroken: boolean) {
@@ -422,7 +454,7 @@
       const original = bisect.original;
       bisect = null;
       undoStack = redoStack = [];
-      commit(original, false);
+      commit(original.rows, original.order, false);
       say(suspects.length ? `Found it: ${suspects[0]} causes the problem. Your mod list is restored.` : "The problem didn't follow any single mod. Your mod list is restored.", !!suspects.length);
       logOpen = true;
       if (suspects.length) selected = suspects[0];
@@ -436,36 +468,51 @@
     const original = bisect.original;
     bisect = null;
     undoStack = redoStack = [];
-    commit(original, false);
+    commit(original.rows, original.order, false);
   }
 
-  // --- undo/redo for list edits (toggle, reorder, separators, fixes) ---
-  let undoStack = $state<Row[][]>([]);
-  let redoStack = $state<Row[][]>([]);
+  // --- undo/redo for list edits (toggle, reorder, separators, fixes) in the library and the load order ---
+  type Lists = { rows: Row[]; order: string[] };
+  let undoStack = $state<Lists[]>([]);
+  let redoStack = $state<Lists[]>([]);
 
-  const commit = (next: Row[], record = true) => {
+  /** Save the library and the load order (kept to the library's enabled mods). */
+  const commit = (next: Row[], nextOrder = order, record = true) => {
     if (record) {
-      undoStack = [...undoStack.slice(-49), $state.snapshot(rows)];
+      undoStack = [...undoStack.slice(-49), $state.snapshot({ rows, order })];
       redoStack = [];
     }
     rows = next;
-    return run("Saving", () => api.save(next), { keepHistory: true });
+    order = syncOrder(next, nextOrder);
+    return run("Saving", () => api.save(rows, order), { keepHistory: true });
   };
+
+  /** Save a sorted load list: its order, and the mods it turned on. */
+  function commitList(sorted: Row[]) {
+    const on = orderOf(sorted);
+    return commit(rows.map((r) => (r.kind === "mod" && !r.on && on.includes(r.id) ? { ...r, on: true } : r)), on);
+  }
+
+  /** `o` with each of `ids` placed where Autosort would put it. */
+  function placeAll(ids: string[], o = order) {
+    for (const id of ids) o = placeInOrder(o, id, (i) => mods.get(i), cats ? tiers(cats.of, cats.order) : undefined);
+    return o;
+  }
 
   function undo() {
     const prev = undoStack.at(-1);
     if (!prev || busy) return;
     undoStack = undoStack.slice(0, -1);
-    redoStack = [...redoStack, $state.snapshot(rows)];
-    commit(prev, false);
+    redoStack = [...redoStack, $state.snapshot({ rows, order })];
+    commit(prev.rows, prev.order, false);
   }
 
   function redo() {
     const next = redoStack.at(-1);
     if (!next || busy) return;
     redoStack = redoStack.slice(0, -1);
-    undoStack = [...undoStack, $state.snapshot(rows)];
-    commit(next, false);
+    undoStack = [...undoStack, $state.snapshot({ rows, order })];
+    commit(next.rows, next.order, false);
   }
 
   const TAB_IDS = ["mods", "workshop", "servers", "zb"];
@@ -506,7 +553,17 @@
   }
 
   function toggle(id: string) {
-    commit(rows.map((r) => (r.kind === "mod" && r.id === id ? { ...r, on: !r.on } : r)));
+    const on = !mods.get(id)?.on;
+    commit(rows.map((r) => (r.kind === "mod" && r.id === id ? { ...r, on } : r)), on ? placeAll([id]) : order);
+  }
+
+  /** A drag in the load order: the mod at `from` dropped before position `to`. */
+  function moveInOrder(from: number, to: number) {
+    if (busy || to === from || to === from + 1 || to < 0 || to > order.length) return;
+    const next = [...order];
+    const [id] = next.splice(from, 1);
+    next.splice(to > from ? to - 1 : to, 0, id);
+    commit(rows, next);
   }
 
   /** A drop from the list: a separator carries its whole section. */
@@ -608,7 +665,8 @@
   }
 
   function bulkSet(on: boolean) {
-    commit(rows.map((r) => (r.kind === "mod" && picked.has(r.id) ? { ...r, on } : r)));
+    const turning = rows.flatMap((r) => (r.kind === "mod" && picked.has(r.id) && r.on !== on ? [r.id] : []));
+    commit(rows.map((r) => (r.kind === "mod" && picked.has(r.id) ? { ...r, on } : r)), on ? placeAll(turning) : order);
   }
 
   /** Move the picked mods (in their current order) to just under separator `to` ("top" / "bottom"). */
@@ -812,7 +870,7 @@
   {#if tab === "workshop"}
     <!-- kept mounted above -->
   {:else if tab === "servers"}
-    <ServersSaves {busy} profile={view?.profile ?? ""} enabledIds={[...mods.values()].filter((m) => m.on).map((m) => m.id)}
+    <ServersSaves {busy} profile={view?.profile ?? ""} enabledIds={order}
       onImport={(name) => run(`Importing ${name}.ini`, () => api.serverImport(name), { showLog: true })}
       onUseSave={(mode, name) => run(`Loading the mods of ${name}`, () => api.saveUse(mode, name))} />
   {:else if tab === "zb"}
@@ -849,7 +907,7 @@
     </div>
     <label class="sort">
       <select bind:value={sortBy} aria-label="Sort the list" title="Sort the list">
-        <option value="order">Load order</option>
+        <option value="order">Library order</option>
         <option value="name">Name</option>
         <option value="size">Size</option>
         <option value="updated">Last changed</option>
@@ -882,7 +940,7 @@
       </span>
     {:else if !missingReqs.size && !fixable}
       <span class="hint">
-        {filtering ? "Clear the search and filter, and sort by load order, to reorder." : "Drag or Alt+↑/↓ to reorder · Space toggles · Ctrl/Shift+click selects"}
+        {filtering ? "Clear the search and filter, and sort by library order, to reorder." : "Drag or Alt+↑/↓ to organise · Space toggles · Ctrl/Shift+click selects"}
       </span>
     {:else}
       <span class="spacer"></span>
@@ -892,6 +950,7 @@
     <button class="quiet icon" onclick={undo} disabled={busy || !undoStack.length} title="Undo the last list change (Ctrl+Z)" aria-label="Undo"><Icon name="undo" size={16} /></button>
     <button class="quiet icon" onclick={redo} disabled={busy || !redoStack.length} title="Redo (Ctrl+Y)" aria-label="Redo"><Icon name="redo" size={16} /></button>
     <button class="quiet" onclick={addSeparator} disabled={busy || filtering} title="Add a separator above the selected mod"><Icon name="plus" size={14} />Separator</button>
+    <button class="quiet" onclick={() => groupLibrary()} disabled={busy} title="Sort your mods into one section per category, from their Workshop tags. The load order doesn't change."><Icon name="layers" size={14} />Group by category</button>
     </span>
   </div>
 
@@ -907,7 +966,7 @@
           <p>Paste a Steam Workshop link above to install a mod, or subscribe to mods in Steam: subscriptions show up here automatically.</p>
         </div>
       {:else}
-        <ModTable {rows} {visible} {sectionOf} {filtering} {busy} build={view?.build ?? null} {stats} {overlaps} {problems} {updates}
+        <ModTable {rows} {order} {visible} {sectionOf} {filtering} {busy} build={view?.build ?? null} {stats} {overlaps} {problems} {updates}
           {collapsed} {picked} {selected} bind:dragFrom bind:editingSep onRowClick={rowClick} onRowKey={rowKey} onToggle={toggle}
           onToggleSection={toggleSection} onDrop={dropOn} onRename={renameSep} onRemoveSep={removeSep} />
       {/if}
@@ -918,7 +977,8 @@
         onToggle={toggle} onSelect={(id) => (selected = id)}
         onRemove={remove} onRollback={(id) => run(`Restoring ${id}`, () => api.rollback(id))} onClose={() => (selected = null)} />
     {:else if rows.length}
-      <LoadOrder {rows} {problems} {fixable} {overlaps} {busy} onAutosort={() => autosortList()} onFix={fixLoadOrder} />
+      <LoadOrder {rows} {order} {mods} {problems} {fixable} {overlaps} {busy} onAutosort={autosortList} onFix={fixLoadOrder}
+        onMove={moveInOrder} onSelect={(id) => (selected = id)} />
     {/if}
   </main>
   </section>

@@ -1,10 +1,51 @@
 // Load-order rules from mod.info: require, incompatible, loadModAfter, loadModBefore.
 // Pure functions so they can be checked outside the app (scripts/order-check.ts).
+// Two lists: the library (`Row[]`, organised by the player, order is cosmetic) and the
+// load order (enabled mod ids). Rule checks and sorts run on a load list: the library's
+// mods with the enabled ones first, in load order (see `loadList`).
 import type { ModRow, Row } from "./api";
 
 export type Problem = { text: string; fixable: boolean };
 
 const isMod = (r: Row): r is ModRow => r.kind === "mod";
+
+/** `order` kept to the library's enabled mods, plus any it lacks at the end (in library order). */
+export function syncOrder(rows: Row[], order: string[]): string[] {
+  const on = rows.flatMap((r) => (isMod(r) && r.on ? [r.id] : []));
+  const set = new Set(on);
+  return [...new Set([...order.filter((id) => set.has(id)), ...on])];
+}
+
+/** The library's mods, enabled ones first in load order, then the disabled ones. */
+export function loadList(rows: Row[], order: string[]): ModRow[] {
+  const mods = new Map(rows.filter(isMod).map((r) => [r.id, r]));
+  return [...syncOrder(rows, order).map((id) => mods.get(id)!), ...rows.filter((r): r is ModRow => isMod(r) && !r.on)];
+}
+
+/** The enabled ids of a load list, in order. */
+export const orderOf = (list: Row[]) => list.flatMap((r) => (isMod(r) && r.on ? [r.id] : []));
+
+/** Autosort's tiers from the mods' categories: frameworks (the first category) 0, translations 2, the rest 1. */
+export const tiers = (of: Record<string, string>, order: string[]) => (id: string) => (of[id] === order[0] ? 0 : of[id] === "Translations" ? 2 : 1);
+
+/**
+ * `order` with `id` inserted where Autosort would put it, moving nothing else: after what it
+ * must load after, before what must load after it, and in that room after the last mod of
+ * its tier or an earlier one (without tiers: the end of the room).
+ */
+export function placeInOrder(order: string[], id: string, mod: (id: string) => ModRow | undefined, tier: (id: string) => number = () => 1): string[] {
+  const rest = order.filter((o) => o !== id);
+  // a must load after b
+  const after = (a: string, b: string) =>
+    [...(mod(a)?.requires ?? []), ...(mod(a)?.load_after ?? [])].includes(b) || (mod(b)?.load_before ?? []).includes(a);
+  const lo = rest.findLastIndex((o) => after(id, o)) + 1;
+  const first = rest.findIndex((o) => after(o, id));
+  const hi = Math.max(lo, first < 0 ? rest.length : first); // conflicting rules: its own needs win
+  let at = lo;
+  for (let i = lo; i < hi; i++) if (tier(rest[i]) <= tier(id)) at = i + 1;
+  rest.splice(at, 0, id);
+  return rest;
+}
 
 /** The first problem of each enabled mod, by mod id. */
 export function findProblems(rows: Row[]): Map<string, Problem> {
@@ -140,9 +181,8 @@ function pullUp(rows: Row[]): Row[] {
 }
 
 /**
- * The list regrouped under one separator per category, sections in `order`. Mods keep
- * their relative order within a section and the list's own separators are dropped. A
- * requirement in a later section moves up to just above the mod that needs it.
+ * The library regrouped under one separator per category, sections in `order`. Mods keep
+ * their relative order within a section and the list's own separators are dropped.
  */
 export function groupByCategory(rows: Row[], of: Record<string, string>, order: string[]): Row[] {
   const cat = (m: ModRow) => (order.includes(of[m.id]) ? of[m.id] : order[order.length - 1]);
@@ -152,21 +192,24 @@ export function groupByCategory(rows: Row[], of: Record<string, string>, order: 
     const section = mods.filter((m) => cat(m) === name);
     if (section.length) out.push({ kind: "sep", name }, ...section);
   }
-  return pullUp(out);
+  return out;
 }
 
 /**
- * The most stable order PZMM knows: turn on what enabled mods need, group by category
- * (frameworks first, translations last), then satisfy every require / loadModAfter /
- * loadModBefore rule while keeping your order everywhere else.
+ * The most stable load order PZMM knows, for a load list: turn on what enabled mods need,
+ * frameworks first and translations last (by category), then satisfy every require /
+ * loadModAfter / loadModBefore rule while keeping your order everywhere else.
  */
-export function autosort(rows: Row[], of: Record<string, string>, order: string[]): Row[] {
-  return groupByCategory(enableRequirements(rows), of, order);
+export function autosort(list: Row[], of: Record<string, string>, order: string[]): Row[] {
+  const next = enableRequirements(list);
+  const tier = tiers(of, order);
+  const on = next.filter((r) => isMod(r) && r.on).sort((a, b) => tier((a as ModRow).id) - tier((b as ModRow).id)); // stable
+  return pullUp([...on, ...next.filter((r) => !(isMod(r) && r.on))]);
 }
 
 /**
- * Move each of `ids` to the end of its category's section, adding the section (in
- * `order`) when the list doesn't have it yet.
+ * Move each of `ids` to the end of its category's section in the library, adding the
+ * section (in `order`) when the list doesn't have it yet.
  */
 export function placeInSections(rows: Row[], of: Record<string, string>, order: string[], ids: string[]): Row[] {
   const next = [...rows];
@@ -184,8 +227,11 @@ export function placeInSections(rows: Row[], of: Record<string, string>, order: 
     const end = next.findIndex((r, i) => i > sep && r.kind === "sep");
     next.splice(end < 0 ? next.length : end, 0, m);
   }
-  return pullUp(next);
+  return next;
 }
+
+/** The server's Map= list sorted: mod maps keep their order, before the game's own map. */
+export const sortMaps = (maps: string[], base = "Muldraugh, KY") => [...maps.filter((m) => m !== base), ...maps.filter((m) => m === base)];
 
 /**
  * Where a section dragged from `from` lands when dropped on row `to`: past the hovered

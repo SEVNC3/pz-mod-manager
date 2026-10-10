@@ -94,13 +94,13 @@ This merges their findings. Each item names its source. Work top to bottom; P0 a
 
 ## P4: library and load order split (like Mod Organizer 2)
 
-45. [ ] **The left list is the library.** Workshop items and packages, organised with categories, separators, drag and on/off. Its order is organisation only and no longer sets what the game loads.
-46. [ ] **A load order list in the side panel** (when no mod is selected), under the overview tiles and Autosort. It lists the enabled **mod IDs** (one Workshop item can hold several) in the order written to `default.txt` and the server `Mods=` line, and they drag independently of the library.
-47. [ ] **Autosort sorts the load order only**: `require` / `loadModAfter` / `loadModBefore`, frameworks first, translations last. The tag sections become **Group by category** on the library.
-48. [ ] **Enabling places a mod ID** where Autosort would put it; disabling removes it from the load order.
-49. [ ] **Profiles store the load order apart from the library.** Existing profiles start with their current order, so nothing moves on upgrade. Sharing codes, sync with the game's mod menu, bisect and save/server import all use the load order.
-50. [ ] **Map order**: a second list for the server `Map=` line, with the same drag and autosort (maps before `Muldraugh, KY`).
-51. [ ] **Conflicts and override icons follow the load order**, since that decides which file wins.
+45. [x] **The left list is the library.** Workshop items and packages, organised with categories, separators, drag and on/off. Its order is organisation only and no longer sets what the game loads.
+46. [x] **A load order list in the side panel** (when no mod is selected), under the overview tiles and Autosort. It lists the enabled **mod IDs** (one Workshop item can hold several) in the order written to `default.txt` and the server `Mods=` line, and they drag independently of the library.
+47. [x] **Autosort sorts the load order only**: `require` / `loadModAfter` / `loadModBefore`, frameworks first, translations last. The tag sections become **Group by category** on the library.
+48. [x] **Enabling places a mod ID** where Autosort would put it; disabling removes it from the load order.
+49. [x] **Profiles store the load order apart from the library.** Existing profiles start with their current order, so nothing moves on upgrade. Sharing codes, sync with the game's mod menu, bisect and save/server import all use the load order.
+50. [x] **Map order**: a second list for the server `Map=` line, with the same drag and autosort (maps before `Muldraugh, KY`).
+51. [x] **Conflicts and override icons follow the load order**, since that decides which file wins.
 
 ## P5: a real Settings tab
 

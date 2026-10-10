@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { api, type ServersAndSaves } from "./api";
   import Icon from "./Icon.svelte";
+  import { sortMaps } from "./order";
 
   let { busy, profile, enabledIds, onImport, onUseSave }: {
     busy: boolean;
@@ -20,6 +21,40 @@
   let notes = $state<string[]>([]);
   let error = $state("");
 
+  // the Map= line Write sets (empty when no enabled mod adds a map): drag or Alt+arrows to arrange
+  let maps = $state<string[]>([]);
+  let mapFrom = $state<number | null>(null);
+  let mapAt = $state<number | null>(null);
+  $effect(() => {
+    const name = target.trim();
+    if (!name) return;
+    api.serverMaps(name).then((m) => target.trim() === name && (maps = m)).catch(() => (maps = []));
+  });
+
+  /** The map at `from` dropped before position `to`. */
+  function moveMap(from: number, to: number) {
+    if (to === from || to === from + 1 || to < 0 || to > maps.length) return;
+    const next = [...maps];
+    const [m] = next.splice(from, 1);
+    next.splice(to > from ? to - 1 : to, 0, m);
+    maps = next;
+  }
+
+  /** Alt+arrows move the focused map (and keep it focused). */
+  async function mapKey(e: KeyboardEvent, i: number) {
+    if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    e.preventDefault();
+    const li = e.currentTarget as HTMLElement;
+    moveMap(i, e.key === "ArrowUp" ? i - 1 : i + 2);
+    await tick();
+    li.focus();
+  }
+
+  function dropMap(to: number) {
+    if (mapFrom !== null) moveMap(mapFrom, to);
+    mapFrom = mapAt = null;
+  }
+
   const refresh = () =>
     api
       .serversAndSaves()
@@ -35,7 +70,7 @@
     error = "";
     notes = [];
     try {
-      notes = await api.serverExport(target.trim());
+      notes = await api.serverExport(target.trim(), maps);
       refresh();
     } catch (err) {
       error = String(err);
@@ -87,6 +122,25 @@
       {/if}
       <button class="primary" type="submit" disabled={busy || !target.trim()}><Icon name="upload" size={14} />Write to {target.trim() || "…"}.ini</button>
     </form>
+    {#if maps.length}
+      <h3>Map order</h3>
+      <p class="hint">The server loads maps top to bottom: mod maps go before <span class="mono">Muldraugh, KY</span>. Drag or Alt+↑/↓ to arrange; Write saves it.</p>
+      <ol class="drag-list maps" role="listbox" aria-label="Map order">
+        {#each maps as m, i (m)}
+          <li role="option" aria-selected="false" class:drop={mapAt === i} class:dragging={mapFrom === i} draggable="true" tabindex="0"
+            onkeydown={(e) => mapKey(e, i)}
+            ondragstart={() => (mapFrom = i)} ondragend={() => { mapFrom = mapAt = null; }}
+            ondragover={(e) => { e.preventDefault(); mapAt = i; }}
+            ondrop={(e) => { e.preventDefault(); dropMap(i); }}>
+            <span class="num mono">{i + 1}</span>{m}
+          </li>
+        {/each}
+        <li class="tail" class:drop={mapAt === maps.length} aria-hidden="true"
+          ondragover={(e) => { e.preventDefault(); mapAt = maps.length; }}
+          ondrop={(e) => { e.preventDefault(); dropMap(maps.length); }}></li>
+      </ol>
+      <button class="quiet" onclick={() => (maps = sortMaps(maps))} title="Mod maps first, in their current order, then Muldraugh, KY"><Icon name="wand" size={14} />Autosort maps</button>
+    {/if}
     {#if notes.length}<ul class="notes">{#each notes as n}<li>{n}</li>{/each}</ul>{/if}
     {#if error}<p class="error">{error}</p>{/if}
 
@@ -200,6 +254,17 @@
   }
   .hint {
     display: block;
+  }
+  .maps {
+    margin-bottom: 6px;
+  }
+  .maps .num {
+    width: 20px;
+    text-align: right;
+    color: var(--accent-text);
+  }
+  .maps li:hover .num {
+    color: var(--on-selected);
   }
   .notes {
     margin: 10px 0 0;
