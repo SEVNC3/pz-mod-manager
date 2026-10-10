@@ -229,7 +229,7 @@
     border-left: 1px solid var(--line);
     background: var(--panel);
   }
-  /* sits on the poster, so it needs its own dark disc to show on any image */
+  /* sits on the poster: a rounded square in the panel's colour, so it shows on any image */
   .close {
     position: absolute;
     top: 22px;
@@ -238,15 +238,16 @@
     width: 32px;
     height: 32px;
     padding: 0;
-    border-radius: 50%;
-    color: #fff;
-    background: rgb(0 0 0 / 0.7);
-    border: 1px solid rgb(255 255 255 / 0.25);
+    border-radius: 8px;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--line);
     box-shadow: 0 2px 8px rgb(0 0 0 / 0.5);
   }
   .close:hover:not(:disabled) {
     background: var(--accent);
-    border-color: rgb(255 255 255 / 0.5);
+    border-color: var(--hover-line);
+    color: #fff;
   }
   .poster {
     display: block;
