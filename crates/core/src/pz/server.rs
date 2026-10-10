@@ -47,16 +47,15 @@ fn split(v: &str) -> Vec<String> {
 
 pub fn read(path: &Path) -> Result<ServerMods> {
     let text = fs::read_to_string(path)?;
-    Ok(ServerMods { mods: split(value(&text, "Mods")), workshop: split(value(&text, "WorkshopItems")) })
+    let workshop = split(value(&text, "WorkshopItems")).into_iter().filter(|w| crate::sources::steam_workshop::valid_id(w)).collect();
+    Ok(ServerMods { mods: split(value(&text, "Mods")), workshop })
 }
 
 /// Set `Mods=`, `WorkshopItems=` and, when any mod adds maps, `Map=` (mod maps first,
-/// then the base map). Every other line is kept. The previous file is kept as `.ini.bak`.
+/// then the base map). Every other line is kept. The file as it was before PZMM's first write is kept as `.ini.bak`.
 pub fn write(path: &Path, mods: &[String], workshop: &[String], maps: &[String], b41: bool) -> Result<()> {
     let old = fs::read_to_string(path).unwrap_or_default();
-    if path.exists() {
-        fs::copy(path, path.with_extension("ini.bak"))?;
-    }
+    crate::backup_once(path)?;
     let prefix = if b41 { "" } else { "\\" };
     let mut set = vec![
         ("Mods", mods.iter().map(|m| format!("{prefix}{m}")).collect::<Vec<_>>().join(";")),
@@ -78,7 +77,7 @@ pub fn write(path: &Path, mods: &[String], workshop: &[String], maps: &[String],
     if let Some(d) = path.parent() {
         fs::create_dir_all(d)?;
     }
-    fs::write(path, lines.join("\n") + "\n")?;
+    crate::write_atomic(path, lines.join("\n") + "\n")?;
     Ok(())
 }
 
@@ -124,7 +123,7 @@ mod tests {
         let text = fs::read_to_string(&p).unwrap();
         assert_eq!(text, "PVP=true\nMods=\\A;\\B\nWorkshopItems=111;222\nMap=Riverside Plus;Muldraugh, KY\nPublic=false\n");
         assert_eq!(read(&p).unwrap(), ServerMods { mods: ids(&["A", "B"]), workshop: ids(&["111", "222"]) });
-        assert!(p.with_extension("ini.bak").exists());
+        assert!(p.with_file_name("servertest.ini.bak").exists());
 
         write(&p, &ids(&["A"]), &[], &[], true).unwrap();
         let text = fs::read_to_string(&p).unwrap();

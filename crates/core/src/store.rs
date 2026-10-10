@@ -44,12 +44,22 @@ pub fn load(paths: &Paths) -> Result<Index> {
 
 pub fn save(paths: &Paths, index: &Index) -> Result<()> {
     fs::create_dir_all(&paths.data)?;
-    fs::write(index_path(paths), serde_json::to_string_pretty(index)?)?;
+    crate::write_atomic(&index_path(paths), serde_json::to_string_pretty(index)?)?;
     Ok(())
 }
 
-fn folder_name(id: &str) -> String {
-    id.chars().map(|c| if r#"<>:"/\|?*"#.contains(c) || c.is_control() { '_' } else { c }).collect()
+/// The mod's folder in `Zomboid/mods`. Refuses ids that can't be a single safe folder
+/// name (`..`, `CON`, `a/b`...), so no id can point outside the mods folder.
+fn mod_dir(paths: &Paths, id: &str) -> Result<PathBuf> {
+    if !crate::safe_file_name(id) {
+        bail!("refusing mod id {id:?}: it can't be used as a folder name");
+    }
+    Ok(paths.mods().join(id))
+}
+
+fn backup_dir(paths: &Paths, id: &str) -> Result<PathBuf> {
+    mod_dir(paths, id)?;
+    Ok(paths.data.join("backups").join(id))
 }
 
 fn copy_dir(from: &Path, to: &Path) -> Result<()> {
@@ -57,11 +67,12 @@ fn copy_dir(from: &Path, to: &Path) -> Result<()> {
     for e in fs::read_dir(from)? {
         let e = e?;
         let dest = to.join(e.file_name());
-        if e.file_type()?.is_dir() {
+        let kind = e.file_type()?;
+        if kind.is_dir() {
             copy_dir(&e.path(), &dest)?;
-        } else {
+        } else if kind.is_file() {
             fs::copy(e.path(), dest)?;
-        }
+        } // symlinks inside downloaded mods are skipped
     }
     Ok(())
 }
@@ -78,49 +89,103 @@ fn move_dir(from: &Path, to: &Path) -> Result<()> {
     Ok(())
 }
 
-fn backup_dir(paths: &Paths, id: &str) -> PathBuf {
-    paths.data.join("backups").join(folder_name(id))
+/// Same files with the same bytes (so an "update" would change nothing).
+fn same_tree(a: &Path, b: &Path) -> bool {
+    fn files(root: &Path) -> Option<BTreeMap<PathBuf, u64>> {
+        let mut out = BTreeMap::new();
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(d) = stack.pop() {
+            for e in fs::read_dir(&d).ok()? {
+                let e = e.ok()?;
+                let kind = e.file_type().ok()?;
+                if kind.is_dir() {
+                    stack.push(e.path());
+                } else if kind.is_file() {
+                    out.insert(e.path().strip_prefix(root).ok()?.to_path_buf(), e.metadata().ok()?.len());
+                }
+            }
+        }
+        Some(out)
+    }
+    match (files(a), files(b)) {
+        (Some(fa), Some(fb)) if fa == fb => fa.keys().all(|rel| fs::read(a.join(rel)).ok() == fs::read(b.join(rel)).ok()),
+        _ => false,
+    }
 }
 
-/// Copy every mod found under `root` into the game's mods folder. The version it
-/// replaces is kept as a backup for `rollback`. Returns the installed mod ids.
+/// Copy every mod found under `root` into the game's mods folder. A mod already there is
+/// replaced only if PZMM installed it; its previous version becomes the rollback backup
+/// (kept as is when the new copy is identical). Each mod is staged next to its final
+/// folder and swapped in, then recorded, so a failure never leaves a half-copied mod.
+/// Mods that can't be installed are logged and skipped. Returns the installed ids.
 pub fn install(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> {
     let found = pz::find_mods(root, 8);
     if found.is_empty() {
         bail!("{source}: no mod.info found");
     }
     let mut index = load(paths)?;
-    let mut ids = vec![];
+    let mut ids: Vec<String> = vec![];
     for m in found {
-        let dest = paths.mods().join(folder_name(&m.id));
-        if dest.exists() {
-            let backup = backup_dir(paths, &m.id);
-            if backup.exists() {
-                fs::remove_dir_all(&backup)?;
-            }
-            move_dir(&dest, &backup)?;
+        if ids.contains(&m.id) {
+            crate::log!("{source}: skipped a second mod with the id {}", m.id);
+            continue;
         }
-        copy_dir(&m.dir, &dest).with_context(|| format!("copying {} to {}", m.id, dest.display()))?;
+        let dest = match mod_dir(paths, &m.id) {
+            Ok(d) => d,
+            Err(e) => {
+                crate::log!("error: {source}: {e:#}");
+                continue;
+            }
+        };
+        if dest.exists() && !index.contains_key(&m.id) {
+            crate::log!(
+                "error: {} is already in {} and wasn't installed by PZMM; left it alone. Remove that folder to install this copy.",
+                m.id,
+                paths.mods().display()
+            );
+            continue;
+        }
+        if dest.exists() && same_tree(&m.dir, &dest) {
+            crate::log!("{} is already up to date ({source})", m.id);
+        } else {
+            // staged outside Zomboid/mods so the game never sees a half-copied mod
+            let staging = paths.data.join("staging").join(&m.id);
+            if staging.exists() {
+                fs::remove_dir_all(&staging)?;
+            }
+            if let Err(e) = copy_dir(&m.dir, &staging) {
+                let _ = fs::remove_dir_all(&staging);
+                return Err(e).with_context(|| format!("copying {} into {}", m.id, paths.mods().display()));
+            }
+            if dest.exists() {
+                let backup = backup_dir(paths, &m.id)?;
+                if backup.exists() {
+                    fs::remove_dir_all(&backup)?;
+                }
+                move_dir(&dest, &backup)?;
+            }
+            move_dir(&staging, &dest).with_context(|| format!("moving {} into place", m.id))?;
+            crate::log!("installed {} ({source})", m.id);
+        }
         index.insert(m.id.clone(), Entry { source: source.to_string(), installed_at: now() });
-        crate::log!("installed {} ({source})", m.id);
+        save(paths, &index)?;
         ids.push(m.id);
     }
-    save(paths, &index)?;
     Ok(ids)
 }
 
 pub fn has_backup(paths: &Paths, id: &str) -> bool {
-    backup_dir(paths, id).exists()
+    backup_dir(paths, id).is_ok_and(|b| b.exists())
 }
 
 /// Swap a mod back to the version it had before its last install/update.
 pub fn rollback(paths: &Paths, id: &str) -> Result<()> {
-    let backup = backup_dir(paths, id);
+    let backup = backup_dir(paths, id)?;
     if !backup.exists() {
         bail!("{id}: no previous version to restore");
     }
-    let dest = paths.mods().join(folder_name(id));
-    let tmp = paths.data.join("backups").join(format!("{}.swap", folder_name(id)));
+    let dest = mod_dir(paths, id)?;
+    let tmp = paths.data.join("backups").join(format!("{id}.swap"));
     if dest.exists() {
         move_dir(&dest, &tmp)?;
     }
@@ -136,11 +201,11 @@ pub fn remove(paths: &Paths, ids: &[String]) -> Result<Vec<String>> {
     let mut index = load(paths)?;
     let mut refused = vec![];
     for id in ids {
-        if index.remove(id).is_some() {
-            let dir = paths.mods().join(folder_name(id));
+        if index.contains_key(id) && let Ok(dir) = mod_dir(paths, id) {
             if dir.exists() {
                 fs::remove_dir_all(dir)?;
             }
+            index.remove(id);
         } else {
             refused.push(id.clone());
         }
@@ -214,6 +279,38 @@ pub(crate) mod tests {
         mod_tree(&paths.mods(), "Manual", "id=Manual\n");
         assert_eq!(remove(&paths, &["RootMod".into(), "Manual".into()]).unwrap(), ["Manual"]);
         assert!(!paths.mods().join("RootMod").exists() && paths.mods().join("Manual").exists());
+    }
+
+    #[test]
+    fn refuses_unsafe_ids_and_unowned_folders() {
+        let (t, paths) = temp_paths();
+        fs::create_dir_all(paths.zomboid.join("Saves")).unwrap();
+        mod_tree(t.path(), "evil/x", "id=..\n");
+        mod_tree(t.path(), "evil/y", "id=CON\n");
+        assert!(install(&paths, &t.path().join("evil"), "local:evil").unwrap().is_empty());
+        assert!(paths.zomboid.join("Saves").exists(), "Zomboid folder untouched");
+        assert!(rollback(&paths, "..").is_err());
+        assert_eq!(remove(&paths, &["..".into()]).unwrap(), [".."]);
+
+        // a hand-installed mod with the same id is left alone
+        mod_tree(&paths.mods(), "Hand", "id=Hand\nname=mine\n");
+        mod_tree(t.path(), "dl/Hand", "id=Hand\nname=download\n");
+        assert!(install(&paths, &t.path().join("dl"), "local:dl").unwrap().is_empty());
+        assert!(fs::read_to_string(paths.mods().join("Hand/mod.info")).unwrap().contains("mine"));
+        assert!(!has_backup(&paths, "Hand"));
+    }
+
+    #[test]
+    fn identical_update_keeps_the_real_backup() {
+        let (t, paths) = temp_paths();
+        mod_tree(t.path(), "v1/M", "id=M\nname=v1\n");
+        mod_tree(t.path(), "v2/M", "id=M\nname=v2\n");
+        install(&paths, &t.path().join("v1"), "local:v1").unwrap();
+        install(&paths, &t.path().join("v2"), "local:v2").unwrap();
+        install(&paths, &t.path().join("v2"), "local:v2").unwrap(); // same content again
+        rollback(&paths, "M").unwrap();
+        assert!(fs::read_to_string(paths.mods().join("M/mod.info")).unwrap().contains("v1"));
+        assert!(!paths.data.join("staging/M").exists());
     }
 
     #[test]

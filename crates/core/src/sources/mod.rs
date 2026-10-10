@@ -40,7 +40,7 @@ impl Source {
     pub fn from_index(s: &str) -> Option<Source> {
         let (kind, v) = s.split_once(':')?;
         match kind {
-            "workshop" => Some(Source::Workshop(v.into())),
+            "workshop" if steam_workshop::valid_id(v) => Some(Source::Workshop(v.into())),
             "github" => Some(Source::GitHub(v.into())),
             "local" => Some(Source::Local(v.into())),
             _ => None,

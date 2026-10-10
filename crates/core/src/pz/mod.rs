@@ -198,8 +198,15 @@ fn block<'a>(text: &'a str, name: &str) -> Option<&'a str> {
     None
 }
 
+/// default.txt, or an empty list when it doesn't exist or can't be read.
 pub fn read_default(path: &Path) -> DefaultTxt {
-    let text = fs::read_to_string(path).unwrap_or_default();
+    try_read_default(path).unwrap_or_else(|| DefaultTxt { maps: "\n".into(), ..Default::default() })
+}
+
+/// default.txt, or None when it's missing or unreadable (locked by the game, not UTF-8).
+/// Callers that act on "nothing is enabled" must use this, not `read_default`.
+pub fn try_read_default(path: &Path) -> Option<DefaultTxt> {
+    let text = fs::read_to_string(path).ok()?;
     let body = block(&text, "mods").unwrap_or("");
     let mods: Vec<String> = body
         .lines()
@@ -207,31 +214,29 @@ pub fn read_default(path: &Path) -> DefaultTxt {
         .map(|v| v.trim().trim_end_matches(',').trim().trim_start_matches('\\').to_string())
         .filter(|v| !v.is_empty())
         .collect();
-    DefaultTxt {
+    Some(DefaultTxt {
         maps: block(&text, "maps").unwrap_or("\n").to_string(),
         b41: !mods.is_empty() && !body.contains('\\'),
         mods,
-    }
+    })
 }
 
 /// Rewrite default.txt with `ids` in order. `b41: None` keeps the file's current format
-/// (B42 when unknown). The previous file is kept as `default.txt.bak`.
+/// (B42 when unknown). The file as it was before PZMM's first write is kept as `default.txt.bak`.
 pub fn write_default(path: &Path, ids: &[String], b41: Option<bool>) -> Result<()> {
     let old = read_default(path);
     let prefix = if b41.unwrap_or(old.b41) { "" } else { "\\" };
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }
-    if path.exists() {
-        fs::copy(path, path.with_extension("txt.bak"))?;
-    }
+    crate::backup_once(path)?;
     let mut seen = HashSet::new();
     let body: String = ids
         .iter()
-        .filter(|i| seen.insert(*i))
+        .filter(|i| !i.is_empty() && seen.insert(*i))
         .map(|i| format!("    mod = {prefix}{i},\n"))
         .collect();
-    fs::write(path, format!("VERSION = 1,\n\nmods\n{{\n{body}}}\n\nmaps\n{{{}}}\n", old.maps))?;
+    crate::write_atomic(path, format!("VERSION = 1,\n\nmods\n{{\n{body}}}\n\nmaps\n{{{}}}\n", old.maps))?;
     Ok(())
 }
 
@@ -282,7 +287,7 @@ mod tests {
         assert!(text.contains("mod = \\ModA,") && text.contains("map = Muldraugh, KY,"));
         let d = read_default(&p);
         assert_eq!((d.mods, d.b41), (vec!["ModA".to_string(), "ModB".into()], false));
-        assert!(p.with_extension("txt.bak").exists());
+        assert!(p.with_file_name("default.txt.bak").exists());
     }
 
     #[test]

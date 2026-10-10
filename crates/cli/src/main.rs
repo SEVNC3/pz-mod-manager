@@ -182,7 +182,7 @@ fn run(cli: Cli) -> Result<()> {
             }
         }
         Cmd::Profile(ProfileCmd::New { name }) => {
-            if profile::list(&paths).contains(&name) {
+            if profile::exists(&paths, &name) {
                 bail!("profile {name:?} already exists");
             }
             profile::save(&paths, &Profile { name: name.clone(), lines: p.lines })?;
@@ -225,7 +225,7 @@ fn list(paths: &Paths, p: &Profile) -> Result<()> {
 fn zombiebuddy(paths: &Paths, p: &mut Profile, action: &str) -> Result<()> {
     use pzmm_core::pz::zombiebuddy as zb;
     let launcher = zb::game_dir().and_then(|g| zb::launcher_dir(&g));
-    let libs = || store::scan(paths).ok().and_then(|mut m| m.remove(zb::MOD_ID)).and_then(|m| zb::libs_dir(&m.dir));
+    let libs = || store::scan(paths).ok().and_then(|mut m| m.remove(zb::MOD_ID)).filter(|m| zb::official_source(&m.source)).and_then(|m| zb::libs_dir(&m.dir));
     match action {
         "status" => {
             let l = launcher.as_deref();
@@ -273,8 +273,7 @@ fn server(paths: &Paths, p: &Profile, action: &str, name: &str) -> Result<()> {
             let have = sources::workshop_available(paths);
             let missing: Vec<Source> = cfg.workshop.iter().filter(|w| !have.contains(*w)).map(|w| Source::Workshop(w.clone())).collect();
             sources::install(paths, &missing, false);
-            let lines = cfg.mods.into_iter().map(|id| profile::Line::Mod { id, on: true }).collect();
-            let prof = Profile { name: format!("Server {name}"), lines };
+            let prof = Profile::from_ids(&format!("Server {name}"), cfg.mods);
             profile::apply(paths, &prof)?;
             println!("now using profile {:?}", prof.name);
         }

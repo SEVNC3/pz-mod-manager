@@ -38,6 +38,12 @@ pub fn launcher_dir(game: &Path) -> Option<PathBuf> {
     [game.to_path_buf(), game.join("projectzomboid")].into_iter().find(|d| d.join(LAUNCHER).is_file())
 }
 
+/// Whether a scanned mod's source is the official ZombieBuddy Workshop item. Only its jar
+/// may become the game's JVM agent; a look-alike local mod named ZombieBuddy must not.
+pub fn official_source(source: &str) -> bool {
+    source.strip_prefix("steam:").or_else(|| source.strip_prefix("workshop:")) == Some(WORKSHOP_ID)
+}
+
 /// The folder inside a ZombieBuddy mod that holds `ZombieBuddy.jar` (normally `libs/`).
 pub fn libs_dir(mod_dir: &Path) -> Option<PathBuf> {
     let mut stack = vec![(mod_dir.to_path_buf(), 0)];
@@ -68,7 +74,7 @@ fn write_launcher(launcher: &Path, v: &Value) -> Result<()> {
     let mut ser = serde_json::Serializer::with_formatter(&mut out, serde_json::ser::PrettyFormatter::with_indent(b"\t"));
     serde::Serialize::serialize(v, &mut ser)?;
     out.push(b'\n');
-    fs::write(p, out)?;
+    crate::write_atomic(&p, out)?;
     Ok(())
 }
 
@@ -183,6 +189,12 @@ mod tests {
         uninstall(&game, false).unwrap();
         assert!(!launcher_patched(&game) && !game.join("ZombieBuddy.jar").exists());
         assert_eq!(read_launcher(&game).unwrap()["vmArgs"], serde_json::json!(["-Xmx3072m"]));
+    }
+
+    #[test]
+    fn only_the_official_item_supplies_the_agent() {
+        assert!(official_source("steam:3619862853") && official_source("workshop:3619862853"));
+        assert!(!official_source("manual") && !official_source("local:C:/x.zip") && !official_source("steam:1"));
     }
 
     #[test]

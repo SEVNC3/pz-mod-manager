@@ -172,7 +172,7 @@ fn rollback(id: String) -> Res<View> {
 #[tauri::command]
 fn profile_new(name: String) -> Res<View> {
     locked(|paths| {
-        if profile::list(paths).contains(&name) {
+        if profile::exists(paths, &name) {
             anyhow::bail!("a profile named {name:?} already exists");
         }
         let lines = active(paths)?.lines;
@@ -300,7 +300,7 @@ type ZbPaths = (Option<std::path::PathBuf>, Option<std::path::PathBuf>, BTreeMap
 fn zb_paths(paths: &Paths) -> anyhow::Result<ZbPaths> {
     let mods = store::scan(paths)?;
     let launcher = zb::game_dir().and_then(|g| zb::launcher_dir(&g));
-    let libs = mods.get(zb::MOD_ID).and_then(|m| zb::libs_dir(&m.dir));
+    let libs = mods.get(zb::MOD_ID).filter(|m| zb::official_source(&m.source)).and_then(|m| zb::libs_dir(&m.dir));
     Ok((launcher, libs, mods))
 }
 
@@ -550,8 +550,7 @@ async fn server_import(name: String) -> Res<View> {
                 pzmm_core::log!("installing {} Workshop item(s) the server uses", missing.len());
                 sources::install(paths, &missing, false);
             }
-            let lines = cfg.mods.into_iter().map(|id| Line::Mod { id, on: true }).collect();
-            profile::apply(paths, &Profile { name: format!("Server {name}"), lines })?;
+            profile::apply(paths, &Profile::from_ids(&format!("Server {name}"), cfg.mods))?;
             view(paths)
         })
     })
@@ -565,8 +564,7 @@ fn save_use(mode: String, name: String) -> Res<View> {
     locked(|paths| {
         let save = pz::saves::list(paths).into_iter().find(|s| s.mode == mode && s.name == name);
         let Some(save) = save else { anyhow::bail!("save {mode}/{name} not found") };
-        let lines = save.mods.into_iter().map(|id| Line::Mod { id, on: true }).collect();
-        profile::apply(paths, &Profile { name: format!("Save {name}"), lines })?;
+        profile::apply(paths, &Profile::from_ids(&format!("Save {name}"), save.mods))?;
         view(paths)
     })
 }

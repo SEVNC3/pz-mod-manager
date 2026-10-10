@@ -246,7 +246,16 @@ fn steamcmd(paths: &Paths) -> Result<PathBuf> {
 
 /// Download items anonymously. Returns each id with its content folder, or None if
 /// SteamCMD didn't produce one (its exit code is unreliable, so we check the folder).
+/// Workshop ids are numbers. Anything else (from a server .ini, a pasted link) must never
+/// reach SteamCMD's command line or a path.
+pub fn valid_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 20 && id.bytes().all(|b| b.is_ascii_digit())
+}
+
 pub fn download(paths: &Paths, app: &str, ids: &[&str]) -> Result<Vec<(String, Option<PathBuf>)>> {
+    if let Some(bad) = ids.iter().find(|i| !valid_id(i)) {
+        bail!("{bad:?} isn't a Workshop item id");
+    }
     let exe = steamcmd(paths)?;
     let mut cmd = Command::new(&exe);
     cmd.arg("+login").arg("anonymous");
@@ -295,6 +304,17 @@ mod tests {
         assert_eq!(page.items[0].id, "3810071828");
         assert_eq!((page.items[0].file_size, page.items[0].tags.clone()), (1_048_576, vec!["Build 42".to_string()]));
         assert!(parse_browse("<html>maintenance</html>").is_err());
+    }
+
+    #[test]
+    fn workshop_ids_are_digits_only() {
+        assert!(valid_id("3619862853"));
+        for bad in ["", "+runscript", "../..", "12 3", "1;2", "123456789012345678901"] {
+            assert!(!valid_id(bad), "{bad:?}");
+        }
+        let t = tempfile::tempdir().unwrap();
+        let paths = Paths { zomboid: t.path().into(), data: t.path().into() };
+        assert!(download(&paths, "108600", &["+runscript"]).is_err(), "rejected before SteamCMD runs");
     }
 
     #[test]

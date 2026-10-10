@@ -30,7 +30,9 @@ pub struct Profile {
 }
 
 impl Profile {
+    /// Each mod appears once (first line wins); empty ids are dropped.
     pub fn parse(name: &str, text: &str) -> Profile {
+        let mut seen = HashSet::new();
         let lines = text
             .lines()
             .map(str::trim)
@@ -43,7 +45,18 @@ impl Profile {
                     l.strip_prefix('-').map(|id| Line::Mod { id: id.trim().into(), on: false })
                 }
             })
+            .filter(|l| match l {
+                Line::Mod { id, .. } => !id.is_empty() && seen.insert(id.clone()),
+                Line::Separator(_) => true,
+            })
             .collect();
+        Profile { name: name.into(), lines }
+    }
+
+    /// A profile enabling `ids` in order (duplicates and empty ids dropped).
+    pub fn from_ids(name: &str, ids: impl IntoIterator<Item = String>) -> Profile {
+        let mut seen = HashSet::new();
+        let lines = ids.into_iter().filter(|id| !id.is_empty() && seen.insert(id.clone())).map(|id| Line::Mod { id, on: true }).collect();
         Profile { name: name.into(), lines }
     }
 
@@ -78,7 +91,7 @@ impl Profile {
     /// refilled in the game's order. Returns whether anything changed.
     pub fn adopt(&mut self, game: &[String]) -> bool {
         let mut seen = HashSet::new();
-        let game: Vec<&String> = game.iter().filter(|i| seen.insert(*i)).collect();
+        let game: Vec<&String> = game.iter().filter(|i| !i.is_empty() && seen.insert(*i)).collect();
         if self.enabled().iter().eq(game.iter().copied()) {
             return false;
         }
@@ -112,10 +125,15 @@ fn dir(paths: &Paths) -> PathBuf {
 }
 
 fn valid_name(name: &str) -> Result<()> {
-    if name.is_empty() || name.contains(['/', '\\', ':', '*', '?', '"', '<', '>', '|']) || name.starts_with('.') {
+    if !crate::safe_file_name(name) || name.starts_with('.') {
         bail!("invalid profile name: {name:?}");
     }
     Ok(())
+}
+
+/// Whether a profile with this name exists, ignoring case (Windows folders do).
+pub fn exists(paths: &Paths, name: &str) -> bool {
+    list(paths).iter().any(|n| n.eq_ignore_ascii_case(name))
 }
 
 pub fn list(paths: &Paths) -> Vec<String> {
@@ -143,7 +161,7 @@ pub fn save(paths: &Paths, profile: &Profile) -> Result<()> {
     valid_name(&profile.name)?;
     let d = dir(paths).join(&profile.name);
     fs::create_dir_all(&d)?;
-    fs::write(d.join("modlist.txt"), profile.to_text())?;
+    crate::write_atomic(&d.join("modlist.txt"), profile.to_text())?;
     Ok(())
 }
 
@@ -162,7 +180,7 @@ fn state(paths: &Paths) -> State {
 
 fn save_state(paths: &Paths, s: &State) -> Result<()> {
     fs::create_dir_all(&paths.data)?;
-    fs::write(paths.data.join("state.json"), serde_json::to_string_pretty(s)?)?;
+    crate::write_atomic(&paths.data.join("state.json"), serde_json::to_string_pretty(s)?)?;
     Ok(())
 }
 
@@ -188,9 +206,10 @@ pub fn set_b41(paths: &Paths, b41: Option<bool>) -> Result<()> {
 /// adopt any changes made in-game. Returns the profile and whether it adopted changes.
 pub fn sync(paths: &Paths) -> Result<(Profile, bool)> {
     let name = active_name(paths);
-    let game = pz::read_default(&paths.default_txt()).mods;
     let mut p = load(paths, &name).unwrap_or_else(|_| Profile { name, lines: vec![] });
-    let changed = p.adopt(&game);
+    // a missing or unreadable default.txt (game running, odd encoding) says nothing about
+    // what's enabled: adopting it would switch the whole profile off
+    let changed = pz::try_read_default(&paths.default_txt()).is_some_and(|game| p.adopt(&game.mods));
     if changed || !dir(paths).join(&p.name).exists() {
         save(paths, &p)?;
     }
@@ -229,6 +248,26 @@ mod tests {
         assert_eq!(p.to_text(), "# --- Maps\n+C\n+A\n+B\n+D\n");
         assert!(p.adopt(&ids(&["B"])));
         assert_eq!(p.to_text(), "# --- Maps\n-C\n-A\n+B\n-D\n");
+    }
+
+    #[test]
+    fn unreadable_default_txt_keeps_the_profile() {
+        let (_t, paths) = temp_paths();
+        apply(&paths, &Profile::from_ids("Default", ids(&["A", "B"]))).unwrap();
+        // the game has it locked / it was deleted / it isn't UTF-8
+        fs::write(paths.default_txt(), [0xff, 0xfe, 0x00]).unwrap();
+        assert_eq!(sync(&paths).unwrap().0.enabled(), ids(&["A", "B"]));
+        fs::remove_file(paths.default_txt()).unwrap();
+        assert_eq!(sync(&paths).unwrap().0.enabled(), ids(&["A", "B"]));
+    }
+
+    #[test]
+    fn duplicates_and_empty_ids_are_dropped() {
+        assert_eq!(Profile::parse("x", "+A\n+\n-A\n+B\n").to_text(), "+A\n+B\n");
+        assert_eq!(Profile::from_ids("x", ids(&["A", "", "A", "B"])).enabled(), ids(&["A", "B"]));
+        let mut p = Profile::parse("x", "+A\n");
+        p.adopt(&ids(&["A", "", "A"]));
+        assert_eq!(p.to_text(), "+A\n");
     }
 
     #[test]
