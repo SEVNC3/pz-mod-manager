@@ -533,6 +533,11 @@
         "few": "Skopiowano {count} mapy: linki do Warsztatu, mod ID, wymagania oraz wiersze Mods=, WorkshopItems= i Map=.",
         "many": "Skopiowano {count} map: linki do Warsztatu, mod ID, wymagania oraz wiersze Mods=, WorkshopItems= i Map=.",
         "other": "Skopiowano {count} map: linki do Warsztatu, mod ID, wymagania oraz wiersze Mods=, WorkshopItems= i Map=."
+      },
+      "text": {
+        "ids": "ID moda: {id} · Folder mapy: {folders}",
+        "required": "Wymagane mody",
+        "missing": "Wymagane, ale nie znalezione (niezainstalowane, nie ma ich w Warsztacie): {ids}"
       }
     },
     "presets": {
@@ -599,7 +604,27 @@
         "many": "{count} innych elementów nie ma tagu Mapa, więc nie zostały odczytane.",
         "other": "{count} innych elementów nie ma tagu Mapa, więc nie zostały odczytane."
       }
-    }
+    },
+    "err": {
+      "scanRunning": "Skanowanie map z Warsztatu już trwa.",
+      "steamStopped": "Steam przestał odpowiadać. To, co odczytano, zostaje; zeskanuj ponownie później.",
+      "timeout": "Steam nie odpowiedział na czas.",
+      "stopped": "Zatrzymano.",
+      "notAnId": "To nie jest ID przedmiotu z Warsztatu.",
+      "noItem": "Nie ma takiego przedmiotu w Warsztacie.",
+      "installed": "Ten przedmiot z Warsztatu jest już zainstalowany: jeśli dodaje mapy, są na liście.",
+      "noFiles": "Steam nie podaje żadnych plików tego przedmiotu.",
+      "fileList": "Steam nie udostępnił listy plików przedmiotu.",
+      "login": "Nie udało się zalogować anonimowo do Steam.",
+      "downloadFailed": "Pobieranie nie powiodło się."
+    },
+    "updatedAgo": "zaktualizowano {when}",
+    "expand": "Powiększ",
+    "expandTip": "Siatka wypełnia kartę (Esc, aby wrócić)",
+    "collapse": "Przywróć",
+    "collapseTip": "Powrót do normalnego rozmiaru",
+    "resizeLabel": "Wysokość siatki",
+    "resizeTip": "Przeciągnij lub naciśnij ↑/↓, aby zmienić wysokość siatki"
   },
   "mapOrder": {
     "label": "Kolejność map",
@@ -607,7 +632,9 @@
     "topTip": "Ładuj ją jako pierwszą",
     "topLabel": "Przenieś {name} na górę",
     "autosort": "Sortuj mapy automatycznie",
-    "autosortTip": "Najpierw mapy z modów w obecnej kolejności, potem Muldraugh, KY"
+    "autosortTip": "Najpierw mapy z modów w obecnej kolejności, potem Muldraugh, KY",
+    "fixed": "Ostatnia",
+    "fixedTip": "Mapa samej gry zawsze ładuje się jako ostatnia"
   },
   "layerIcon": {
     "overrides": "Nadpisuje pliki z {mods}",

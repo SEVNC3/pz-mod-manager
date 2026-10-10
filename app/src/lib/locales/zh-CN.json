@@ -416,6 +416,11 @@
       },
       "copied": {
         "other": "已复制 {count} 张地图：创意工坊链接、mod ID、依赖项以及 Mods=、WorkshopItems= 和 Map= 行。"
+      },
+      "text": {
+        "ids": "模组 ID：{id} · 地图文件夹：{folders}",
+        "required": "所需模组",
+        "missing": "需要但未找到（未安装，创意工坊中也没有）：{ids}"
       }
     },
     "presets": {
@@ -470,7 +475,27 @@
       "collectionUntagged": {
         "other": "另有 {count} 个物品没有“地图”标签，因此未读取。"
       }
-    }
+    },
+    "err": {
+      "scanRunning": "已有一个创意工坊地图扫描正在进行。",
+      "steamStopped": "Steam 停止了响应。已读取的内容会保留；请稍后再扫描。",
+      "timeout": "Steam 没有及时响应。",
+      "stopped": "已停止。",
+      "notAnId": "这不是创意工坊物品 ID。",
+      "noItem": "没有这个创意工坊物品。",
+      "installed": "这个创意工坊物品已安装：如果它添加了地图，它们已在列表中。",
+      "noFiles": "Steam 没有列出此物品的任何文件。",
+      "fileList": "Steam 没有提供该物品的文件列表。",
+      "login": "无法匿名登录 Steam。",
+      "downloadFailed": "下载失败。"
+    },
+    "updatedAgo": "{when}更新",
+    "expand": "展开",
+    "expandTip": "让网格填满整个标签页（按 Esc 返回）",
+    "collapse": "还原",
+    "collapseTip": "恢复正常大小",
+    "resizeLabel": "网格高度",
+    "resizeTip": "拖动或按 ↑/↓ 调整网格高度"
   },
   "mapOrder": {
     "label": "地图顺序",
@@ -478,7 +503,9 @@
     "topTip": "最先加载",
     "topLabel": "将 {name} 移到顶部",
     "autosort": "自动排序地图",
-    "autosortTip": "模组地图在前，保持当前顺序，然后是 Muldraugh, KY"
+    "autosortTip": "模组地图在前，保持当前顺序，然后是 Muldraugh, KY",
+    "fixed": "最后",
+    "fixedTip": "游戏自带的地图总是最后加载"
   },
   "layerIcon": {
     "overrides": "覆盖了 {mods} 的文件",

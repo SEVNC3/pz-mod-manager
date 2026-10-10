@@ -455,6 +455,11 @@
       "copied": {
         "one": "Se copió {count} mapa: enlaces del Workshop, mod IDs, requisitos y las líneas Mods=, WorkshopItems= y Map=.",
         "other": "Se copiaron {count} mapas: enlaces del Workshop, mod IDs, requisitos y las líneas Mods=, WorkshopItems= y Map=."
+      },
+      "text": {
+        "ids": "ID del mod: {id} · Carpeta del mapa: {folders}",
+        "required": "Mods necesarios",
+        "missing": "Necesarios pero no encontrados (no instalados, no están en el Workshop): {ids}"
       }
     },
     "presets": {
@@ -513,7 +518,27 @@
         "one": "{count} elemento más no tiene la etiqueta Map, así que no se leyó.",
         "other": "{count} elementos más no tienen la etiqueta Map, así que no se leyeron."
       }
-    }
+    },
+    "err": {
+      "scanRunning": "Ya hay un escaneo de mapas del Workshop en curso.",
+      "steamStopped": "Steam dejó de responder. Lo leído se conserva; vuelve a escanear más tarde.",
+      "timeout": "Steam no respondió a tiempo.",
+      "stopped": "Detenido.",
+      "notAnId": "Eso no es un ID de elemento del Workshop.",
+      "noItem": "No existe ese elemento del Workshop.",
+      "installed": "Ese elemento del Workshop ya está instalado: si añade mapas, están en la lista.",
+      "noFiles": "Steam no lista archivos para este elemento.",
+      "fileList": "Steam no dio la lista de archivos del elemento.",
+      "login": "No se pudo iniciar sesión en Steam de forma anónima.",
+      "downloadFailed": "La descarga falló."
+    },
+    "updatedAgo": "actualizado {when}",
+    "expand": "Ampliar",
+    "expandTip": "La cuadrícula ocupa toda la pestaña (Esc para volver)",
+    "collapse": "Restaurar",
+    "collapseTip": "Volver al tamaño normal",
+    "resizeLabel": "Altura de la cuadrícula",
+    "resizeTip": "Arrastra, o pulsa ↑/↓, para cambiar la altura de la cuadrícula"
   },
   "mapOrder": {
     "label": "Orden de mapas",
@@ -521,7 +546,9 @@
     "topTip": "Cargarlo primero",
     "topLabel": "Mover {name} arriba del todo",
     "autosort": "Ordenar mapas automáticamente",
-    "autosortTip": "Primero los mapas de mods, en su orden actual, y luego Muldraugh, KY"
+    "autosortTip": "Primero los mapas de mods, en su orden actual, y luego Muldraugh, KY",
+    "fixed": "Último",
+    "fixedTip": "El mapa del propio juego siempre se carga el último"
   },
   "layerIcon": {
     "overrides": "Sobrescribe archivos de {mods}",

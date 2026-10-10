@@ -866,7 +866,8 @@ async fn maps_view() -> Res<MapsView> {
         let (out, providers) = maps::workshop_maps(&checked, build, &mods);
         let items = checked
             .into_iter()
-            .filter(|(_, c)| c.failed.is_empty())
+            // read, or read before and kept while a newer version won't read
+            .filter(|(_, c)| c.failed.is_empty() || !c.builds.is_empty())
             .map(|(id, c)| {
                 let mods = c.mods.get(&build).copied().unwrap_or_default();
                 (id, MapItem { title: c.title, author: c.author, subscriptions: c.subscriptions, size: c.size, manual: c.manual, updated: c.updated, created: c.created, tags: c.tags, mods })
@@ -891,50 +892,62 @@ fn map_quick_select(all: Vec<MapMod>, fixed: Vec<MapMod>, ranks: BTreeMap<String
 }
 
 /// The `Map=` list for `folders`, keeping the arrangement in `order` and, for maps it lacks,
-/// the profile's saved one (see `server::map_order`).
+/// where the profile's order starts (see `profile::map_start`). Reads only: opening the Maps
+/// tab changes nothing.
 #[tauri::command(async)]
 fn map_line(order: Vec<String>, folders: Vec<String>) -> Res<Vec<String>> {
-    let saved = reading(|paths| Ok(profile::map_order(paths, &profile::active_name(paths))))?;
-    Ok(pz::server::map_order(&pz::server::merge_order(&saved, &order), &folders))
+    reading(|paths| {
+        let start = profile::map_start(paths, &profile::peek(paths), &scan(paths)?, profile::effective_build(paths));
+        Ok(pz::server::map_order(&pz::server::merge_order(&start, &order), &folders))
+    })
 }
 
-/// Keep an arranged `Map=` list with the active profile, and give the game the enabled maps
-/// in that order (default.txt's `maps` block).
+/// Keep a `Map=` list the player arranged with the active profile (its enabled maps only:
+/// previewed ones never), and give the game the enabled maps in that order (default.txt's `maps` block).
 #[tauri::command(async)]
 fn map_order_save(maps: Vec<String>) -> Res<()> {
     reading(|paths| {
-        if profile::set_map_order(paths, &profile::active_name(paths), &maps)? {
-            profile::apply(paths, &active(paths)?)?;
+        let p = active(paths)?;
+        let on = pz::server::mod_maps(&p.enabled(), &scan(paths)?, profile::effective_build(paths));
+        let maps: Vec<String> = maps.into_iter().filter(|m| on.contains(m) || maps::is_vanilla(m)).collect();
+        if profile::set_map_order(paths, &p.name, &maps)? {
+            profile::apply(paths, &p)?;
         }
         Ok(())
     })
 }
 
-/// Clipboard text for the shown maps: links, mod ids, requirements and the server lines.
-#[tauri::command(async)]
-fn maps_export(shown: Vec<MapMod>, map_line: Vec<String>) -> Res<String> {
-    reading(|paths| {
-        let (mods, build) = (scan(paths)?, profile::effective_build(paths));
-        let known = maps::workshop_maps(&maps::checked(paths), build, &mods).0;
-        Ok(maps::export(&shown.iter().collect::<Vec<_>>(), &mods, &known, &map_line, build == 41))
+/// Clipboard text for the shown maps: links, mod ids, requirements (looked up on the Workshop
+/// when PZMM doesn't know them) and the server lines, worded with `labels` (the UI's language).
+#[tauri::command]
+async fn maps_export(shown: Vec<MapMod>, map_line: Vec<String>, labels: maps::ExportLabels) -> Res<String> {
+    blocking(move || -> Res<_> {
+        let (mods, build, checked) = reading(|paths| Ok((scan(paths)?, profile::effective_build(paths), maps::checked(paths))))?;
+        let known = maps::workshop_maps(&checked, build, &mods).0;
+        let mut find = |id: &str, needed_by: Option<&str>| match sources::find_mod(id, needed_by, build) {
+            Ok(c) => c.into_iter().next().filter(|c| c.sure()).map(|c| (c.item.title, c.item.id)),
+            Err(e) => {
+                pzmm_core::log!("error: looking up {id}: {e:#}");
+                None
+            }
+        };
+        Ok(maps::export(&shown.iter().collect::<Vec<_>>(), &mods, &known, &map_line, build == 41, &labels, &mut find))
     })
+    .await
 }
 /// Read a Workshop item's cells from its file list, without installing it; with `download`,
 /// SteamCMD downloads it when Steam won't give the list (the download is deleted).
 #[tauri::command]
 async fn map_check(id: String, download: bool) -> Res<Vec<MapMod>> {
-    blocking(move || {
+    blocking(move || -> Res<_> {
         if !sources::steam_workshop::valid_id(&id) {
-            anyhow::bail!("{id:?} isn't a Workshop item id");
+            return Err(maps::ui_error(&maps::Fail::NotAnId.into()));
         }
-        let build = reading(|paths| {
-            if sources::workshop_available(paths).contains(&id) {
-                anyhow::bail!("workshop:{id} is already installed: if it adds maps, they are in the list");
-            }
-            Ok(profile::effective_build(paths))
-        })
-        .map_err(anyhow::Error::msg)?;
-        let found = maps::check(&Paths::detect(), &id, download)?.builds.remove(&build).unwrap_or_default();
+        let (have, build) = reading(|paths| Ok((sources::workshop_available(paths).contains(&id), profile::effective_build(paths))))?;
+        if have {
+            return Err(maps::ui_error(&maps::Fail::Installed.into()));
+        }
+        let found = maps::check(&Paths::detect(), &id, download).map_err(|e| maps::ui_error(&e))?.builds.remove(&build).unwrap_or_default();
         if found.is_empty() {
             pzmm_core::log!("workshop:{id} adds no maps for Build {build}");
         }
@@ -946,23 +959,35 @@ async fn map_check(id: String, download: bool) -> Res<Vec<MapMod>> {
 static MAP_SCAN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static MAP_SCAN_STOP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// A one-at-a-time flag held while this lives: cleared when it drops, errors and panics included.
+struct Running(&'static std::sync::atomic::AtomicBool);
+
+impl Running {
+    /// None while another holds `flag`.
+    fn take(flag: &'static std::sync::atomic::AtomicBool) -> Option<Running> {
+        (!flag.swap(true, std::sync::atomic::Ordering::SeqCst)).then_some(Running(flag))
+    }
+}
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        self.0.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 /// Read every Map-tagged Workshop item, both builds (see `maps::scan_workshop`), sending
 /// "maps-scan" progress events. One scan at a time.
 #[tauri::command]
 async fn map_scan(app: AppHandle) -> Res<maps::Progress> {
-    use std::sync::atomic::Ordering::SeqCst;
-    if MAP_SCAN.swap(true, SeqCst) {
-        return Err("A Workshop map scan is already running.".into());
-    }
-    MAP_SCAN_STOP.store(false, SeqCst);
-    let res = blocking(move || {
+    let Some(_running) = Running::take(&MAP_SCAN) else { return Err(maps::ui_error(&maps::Fail::ScanRunning.into())) };
+    MAP_SCAN_STOP.store(false, std::sync::atomic::Ordering::SeqCst);
+    blocking(move || {
         maps::scan_workshop(&Paths::detect(), &MAP_SCAN_STOP, &mut |p| {
             let _ = app.emit("maps-scan", p);
         })
+        .map_err(|e| maps::ui_error(&e))
     })
-    .await;
-    MAP_SCAN.store(false, SeqCst);
-    res
+    .await
 }
 
 #[tauri::command]
@@ -1279,7 +1304,21 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{Row, launch_url};
+    use super::{Row, Running, launch_url};
+
+    #[test]
+    fn a_scan_flag_always_clears() {
+        static FLAG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        let held = Running::take(&FLAG).unwrap();
+        assert!(Running::take(&FLAG).is_none(), "one at a time");
+        drop(held);
+        // a scan that panics (or errors) still lets the next one start
+        let _ = std::panic::catch_unwind(|| {
+            let _held = Running::take(&FLAG).unwrap();
+            panic!("scan blew up");
+        });
+        assert!(Running::take(&FLAG).is_some());
+    }
 
     #[test]
     fn launch_args_go_in_the_steam_link() {

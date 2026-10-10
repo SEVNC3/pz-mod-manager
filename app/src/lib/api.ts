@@ -242,7 +242,8 @@ export const api = {
   /** The Map= list for `folders`: `order`'s arrangement, the profile's saved one for maps it lacks. */
   mapLine: (order: string[], folders: string[]) => invoke<string[]>("map_line", { order, folders }),
   mapOrderSave: (maps: string[]) => invoke<void>("map_order_save", { maps }),
-  mapsExport: (shown: MapMod[], mapLine: string[]) => invoke<string>("maps_export", { shown, mapLine }),
+  /** `labels`: the export's words in the UI language (`ids` fills {id} and {folders}, `missing` {ids}). */
+  mapsExport: (shown: MapMod[], mapLine: string[], labels: { ids: string; required: string; missing: string }) => invoke<string>("maps_export", { shown, mapLine, labels }),
   mapCheck: (id: string, download: boolean) => invoke<MapMod[]>("map_check", { id, download }),
   /** Read every Map-tagged Workshop item, both builds ("maps-scan" events report progress). */
   mapScan: () => invoke<MapScan>("map_scan"),

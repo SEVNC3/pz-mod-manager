@@ -22,7 +22,7 @@
   import { api, type Cell, type GridCell, type MapCompare, type MapMod, type MapsView, type ModRow, type WorkshopItem } from "./api";
   import Icon from "./Icon.svelte";
   import MapOrder from "./MapOrder.svelte";
-  import { compact, fmtSize, workshopUrl } from "./format";
+  import { compact, fmtAgo, fmtSize, workshopUrl } from "./format";
   import { t, th, type Vars } from "./i18n.svelte";
   import { prefs } from "./prefs.svelte";
 
@@ -42,13 +42,24 @@
     onUndo: () => void;
   } = $props();
 
+  /** A backend error in the player's language: Maps failures come as `maps.err.<key>`, then English detail after ": ". */
+  function errParts(e: unknown) {
+    const s = String(e).replace(/^Error:\s*/, "");
+    const m = s.match(/^(maps\.err\.\w+)(?::\s*([\s\S]*))?$/);
+    return m ? { text: t(m[1]), detail: m[2] ?? "" } : { text: s, detail: "" };
+  }
+  const errText = (e: unknown) => {
+    const { text, detail } = errParts(e);
+    return detail ? `${text} (${detail})` : text;
+  };
+
   let data = $state.raw<MapsView | null>(null);
   /** Maps shown on the grid without being enabled. */
   let preview = $state<Set<string>>(new Set());
   /** Clicked cells (shift-click adds): the list shows only the maps covering one of them. */
   let pickedCells = $state<Cell[]>([]);
 
-  const load = () => api.mapsView().then((v) => (data = v)).catch((e) => say(String(e), {}, true));
+  const load = () => api.mapsView().then((v) => (data = v)).catch((e) => say(errText(e), {}, true));
   // after installs, removals and toggles (busy flips back), like Details; as the scan reads, and
   // when it ends (even if the tab was closed and opened again meanwhile)
   $effect(() => {
@@ -75,7 +86,7 @@
   let gridFor = 0;
   $effect(() => {
     const ask = ++gridFor;
-    api.mapGrid(data?.vanilla ?? [], data?.water ?? [], drawn).then((g) => ask === gridFor && (grid = g)).catch((e) => say(String(e), {}, true));
+    api.mapGrid(data?.vanilla ?? [], data?.water ?? [], drawn).then((g) => ask === gridFor && (grid = g)).catch((e) => say(errText(e), {}, true));
   });
   const byCell = $derived(new Map(grid.map((c) => [`${c.x},${c.y}`, c])));
   const vanillaSet = $derived(new Set((data?.vanilla ?? []).map(key)));
@@ -118,6 +129,7 @@
     preview = last.preview;
   }
   function undoKey(e: KeyboardEvent) {
+    if (e.key === "Escape" && expanded) return toggleExpand();
     const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
     if (typing || busy || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== "z") return;
     e.preventDefault();
@@ -197,7 +209,7 @@
       setPreview(new Set(pick));
       say(pick.length ? "maps.quickSelectDone" : "maps.quickSelectNone", { count: pick.length });
     } catch (e) {
-      say(String(e), {}, true);
+      say(errText(e), {}, true);
     } finally {
       picking = false;
     }
@@ -257,7 +269,7 @@
   const workshopCount = $derived(data ? Object.keys(data.items).length : 0);
   const scanText = $derived.by(() => {
     const p = scan.p;
-    if (scan.error) return /429|limiting/i.test(scan.error) ? t("maps.scan.limited") : scan.error.replace(/^Error:\s*/, "");
+    if (scan.error) return /429|limiting/i.test(scan.error) ? t("maps.scan.limited") : errText(scan.error);
     if (scan.running && scan.stopping) return t("maps.scan.stopping");
     if (!scan.running || !p) return t("maps.scan.summary", { n: data?.checked.length ?? 0, count: workshopCount });
     if (p.phase === "listing") return t("maps.scan.listing", { done: p.done, total: p.total || "?" });
@@ -329,27 +341,31 @@
     }
   }
 
-  // --- Map= order (kept with the profile) and export ---
+  // --- Map= order (kept with the profile once arranged) and export ---
   let mapLine = $state<string[]>([]);
   const folders = $derived(shown.flatMap((m) => m.maps.map((f) => f.folder)));
+  let lineFor = 0;
   $effect(() => {
     const f = folders;
-    api.mapLine(untrack(() => $state.snapshot(mapLine)), f).then((l) => (mapLine = l)).catch(() => {});
+    const ask = ++lineFor;
+    api.mapLine(untrack(() => $state.snapshot(mapLine)), f).then((l) => ask === lineFor && (mapLine = l)).catch(() => {});
   });
-  // saved (and given to the game) once the arranging stops for a moment
-  $effect(() => {
-    const line = $state.snapshot(mapLine);
-    if (!line.length) return;
-    const t = setTimeout(() => api.mapOrderSave(line).catch((e) => say(String(e), {}, true)), 600);
-    return () => clearTimeout(t);
-  });
+  // saved (and given to the game) only when the player arranges, once they stop for a moment:
+  // opening the tab changes nothing
+  let saving: ReturnType<typeof setTimeout> | undefined;
+  function arranged(line: string[]) {
+    lineFor++; // an answer still on its way is older than this
+    clearTimeout(saving);
+    saving = setTimeout(() => api.mapOrderSave(line).catch((e) => say(errText(e), {}, true)), 600);
+  }
 
   async function exportMaps() {
     try {
-      await navigator.clipboard.writeText(await api.mapsExport(shown, $state.snapshot(mapLine)));
+      const labels = { ids: t("maps.export.text.ids"), required: t("maps.export.text.required"), missing: t("maps.export.text.missing") };
+      await navigator.clipboard.writeText(await api.mapsExport(shown, $state.snapshot(mapLine), labels));
       say("maps.export.copied", { count: shown.length });
     } catch (e) {
-      say(String(e), {}, true);
+      say(errText(e), {}, true);
     }
   }
 
@@ -371,7 +387,7 @@
       presetName = "";
       say("maps.presets.saved", { count: shown.length, name });
     } catch (err) {
-      say(String(err), {}, true);
+      say(errText(err), {}, true);
     }
   }
   function loadPreset() {
@@ -386,7 +402,7 @@
       presets = await api.mapPresetSet(presetPick, null);
       presetPick = "";
     } catch (err) {
-      say(String(err), {}, true);
+      say(errText(err), {}, true);
     }
   }
 
@@ -401,7 +417,7 @@
     try {
       compared = await api.mapServerCompare(server, [...new Set(folders)]);
     } catch (err) {
-      say(String(err), {}, true);
+      say(errText(err), {}, true);
     }
   }
   const byId = (id: string | null) => (id ? all.find((m) => m.id === id) : undefined);
@@ -409,9 +425,14 @@
   // --- check one Workshop map without installing it ---
   let checkText = $state("");
   let checking = $state(false);
+  /** The Workshop item in a link or text: its `id=`, else the last long number (never the game's own app id). */
+  const workshopIdOf = (text: string) => {
+    const id = text.match(/[?&]id=(\d+)/)?.[1] ?? text.match(/\d{4,}/g)?.at(-1);
+    return id === "108600" ? undefined : id;
+  };
   async function check(e: Event) {
     e.preventDefault();
-    const id = checkText.trim().match(/(?:id=)?(\d{4,})/)?.[1];
+    const id = workshopIdOf(checkText.trim());
     if (!id) return say("maps.check.pasteId", {}, true);
     checking = true;
     try {
@@ -423,7 +444,8 @@
       try {
         found = await api.mapCheck(id, false);
       } catch (err) {
-        if (!confirm(t("maps.check.confirmDownload", { title: item.title, error: String(err).replace(/^Error:\s*/, ""), size: fmtSize(item.file_size) }))) return;
+        const why = errParts(err);
+        if (!confirm(t("maps.check.confirmDownload", { title: item.title, error: why.detail || why.text, size: fmtSize(item.file_size) }))) return;
         found = await api.mapCheck(id, true);
       }
       checkText = "";
@@ -431,7 +453,7 @@
       say(found.length ? "maps.check.read" : "maps.check.noMaps", { title: item.title, build: String(data?.build) });
       await load();
     } catch (err) {
-      say(String(err), {}, true);
+      say(errText(err), {}, true);
     } finally {
       checking = false;
     }
@@ -472,7 +494,44 @@
   }
 
   // --- the grid: a canvas (thousands of cells), coloured from the theme's tokens ---
-  const HEIGHT = 460;
+  const [MIN_H, MAX_H] = [240, 2400];
+  /** The grid's height (drag the handle under it), unless expanded to fill the tab. */
+  let height = $state(460);
+  let expanded = $state(false);
+  let boxH = $state(0);
+  const HEIGHT = $derived(boxH || height);
+  let section = $state<HTMLElement>();
+  let refit = false;
+  function toggleExpand() {
+    expanded = !expanded;
+    if (section) section.scrollTop = 0;
+    refit = true; // once the grid has its new size
+  }
+  $effect(() => {
+    void boxH;
+    if (refit) {
+      refit = false;
+      untrack(fit);
+    }
+  });
+  const clampH = (h: number) => Math.round(Math.min(MAX_H, Math.max(MIN_H, h)));
+  function resizeStart(e: PointerEvent) {
+    const [y0, h0, el] = [e.clientY, height, e.currentTarget as HTMLElement];
+    el.setPointerCapture(e.pointerId);
+    const to = (m: PointerEvent) => (height = clampH(h0 + m.clientY - y0));
+    const end = () => {
+      el.removeEventListener("pointermove", to);
+      el.removeEventListener("pointerup", end);
+    };
+    el.addEventListener("pointermove", to);
+    el.addEventListener("pointerup", end);
+  }
+  function resizeKey(e: KeyboardEvent) {
+    const step = e.key === "ArrowUp" ? -40 : e.key === "ArrowDown" ? 40 : 0;
+    if (!step) return;
+    e.preventDefault();
+    height = clampH(height + step);
+  }
   let canvas = $state<HTMLCanvasElement>();
   let probe = $state<HTMLSpanElement>();
   let width = $state(0);
@@ -620,9 +679,9 @@
 
 <svelte:window onkeydown={undoKey} />
 
-<section class="maps blueprint" aria-label={t("maps.label")}>
+<section class="maps blueprint" class:expanded aria-label={t("maps.label")} bind:this={section}>
   <div class="inner">
-    <div class="card world">
+    <div class="card world" class:expanded>
       <div class="head">
         <h2>{t("maps.worldMap")}</h2>
         <button class="quiet" onclick={() => (help = !help)} aria-expanded={help}><Icon name="info" size={14} />{t("maps.help.button")}</button>
@@ -660,10 +719,11 @@
           <button class="quiet" onclick={() => zoom(1.25)} aria-label={t("maps.zoomIn")}><Icon name="plus" size={14} />{t("maps.zoomIn")}</button>
           <button class="quiet" onclick={() => zoom(0.8)}>{t("maps.zoomOut")}</button>
           <button class="quiet" onclick={fit}>{t("maps.fit")}</button>
+          <button class="quiet" onclick={toggleExpand} aria-pressed={expanded} title={expanded ? t("maps.collapseTip") : t("maps.expandTip")}><Icon name={expanded ? "minimize" : "maximize"} size={14} />{expanded ? t("maps.collapse") : t("maps.expand")}</button>
         </span>
       </div>
-      <div class="canvas" bind:clientWidth={width}>
-        <canvas bind:this={canvas} style:height="{HEIGHT}px"
+      <div class="canvas" bind:clientWidth={width} bind:clientHeight={boxH} style:height={expanded ? undefined : `${height}px`}>
+        <canvas bind:this={canvas}
           aria-label={t("maps.gridLabel", { maps: shown.length, conflicts: conflictCells, over: overCells })}
           onpointerdown={down} onpointermove={move} onpointerup={up} onpointerleave={() => (hover = null)} onwheel={wheel}></canvas>
         <span bind:this={probe} hidden></span>
@@ -680,6 +740,12 @@
         {/if}
         {#if !data}<p class="loading">{t("maps.readingFiles")}</p>{/if}
       </div>
+      {#if !expanded}
+        <!-- a window splitter (focusable separator): svelte counts separators as non-interactive -->
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+        <div class="resize" role="separator" aria-orientation="horizontal" aria-label={t("maps.resizeLabel")} title={t("maps.resizeTip")} tabindex="0"
+          aria-valuenow={height} aria-valuemin={MIN_H} aria-valuemax={MAX_H} onpointerdown={resizeStart} onkeydown={resizeKey}></div>
+      {/if}
       {#if data && !data.vanilla}
         <p class="hint">{t("maps.noVanilla", { build: data.build })}</p>
       {/if}
@@ -753,7 +819,7 @@
               aria-label={t("maps.previewLabel", { name: nameOf(m) })} title={on ? t("maps.alwaysShownTip") : t("maps.previewTip")} />
             <span class="name">
               <span><strong>{nameOf(m)}</strong>{#if on}<span class="on">{t("common.enabled")}</span>{:else if !installed}<span class="off">{t("maps.notInstalled")}</span>{/if}{#if isShown}<button class="link hide" onclick={() => toggleHidden(m.id)} title={hidden.has(m.id) ? t("maps.showOnGridTip") : t("maps.hideOnGridTip")}>{hidden.has(m.id) ? t("maps.showOnGrid") : t("maps.hideOnGrid")}</button>{/if}</span>
-              <span class="hint">{t("maps.cellCount", { count: cellCount(m) })} · {m.maps.map((f) => f.folder).join("; ")}{meta?.author ? ` · ${t("maps.byAuthor", { author: meta.author })}` : ""}{meta?.subscriptions ? ` · ${t("maps.subscribers", { count: meta.subscriptions, n: compact.format(meta.subscriptions) })}` : ""}{!installed && meta?.size ? ` · ${fmtSize(meta.size)}` : ""}</span>
+              <span class="hint">{t("maps.cellCount", { count: cellCount(m) })} · {m.maps.map((f) => f.folder).join("; ")}{meta?.author ? ` · ${t("maps.byAuthor", { author: meta.author })}` : ""}{meta?.subscriptions ? ` · ${t("maps.subscribers", { count: meta.subscriptions, n: compact.format(meta.subscriptions) })}` : ""}{!installed && meta?.size ? ` · ${fmtSize(meta.size)}` : ""}{meta?.updated ? ` · ${t("maps.updatedAgo", { when: fmtAgo(meta.updated) })}` : ""}</span>
               {#each [...(clash?.with ?? [])].slice(0, 3) as [rival, cells] (rival)}
                 <span class="bad">{@html th("maps.conflictsWith", { count: cells.length, name: names.get(rival) ?? rival, cells: cellList(cells) })}
                   <button class="link" onclick={() => swap(m)} disabled={busy} title={t("maps.swapTip")}>{t("maps.swap")}</button></span>
@@ -870,7 +936,7 @@
       {#if mapLine.length}
         <h3>{t("maps.export.orderTitle")}</h3>
         <p class="hint">{@html th("maps.export.orderHint")}</p>
-        <MapOrder bind:maps={mapLine} />
+        <MapOrder bind:maps={mapLine} onarrange={arranged} />
       {/if}
       <div class="row">
         <button class="primary" onclick={exportMaps} disabled={!shown.length}><Icon name="copy" size={14} />{t("maps.export.copy", { count: shown.length })}</button>
@@ -1063,8 +1129,42 @@
   canvas {
     display: block;
     width: 100%;
+    height: 100%;
     cursor: crosshair;
     touch-action: none;
+  }
+  .resize {
+    height: 10px;
+    margin: 2px 0 -6px;
+    cursor: ns-resize;
+    touch-action: none;
+    background: linear-gradient(var(--muted), var(--muted)) center / 36px 3px no-repeat;
+    border-radius: 4px;
+    opacity: 0.6;
+  }
+  .resize:hover,
+  .resize:focus-visible {
+    opacity: 1;
+    background-color: color-mix(in oklab, var(--accent) 16%, var(--panel));
+  }
+  .resize:focus-visible {
+    outline: 2px solid var(--focus);
+  }
+  .maps.expanded {
+    position: relative;
+    overflow: hidden;
+  }
+  .world.expanded {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    border-radius: 0;
+  }
+  .world.expanded .canvas {
+    flex: 1;
+    min-height: 0;
   }
   .loading {
     position: absolute;

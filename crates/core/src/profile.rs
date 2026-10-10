@@ -272,16 +272,31 @@ pub fn set_map_order(paths: &Paths, name: &str, maps: &[String]) -> Result<bool>
     Ok(true)
 }
 
-/// default.txt's `maps` block for `profile`: its arranged order, kept to the enabled mods' maps
-/// on `build`, without Muldraugh (the game loads it last on its own). None keeps the block as
-/// it is: the profile's maps were never arranged.
-fn game_maps(paths: &Paths, profile: &Profile, build: u8) -> Option<Vec<String>> {
+/// Where `profile`'s `Map=` order starts: its arranged order (maporder.txt); never arranged,
+/// default.txt's `maps` block as it stands (hand-arranged, or another profile's), then the
+/// enabled mods' maps on `build` in load order. Reads only.
+pub fn map_start(paths: &Paths, profile: &Profile, mods: &std::collections::BTreeMap<String, crate::store::Row>, build: u8) -> Vec<String> {
     let order = map_order(paths, &profile.name);
-    if order.is_empty() {
-        return None;
+    if !order.is_empty() {
+        return order;
     }
+    let mut out = pz::read_default(&paths.default_txt()).map_folders();
+    out.extend(pz::server::mod_maps(&profile.enabled(), mods, build));
+    out
+}
+
+/// default.txt's `maps` block for `profile`: its enabled mods' maps on `build`, in the order
+/// `map_start` gives (so a never-arranged profile keeps the block's order but drops other
+/// profiles' maps), without Muldraugh (`write_default` keeps it last). None (the mods can't
+/// be read) keeps the block as it is.
+fn game_maps(paths: &Paths, profile: &Profile, build: u8) -> Option<Vec<String>> {
     let mods = crate::store::scan(paths).ok()?;
-    let line = pz::server::map_order(&order, &pz::server::mod_maps(&profile.enabled(), &mods, build));
+    let mut allowed = pz::server::mod_maps(&profile.enabled(), &mods, build);
+    // folders no installed mod provides (a mod outside PZMM's view) aren't PZMM's to drop
+    let ids: Vec<String> = mods.keys().cloned().collect();
+    let known = pz::server::mod_maps(&ids, &mods, build);
+    allowed.extend(pz::read_default(&paths.default_txt()).map_folders().into_iter().filter(|f| !known.contains(f)));
+    let line = pz::server::map_order(&map_start(paths, profile, &mods, build), &allowed);
     Some(line.into_iter().filter(|m| m != pz::server::BASE_MAP).collect())
 }
 
@@ -501,13 +516,61 @@ mod tests {
             fs::write(d.join("mod.info"), format!("id={id}\n")).unwrap();
         }
         apply(&paths, &Profile::parse("Default", "+A\n+B\n")).unwrap();
-        assert_eq!(pz::read_default(&paths.default_txt()).maps, "\n", "never arranged: the block is left alone");
+        assert_eq!(pz::read_default(&paths.default_txt()).maps, "\n    map = Town A,\n    map = Town B,\n", "never arranged: the enabled maps in load order");
         set_map_order(&paths, "Default", &ids(&["Town B", "Off", "Town A", "Muldraugh, KY"])).unwrap();
         apply(&paths, &Profile::parse("Default", "+A\n+B\n")).unwrap();
         assert_eq!(pz::read_default(&paths.default_txt()).maps, "\n    map = Town B,\n    map = Town A,\n", "enabled maps only, Muldraugh left to the game");
         // a map that leaves the arrangement keeps its place in the saved order
         set_map_order(&paths, "Default", &ids(&["Town A", "Town B", "Muldraugh, KY"])).unwrap();
         assert_eq!(map_order(&paths, "Default"), ids(&["Town A", "Town B", "Off", "Muldraugh, KY"]));
+    }
+
+    /// Mods `ids`, each adding one map folder (B42 layout).
+    fn map_mods(paths: &Paths, mods: &[(&str, &str)]) {
+        for (id, map) in mods {
+            let d = paths.mods().join(id).join("42");
+            fs::create_dir_all(d.join("media/maps").join(map)).unwrap();
+            fs::write(d.join("mod.info"), format!("id={id}\n")).unwrap();
+        }
+    }
+
+    #[test]
+    fn opening_keeps_a_hand_arranged_block() {
+        let (_t, paths) = temp_paths();
+        map_mods(&paths, &[("A", "Town A"), ("B", "Town B")]);
+        // arranged by hand (or by the game), never in PZMM: no maporder.txt
+        let game = "VERSION = 1,\n\nmods\n{\n    mod = \\A,\n    mod = \\B,\n}\n\nmaps\n{\n    map = Town B,\n    map = Town A,\n    map = Muldraugh, KY,\n}\n";
+        fs::create_dir_all(paths.default_txt().parent().unwrap()).unwrap();
+        fs::write(paths.default_txt(), game).unwrap();
+        // opening: the view syncs the profile, the Maps tab asks where the order starts
+        let (p, _) = sync(&paths).unwrap();
+        let mods = crate::store::scan(&paths).unwrap();
+        let line = pz::server::map_order(&map_start(&paths, &p, &mods, 42), &pz::server::mod_maps(&p.enabled(), &mods, 42));
+        assert_eq!(line, ids(&["Town B", "Town A", "Muldraugh, KY"]), "the block's order, not A-Z");
+        assert_eq!(fs::read_to_string(paths.default_txt()).unwrap(), game, "default.txt unchanged byte for byte");
+        assert!(map_order(&paths, "Default").is_empty(), "nothing saved");
+        // and applying the same list (a toggle elsewhere) keeps the arrangement
+        apply(&paths, &p).unwrap();
+        assert_eq!(fs::read_to_string(paths.default_txt()).unwrap(), game);
+    }
+
+    #[test]
+    fn switching_to_a_never_arranged_profile_drops_the_other_maps() {
+        let (_t, paths) = temp_paths();
+        map_mods(&paths, &[("A", "Town A"), ("B", "Town B"), ("C", "Other"), ("D", "Town D")]);
+        apply(&paths, &Profile::parse("Big", "+A\n+B\n+C\n")).unwrap();
+        set_map_order(&paths, "Big", &ids(&["Other", "Town B", "Town A", "Muldraugh, KY"])).unwrap();
+        apply(&paths, &Profile::parse("Big", "+A\n+B\n+C\n")).unwrap();
+        assert_eq!(pz::read_default(&paths.default_txt()).map_folders(), ids(&["Other", "Town B", "Town A"]));
+        // Small was never arranged: the block's order where it's still valid, then its own new maps
+        apply(&paths, &Profile::parse("Small", "+D\n+A\n+B\n")).unwrap();
+        assert_eq!(pz::read_default(&paths.default_txt()).map_folders(), ids(&["Town B", "Town A", "Town D"]));
+        assert!(map_order(&paths, "Small").is_empty(), "still never arranged");
+        // a folder no installed mod provides stays where it was
+        let d = fs::read_to_string(paths.default_txt()).unwrap().replace("    map = Town A,", "    map = Unknown Map,\n    map = Town A,");
+        fs::write(paths.default_txt(), d).unwrap();
+        apply(&paths, &Profile::parse("Small", "+D\n+A\n+B\n")).unwrap();
+        assert_eq!(pz::read_default(&paths.default_txt()).map_folders(), ids(&["Town B", "Unknown Map", "Town A", "Town D"]));
     }
 
     #[test]

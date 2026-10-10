@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::{Paths, is_version_dir};
@@ -21,6 +21,69 @@ use crate::sources::steam_workshop::{self, Item};
 use crate::store;
 
 pub type Cell = (i32, i32);
+
+/// Why a Maps action failed: a stable key the UI says in the player's language
+/// (`maps.err.<key>`); Display is the English, for logs and the CLI.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Fail {
+    ScanRunning,
+    SteamStopped,
+    Timeout,
+    Stopped,
+    NotAnId,
+    NoItem,
+    Installed,
+    NoFiles,
+    FileList,
+    Login,
+    DownloadFailed,
+}
+
+impl Fail {
+    pub fn key(self) -> &'static str {
+        match self {
+            Fail::ScanRunning => "scanRunning",
+            Fail::SteamStopped => "steamStopped",
+            Fail::Timeout => "timeout",
+            Fail::Stopped => "stopped",
+            Fail::NotAnId => "notAnId",
+            Fail::NoItem => "noItem",
+            Fail::Installed => "installed",
+            Fail::NoFiles => "noFiles",
+            Fail::FileList => "fileList",
+            Fail::Login => "login",
+            Fail::DownloadFailed => "downloadFailed",
+        }
+    }
+}
+
+impl std::fmt::Display for Fail {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(match self {
+            Fail::ScanRunning => "a Workshop map scan is already running",
+            Fail::SteamStopped => "Steam stopped answering; what was read is kept, scan again later",
+            Fail::Timeout => "Steam didn't answer in time",
+            Fail::Stopped => "stopped",
+            Fail::NotAnId => "that isn't a Workshop item id",
+            Fail::NoItem => "there's no such Workshop item",
+            Fail::Installed => "that Workshop item is already installed: if it adds maps, they are in the list",
+            Fail::NoFiles => "Steam lists no files for it",
+            Fail::FileList => "Steam didn't give the item's file list",
+            Fail::Login => "couldn't log in to Steam anonymously",
+            Fail::DownloadFailed => "the download failed",
+        })
+    }
+}
+
+impl std::error::Error for Fail {}
+
+/// An error for the UI: `maps.err.<key>`, then what went wrong under it (English) after ": ",
+/// when it's a Maps failure; else its text.
+pub fn ui_error(e: &anyhow::Error) -> String {
+    let Some(fail) = e.downcast_ref::<Fail>() else { return format!("{e:#}") };
+    let under: Vec<String> = e.chain().map(|c| c.to_string()).skip_while(|c| *c != fail.to_string()).skip(1).collect();
+    format!("maps.err.{}{}", fail.key(), if under.is_empty() { String::new() } else { format!(": {}", under.join(": ")) })
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct MapFolder {
@@ -250,6 +313,11 @@ const VANILLA_FOLDERS: [&str; 12] = [
     "Valley Station, KY",
     "West Point, KY",
 ];
+
+/// One of the game's own map folders (see `VANILLA_FOLDERS`).
+pub fn is_vanilla(folder: &str) -> bool {
+    VANILLA_FOLDERS.contains(&folder)
+}
 
 /// The game's own maps (`<game>/media/maps/*`, and the known vanilla folders): their folder
 /// names, and the cells when the install is `build` (B42's lotheaders start with `LOTH`,
@@ -528,30 +596,52 @@ fn parse_seed(gz: &[u8]) -> Result<BTreeMap<String, Checked>> {
     Ok(serde_json::from_reader(flate2::read::GzDecoder::new(gz))?)
 }
 
-fn seed() -> BTreeMap<String, Checked> {
-    // tests start from nothing, like a build without a seed
-    if cfg!(test) { BTreeMap::new() } else { parse_seed(SEED).unwrap_or_default() }
+/// The seed, parsed once. One that doesn't parse is logged (once) and counts as empty.
+fn seed() -> &'static BTreeMap<String, Checked> {
+    static PARSED: std::sync::OnceLock<BTreeMap<String, Checked>> = std::sync::OnceLock::new();
+    PARSED.get_or_init(|| {
+        // tests start from nothing, like a build without a seed
+        if cfg!(test) {
+            return BTreeMap::new();
+        }
+        parse_seed(SEED).unwrap_or_else(|e| {
+            crate::log!("error: PZMM's built-in map index doesn't parse ({e:#}); the Workshop scan reads every map instead");
+            BTreeMap::new()
+        })
+    })
 }
 
-/// Workshop items read without installing, by item id: the seed until anything is saved. A
-/// file that doesn't parse (damaged, or from before builds were kept apart) is kept as
-/// `maps-checked.json.bad` and starts over from the seed; one that can't be read is an error
-/// (saving over it would wipe it).
+/// Seed entries `all` lacks, or has older (`updated`) and not hand-checked, go in: a newer
+/// PZMM brings its newer index to an existing install.
+fn merge_seed(all: &mut BTreeMap<String, Checked>, seed: &BTreeMap<String, Checked>) {
+    for (id, s) in seed {
+        if all.get(id).is_none_or(|c| !c.manual && c.updated < s.updated) {
+            all.insert(id.clone(), s.clone());
+        }
+    }
+}
+
+/// Workshop items read without installing, by item id, with the seed merged in (see
+/// `merge_seed`). A file that doesn't parse (damaged, or from before builds were kept apart)
+/// is kept as `maps-checked.json.bad` and starts over from the seed; one that can't be read
+/// is an error (saving over it would wipe it).
 fn read_checked(paths: &Paths) -> Result<BTreeMap<String, Checked>> {
     let file = checked_file(paths);
     let bytes = match fs::read(&file) {
         Ok(b) => b,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(seed()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(seed().clone()),
         Err(e) => return Err(e).with_context(|| format!("reading {}", file.display())),
     };
-    Ok(serde_json::from_slice(&bytes).unwrap_or_else(|e| {
+    let mut all = serde_json::from_slice(&bytes).unwrap_or_else(|e| {
         let bad = file.with_extension("json.bad");
         if fs::read(&bad).ok().as_deref() != Some(bytes.as_slice()) {
             let _ = fs::copy(&file, &bad);
             crate::log!("error: {} is damaged ({e}); kept a copy as {} and started from the built-in map index", file.display(), bad.display());
         }
-        seed()
-    }))
+        BTreeMap::new()
+    });
+    merge_seed(&mut all, seed());
+    Ok(all)
 }
 
 /// Workshop items read without installing, by item id (none while the file can't be read).
@@ -570,7 +660,11 @@ pub fn save_checked(paths: &Paths, new: BTreeMap<String, Checked>) -> Result<()>
         return Ok(());
     }
     let mut all = read_checked(paths).context("nothing was saved")?;
-    all.extend(new);
+    for (id, mut c) in new {
+        // checked by hand since the scan took its snapshot: it stays hand-checked
+        c.manual |= all.get(&id).is_some_and(|o| o.manual);
+        all.insert(id, c);
+    }
     fs::create_dir_all(&paths.data)?;
     Ok(crate::write_atomic(&checked_file(paths), serde_json::to_vec(&all)?)?)
 }
@@ -669,12 +763,12 @@ pub fn from_listing(item: &str, files: &[String], build: u8, read: &mut dyn FnMu
     Ok((out, count))
 }
 
-/// Read a Workshop item's maps (both builds) from its manifest on `session`.
-pub fn read_listing(session: &Session, item: &Item) -> Result<Checked> {
+/// Read a Workshop item's maps (both builds) from its manifest on `session`; `stop` ends it.
+pub fn read_listing(session: &Session, item: &Item, stop: &AtomicBool) -> Result<Checked> {
     if item.hcontent == 0 {
-        bail!("workshop:{}: Steam lists no files for it", item.id);
+        return Err(anyhow::Error::new(Fail::NoFiles).context(format!("workshop:{}", item.id)));
     }
-    let files = session.files(item.hcontent)?;
+    let files = session.files(item.hcontent, stop)?;
     let names: Vec<String> = files.iter().map(|f| f.path.clone()).collect();
     let mut texts: BTreeMap<String, String> = BTreeMap::new();
     let mut read = |p: &str| -> Result<String> {
@@ -682,7 +776,7 @@ pub fn read_listing(session: &Session, item: &Item) -> Result<Checked> {
             return Ok(t.clone());
         }
         let f = files.iter().find(|f| f.path == p).context("not in the file list")?;
-        let t = super::decode_text(&session.read(f).with_context(|| format!("reading {p}"))?);
+        let t = super::decode_text(&session.read(f, stop).with_context(|| format!("reading {p}"))?);
         texts.insert(p.to_string(), t.clone());
         Ok(t)
     };
@@ -719,14 +813,15 @@ pub fn read_item(dir: &Path, item: &str) -> (BTreeMap<u8, Vec<MapMod>>, BTreeMap
 /// Nothing is installed. When Steam won't give the list and `download` is set, SteamCMD
 /// downloads the item instead, and the download is deleted after reading it.
 pub fn check(paths: &Paths, item: &str, download: bool) -> Result<Checked> {
-    let info = steam_workshop::details(&[item])?.pop().with_context(|| format!("there's no Workshop item {item}"))?;
-    let mut c = match Session::open().and_then(|s| read_listing(&s, &info)) {
+    let info = steam_workshop::details(&[item])?.pop().ok_or(Fail::NoItem).with_context(|| format!("workshop:{item}"))?;
+    let never = AtomicBool::new(false);
+    let mut c = match Session::open(&never).and_then(|s| read_listing(&s, &info, &never)) {
         Ok(c) => c,
-        Err(e) if !download => return Err(e.context(format!("reading the file list of {} from Steam", info.title))),
+        Err(e) if !download => return Err(e.context(Fail::FileList)),
         Err(e) => {
             crate::log!("workshop:{item}: no file list from Steam ({e:#}), downloading it with SteamCMD instead");
             let got = steam_workshop::download(paths, super::STEAM_APP, &[item])?;
-            let dir = got.into_iter().next().and_then(|(_, d)| d).with_context(|| format!("workshop:{item}: download failed"))?;
+            let dir = got.into_iter().next().and_then(|(_, d)| d).ok_or(Fail::DownloadFailed).with_context(|| format!("workshop:{item}"))?;
             let (builds, mods) = read_item(&dir, item);
             fs::remove_dir_all(&dir).with_context(|| format!("deleting the download in {}", dir.display()))?;
             Checked { size: info.file_size, builds, mods, ..Checked::from_item(&info) }
@@ -795,8 +890,17 @@ fn network_error(e: &anyhow::Error) -> bool {
         Some(E::CdnStatus { status, .. }) => status.as_u16() == 429 || status.is_server_error(),
         Some(E::Connection(C::ServiceMethodFailed(r))) => matches!(r, R::NoConnection | R::Busy | R::Timeout | R::ServiceUnavailable | R::RateLimitExceeded),
         Some(E::Connection(c)) => !matches!(c, C::DepotAccessDenied(_)),
-        _ => c.is::<std::io::Error>(),
+        _ => c.is::<std::io::Error>() || c.downcast_ref::<Fail>() == Some(&Fail::Timeout),
     })
+}
+
+/// What to keep for an item that couldn't be read (`why`): its last good read, still due to be
+/// read again (its `updated` is the old one), else just its Workshop facts.
+fn unread(old: Option<&Checked>, item: &Item, why: String) -> Checked {
+    match old.filter(|c| !c.builds.is_empty()) {
+        Some(c) => Checked { failed: why, ..c.clone() },
+        None => Checked { failed: why, ..Checked::from_item(item) },
+    }
 }
 
 /// Every Map-tagged Workshop item (all result pages, both builds), then the file lists of the
@@ -844,7 +948,7 @@ pub fn scan_workshop(paths: &Paths, stop: &AtomicBool, progress: &mut dyn FnMut(
             }
             // no files to read: wait for an update (not Steam's fault, so not a reason to give up)
             _ if i.hcontent == 0 => {
-                refreshed.insert(i.id.clone(), Checked { failed: "Steam lists no files for it".into(), ..Checked::from_item(i) });
+                refreshed.insert(i.id.clone(), unread(old.get(&i.id), i, Fail::NoFiles.to_string()));
                 failed += 1;
             }
             _ => todo.push(i),
@@ -855,7 +959,10 @@ pub fn scan_workshop(paths: &Paths, stop: &AtomicBool, progress: &mut dyn FnMut(
     p = Progress { phase: "reading", total: todo.len(), failed, ..Default::default() };
     progress(&p);
     if !todo.is_empty() && !stopped() {
-        let session = Session::open()?;
+        let session = match Session::open(stop) {
+            Err(_) if stopped() => return Ok(p),
+            s => s?,
+        };
         let (next, streak, quit) = (AtomicUsize::new(0), AtomicUsize::new(0), AtomicBool::new(false));
         let done = || stopped() || quit.load(Relaxed);
         let (tx, rx) = std::sync::mpsc::channel::<(&Item, Result<Checked>, bool)>();
@@ -866,7 +973,10 @@ pub fn scan_workshop(paths: &Paths, stop: &AtomicBool, progress: &mut dyn FnMut(
                 s.spawn(move || {
                     while !done() {
                         let Some(&i) = todo.get(next.fetch_add(1, Relaxed)) else { break };
-                        let res = read_listing(session, i);
+                        let res = read_listing(session, i, stop);
+                        if res.is_err() && done() {
+                            break; // cut short, not a failure
+                        }
                         let net = res.as_ref().err().is_some_and(network_error);
                         let n = if net { streak.fetch_add(1, Relaxed) + 1 } else { 0 };
                         if res.is_ok() {
@@ -886,18 +996,17 @@ pub fn scan_workshop(paths: &Paths, stop: &AtomicBool, progress: &mut dyn FnMut(
                 for (i, res, net) in &rx {
                     p.done += 1;
                     match res {
-                        Ok(mut c) => {
-                            c.manual = old.get(&i.id).is_some_and(|o| o.manual);
-                            batch.insert(i.id.clone(), c);
+                        Ok(c) => {
+                            batch.insert(i.id.clone(), c); // keeps `manual` (see save_checked)
                         }
                         Err(e) => {
                             crate::log!("workshop:{} ({}): {e:#}", i.id, i.title);
                             p.failed += 1;
                             if !net {
-                                batch.insert(i.id.clone(), Checked { failed: format!("{e:#}"), ..Checked::from_item(i) });
+                                batch.insert(i.id.clone(), unread(old.get(&i.id), i, format!("{e:#}")));
                             } else if streak.load(Relaxed) >= 5 {
                                 save_checked(paths, std::mem::take(&mut batch))?;
-                                bail!("Steam stopped answering ({e:#}); what was read is kept, scan again later");
+                                return Err(e.context(Fail::SteamStopped));
                             }
                         }
                     }
@@ -984,34 +1093,87 @@ pub fn workshop_item(source: &str) -> Option<&str> {
     source.strip_prefix("steam:").or_else(|| source.strip_prefix("workshop:")).filter(|i| !i.is_empty())
 }
 
-/// Clipboard text for the shown maps: each map's Workshop link, mod id and folders, then the
-/// server lines. A requirement is looked up among the installed `mods`, the shown maps and the
-/// `known` Workshop maps; `Mods=` puts each mod's requirements (recursively) before it, and
-/// `WorkshopItems=` holds every item they come from. `map_line` is the arranged `Map=` list
-/// (see `server::map_order`).
-pub fn export(shown: &[&MapMod], mods: &BTreeMap<String, store::Row>, known: &[MapMod], map_line: &[String], b41: bool) -> String {
-    // id -> (requires, source): installed wins, then the shown maps
-    let mut info: HashMap<&str, (&[String], &str)> = HashMap::new();
+/// The export's words, in the UI's language: `ids` fills `{id}` and `{folders}`, `missing`
+/// fills `{ids}`. The server lines stay as the game reads them.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(default)]
+pub struct ExportLabels {
+    pub ids: String,
+    pub required: String,
+    pub missing: String,
+}
+
+impl Default for ExportLabels {
+    fn default() -> Self {
+        ExportLabels {
+            ids: "Mod ID: {id} · Map folder: {folders}".into(),
+            required: "Required mods".into(),
+            missing: "Required but not found (not installed, not on the Workshop): {ids}".into(),
+        }
+    }
+}
+
+/// Looks a mod id up on the Workshop (from the item that needs it): its title and item id.
+pub type FindMod<'a> = dyn FnMut(&str, Option<&str>) -> Option<(String, String)> + 'a;
+
+/// Clipboard text for the shown maps: each map's Workshop link, mod id and folders, the mods
+/// they need (names and links), then the server lines. A requirement is looked up among the
+/// installed `mods`, the shown maps and the `known` Workshop maps, else `find` (id, the
+/// Workshop item that needs it) names its Workshop item and title; `Mods=` puts each mod's
+/// requirements (recursively) before it, and `WorkshopItems=` holds every item they come from.
+/// `map_line` is the arranged `Map=` list (see `server::map_order`).
+pub fn export(
+    shown: &[&MapMod],
+    mods: &BTreeMap<String, store::Row>,
+    known: &[MapMod],
+    map_line: &[String],
+    b41: bool,
+    labels: &ExportLabels,
+    find: &mut FindMod,
+) -> String {
+    /// id -> (name, requires, source)
+    type Info = HashMap<String, (String, Vec<String>, String)>;
+    // installed wins, then the shown maps
+    let mut info: Info = HashMap::new();
     for m in known.iter().chain(shown.iter().copied()) {
-        info.insert(m.id.as_str(), (m.requires.as_slice(), m.source.as_str()));
+        info.insert(m.id.clone(), (m.name.clone(), m.requires.clone(), m.source.clone()));
     }
     for r in mods.values() {
-        info.insert(r.id.as_str(), (r.requires.as_slice(), r.source.as_str()));
+        info.insert(r.id.clone(), (r.name.clone(), r.requires.clone(), r.source.clone()));
     }
-    fn visit<'a>(id: &'a str, info: &HashMap<&str, (&'a [String], &'a str)>, seen: &mut HashSet<&'a str>, ids: &mut Vec<&'a str>, missing: &mut Vec<&'a str>) {
-        if !seen.insert(id) {
+    // requirements none of those provide: their Workshop item, asked once each
+    let (mut queue, mut asked): (Vec<(String, Option<String>)>, HashSet<String>) = (shown.iter().map(|m| (m.id.clone(), None)).collect(), HashSet::new());
+    while let Some((id, needed_by)) = queue.pop() {
+        if !asked.insert(id.clone()) {
+            continue;
+        }
+        match info.get(&id) {
+            Some((_, requires, source)) => {
+                let item = workshop_item(source).map(String::from);
+                queue.extend(requires.iter().map(|r| (r.clone(), item.clone())));
+            }
+            None => {
+                if let Some((title, item)) = find(&id, needed_by.as_deref()) {
+                    info.insert(id, (title, vec![], format!("workshop:{item}")));
+                }
+            }
+        }
+    }
+    fn visit(id: &str, info: &Info, seen: &mut HashSet<String>, ids: &mut Vec<String>, missing: &mut Vec<String>) {
+        if !seen.insert(id.to_string()) {
             return;
         }
         match info.get(id) {
-            Some((requires, _)) => {
-                for r in *requires {
+            Some((_, requires, _)) => {
+                for r in requires {
                     visit(r, info, seen, ids, missing);
                 }
-                ids.push(id);
+                ids.push(id.to_string());
             }
-            None => missing.push(id),
+            None => missing.push(id.to_string()),
         }
     }
+    let url = |item: &str| format!("https://steamcommunity.com/sharedfiles/filedetails/?id={item}");
     let (mut seen, mut ids, mut missing, mut items) = (HashSet::new(), vec![], vec![], vec![]);
     let mut text = String::new();
     for m in shown {
@@ -1019,21 +1181,22 @@ pub fn export(shown: &[&MapMod], mods: &BTreeMap<String, store::Row>, known: &[M
         let name = if m.name.is_empty() { &m.id } else { &m.name };
         text += &format!("{name}\n");
         if let Some(item) = workshop_item(&m.source) {
-            text += &format!("  https://steamcommunity.com/sharedfiles/filedetails/?id={item}\n");
+            text += &format!("  {}\n", url(item));
         }
         let folders: Vec<&str> = m.maps.iter().map(|f| f.folder.as_str()).collect();
-        text += &format!("  Mod ID: {} · Map folder: {}\n", m.id, folders.join("; "));
+        text += &format!("  {}\n", labels.ids.replace("{id}", &m.id).replace("{folders}", &folders.join("; ")));
     }
-    let item_of = |id: &str| info.get(id).and_then(|(_, source)| workshop_item(source));
-    let needed: Vec<&&str> = ids.iter().filter(|i| !shown.iter().any(|m| m.id == **i)).collect();
+    let item_of = |id: &str| info.get(id).and_then(|(_, _, source)| workshop_item(source));
+    let needed: Vec<&String> = ids.iter().filter(|i| !shown.iter().any(|m| m.id == **i)).collect();
     if !needed.is_empty() {
-        text += "\nRequired mods\n";
+        text += &format!("\n{}\n", labels.required);
         for id in needed {
-            text += &format!("  {}{}\n", id, item_of(id).map(|i| format!(": https://steamcommunity.com/sharedfiles/filedetails/?id={i}")).unwrap_or_default());
+            let name = info.get(id).map(|i| i.0.as_str()).filter(|n| !n.is_empty() && n != id);
+            text += &format!("  {}{}\n", name.map_or(id.clone(), |n| format!("{n} ({id})")), item_of(id).map(|i| format!(": {}", url(i))).unwrap_or_default());
         }
     }
     if !missing.is_empty() {
-        text += &format!("\nRequired but not found (not installed, not a known Workshop map): {}\n", missing.join(", "));
+        text += &format!("\n{}\n", labels.missing.replace("{ids}", &missing.join(", ")));
     }
     for item in ids.iter().filter_map(|id| item_of(id)) {
         if !items.contains(&item) {
@@ -1247,6 +1410,46 @@ mod tests {
     }
 
     #[test]
+    fn a_failed_read_keeps_the_last_good_one() {
+        let good = Checked { title: "Town".into(), updated: 10, builds: [(41, vec![]), (42, vec![map("Town", &[(1, 1)])])].into(), manual: true, ..Default::default() };
+        let item = Item { id: "111".into(), title: "Town v2".into(), time_updated: 20, ..Default::default() };
+        let kept = unread(Some(&good), &item, "timeout".into());
+        assert_eq!((kept.builds, kept.updated, kept.manual, kept.failed.as_str()), (good.builds.clone(), 10, true, "timeout"));
+        assert!(stale(Some(&unread(Some(&good), &item, "x".into())), 20), "read again next scan");
+        let fresh = unread(None, &item, "x".into());
+        assert!(fresh.builds.is_empty() && fresh.updated == 20 && !stale(Some(&fresh), 20), "nothing to keep: waits for an update");
+    }
+
+    #[test]
+    fn hand_checks_survive_a_scans_old_snapshot() {
+        let (_t, paths) = store::tests::temp_paths();
+        save_checked(&paths, [("111".to_string(), Checked { manual: true, updated: 1, ..Default::default() })].into()).unwrap();
+        // the scan read it from a snapshot taken before the check
+        save_checked(&paths, [("111".to_string(), Checked { updated: 2, ..Default::default() })].into()).unwrap();
+        assert!(checked(&paths)["111"].manual);
+        assert_eq!(checked(&paths)["111"].updated, 2);
+    }
+
+    #[test]
+    fn a_newer_seed_fills_in_the_cache() {
+        let at = |updated: u64, manual: bool| Checked { updated, manual, ..Default::default() };
+        let mut all: BTreeMap<String, Checked> = [("old".into(), at(1, false)), ("mine".into(), at(1, true)), ("newer".into(), at(9, false))].into();
+        let seed: BTreeMap<String, Checked> = [("old".into(), at(5, false)), ("mine".into(), at(5, false)), ("newer".into(), at(5, false)), ("new".into(), at(5, false))].into();
+        merge_seed(&mut all, &seed);
+        let got: Vec<(&str, u64)> = all.iter().map(|(k, c)| (k.as_str(), c.updated)).collect();
+        assert_eq!(got, [("mine", 1), ("new", 5), ("newer", 9), ("old", 5)], "hand-checked and newer entries stay; missing and older ones come from the seed");
+    }
+
+    #[test]
+    fn errors_carry_a_key_for_the_ui() {
+        let e = anyhow::Error::new(Fail::Timeout).context("reading mod.info").context(Fail::FileList).context("workshop:1");
+        assert_eq!(ui_error(&e), "maps.err.fileList: reading mod.info: Steam didn't answer in time");
+        assert_eq!(ui_error(&anyhow::Error::new(Fail::Installed)), "maps.err.installed");
+        assert_eq!(ui_error(&anyhow::anyhow!("disk full")), "disk full");
+        assert!(network_error(&anyhow::Error::new(Fail::Timeout).context("reading mod.info")), "a silent Steam counts towards giving up");
+    }
+
+    #[test]
     fn an_unreadable_index_is_never_saved_over() {
         let (_t, paths) = store::tests::temp_paths();
         save_checked(&paths, [("111".to_string(), Checked { updated: 1, ..Default::default() })].into()).unwrap();
@@ -1388,16 +1591,31 @@ mod tests {
         (town.source, town.requires, town.name) = ("steam:111".into(), vec!["Tiles".into(), "Gone".into()], "Town Name".into());
         let mut checked = map("Fort", &[(2, 2)]);
         checked.source = "workshop:333".into();
-        let text = export(&[&town, &checked], &mods, &[], &["Town".into(), "Fort".into(), "Muldraugh, KY".into()], false);
+        let none = &mut |_: &str, _: Option<&str>| -> Option<(String, String)> { None };
+        let text = export(&[&town, &checked], &mods, &[], &["Town".into(), "Fort".into(), "Muldraugh, KY".into()], false, &ExportLabels::default(), none);
         assert_eq!(
             text,
             "Town Name\n  https://steamcommunity.com/sharedfiles/filedetails/?id=111\n  Mod ID: Town · Map folder: Town\n\
              Fort\n  https://steamcommunity.com/sharedfiles/filedetails/?id=333\n  Mod ID: Fort · Map folder: Fort\n\
              \nRequired mods\n  Base: https://steamcommunity.com/sharedfiles/filedetails/?id=111\n  Tiles: https://steamcommunity.com/sharedfiles/filedetails/?id=222\n\
-             \nRequired but not found (not installed, not a known Workshop map): Gone\n\
+             \nRequired but not found (not installed, not on the Workshop): Gone\n\
              \nMods=\\Base;\\Tiles;\\Town;\\Fort\nWorkshopItems=111;222;333\nMap=Town;Fort;Muldraugh, KY\n"
         );
-        assert!(export(&[&checked], &mods, &[], &[], true).ends_with("\nMods=Fort\nWorkshopItems=333\n"));
+        assert!(export(&[&checked], &mods, &[], &[], true, &ExportLabels::default(), none).ends_with("\nMods=Fort\nWorkshopItems=333\n"));
+        // a requirement nobody here has: looked up on the Workshop from the item that needs it, named and linked
+        let mut asked = vec![];
+        let labels = ExportLabels { ids: "Mod-ID: {id} · Kartenordner: {folders}".into(), required: "Benötigte Mods".into(), ..Default::default() };
+        let text = export(&[&town], &mods, &[], &[], false, &labels, &mut |id, from| {
+            asked.push(format!("{id}<{}", from.unwrap_or("")));
+            (id == "Gone").then(|| ("Gone Forever".to_string(), "444".to_string()))
+        });
+        assert_eq!(asked, ["Gone<111"], "asked once, from Town's item");
+        assert!(text.contains("  Mod-ID: Town · Kartenordner: Town\n"), "{text}");
+        assert!(
+            text.contains("\nBenötigte Mods\n  Base: https://steamcommunity.com/sharedfiles/filedetails/?id=111\n  Tiles: https://steamcommunity.com/sharedfiles/filedetails/?id=222\n  Gone Forever (Gone): https://steamcommunity.com/sharedfiles/filedetails/?id=444\n"),
+            "{text}"
+        );
+        assert!(!text.contains("not found") && text.ends_with("\nMods=\\Base;\\Tiles;\\Gone;\\Town\nWorkshopItems=111;222;444\n"), "{text}");
     }
 
     #[test]
@@ -1406,7 +1624,7 @@ mod tests {
         // known Workshop map that isn't shown), which needs Expansion back (a loop)
         let mk = |id: &str, item: &str, requires: &[&str]| MapMod { source: format!("workshop:{item}"), requires: requires.iter().map(|s| s.to_string()).collect(), ..map(id, &[]) };
         let (expansion, base, tiles) = (mk("Expansion", "1", &["Base", "Tiles"]), mk("Base", "2", &[]), mk("Tiles", "3", &["Expansion"]));
-        let text = export(&[&expansion, &base], &BTreeMap::new(), &[tiles], &[], false);
+        let text = export(&[&expansion, &base], &BTreeMap::new(), &[tiles], &[], false, &ExportLabels::default(), &mut |_, _| None);
         assert!(!text.contains("not found"), "{text}");
         assert!(text.ends_with("\nMods=\\Base;\\Tiles;\\Expansion\nWorkshopItems=2;3;1\n"), "requirements first: {text}");
         assert!(text.contains("Required mods\n  Tiles: https://steamcommunity.com/sharedfiles/filedetails/?id=3\n"));

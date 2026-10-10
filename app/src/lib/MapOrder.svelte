@@ -4,19 +4,26 @@
   import { t } from "./i18n.svelte";
   import { sortMaps } from "./order";
 
-  // a Map= line (Servers & saves, Maps): drag or Alt+arrows to arrange
-  let { maps = $bindable() }: { maps: string[] } = $props();
+  // a Map= line (Servers & saves, Maps): drag or Alt+arrows to arrange; Muldraugh stays last
+  // `onarrange`: the player moved something (not called when `maps` is set from outside)
+  let { maps = $bindable(), onarrange }: { maps: string[]; onarrange?: (maps: string[]) => void } = $props();
 
+  const BASE = "Muldraugh, KY";
   let mapFrom = $state<number | null>(null);
   let mapAt = $state<number | null>(null);
 
+  function arrange(next: string[]) {
+    maps = sortMaps(next, BASE);
+    onarrange?.(maps);
+  }
+
   /** The map at `from` dropped before position `to`. */
   function moveMap(from: number, to: number) {
-    if (to === from || to === from + 1 || to < 0 || to > maps.length) return;
+    if (to === from || to === from + 1 || to < 0 || to > maps.length || maps[from] === BASE) return;
     const next = [...maps];
     const [m] = next.splice(from, 1);
     next.splice(to > from ? to - 1 : to, 0, m);
-    maps = next;
+    arrange(next);
   }
 
   /** Alt+arrows move the focused map (and keep it focused). */
@@ -37,20 +44,23 @@
 
 <ol class="drag-list maps" role="listbox" aria-label={t("mapOrder.label")}>
   {#each maps as m, i (m)}
-    <li role="option" aria-selected="false" class:drop={mapAt === i} class:dragging={mapFrom === i} draggable="true" tabindex="0"
+    {@const fixed = m === BASE}
+    <li role="option" aria-selected="false" class:drop={mapAt === i} class:dragging={mapFrom === i} class:fixed draggable={!fixed} tabindex="0"
+      title={fixed ? t("mapOrder.fixedTip") : undefined}
       onkeydown={(e) => mapKey(e, i)}
       ondragstart={() => (mapFrom = i)} ondragend={() => { mapFrom = mapAt = null; }}
       ondragover={(e) => { e.preventDefault(); mapAt = i; }}
       ondrop={(e) => { e.preventDefault(); dropMap(i); }}>
       <span class="num mono">{i + 1}</span>{m}
-      {#if i > 0 && m !== "Muldraugh, KY"}<button class="quiet top" onclick={() => moveMap(i, 0)} title={t("mapOrder.topTip")} aria-label={t("mapOrder.topLabel", { name: m })}>{t("mapOrder.top")}</button>{/if}
+      {#if fixed}<span class="pin"><Icon name="lock" size={12} />{t("mapOrder.fixed")}</span>
+      {:else if i > 0}<button class="quiet top" onclick={() => moveMap(i, 0)} title={t("mapOrder.topTip")} aria-label={t("mapOrder.topLabel", { name: m })}>{t("mapOrder.top")}</button>{/if}
     </li>
   {/each}
   <li class="tail" class:drop={mapAt === maps.length} aria-hidden="true"
     ondragover={(e) => { e.preventDefault(); mapAt = maps.length; }}
     ondrop={(e) => { e.preventDefault(); dropMap(maps.length); }}></li>
 </ol>
-<button class="quiet" onclick={() => (maps = sortMaps(maps))} title={t("mapOrder.autosortTip")}><Icon name="wand" size={14} />{t("mapOrder.autosort")}</button>
+<button class="quiet" onclick={() => arrange(maps)} title={t("mapOrder.autosortTip")}><Icon name="wand" size={14} />{t("mapOrder.autosort")}</button>
 
 <style>
   .maps {
@@ -64,9 +74,22 @@
   .maps li:hover .num {
     color: var(--on-selected);
   }
-  .top {
+  .top,
+  .pin {
     margin-left: auto;
     padding: 0 6px;
     font-size: 12px;
+  }
+  .maps li.fixed {
+    cursor: default;
+  }
+  .pin {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--muted);
+  }
+  .maps li.fixed:hover .pin {
+    color: inherit;
   }
 </style>

@@ -1,6 +1,6 @@
 // Display helpers shared by the views.
 
-import { numLocale, t } from "./i18n.svelte";
+import { lang, numLocale, t } from "./i18n.svelte";
 
 const one = (n: number) => n.toLocaleString(numLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 export const fmtSize = (b: number) =>
@@ -18,6 +18,15 @@ export const fmtDate = (time: number, style: "short" | "long") => (time ? new Da
 
 /** A unix time as a date and time. */
 export const fmtDateTime = (time: number) => new Date(time * 1000).toLocaleString(numLocale(), { dateStyle: "medium", timeStyle: "short" });
+
+const AGO: [Intl.RelativeTimeFormatUnit, number][] = [["year", 31536000], ["month", 2592000], ["week", 604800], ["day", 86400], ["hour", 3600], ["minute", 60]];
+/** "3 days ago": a unix time from now, in the UI language ("" for 0, "unknown"). */
+export function fmtAgo(time: number) {
+  if (!time) return "";
+  const s = time - Date.now() / 1000;
+  const [unit, n] = AGO.find(([, n]) => Math.abs(s) >= n) ?? ["minute", 60];
+  return new Intl.RelativeTimeFormat(lang(), { numeric: "auto" }).format(Math.round(s / n), unit);
+}
 
 /** 1.2K, 3.4M: counts on Workshop cards. */
 export const compact = { format: (n: number) => n.toLocaleString(numLocale(), { notation: "compact", maximumFractionDigits: 1 }) };

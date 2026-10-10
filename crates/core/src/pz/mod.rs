@@ -240,6 +240,13 @@ pub struct DefaultTxt {
     pub b41: bool,
 }
 
+impl DefaultTxt {
+    /// The map folders the `maps` block lists (`map = <folder>,`), in order.
+    pub fn map_folders(&self) -> Vec<String> {
+        self.maps.lines().filter_map(|l| l.trim().strip_prefix("map")?.trim_start().strip_prefix('=')).map(|v| v.trim().trim_end_matches(',').trim().to_string()).filter(|v| !v.is_empty()).collect()
+    }
+}
+
 /// Inner text of `name { ... }`.
 fn block<'a>(text: &'a str, name: &str) -> Option<&'a str> {
     let mut from = 0;
@@ -398,6 +405,7 @@ mod tests {
                 format!("VERSION = 1,\n\nmods\n{{\n    mod = {prefix}Town,\n}}\n\nmaps\n{{\n    map = Riverside Plus,\n    map = Fort, KY,\n}}\n")
             );
             assert_eq!(read_default(&p).maps, "\n    map = Riverside Plus,\n    map = Fort, KY,\n");
+            assert_eq!(read_default(&p).map_folders(), maps);
             // None keeps the block; an empty list empties it
             write_default(&p, &["Town".into()], None, None).unwrap();
             assert!(fs::read_to_string(&p).unwrap().contains("map = Fort, KY,"));

@@ -455,6 +455,11 @@
       "copied": {
         "one": "{count} Karte kopiert: Workshop-Links, Mod-IDs, Abhängigkeiten und die Zeilen Mods=, WorkshopItems= und Map=.",
         "other": "{count} Karten kopiert: Workshop-Links, Mod-IDs, Abhängigkeiten und die Zeilen Mods=, WorkshopItems= und Map=."
+      },
+      "text": {
+        "ids": "Mod-ID: {id} · Kartenordner: {folders}",
+        "required": "Benötigte Mods",
+        "missing": "Benötigt, aber nicht gefunden (nicht installiert, nicht im Workshop): {ids}"
       }
     },
     "presets": {
@@ -513,7 +518,27 @@
         "one": "{count} weiteres Objekt hat nicht den Tag Map und wurde daher nicht gelesen.",
         "other": "{count} weitere Objekte haben nicht den Tag Map und wurden daher nicht gelesen."
       }
-    }
+    },
+    "err": {
+      "scanRunning": "Ein Workshop-Kartenscan läuft bereits.",
+      "steamStopped": "Steam antwortet nicht mehr. Was gelesen wurde, bleibt erhalten; scanne später erneut.",
+      "timeout": "Steam hat nicht rechtzeitig geantwortet.",
+      "stopped": "Angehalten.",
+      "notAnId": "Das ist keine Workshop-Objekt-ID.",
+      "noItem": "Dieses Workshop-Objekt gibt es nicht.",
+      "installed": "Dieses Workshop-Objekt ist bereits installiert: Falls es Karten hinzufügt, stehen sie in der Liste.",
+      "noFiles": "Steam listet für dieses Objekt keine Dateien.",
+      "fileList": "Steam hat die Dateiliste des Objekts nicht geliefert.",
+      "login": "Die anonyme Anmeldung bei Steam ist fehlgeschlagen.",
+      "downloadFailed": "Der Download ist fehlgeschlagen."
+    },
+    "updatedAgo": "aktualisiert {when}",
+    "expand": "Vergrößern",
+    "expandTip": "Das Raster füllt den Tab (Esc kehrt zurück)",
+    "collapse": "Wiederherstellen",
+    "collapseTip": "Zurück zur normalen Größe",
+    "resizeLabel": "Rasterhöhe",
+    "resizeTip": "Ziehen oder ↑/↓ drücken, um die Höhe des Rasters zu ändern"
   },
   "mapOrder": {
     "label": "Kartenreihenfolge",
@@ -521,7 +546,9 @@
     "topTip": "Zuerst laden",
     "topLabel": "{name} nach oben verschieben",
     "autosort": "Karten automatisch sortieren",
-    "autosortTip": "Zuerst Mod-Karten in ihrer aktuellen Reihenfolge, dann Muldraugh, KY"
+    "autosortTip": "Zuerst Mod-Karten in ihrer aktuellen Reihenfolge, dann Muldraugh, KY",
+    "fixed": "Zuletzt",
+    "fixedTip": "Die Karte des Spiels lädt immer zuletzt"
   },
   "layerIcon": {
     "overrides": "Überschreibt Dateien von {mods}",

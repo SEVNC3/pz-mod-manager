@@ -416,6 +416,11 @@
       },
       "copied": {
         "other": "맵 {count}개를 복사했어요: 창작마당 링크, 모드 ID, 요구 사항, Mods=, WorkshopItems=, Map= 줄."
+      },
+      "text": {
+        "ids": "모드 ID: {id} · 맵 폴더: {folders}",
+        "required": "필요한 모드",
+        "missing": "필요하지만 찾지 못함 (설치되지 않았고 창작마당에도 없음): {ids}"
       }
     },
     "presets": {
@@ -470,7 +475,27 @@
       "collectionUntagged": {
         "other": "다른 항목 {count}개는 Map 태그가 없어서 읽지 않았어요."
       }
-    }
+    },
+    "err": {
+      "scanRunning": "창작마당 맵 스캔이 이미 진행 중이에요.",
+      "steamStopped": "Steam이 응답을 멈췄어요. 읽은 내용은 보존돼요. 나중에 다시 스캔하세요.",
+      "timeout": "Steam이 제때 응답하지 않았어요.",
+      "stopped": "중지됨.",
+      "notAnId": "창작마당 아이템 ID가 아니에요.",
+      "noItem": "그런 창작마당 아이템은 없어요.",
+      "installed": "이미 설치된 창작마당 아이템이에요. 맵을 추가한다면 목록에 있어요.",
+      "noFiles": "Steam에 이 아이템의 파일이 나와 있지 않아요.",
+      "fileList": "Steam이 아이템의 파일 목록을 주지 않았어요.",
+      "login": "Steam에 익명으로 로그인하지 못했어요.",
+      "downloadFailed": "다운로드에 실패했어요."
+    },
+    "updatedAgo": "{when} 업데이트됨",
+    "expand": "확장",
+    "expandTip": "그리드가 탭 전체를 채워요 (Esc로 돌아가기)",
+    "collapse": "복원",
+    "collapseTip": "원래 크기로 돌아가기",
+    "resizeLabel": "그리드 높이",
+    "resizeTip": "드래그하거나 ↑/↓를 눌러 그리드 높이를 바꾸세요"
   },
   "mapOrder": {
     "label": "맵 순서",
@@ -478,7 +503,9 @@
     "topTip": "가장 먼저 로드",
     "topLabel": "{name} 맨 위로 이동",
     "autosort": "맵 자동 정렬",
-    "autosortTip": "모드 맵을 현재 순서대로 먼저, 그다음 Muldraugh, KY"
+    "autosortTip": "모드 맵을 현재 순서대로 먼저, 그다음 Muldraugh, KY",
+    "fixed": "마지막",
+    "fixedTip": "게임 기본 맵은 항상 마지막에 로드돼요"
   },
   "layerIcon": {
     "overrides": "{mods}의 파일을 덮어씀",

@@ -455,6 +455,11 @@
       "copied": {
         "one": "{count} carte copiée : liens du Workshop, mod IDs, prérequis et lignes Mods=, WorkshopItems= et Map=.",
         "other": "{count} cartes copiées : liens du Workshop, mod IDs, prérequis et lignes Mods=, WorkshopItems= et Map=."
+      },
+      "text": {
+        "ids": "ID du mod : {id} · Dossier de carte : {folders}",
+        "required": "Mods requis",
+        "missing": "Requis mais introuvables (non installés, absents du Workshop) : {ids}"
       }
     },
     "presets": {
@@ -513,7 +518,27 @@
         "one": "{count} autre objet n'a pas le tag Map, il n'a donc pas été lu.",
         "other": "{count} autres objets n'ont pas le tag Map, ils n'ont donc pas été lus."
       }
-    }
+    },
+    "err": {
+      "scanRunning": "Une analyse des cartes du Workshop est déjà en cours.",
+      "steamStopped": "Steam ne répond plus. Ce qui a été lu est conservé ; relancez l'analyse plus tard.",
+      "timeout": "Steam n'a pas répondu à temps.",
+      "stopped": "Arrêté.",
+      "notAnId": "Ce n'est pas un ID d'objet du Workshop.",
+      "noItem": "Cet objet du Workshop n'existe pas.",
+      "installed": "Cet objet du Workshop est déjà installé : s'il ajoute des cartes, elles sont dans la liste.",
+      "noFiles": "Steam ne liste aucun fichier pour cet objet.",
+      "fileList": "Steam n'a pas fourni la liste des fichiers de l'objet.",
+      "login": "Impossible de se connecter anonymement à Steam.",
+      "downloadFailed": "Le téléchargement a échoué."
+    },
+    "updatedAgo": "mis à jour {when}",
+    "expand": "Agrandir",
+    "expandTip": "La grille remplit l'onglet (Échap pour revenir)",
+    "collapse": "Restaurer",
+    "collapseTip": "Revenir à la taille normale",
+    "resizeLabel": "Hauteur de la grille",
+    "resizeTip": "Faites glisser, ou appuyez sur ↑/↓, pour changer la hauteur de la grille"
   },
   "mapOrder": {
     "label": "Ordre des cartes",
@@ -521,7 +546,9 @@
     "topTip": "La charger en premier",
     "topLabel": "Placer {name} en haut",
     "autosort": "Trier les cartes automatiquement",
-    "autosortTip": "Cartes des mods d'abord, dans leur ordre actuel, puis Muldraugh, KY"
+    "autosortTip": "Cartes des mods d'abord, dans leur ordre actuel, puis Muldraugh, KY",
+    "fixed": "En dernier",
+    "fixedTip": "La carte du jeu se charge toujours en dernier"
   },
   "layerIcon": {
     "overrides": "Remplace des fichiers de {mods}",

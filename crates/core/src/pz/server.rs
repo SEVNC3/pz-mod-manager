@@ -56,30 +56,29 @@ pub fn read(path: &Path) -> Result<ServerMods> {
     Ok(ServerMods { mods: split(value(&text, "Mods")), workshop, maps: split(value(&text, "Map")) })
 }
 
-/// The `Map=` list for `mod_maps` (the enabled mods' maps): maps keep their place in
-/// `order` (the user's arrangement or the config's current line), new ones go just before
-/// Muldraugh, which goes last if `order` lacks it. Empty when no mod adds a map.
+/// The `Map=` list for `mod_maps` (the enabled mods' maps): maps, and the game's own ones,
+/// keep their place in `order` (the user's arrangement or the config's current line), new
+/// ones go before the first of the game's maps, and Muldraugh always goes last. Empty when
+/// no mod adds a map.
 pub fn map_order(order: &[String], mod_maps: &[String]) -> Vec<String> {
     if mod_maps.is_empty() {
         return vec![];
     }
     let mut out: Vec<String> = vec![];
-    for m in order.iter().filter(|m| mod_maps.contains(m) || *m == BASE_MAP) {
+    for m in order.iter().filter(|m| *m != BASE_MAP && (mod_maps.contains(m) || super::maps::is_vanilla(m))) {
         if !out.contains(m) {
             out.push(m.clone());
         }
     }
-    let base = out.iter().position(|m| m == BASE_MAP).unwrap_or(out.len());
+    let at = out.iter().position(|m| super::maps::is_vanilla(m)).unwrap_or(out.len());
     let mut new: Vec<String> = vec![];
-    for m in mod_maps.iter().filter(|m| !out.contains(m)) {
+    for m in mod_maps.iter().filter(|m| !out.contains(m) && *m != BASE_MAP) {
         if !new.contains(m) {
             new.push(m.clone());
         }
     }
-    out.splice(base..base, new);
-    if !out.iter().any(|m| m == BASE_MAP) {
-        out.push(BASE_MAP.into());
-    }
+    out.splice(at..at, new);
+    out.push(BASE_MAP.into());
     out
 }
 
@@ -237,6 +236,8 @@ mod tests {
         // B stays first, the gone map drops, the new C goes before Muldraugh
         assert_eq!(map_order(&ids(&["B", "Gone", "A", BASE_MAP]), &ids(&["A", "B", "C", "A"])), ids(&["B", "A", "C", BASE_MAP]));
         assert_eq!(map_order(&[], &ids(&["A"])), ids(&["A", BASE_MAP]));
+        // Muldraugh is pinned last; the game's other maps keep their place, new mod maps go before them
+        assert_eq!(map_order(&ids(&[BASE_MAP, "A", "Riverside, KY", "Gone"]), &ids(&["A", "C"])), ids(&["A", "C", "Riverside, KY", BASE_MAP]));
     }
 
     #[test]

@@ -455,6 +455,11 @@
       "copied": {
         "one": "Copied {count} map: Workshop links, mod IDs, requirements and the Mods=, WorkshopItems= and Map= lines.",
         "other": "Copied {count} maps: Workshop links, mod IDs, requirements and the Mods=, WorkshopItems= and Map= lines."
+      },
+      "text": {
+        "ids": "Mod ID: {id} · Map folder: {folders}",
+        "required": "Required mods",
+        "missing": "Required but not found (not installed, not on the Workshop): {ids}"
       }
     },
     "presets": {
@@ -513,7 +518,27 @@
         "one": "{count} other item isn't tagged Map, so it wasn't read.",
         "other": "{count} other items aren't tagged Map, so they weren't read."
       }
-    }
+    },
+    "err": {
+      "scanRunning": "A Workshop map scan is already running.",
+      "steamStopped": "Steam stopped answering. What was read is kept; scan again later.",
+      "timeout": "Steam didn't answer in time.",
+      "stopped": "Stopped.",
+      "notAnId": "That isn't a Workshop item ID.",
+      "noItem": "There's no such Workshop item.",
+      "installed": "That Workshop item is already installed: if it adds maps, they're in the list.",
+      "noFiles": "Steam lists no files for this item.",
+      "fileList": "Steam didn't give the item's file list.",
+      "login": "Couldn't log in to Steam anonymously.",
+      "downloadFailed": "The download failed."
+    },
+    "updatedAgo": "updated {when}",
+    "expand": "Expand",
+    "expandTip": "Fill the tab with the grid (Esc goes back)",
+    "collapse": "Restore",
+    "collapseTip": "Back to the normal size",
+    "resizeLabel": "Grid height",
+    "resizeTip": "Drag, or press ↑/↓, to change the grid's height"
   },
   "mapOrder": {
     "label": "Map order",
@@ -521,7 +546,9 @@
     "topTip": "Load it first",
     "topLabel": "Move {name} to the top",
     "autosort": "Autosort maps",
-    "autosortTip": "Mod maps first, in their current order, then Muldraugh, KY"
+    "autosortTip": "Mod maps first, in their current order, then Muldraugh, KY",
+    "fixed": "Last",
+    "fixedTip": "The game's own map always loads last"
   },
   "layerIcon": {
     "overrides": "Overrides files from {mods}",
