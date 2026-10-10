@@ -129,8 +129,10 @@ fn main() {
 fn run(cli: Cli) -> Result<()> {
     let paths = Paths::detect();
     // read-only commands skip the lock; the rest wait for the app to finish its change
-    let _lock = if matches!(cli.cmd, Cmd::Search { .. } | Cmd::Watch { .. }) { None } else { Some(pzmm_core::lock_data(&paths)?) };
-    let (mut p, adopted) = profile::sync(&paths)?;
+    let read_only = matches!(cli.cmd, Cmd::Search { .. } | Cmd::Watch { .. });
+    let _lock = if read_only { None } else { Some(pzmm_core::lock_data(&paths)?) };
+    // sync can save the profile, so only commands holding the lock run it
+    let (mut p, adopted) = if read_only { (profile::peek(&paths), false) } else { profile::sync(&paths)? };
     if adopted {
         println!("picked up mod list changes made in-game (profile {:?})", p.name);
     }

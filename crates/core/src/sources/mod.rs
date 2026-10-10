@@ -124,6 +124,13 @@ pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
             false
         });
     }
+    workshop.retain(|id| {
+        let ok = steam_workshop::valid_id(id);
+        if !ok {
+            report(Err(anyhow::anyhow!("workshop:{id}: not a Workshop item id (a link needs ?id=…)")));
+        }
+        ok
+    });
     if !workshop.is_empty() {
         let refs: Vec<&str> = workshop.iter().map(String::as_str).collect();
         match steam_workshop::download(paths, pz::STEAM_APP, &refs) {

@@ -563,12 +563,18 @@ pub fn download(paths: &Paths, app: &str, ids: &[&str]) -> Result<Vec<(String, O
     let mut child = cmd.spawn().with_context(|| format!("running {}", exe.display()))?;
     let reader = child.stdout.take().map(|out| {
         std::thread::spawn(move || {
+            let mut done = std::collections::HashSet::new();
             for line in BufReader::new(out).lines().map_while(Result::ok) {
                 let l = line.to_lowercase();
                 if l.contains("workshop") || l.contains("error") {
                     crate::log!("{}", line.trim());
                 }
+                // "Success. Downloaded item 123 to ..."
+                if let Some(rest) = line.split("Downloaded item ").nth(1) {
+                    done.insert(rest.chars().take_while(char::is_ascii_digit).collect::<String>());
+                }
             }
+            done
         })
     });
     // ponytail: one overall limit; a per-item limit if huge downloads ever need longer
@@ -576,15 +582,14 @@ pub fn download(paths: &Paths, app: &str, ids: &[&str]) -> Result<Vec<(String, O
     while child.try_wait()?.is_none() {
         if std::time::Instant::now() > deadline {
             let _ = child.kill();
+            let _ = child.wait();
             bail!("SteamCMD didn't finish within an hour and was stopped");
         }
         std::thread::sleep(std::time::Duration::from_millis(300));
     }
-    if let Some(r) = reader {
-        let _ = r.join();
-    }
+    let done = reader.and_then(|r| r.join().ok()).unwrap_or_default();
     let content: &Path = &exe.parent().unwrap().join("steamapps/workshop/content").join(app);
-    Ok(ids.iter().map(|id| (id.to_string(), Some(content.join(id)).filter(|d| d.is_dir()))).collect())
+    Ok(ids.iter().map(|id| (id.to_string(), Some(content.join(id)).filter(|d| done.contains(*id) && d.is_dir()))).collect())
 }
 
 #[cfg(test)]

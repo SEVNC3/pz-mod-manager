@@ -193,8 +193,14 @@ pub fn list(paths: &Paths) -> Vec<String> {
     names
 }
 
+/// The on-disk spelling of a profile name (folders ignore case on Windows; PZMM follows them).
+fn on_disk(paths: &Paths, name: &str) -> String {
+    list(paths).into_iter().find(|n| n.eq_ignore_ascii_case(name)).unwrap_or_else(|| name.to_string())
+}
+
 pub fn load(paths: &Paths, name: &str) -> Result<Profile> {
     valid_name(name)?;
+    let name = &on_disk(paths, name);
     let p = dir(paths).join(name).join("modlist.txt");
     if !p.exists() {
         bail!("no profile named {name:?}");
@@ -213,7 +219,8 @@ pub fn save(paths: &Paths, profile: &Profile) -> Result<()> {
 
 pub fn delete(paths: &Paths, name: &str) -> Result<()> {
     valid_name(name)?;
-    if active_name(paths) == name {
+    let name = &on_disk(paths, name);
+    if active_name(paths).eq_ignore_ascii_case(name) {
         bail!("{name:?} is the active profile; switch to another first");
     }
     fs::remove_dir_all(dir(paths).join(name))?;
@@ -256,6 +263,13 @@ pub fn effective_build(paths: &Paths) -> u8 {
 
 pub fn set_b41(paths: &Paths, b41: Option<bool>) -> Result<()> {
     save_state(paths, &State { b41, ..state(paths) })
+}
+
+/// The active profile as saved, without picking up in-game changes (for callers that don't
+/// hold the data lock and so must not write).
+pub fn peek(paths: &Paths) -> Profile {
+    let name = active_name(paths);
+    load(paths, &name).unwrap_or(Profile { name, lines: vec![] })
 }
 
 /// Load the active profile (creating "Default" from the game's list on first run) and
@@ -362,6 +376,15 @@ mod tests {
 
     fn ids(v: &[&str]) -> Vec<String> {
         v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn profile_names_ignore_case_like_their_folders() {
+        let (_t, paths) = temp_paths();
+        apply(&paths, &Profile::parse("Default", "+A
+")).unwrap();
+        assert_eq!(load(&paths, "default").unwrap().name, "Default");
+        assert!(delete(&paths, "DEFAULT").is_err(), "the active profile can't be deleted under another casing");
     }
 
     #[test]

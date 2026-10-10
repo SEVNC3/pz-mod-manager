@@ -80,7 +80,8 @@ pub fn workshop_mod_ids(description: &str) -> Vec<String> {
     }
     let mut ids = vec![];
     for line in plain.lines() {
-        let lower = line.to_lowercase();
+        // ASCII lowercasing keeps byte offsets identical (to_lowercase turns İ into two chars)
+        let lower = line.to_ascii_lowercase();
         let Some(at) = lower.find("mod id") else { continue };
         let Some(colon) = line[at..].find(':') else { continue };
         if line[at..at + colon].len() > 9 {
@@ -365,6 +366,9 @@ Mod ID: Denseenvironment"), ["Denseenvironment"]);
 [h1]Mod ID: A[/h1]"), ["A", "B", "C"]);
         assert_eq!(workshop_mod_ids(r"Mod IDs: \TLOG_Remaster,TLOG_Remaster Flamethrower"), ["TLOG_Remaster", "TLOG_Remaster Flamethrower"]);
         assert!(workshop_mod_ids("This mod id is great: really").is_empty());
+        // non-ASCII text before the label used to shift the byte offsets (and could panic)
+        assert_eq!(workshop_mod_ids("İNDİRİLEBİLİR İÇERİK İÇİN GEREKLİ MOD ID: X"), ["X"]);
+        assert_eq!(workshop_mod_ids("İİİ Mod ID: Şehir"), ["Şehir"]);
     }
 
     #[test]
