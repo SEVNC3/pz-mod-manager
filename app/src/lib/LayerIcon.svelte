@@ -25,8 +25,8 @@
     stroke-linejoin: round;
   }
   .wins .top {
-    fill: var(--accent);
-    stroke: var(--accent);
+    fill: var(--accent-text);
+    stroke: var(--accent-text);
   }
   .loses .bottom {
     fill: var(--danger);

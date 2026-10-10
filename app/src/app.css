@@ -1,7 +1,7 @@
 /* PZMM tokens. Dark = charcoal, light = "daylight". The accent is user-chosen
    (set as --accent on <html>); everything else derives from it with color-mix(). */
 :root {
-  /* charcoal: neutral blacks and greys, so the amber accent and mod art carry the colour */
+  /* charcoal: neutral blacks and greys, so the blood-red accent and mod art carry the colour */
   --bg: #121212;
   --panel: #1a1a1a;
   --raised: #242424;
@@ -11,10 +11,12 @@
   --danger: #e5604f;
   --tape: #e6d8ad;
   --tape-ink: #2a2823;
-  --accent: #fc2684;
-  --accent-soft: color-mix(in oklab, var(--accent) 18%, transparent);
-  --accent-text: color-mix(in oklab, var(--accent) 85%, white);
-  --focus: color-mix(in oklab, var(--accent) 80%, white);
+  --accent: #6e080c;
+  --on-accent: #ffffff;
+  /* the accent is dark: soft fills use more of it, text and focus rings lift it toward white */
+  --accent-soft: color-mix(in oklab, var(--accent) 32%, transparent);
+  --accent-text: color-mix(in oklab, var(--accent) 55%, white);
+  --focus: color-mix(in oklab, var(--accent) 50%, white);
   --shadow: 0 8px 28px rgb(0 0 0 / 0.35);
 
   --font-body: "Atkinson Hyperlegible", system-ui, sans-serif;
@@ -99,7 +101,7 @@ button:disabled {
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #1b1a17;
+  color: var(--on-accent);
   font-weight: 700;
 }
 button.quiet {

@@ -160,7 +160,7 @@
   .checks li.ok .mark {
     background: var(--accent);
     border-color: var(--accent);
-    color: #1b1a17;
+    color: var(--on-accent);
     font-weight: 700;
   }
   .hint {

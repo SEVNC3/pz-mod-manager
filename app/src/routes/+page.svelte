@@ -120,13 +120,20 @@
     }
   };
   let theme = $state(pref("pzmm.theme", "system"));
-  const DEFAULT_ACCENT = "#fc2684"; // the PZMM logo's pink
-  let accent = $state([pref("pzmm.accent", DEFAULT_ACCENT)].map((a) => (a === "#d39b3a" ? DEFAULT_ACCENT : a))[0]);
+  const DEFAULT_ACCENT = "#6e080c"; // the blood on the separator tape (static/blood.svg)
+  // people still on an earlier default (amber, then pink) move to the current one
+  let accent = $state([pref("pzmm.accent", DEFAULT_ACCENT)].map((a) => (["#d39b3a", "#fc2684"].includes(a) ? DEFAULT_ACCENT : a))[0]);
+  /** Text colour on an accent fill: dark on light accents, white on dark ones. */
+  const onAccent = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? "#1b1a17" : "#ffffff";
+  };
   $effect(() => {
     const root = document.documentElement;
     if (theme === "system") delete root.dataset.theme;
     else root.dataset.theme = theme;
     root.style.setProperty("--accent", accent);
+    root.style.setProperty("--on-accent", onAccent(accent));
     try {
       localStorage.setItem("pzmm.theme", theme);
       localStorage.setItem("pzmm.accent", accent);
