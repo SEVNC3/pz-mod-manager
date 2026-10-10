@@ -945,6 +945,7 @@
   <section class="mods">
   {#if saveDiff && latestSave && !saveNoticeDismissed}
     <div class="banner save" role="status">
+      <Icon name="alert" size={16} />
       <span>
         Your latest save, <strong>{latestSave.name}</strong>, was played with a different mod list:
         {[saveDiff.missing.length && `${saveDiff.missing.length} of its mods aren't enabled`, saveDiff.extra.length && `${saveDiff.extra.length} enabled mods weren't in it`].filter(Boolean).join(", ")}.
@@ -956,6 +957,7 @@
   {/if}
   {#if zbNeeded}
     <div class="banner" role="status">
+      <Icon name="alert" size={16} />
       <span>{zb?.required_by.length} enabled {zb?.required_by.length === 1 ? "mod needs" : "mods need"} ZombieBuddy, which isn't set up{zb?.files_current || zb?.launcher_patched ? " completely (a game update may have reset it)" : ""}.</span>
       <button onclick={() => (tab = "zb")}><Icon name="settings" size={14} />Set up ZombieBuddy</button>
     </div>
@@ -1645,7 +1647,7 @@
     color: var(--muted);
   }
   .keys {
-    flex-basis: 100%;
+    grid-column: 1 / -1;
     color: var(--muted);
     font-size: 12px;
   }
@@ -1853,6 +1855,29 @@
   }
   .quiet-line {
     color: var(--muted);
+  }
+
+  /* strips above the list (banners, plans, findings, settings, app update) are cards like everything else */
+  .banner,
+  .mode-plan,
+  .findings,
+  .settings,
+  .app-update {
+    margin: 10px 16px 0;
+    border-bottom: 0;
+    border-radius: 8px;
+    box-shadow: var(--card-shadow);
+  }
+  .settings {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    align-items: center;
+    gap: 12px 18px;
+    padding: 14px 18px;
+  }
+  .banner > :global(.icon) {
+    flex: none;
+    color: var(--danger);
   }
 
   @media (max-width: 900px) {

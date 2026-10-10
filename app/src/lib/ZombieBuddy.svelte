@@ -42,7 +42,7 @@
   );
 </script>
 
-<section class="zb" aria-label="ZombieBuddy">
+<section class="zb blueprint" aria-label="ZombieBuddy">
   <div class="inner">
     <h2>ZombieBuddy</h2>
     <p class="lede">
@@ -118,8 +118,12 @@
     min-height: 0;
   }
   .inner {
-    max-width: 680px;
-    padding: 28px 24px 40px;
+    width: min(760px, calc(100% - 32px));
+    margin: 24px auto 40px;
+    padding: 22px 26px 24px;
+    background: var(--panel);
+    border-radius: 8px;
+    box-shadow: var(--card-shadow);
   }
   h2 {
     margin: 0 0 6px;

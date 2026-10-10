@@ -12,7 +12,11 @@
   } = $props();
 
   let data = $state<ServersAndSaves | null>(null);
-  let target = $state("servertest");
+  /** An existing config, or NEW to type a name for a new one. */
+  const NEW = "\u0000new";
+  let picked = $state("");
+  let newName = $state("servertest");
+  const target = $derived(picked === NEW || !data?.servers.length ? newName : picked);
   let notes = $state<string[]>([]);
   let error = $state("");
 
@@ -22,7 +26,7 @@
       .then((d) => {
         data = d;
         // default to a config that exists, so "Write to" doesn't create a stray servertest.ini
-        if (d.servers.length && !d.servers.includes(target)) target = d.servers[0];
+        if (d.servers.length && picked !== NEW && !d.servers.includes(picked)) picked = d.servers[0];
       })
       .catch((e) => (error = String(e)));
 
@@ -61,8 +65,9 @@
   onMount(refresh);
 </script>
 
-<section class="ss" aria-label="Servers and saves">
+<section class="ss blueprint" aria-label="Servers and saves">
   <div class="inner">
+  <div class="card">
     <h2>Dedicated server</h2>
     <p class="lede">
       Send the "{profile}" profile to a server config, so the server loads the same mods in the same order. It sets
@@ -71,8 +76,15 @@
     </p>
     <form class="row" onsubmit={exportTo}>
       <label for="srv">Server config</label>
-      <input id="srv" type="text" list="servers" bind:value={target} spellcheck="false" />
-      <datalist id="servers">{#each data?.servers ?? [] as s}<option value={s}></option>{/each}</datalist>
+      {#if data?.servers.length}
+        <select id="srv" bind:value={picked}>
+          {#each data.servers as s}<option value={s}>{s}.ini</option>{/each}
+          <option value={NEW}>New config…</option>
+        </select>
+      {/if}
+      {#if picked === NEW || !data?.servers.length}
+        <input type="text" bind:value={newName} spellcheck="false" aria-label="New server config name" placeholder="servertest" />
+      {/if}
       <button class="primary" type="submit" disabled={busy || !target.trim()}><Icon name="upload" size={14} />Write to {target.trim() || "…"}.ini</button>
     </form>
     {#if notes.length}<ul class="notes">{#each notes as n}<li>{n}</li>{/each}</ul>{/if}
@@ -96,7 +108,10 @@
       <p class="hint">No server configs in <span class="mono">{data.server_dir}</span> yet.</p>
     {/if}
 
-    <h2 class="gap">Saved games</h2>
+  </div>
+
+  <div class="card">
+    <h2>Saved games</h2>
     <p class="lede">Each save remembers the mods it was played with. Load a save's mods before you continue it, so nothing goes missing.</p>
     {#if data && data.saves.length === 0}
       <p class="hint">No saves with a mod list yet.</p>
@@ -114,6 +129,7 @@
       </ul>
     {/if}
   </div>
+  </div>
 </section>
 
 <style>
@@ -122,15 +138,22 @@
     min-height: 0;
   }
   .inner {
-    max-width: 760px;
-    padding: 28px 24px 40px;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+    display: grid;
+    gap: 16px;
+  }
+  .card {
+    background: var(--panel);
+    border-radius: 8px;
+    box-shadow: var(--card-shadow);
+    padding: 20px 24px 22px;
+    min-width: 0;
   }
   h2 {
     margin: 0 0 6px;
     font-size: 22px;
-  }
-  h2.gap {
-    margin-top: 36px;
   }
   h3 {
     margin: 24px 0 4px;
@@ -159,8 +182,13 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 9px 0;
-    border-bottom: 1px solid var(--line);
+    padding: 9px 8px;
+    margin: 0 -8px;
+    border-radius: 6px;
+    border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+  }
+  .list li:hover {
+    background: color-mix(in oklab, var(--accent) 16%, var(--panel));
   }
   .name {
     min-width: 0;
