@@ -7,6 +7,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
+pub mod files;
+pub mod saves;
+pub mod server;
 pub mod zombiebuddy;
 
 pub const STEAM_APP: &str = "108600";
@@ -45,8 +48,15 @@ pub fn read_info(path: &Path) -> HashMap<String, String> {
         .collect()
 }
 
+/// Mod ids listed in mod.info's `require=` (B42 writes them as `\Id`).
+pub fn requires(info: &HashMap<String, String>) -> Vec<String> {
+    info.get("require")
+        .map(|r| r.split([',', ';']).map(|s| s.trim().trim_start_matches('\\').to_string()).filter(|s| !s.is_empty()).collect())
+        .unwrap_or_default()
+}
+
 /// B42 puts mod.info in `42/`, `42.13/`... and shared files in `common/`.
-fn is_version_dir(name: &str) -> bool {
+pub(crate) fn is_version_dir(name: &str) -> bool {
     name == "common" || name.split('.').all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
 }
 
@@ -56,6 +66,8 @@ pub struct FoundMod {
     pub dir: PathBuf,
     /// The mod.info it was read from (B42: inside `42/`).
     pub info: PathBuf,
+    /// Mod ids it lists in `require=`.
+    pub requires: Vec<String>,
 }
 
 fn walk(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
@@ -88,12 +100,14 @@ pub fn find_mods(root: &Path, depth: usize) -> Vec<FoundMod> {
         .to_path_buf();
         if seen.insert(dir.clone()) {
             let mut i = read_info(&info);
+            let requires = requires(&i);
             let fallback = dir.file_name().unwrap_or_default().to_string_lossy().into_owned();
             out.push(FoundMod {
                 id: i.remove("id").filter(|s| !s.is_empty()).unwrap_or(fallback),
                 name: i.remove("name").unwrap_or_default(),
                 dir,
                 info,
+                requires,
             });
         }
     }
@@ -217,6 +231,13 @@ mod tests {
         assert!(fs::read_to_string(&p).unwrap().contains("mod = New,"));
         write_default(&p, &["Old".into()], Some(false)).unwrap();
         assert!(fs::read_to_string(&p).unwrap().contains("mod = \\Old,"));
+    }
+
+    #[test]
+    fn parses_requires() {
+        let info = HashMap::from([("require".to_string(), r"\ZombieBuddy, \ModOptions;tsarslib,".to_string())]);
+        assert_eq!(requires(&info), ["ZombieBuddy", "ModOptions", "tsarslib"]);
+        assert!(requires(&HashMap::new()).is_empty());
     }
 
     #[test]

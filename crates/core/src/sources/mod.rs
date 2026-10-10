@@ -150,6 +150,33 @@ fn expand_workshop(paths: &Paths, ids: Vec<String>) -> Vec<String> {
     out
 }
 
+/// Mods PZMM installed from the Workshop that have been updated there since.
+/// (Steam keeps subscriptions current itself; GitHub sources aren't checked yet.)
+pub fn check_updates(paths: &Paths) -> Result<Vec<String>> {
+    let index = store::load(paths)?;
+    let ours: Vec<(&String, &str, u64)> = index
+        .iter()
+        .filter_map(|(id, e)| {
+            let item = e.source.strip_prefix("workshop:")?;
+            // v0.1 imports have no install time: fall back to the mod folder's age
+            let at = if e.installed_at > 0 {
+                e.installed_at
+            } else {
+                std::fs::metadata(paths.mods().join(id))
+                    .and_then(|m| m.modified())
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map_or(0, |d| d.as_secs())
+            };
+            Some((id, item, at))
+        })
+        .collect();
+    let items: Vec<&str> = ours.iter().map(|o| o.1).collect::<HashSet<_>>().into_iter().collect();
+    let updated: std::collections::HashMap<String, u64> =
+        steam_workshop::details(&items)?.into_iter().map(|i| (i.id, i.time_updated)).collect();
+    Ok(ours.into_iter().filter(|(_, item, at)| updated.get(*item).is_some_and(|t| t > at)).map(|(id, ..)| id.clone()).collect())
+}
+
 fn install_local(paths: &Paths, p: &Path) -> Result<Vec<String>> {
     let abs = std::path::absolute(p)?;
     let source = format!("local:{}", abs.display());

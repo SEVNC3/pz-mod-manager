@@ -15,6 +15,13 @@ use crate::sources::steam_workshop;
 pub struct Entry {
     /// `workshop:<id>`, `github:<owner/repo[@ref]>` or `local:<path>`.
     pub source: String,
+    /// When PZMM last installed it (seconds since 1970); 0 for v0.1 imports.
+    #[serde(default)]
+    pub installed_at: u64,
+}
+
+pub fn now() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs())
 }
 
 pub type Index = BTreeMap<String, Entry>;
@@ -32,7 +39,7 @@ pub fn load(paths: &Paths) -> Result<Index> {
     let old = paths.mods().join("pzmm.json");
     let v1: BTreeMap<String, String> =
         if old.exists() { serde_json::from_str(&fs::read_to_string(old)?).unwrap_or_default() } else { BTreeMap::new() };
-    Ok(v1.into_iter().map(|(id, source)| (id, Entry { source })).collect())
+    Ok(v1.into_iter().map(|(id, source)| (id, Entry { source, installed_at: 0 })).collect())
 }
 
 pub fn save(paths: &Paths, index: &Index) -> Result<()> {
@@ -94,7 +101,7 @@ pub fn install(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> 
             move_dir(&dest, &backup)?;
         }
         copy_dir(&m.dir, &dest).with_context(|| format!("copying {} to {}", m.id, dest.display()))?;
-        index.insert(m.id.clone(), Entry { source: source.to_string() });
+        index.insert(m.id.clone(), Entry { source: source.to_string(), installed_at: now() });
         crate::log!("installed {} ({source})", m.id);
         ids.push(m.id);
     }
@@ -149,6 +156,7 @@ pub struct Row {
     pub source: String,
     pub dir: PathBuf,
     pub info: PathBuf,
+    pub requires: Vec<String>,
 }
 
 /// Every mod the game can load: Steam subscriptions, then Zomboid/mods (wins on clashes).
@@ -159,12 +167,12 @@ pub fn scan(paths: &Paths) -> Result<BTreeMap<String, Row>> {
         for m in pz::workshop_mods(&ws) {
             let item = m.dir.strip_prefix(&ws).ok().and_then(|r| r.iter().next()).map(|s| s.to_string_lossy().into_owned());
             let source = format!("steam:{}", item.unwrap_or_default());
-            out.insert(m.id.clone(), Row { id: m.id, name: m.name, source, dir: m.dir, info: m.info });
+            out.insert(m.id.clone(), Row { id: m.id, name: m.name, source, dir: m.dir, info: m.info, requires: m.requires });
         }
     }
     for m in pz::local_mods(paths) {
         let source = index.get(&m.id).map_or("manual".to_string(), |e| e.source.clone());
-        out.insert(m.id.clone(), Row { id: m.id, name: m.name, source, dir: m.dir, info: m.info });
+        out.insert(m.id.clone(), Row { id: m.id, name: m.name, source, dir: m.dir, info: m.info, requires: m.requires });
     }
     Ok(out)
 }

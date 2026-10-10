@@ -1,6 +1,6 @@
 # Foundation Plan: PZMM (Project Zomboid Mod Manager)
 
-Status: draft · 2026-10-10
+Status: v1.0 built · 2026-10-10
 
 ## 1. Scope
 
@@ -114,5 +114,13 @@ All paths are stored relative to `Zomboid/` or `<data>/`. Applying a profile onl
 | **0.2 · Core** | Cargo workspace, a port of the v0.1 logic into `core` (`pz/`, store, sources), profiles, reconcile, and the `pzmm` command line with v0.1's commands. CI on Windows and Linux. | `cargo test` passes on both systems, and existing v0.1 installs are picked up unchanged. |
 | **0.3 · App** | Tauri + Svelte: mod table, details pane, install, enable/disable, drag to reorder, profiles, themes. Windows installer and Linux AppImage. | Covers everything v0.1 does in the new interface. |
 | **1.0 · PZ, done well** | Collections, updates with rollback, dependencies, server export and import, saves, maps, conflicts, launch. | A B42 player can go from a fresh install to 50 mods to a running server without opening a file. |
+
+**v1.0 status:**
+- **Done:** everything above, plus two additions: a Workshop browser tab and ZombieBuddy setup (Java agent files plus the launcher flag).
+- **Not done:**
+  - Update checks for GitHub sources.
+  - Managing the `maps { }` block in `default.txt`. Servers already get `Map=`.
+  - Launching the dedicated server from the app.
+- **Still unverified in a real B42 game:** the `default.txt` format.
 
 **Later, only if you move into another game:** add `crates/core/<game>/` next to `pz/`, then extract a `Game` trait from the two real modules. The store, profiles, reconcile and sources are already game-neutral.

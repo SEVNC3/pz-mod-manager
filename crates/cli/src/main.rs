@@ -59,6 +59,14 @@ enum Cmd {
         #[arg(long)]
         build: Option<u8>,
     },
+    /// List mods PZMM installed from the Workshop that have updates waiting
+    Outdated,
+    /// Write the active profile to Zomboid/Server/<name>.ini, or make a profile from it
+    Server {
+        /// export or import
+        action: String,
+        name: String,
+    },
     /// Set up the ZombieBuddy Java agent (Java mods): status, install or uninstall
     Zombiebuddy {
         #[arg(default_value = "status")]
@@ -136,6 +144,14 @@ fn run(cli: Cli) -> Result<()> {
                 println!("{:>11}  {:<50} {:>9} subs", i.id, i.title.chars().take(50).collect::<String>(), i.subscriptions);
             }
         }
+        Cmd::Outdated => {
+            let ids = sources::check_updates(&paths)?;
+            if ids.is_empty() {
+                println!("everything PZMM installed is up to date");
+            }
+            ids.iter().for_each(|i| println!("{i}: update available (pzmm update)"));
+        }
+        Cmd::Server { action, name } => server(&paths, &p, &action, &name)?,
         Cmd::Zombiebuddy { action } => zombiebuddy(&paths, &mut p, &action)?,
         Cmd::Profile(ProfileCmd::List) => {
             for name in profile::list(&paths) {
@@ -216,6 +232,30 @@ fn zombiebuddy(paths: &Paths, p: &mut Profile, action: &str) -> Result<()> {
             }
         }
         _ => bail!("expected status, install or uninstall"),
+    }
+    Ok(())
+}
+
+fn server(paths: &Paths, p: &Profile, action: &str, name: &str) -> Result<()> {
+    use pzmm_core::pz::server;
+    let file = server::path(paths, name)?;
+    match action {
+        "export" => {
+            for note in server::export(paths, name, &p.enabled(), &store::scan(paths)?)? {
+                println!("{note}");
+            }
+        }
+        "import" => {
+            let cfg = server::read(&file)?;
+            let have = sources::workshop_available(paths);
+            let missing: Vec<Source> = cfg.workshop.iter().filter(|w| !have.contains(*w)).map(|w| Source::Workshop(w.clone())).collect();
+            sources::install(paths, &missing, false);
+            let lines = cfg.mods.into_iter().map(|id| profile::Line::Mod { id, on: true }).collect();
+            let prof = Profile { name: format!("Server {name}"), lines };
+            profile::apply(paths, &prof)?;
+            println!("now using profile {:?}", prof.name);
+        }
+        _ => bail!("expected export or import"),
     }
     Ok(())
 }

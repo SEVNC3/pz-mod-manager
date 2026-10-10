@@ -5,8 +5,10 @@
   import Details from "$lib/Details.svelte";
   import Workshop from "$lib/Workshop.svelte";
   import ZombieBuddy from "$lib/ZombieBuddy.svelte";
+  import ServersSaves from "$lib/ServersSaves.svelte";
 
-  let tab = $state<"mods" | "workshop" | "zb">("mods");
+  let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
+  let updates = $state<Set<string>>(new Set());
   let zb = $state<ZbStatus | null>(null);
   const zbNeeded = $derived(!!zb && zb.required_by.length > 0 && !zbReady(zb));
   const refreshZb = () => api.zbStatus().then((s) => (zb = s)).catch(() => {});
@@ -19,7 +21,7 @@
   let log = $state<{ text: string; error: boolean }[]>([]);
   let logOpen = $state(false);
   let search = $state("");
-  let filter = $state<"all" | "on" | "off">("all");
+  let filter = $state<"all" | "on" | "off" | "problems">("all");
   let installText = $state("");
   let settingsOpen = $state(false);
   let newProfile = $state<string | null>(null);
@@ -57,6 +59,25 @@
     rows.forEach((r, i) => r.kind === "mod" && r.on && o.set(i, ++n));
     return o;
   });
+  const problems = $derived.by(() => {
+    const pos = new Map<string, number>();
+    rows.forEach((r, i) => r.kind === "mod" && pos.set(r.id, i));
+    const out = new Map<string, { text: string; fixable: boolean }>();
+    rows.forEach((r, i) => {
+      if (r.kind !== "mod" || !r.on || r.missing) return;
+      for (const req of r.requires) {
+        const dep = mods.get(req);
+        if (!dep || dep.missing) out.set(r.id, { text: `Needs ${req} (not installed)`, fixable: false });
+        else if (!dep.on) out.set(r.id, { text: `Needs ${req} (disabled)`, fixable: true });
+        else if ((pos.get(req) ?? 0) > i) out.set(r.id, { text: `${req} must load first`, fixable: true });
+        else continue;
+        break;
+      }
+    });
+    return out;
+  });
+  const fixable = $derived([...problems.values()].filter((p) => p.fixable).length);
+  const problemCount = $derived(problems.size + [...mods.values()].filter((m) => m.on && m.missing).length);
   const filtering = $derived(search.trim() !== "" || filter !== "all");
   const visible = $derived.by(() => {
     const q = search.trim().toLowerCase();
@@ -66,6 +87,7 @@
         if (r.kind === "sep") return !filtering;
         if (filter === "on" && !r.on) return false;
         if (filter === "off" && r.on) return false;
+        if (filter === "problems" && !problems.has(r.id) && !r.missing) return false;
         return !q || r.id.toLowerCase().includes(q) || r.name.toLowerCase().includes(q);
       });
   });
@@ -99,6 +121,51 @@
       busy = false;
       busyLabel = "";
       refreshZb();
+    }
+  }
+
+  /** Enable disabled requirements and move each requirement above the first mod needing it. */
+  function fixLoadOrder() {
+    const next = [...rows];
+    for (let pass = 0; pass < 50; pass++) {
+      let changed = false;
+      outer: for (let i = 0; i < next.length; i++) {
+        const m = next[i];
+        if (m.kind !== "mod" || !m.on) continue;
+        for (const req of m.requires) {
+          const j = next.findIndex((r) => r.kind === "mod" && r.id === req);
+          if (j < 0) continue;
+          const dep = next[j] as ModRow;
+          if (!dep.on) {
+            next[j] = { ...dep, on: true };
+            changed = true;
+          }
+          if (j > i) {
+            const [item] = next.splice(j, 1);
+            next.splice(i, 0, item);
+            changed = true;
+            break outer;
+          }
+        }
+      }
+      if (!changed) break;
+    }
+    commit(next);
+  }
+
+  async function checkUpdates() {
+    try {
+      updates = new Set(await api.checkUpdates());
+      if (updates.size) say(`${updates.size} mod${updates.size === 1 ? " has an update" : "s have updates"} on the Workshop.`);
+    } catch (e) {
+      say(`Couldn't check for updates: ${e}`);
+    }
+  }
+
+  async function updateMods(ids: string[]) {
+    logOpen = true;
+    if (await run(`Updating ${ids.length === 1 ? ids[0] : `${ids.length} mods`}`, () => api.updateMods(ids))) {
+      updates = new Set([...updates].filter((u) => !ids.includes(u)));
     }
   }
 
@@ -193,7 +260,7 @@
 
   onMount(() => {
     const unlisten = listen<string>("log", (e) => say(e.payload, e.payload.startsWith("error:")));
-    run("Loading", api.load);
+    run("Loading", api.load).then(checkUpdates);
     return () => {
       unlisten.then((f) => f());
     };
@@ -235,7 +302,12 @@
     </form>
 
     <div class="right">
-      <button onclick={() => { logOpen = true; run("Updating mods", api.updateAll); }} disabled={busy}>Update all</button>
+      {#if updates.size}
+        <button class="primary" onclick={() => updateMods([...updates])} disabled={busy}>Update {updates.size} {updates.size === 1 ? "mod" : "mods"}</button>
+      {:else}
+        <button onclick={() => { logOpen = true; run("Updating mods", api.updateAll).then(() => (updates = new Set())); }} disabled={busy}
+          title="Re-download every mod PZMM installed">Update all</button>
+      {/if}
       <button onclick={() => api.openUrl("steam://rungameid/108600")}>Launch game</button>
       <button class="quiet" aria-expanded={settingsOpen} onclick={() => (settingsOpen = !settingsOpen)}>Settings</button>
     </div>
@@ -267,7 +339,7 @@
   {/if}
 
   <div class="tabs" role="tablist" aria-label="Sections">
-    {#each [["mods", "My mods"], ["workshop", "Browse Workshop"], ["zb", "ZombieBuddy"]] as [id, label]}
+    {#each [["mods", "My mods"], ["workshop", "Browse Workshop"], ["servers", "Servers & saves"], ["zb", "ZombieBuddy"]] as [id, label]}
       <button role="tab" aria-selected={tab === id} class:active={tab === id} onclick={() => (tab = id as typeof tab)}>
         {label}{#if id === "zb" && zbNeeded}<span class="alert" aria-label="needs setup"></span>{/if}
       </button>
@@ -276,6 +348,10 @@
 
   {#if tab === "workshop"}
     <Workshop {busy} defaultBuild={view?.build ?? null} onInstall={installWorkshop} />
+  {:else if tab === "servers"}
+    <ServersSaves {busy} profile={view?.profile ?? ""} enabledIds={[...mods.values()].filter((m) => m.on).map((m) => m.id)}
+      onImport={(name) => { logOpen = true; return run(`Importing ${name}.ini`, () => api.serverImport(name)); }}
+      onUseSave={(mode, name) => run(`Loading the mods of ${name}`, () => api.saveUse(mode, name))} />
   {:else if tab === "zb"}
     <ZombieBuddy status={zb} profile={view?.profile ?? ""} {busy}
       onSetup={async () => { logOpen = true; await run("Setting up ZombieBuddy", api.zbInstall); }}
@@ -291,11 +367,15 @@
   <div class="filters">
     <input type="search" bind:value={search} placeholder="Search mods" aria-label="Search mods" />
     <div class="seg" role="radiogroup" aria-label="Show">
-      {#each [["all", "All"], ["on", "Enabled"], ["off", "Disabled"]] as [v, label]}
+      {#each [["all", "All"], ["on", "Enabled"], ["off", "Disabled"], ["problems", `Problems${problemCount ? ` (${problemCount})` : ""}`]] as [v, label]}
         <button role="radio" aria-checked={filter === v} class:active={filter === v} onclick={() => (filter = v as typeof filter)}>{label}</button>
       {/each}
     </div>
     <span class="count">{enabledCount} enabled · {mods.size} mods</span>
+    {#if fixable}
+      <button class="primary" onclick={fixLoadOrder} disabled={busy}
+        title="Enable required mods and move them above the mods that need them">Fix load order</button>
+    {/if}
     <span class="hint">
       {filtering ? "Clear the search and filter to change load order." : "Drag to reorder · Alt+↑/↓ · Space toggles"}
     </span>
@@ -356,6 +436,10 @@
                   <td class="src">
                     {#if r.missing}
                       <span class="missing">Not installed</span>
+                    {:else if problems.has(r.id)}
+                      <span class="missing" title={problems.get(r.id)?.text}>⚠ {problems.get(r.id)?.text}</span>
+                    {:else if updates.has(r.id)}
+                      <span class="update">Update available</span>
                     {:else}
                       <span class="badge" data-kind={r.source.split(":")[0]}>{src.label}</span>
                     {/if}
@@ -376,7 +460,8 @@
     </div>
 
     {#if selected}
-      <Details id={selected} {mods} {busy} onToggle={toggle} onSelect={(id) => (selected = id)}
+      <Details id={selected} {mods} {busy} hasUpdate={updates.has(selected)} onUpdate={(id) => updateMods([id])}
+        onToggle={toggle} onSelect={(id) => (selected = id)}
         onRemove={remove} onRollback={(id) => run(`Restoring ${id}`, () => api.rollback(id))} />
     {/if}
   </main>
@@ -651,7 +736,10 @@
     color: var(--muted);
   }
   .src {
-    width: 120px;
+    width: 230px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     text-align: right;
   }
   .badge {
@@ -665,6 +753,11 @@
   .badge[data-kind="workshop"],
   .badge[data-kind="local"] {
     color: var(--text);
+  }
+  .update {
+    color: var(--accent-text);
+    font-weight: 700;
+    font-size: 12px;
   }
   .missing {
     color: var(--danger);

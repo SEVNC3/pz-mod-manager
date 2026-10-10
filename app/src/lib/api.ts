@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type ModRow = { kind: "mod"; id: string; name: string; source: string; on: boolean; missing: boolean };
+export type ModRow = { kind: "mod"; id: string; name: string; source: string; on: boolean; missing: boolean; requires: string[] };
 export type SepRow = { kind: "sep"; name: string };
 export type Row = ModRow | SepRow;
 
@@ -48,6 +48,10 @@ export type ZbStatus = {
 };
 export const zbReady = (s: ZbStatus | null) => !!s && s.have_mod && s.files_current && s.launcher_patched && s.enabled;
 
+export type Conflict = { other: string; files: number; wins: boolean; examples: string[] };
+export type Save = { mode: string; name: string; mods: string[]; modified: number };
+export type ServersAndSaves = { servers: string[]; server_dir: string; saves: Save[] };
+
 export const api = {
   load: () => invoke<View>("load"),
   save: (rows: Row[]) => invoke<View>("save", { rows }),
@@ -67,6 +71,13 @@ export const api = {
   zbPreview: (remove: boolean) => invoke<string[]>("zb_preview", { remove }),
   zbInstall: () => invoke<View>("zb_install"),
   zbUninstall: () => invoke<View>("zb_uninstall"),
+  checkUpdates: () => invoke<string[]>("check_updates"),
+  updateMods: (ids: string[]) => invoke<View>("update_mods", { ids }),
+  conflicts: (id: string) => invoke<Conflict[]>("conflicts", { id }),
+  serversAndSaves: () => invoke<ServersAndSaves>("servers_and_saves"),
+  serverExport: (name: string) => invoke<string[]>("server_export", { name }),
+  serverImport: (name: string) => invoke<View>("server_import", { name }),
+  saveUse: (mode: string, name: string) => invoke<View>("save_use", { mode, name }),
   openPath: (path: string) => invoke<void>("open_path", { path }),
   openUrl: (url: string) => invoke<void>("open_url", { url }),
 };

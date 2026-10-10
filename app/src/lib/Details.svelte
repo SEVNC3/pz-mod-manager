@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { api, describeSource, type Details, type ModRow } from "./api";
+  import { api, describeSource, type Conflict, type Details, type ModRow } from "./api";
 
   let {
     id,
     mods,
     busy,
+    hasUpdate,
+    onUpdate,
     onToggle,
     onRemove,
     onRollback,
@@ -13,6 +15,8 @@
     id: string;
     mods: Map<string, ModRow>;
     busy: boolean;
+    hasUpdate: boolean;
+    onUpdate: (id: string) => void;
     onToggle: (id: string) => void;
     onRemove: (id: string) => void;
     onRollback: (id: string) => void;
@@ -20,6 +24,7 @@
   } = $props();
 
   let d = $state<Details | null>(null);
+  let conflicts = $state<Conflict[]>([]);
   let poster = $state<string | null>(null);
   let loadedFor = "";
 
@@ -32,6 +37,9 @@
     api.details(target).then((r) => {
       if (target === id) d = r;
     });
+    api.conflicts(target).then((c) => {
+      if (target === id) conflicts = c;
+    }).catch(() => (conflicts = []));
     if (loadedFor !== target) {
       loadedFor = target;
       if (poster) URL.revokeObjectURL(poster);
@@ -95,6 +103,13 @@
       {/each}
     </dl>
 
+    {#if hasUpdate && d.ours}
+      <div class="update">
+        <span>A newer version is on the Workshop.</span>
+        <button class="primary" onclick={() => onUpdate(id)} disabled={busy}>Update now</button>
+      </div>
+    {/if}
+
     {#if requires.length}
       <h3>Requires</h3>
       <ul class="requires">
@@ -106,6 +121,21 @@
           </li>
         {/each}
       </ul>
+    {/if}
+
+    {#if conflicts.length}
+      <h3>Shared files</h3>
+      <ul class="conflicts">
+        {#each conflicts as c}
+          <li title={c.examples.join(", ")}>
+            <span class="mono">{c.other}</span>
+            <span class={c.wins ? "ok" : "bad"}>
+              {c.files} {c.files === 1 ? "file" : "files"}, {c.wins ? "this mod's copies win" : `${c.other}'s copies win`}
+            </span>
+          </li>
+        {/each}
+      </ul>
+      <p class="note small">The mod lower in the load order wins. Drag to change which one's files are used.</p>
     {/if}
 
     {#if description}
@@ -216,5 +246,29 @@
   .note {
     margin-top: 22px;
     color: var(--muted);
+  }
+  .note.small {
+    margin-top: 4px;
+    font-size: 12px;
+  }
+  .update {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--accent-soft);
+  }
+  .conflicts {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .conflicts li {
+    display: flex;
+    flex-direction: column;
+    padding: 3px 0;
   }
 </style>

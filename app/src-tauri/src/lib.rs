@@ -33,6 +33,8 @@ enum Row {
         on: bool,
         #[serde(default)]
         missing: bool,
+        #[serde(default)]
+        requires: Vec<String>,
     },
     Sep {
         name: String,
@@ -59,15 +61,15 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
         match line {
             Line::Separator(name) => rows.push(Row::Sep { name }),
             Line::Mod { id, on } => match mods.remove(&id) {
-                Some(m) => rows.push(Row::Mod { id, name: m.name, source: m.source, on, missing: false }),
-                None if on => rows.push(Row::Mod { id, name: String::new(), source: String::new(), on, missing: true }),
+                Some(m) => rows.push(Row::Mod { id, name: m.name, source: m.source, on, missing: false, requires: m.requires }),
+                None if on => rows.push(Row::Mod { id, name: String::new(), source: String::new(), on, missing: true, requires: vec![] }),
                 None => {} // disabled and gone: drop it
             },
         }
     }
     let mut rest: Vec<store::Row> = mods.into_values().collect();
     rest.sort_by_key(|m| (if m.name.is_empty() { &m.id } else { &m.name }).to_lowercase());
-    rows.extend(rest.into_iter().map(|m| Row::Mod { id: m.id, name: m.name, source: m.source, on: false, missing: false }));
+    rows.extend(rest.into_iter().map(|m| Row::Mod { id: m.id, name: m.name, source: m.source, on: false, missing: false, requires: m.requires }));
     Ok(View {
         profile: p.name,
         profiles: profile::list(paths),
@@ -309,11 +311,7 @@ fn zb_status() -> Res<ZbStatus> {
         let enabled = active(paths)?.enabled();
         let required_by = enabled
             .iter()
-            .filter(|id| {
-                mods.get(*id).is_some_and(|m| {
-                    pz::read_info(&m.info).get("require").is_some_and(|r| r.split([',', ';']).any(|x| x.trim().trim_start_matches('\\') == zb::MOD_ID))
-                })
-            })
+            .filter(|id| mods.get(*id).is_some_and(|m| m.requires.iter().any(|r| r == zb::MOD_ID)))
             .cloned()
             .collect();
         Ok(ZbStatus {
@@ -385,6 +383,114 @@ fn zb_uninstall() -> Res<View> {
     })
 }
 
+// --- updates, conflicts, servers, saves ---
+
+#[tauri::command]
+async fn check_updates() -> Res<Vec<String>> {
+    tauri::async_runtime::spawn_blocking(|| sources::check_updates(&Paths::detect()).map_err(|e| format!("{e:#}")))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Re-download specific mods PZMM installed.
+#[tauri::command]
+async fn update_mods(ids: Vec<String>) -> Res<View> {
+    tauri::async_runtime::spawn_blocking(move || {
+        locked(|paths| {
+            let index = store::load(paths)?;
+            let mut seen = std::collections::HashSet::new();
+            let todo: Vec<Source> = ids
+                .iter()
+                .filter_map(|id| index.get(id))
+                .filter(|e| seen.insert(e.source.clone()))
+                .filter_map(|e| Source::from_index(&e.source))
+                .collect();
+            sources::install(paths, &todo, false);
+            view(paths)
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn conflicts(id: String) -> Res<Vec<pz::files::Conflict>> {
+    locked(|paths| {
+        let mods = store::scan(paths)?;
+        let enabled = active(paths)?.enabled();
+        let Some(mine) = mods.get(&id) else { return Ok(vec![]) };
+        let my_pos = enabled.iter().position(|e| *e == id).unwrap_or(usize::MAX);
+        let others: Vec<(String, std::path::PathBuf, usize)> = enabled
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| **e != id)
+            .filter_map(|(pos, e)| mods.get(e).map(|m| (e.clone(), m.dir.clone(), pos)))
+            .collect();
+        Ok(pz::files::conflicts(&mine.dir, my_pos, &others))
+    })
+}
+
+#[derive(Serialize)]
+struct ServersAndSaves {
+    servers: Vec<String>,
+    server_dir: String,
+    saves: Vec<pz::saves::Save>,
+}
+
+#[tauri::command]
+fn servers_and_saves() -> Res<ServersAndSaves> {
+    locked(|paths| {
+        Ok(ServersAndSaves {
+            servers: pz::server::list(paths),
+            server_dir: pz::server::dir(paths).display().to_string(),
+            saves: pz::saves::list(paths),
+        })
+    })
+}
+
+/// Write the active profile into `Server/<name>.ini`. Returns notes for the user.
+#[tauri::command]
+fn server_export(name: String) -> Res<Vec<String>> {
+    locked(|paths| {
+        let notes = pz::server::export(paths, &name, &active(paths)?.enabled(), &store::scan(paths)?)?;
+        notes.iter().for_each(|n| pzmm_core::log!("{n}"));
+        Ok(notes)
+    })
+}
+
+/// Make a profile from a server config (installing missing Workshop items) and use it.
+#[tauri::command]
+async fn server_import(name: String) -> Res<View> {
+    tauri::async_runtime::spawn_blocking(move || {
+        locked(|paths| {
+            let cfg = pz::server::read(&pz::server::path(paths, &name)?)?;
+            let have = sources::workshop_available(paths);
+            let missing: Vec<Source> = cfg.workshop.iter().filter(|w| !have.contains(*w)).map(|w| Source::Workshop(w.clone())).collect();
+            if !missing.is_empty() {
+                pzmm_core::log!("installing {} Workshop item(s) the server uses", missing.len());
+                sources::install(paths, &missing, false);
+            }
+            let lines = cfg.mods.into_iter().map(|id| Line::Mod { id, on: true }).collect();
+            profile::apply(paths, &Profile { name: format!("Server {name}"), lines })?;
+            view(paths)
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Make a profile from a save's mod list and use it.
+#[tauri::command]
+fn save_use(mode: String, name: String) -> Res<View> {
+    locked(|paths| {
+        let save = pz::saves::list(paths).into_iter().find(|s| s.mode == mode && s.name == name);
+        let Some(save) = save else { anyhow::bail!("save {mode}/{name} not found") };
+        let lines = save.mods.into_iter().map(|id| Line::Mod { id, on: true }).collect();
+        profile::apply(paths, &Profile { name: format!("Save {name}"), lines })?;
+        view(paths)
+    })
+}
+
 #[tauri::command]
 fn open_path(app: AppHandle, path: String) -> Res<()> {
     app.opener().open_path(path, None::<&str>).map_err(|e| e.to_string())
@@ -417,7 +523,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
-            details, poster, open_path, open_url, workshop_browse, zb_status, zb_preview, zb_install, zb_uninstall
+            details, poster, open_path, open_url, workshop_browse, zb_status, zb_preview, zb_install, zb_uninstall,
+            check_updates, update_mods, conflicts, servers_and_saves, server_export, server_import, save_use
         ])
         .run(tauri::generate_context!())
         .expect("error while running PZMM");

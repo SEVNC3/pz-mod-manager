@@ -2,11 +2,16 @@
 
 A free, open-source mod manager for **Project Zomboid** (Build 41 and 42), for Windows and Linux.
 
-- **Install** from the Steam Workshop (link or ID), from GitHub (`owner/repo`, optionally `@tag`) or from a local `.zip` or folder. You don't need to log in to Steam.
+- **Browse the Workshop** inside the app: search, sort and filter by Build 41/42, then install in one click.
+- **Install** from the Steam Workshop (link, ID or a whole collection), from GitHub (`owner/repo`, optionally `@tag`) or from a local `.zip` or folder. You don't need to log in to Steam. If a mod lists other mods it requires, PZMM installs those too.
 - **See everything:** Steam Workshop subscriptions and the mods in your `Zomboid/mods` folder, in one list with each mod's poster, author and description.
 - **Load order:** drag to reorder, group mods under separators, and switch mods on and off. PZMM writes the same `mods/default.txt` the game reads.
 - **Profiles:** keep separate mod setups ("Solo", "Friends server") and switch between them in one click. Changes you make in the game's own mod menu are picked up automatically.
-- **Safe updates:** **Update all** keeps the previous version of each mod, and **Restore previous version** brings it back if an update breaks your save.
+- **Dependencies:** PZMM flags enabled mods whose required mods are missing, disabled or loading too late. **Fix load order** sorts it out.
+- **Conflicts:** each mod's details show which other mods replace the same files, and which copy wins.
+- **Updates:** PZMM checks the Workshop for newer versions of the mods it installed, without downloading them. Every update keeps the previous version, and **Restore previous version** brings it back if an update breaks your save.
+- **Servers and saves:** write a profile into a dedicated server's config (`Mods=`, `WorkshopItems=`, `Map=`), turn a server config into a profile, or load the mods a save was played with.
+- **ZombieBuddy:** one-click setup for [ZombieBuddy](https://github.com/zed-0xff/ZombieBuddy), the loader that Java mods need. PZMM shows each change before applying it and can undo it.
 - **Ownership:** PZMM only deletes mods it installed. It never touches your Workshop subscriptions or mods you installed by hand.
 
 ## Download
@@ -43,6 +48,11 @@ pzmm rollback ModId          # restore the version before the last update
 pzmm profile new Server
 pzmm profile use Server
 pzmm build 41                # force the B41 default.txt format
+pzmm search snow --sort toprated --build 42
+pzmm outdated                # Workshop mods with updates waiting
+pzmm server export servertest   # active profile -> Zomboid/Server/servertest.ini
+pzmm server import servertest   # server config -> profile (installs missing mods)
+pzmm zombiebuddy install     # also: status, uninstall
 ```
 
 The command line and the app share the same profiles and data.
@@ -53,6 +63,7 @@ On Linux, SteamCMD needs 32-bit libraries (`lib32gcc-s1` on Debian/Ubuntu).
 |---|---|---|
 | `PZ_HOME` | `~/Zomboid` | Your Zomboid user folder |
 | `PZMM_DATA` | `%LOCALAPPDATA%\pzmm` or `~/.local/share/pzmm` | Profiles, backups, SteamCMD |
+| `PZ_GAME_DIR` | found in your Steam libraries | The game's install folder (used for ZombieBuddy) |
 | `GITHUB_TOKEN` | none | Private repos or a higher GitHub API rate limit |
 
 ## Build from source
