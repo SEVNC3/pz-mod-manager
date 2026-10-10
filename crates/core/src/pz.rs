@@ -52,6 +52,8 @@ pub struct FoundMod {
     pub id: String,
     pub name: String,
     pub dir: PathBuf,
+    /// The mod.info it was read from (B42: inside `42/`).
+    pub info: PathBuf,
 }
 
 fn walk(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
@@ -89,6 +91,7 @@ pub fn find_mods(root: &Path, depth: usize) -> Vec<FoundMod> {
                 id: i.remove("id").filter(|s| !s.is_empty()).unwrap_or(fallback),
                 name: i.remove("name").unwrap_or_default(),
                 dir,
+                info,
             });
         }
     }

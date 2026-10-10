@@ -95,11 +95,15 @@ pub fn install(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> 
         }
         copy_dir(&m.dir, &dest).with_context(|| format!("copying {} to {}", m.id, dest.display()))?;
         index.insert(m.id.clone(), Entry { source: source.to_string() });
-        println!("installed {} ({source})", m.id);
+        crate::log!("installed {} ({source})", m.id);
         ids.push(m.id);
     }
     save(paths, &index)?;
     Ok(ids)
+}
+
+pub fn has_backup(paths: &Paths, id: &str) -> bool {
+    backup_dir(paths, id).exists()
 }
 
 /// Swap a mod back to the version it had before its last install/update.
@@ -144,6 +148,7 @@ pub struct Row {
     /// Index source, `steam:<item>` for Workshop subscriptions, or `manual`.
     pub source: String,
     pub dir: PathBuf,
+    pub info: PathBuf,
 }
 
 /// Every mod the game can load: Steam subscriptions, then Zomboid/mods (wins on clashes).
@@ -154,12 +159,12 @@ pub fn scan(paths: &Paths) -> Result<BTreeMap<String, Row>> {
         for m in pz::workshop_mods(&ws) {
             let item = m.dir.strip_prefix(&ws).ok().and_then(|r| r.iter().next()).map(|s| s.to_string_lossy().into_owned());
             let source = format!("steam:{}", item.unwrap_or_default());
-            out.insert(m.id.clone(), Row { id: m.id, name: m.name, source, dir: m.dir });
+            out.insert(m.id.clone(), Row { id: m.id, name: m.name, source, dir: m.dir, info: m.info });
         }
     }
     for m in pz::local_mods(paths) {
         let source = index.get(&m.id).map_or("manual".to_string(), |e| e.source.clone());
-        out.insert(m.id.clone(), Row { id: m.id, name: m.name, source, dir: m.dir });
+        out.insert(m.id.clone(), Row { id: m.id, name: m.name, source, dir: m.dir, info: m.info });
     }
     Ok(out)
 }

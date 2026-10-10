@@ -1,41 +1,36 @@
 # PZMM: Project Zomboid Mod Manager
 
-A small, open-source mod manager for **Project Zomboid** (Build 41 and Build 42).
+A free, open-source mod manager for **Project Zomboid** (Build 41 and 42), for Windows and Linux.
 
-- Install mods from the **Steam Workshop** (ID or URL) or from **GitHub** (`owner/repo`, optionally `@tag` or `@branch`)
-- See every mod you have: Workshop subscriptions and mods in `Zomboid/mods`
-- Enable, disable and reorder mods (load order), using the same `mods/default.txt` the game reads
-- Update everything you installed with one click
-
-No Python, no account, no Steam login needed. Workshop downloads use Valve's [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD) with an anonymous login. The app fetches SteamCMD itself the first time you install a Workshop mod.
+- **Install** from the Steam Workshop (link or ID), from GitHub (`owner/repo`, optionally `@tag`) or from a local `.zip` or folder. You don't need to log in to Steam.
+- **See everything:** Steam Workshop subscriptions and the mods in your `Zomboid/mods` folder, in one list with each mod's poster, author and description.
+- **Load order:** drag to reorder, group mods under separators, and switch mods on and off. PZMM writes the same `mods/default.txt` the game reads.
+- **Profiles:** keep separate mod setups ("Solo", "Friends server") and switch between them in one click. Changes you make in the game's own mod menu are picked up automatically.
+- **Safe updates:** **Update all** keeps the previous version of each mod, and **Restore previous version** brings it back if an update breaks your save.
+- **Ownership:** PZMM only deletes mods it installed. It never touches your Workshop subscriptions or mods you installed by hand.
 
 ## Download
 
-Get `PZMM.exe` from the [latest release](../../releases/latest) and run it. Windows may show a SmartScreen warning because the exe isn't code-signed. Click **More info → Run anyway**, or run from source (below).
+From the [latest release](../../releases/latest):
+
+| System | File |
+|---|---|
+| Windows | `PZMM_<version>_x64-setup.exe` |
+| Linux | `PZMM_<version>_amd64.AppImage` (any distribution) or `.deb` (Debian/Ubuntu) |
+| Servers (no desktop) | `pzmm-linux-x64` or `pzmm-windows-x64.exe`: the command-line version, a single file |
+
+The Windows installer isn't code-signed yet, so Windows may show a SmartScreen warning. Click **More info → Run anyway**.
 
 ## Use
 
-1. Paste a Workshop ID/URL or a GitHub repo into the box and click **Install**. To install several at once, separate them with spaces.
-2. Double-click a mod (or use **Enable / Disable**) to switch it on or off. Use **Move Up / Down** to change the load order.
-3. Start the game. Your mods will be active.
+1. Paste a Workshop link, a GitHub repo or a zip path into the box at the top, then click **Install**. The mod is installed and enabled.
+2. Tick or untick mods to enable or disable them. Drag rows to change the load order. With a row selected, you can also use the keyboard: **Space** toggles it and **Alt+↑/↓** moves it.
+3. Use **Add separator** to group your list, and double-click a separator to rename it.
+4. Click **Launch game**.
 
-Examples of what you can paste:
-
-```
-2169435993
-https://steamcommunity.com/sharedfiles/filedetails/?id=2169435993
-someone/their-pz-mod
-someone/their-pz-mod@v1.2.0
-https://github.com/someone/their-pz-mod
-```
-
-Installed mods are copied to `Zomboid/mods/<mod id>`. To remove a Steam Workshop subscription, unsubscribe in Steam. **Remove** only deletes mods in `Zomboid/mods`.
-
-**Build 41 or 42?** The app keeps whatever format your `default.txt` already uses. If the file is new, the app uses the Build 42 format. Tick **Build 41 format** if you play B41. Before each save, the previous file is kept as `default.txt.bak`.
+**Build 41 or 42?** PZMM keeps whatever format your `default.txt` already uses. If the file is new, PZMM uses the Build 42 format. To set it yourself, go to **Settings → Game build**. Before each save, the previous file is kept as `default.txt.bak`.
 
 ## Command line (`pzmm`)
-
-`pzmm` is a single-file program for Windows and Linux, with nothing to install, so it suits dedicated servers. Download `pzmm-windows-x64.exe` or `pzmm-linux-x64` from the [latest release](../../releases/latest).
 
 ```
 pzmm add 2169435993 someone/their-pz-mod ./MyMod.zip
@@ -45,14 +40,14 @@ pzmm disable ModId
 pzmm remove ModId
 pzmm update
 pzmm rollback ModId          # restore the version before the last update
-pzmm profile new Server      # profiles: named mod setups
+pzmm profile new Server
 pzmm profile use Server
 pzmm build 41                # force the B41 default.txt format
 ```
 
-- **Profiles:** the active profile is written to `default.txt`. Changes you make in the game's own mod menu are picked up on the next run.
-- **Only touches its own mods:** `pzmm remove` deletes only mods PZMM installed. Steam Workshop subscriptions and mods you installed by hand are left alone.
-- **On Linux:** SteamCMD needs 32-bit libraries (`lib32gcc-s1` on Debian/Ubuntu).
+The command line and the app share the same profiles and data.
+
+On Linux, SteamCMD needs 32-bit libraries (`lib32gcc-s1` on Debian/Ubuntu).
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -62,10 +57,23 @@ pzmm build 41                # force the B41 default.txt format
 
 ## Build from source
 
-- **`pzmm`:** install [Rust](https://rustup.rs), then run `cargo build --release`. Run the tests with `cargo test`.
-- **The current Windows app (`PZMM.exe`):** needs Python 3.10+ with Tkinter. Run it with `python gui.py`. The new desktop app (v0.3) replaces it.
-- **Plan:** see [docs/FOUNDATION.md](docs/FOUNDATION.md).
-- **Releases:** pushing a `v*` tag builds every release file and publishes the release.
+This needs [Rust](https://rustup.rs) and Node.js 22 or newer. On Linux it also needs the [Tauri system packages](https://tauri.app/start/prerequisites/).
+
+```
+cargo test                                  # core + CLI
+cd app && npm ci && npx tauri dev           # desktop app, live reload
+cd app && npx tauri build                   # installers in target/release/bundle
+```
+
+How the code is organised:
+
+| Path | What it is |
+|---|---|
+| `crates/core` | Shared logic. Everything specific to Project Zomboid lives in `pz.rs`. |
+| `crates/cli` | The `pzmm` command line |
+| `app/` | The desktop app: Tauri 2 with Svelte 5 |
+
+The full plan is in [docs/FOUNDATION.md](docs/FOUNDATION.md). Pushing a `v*` tag builds every download and publishes a release.
 
 ## License
 

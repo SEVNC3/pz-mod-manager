@@ -69,7 +69,7 @@ pub fn install(paths: &Paths, sources: &[Source]) -> Vec<String> {
     let mut ids = vec![];
     let mut report = |r: Result<Vec<String>>| match r {
         Ok(v) => ids.extend(v),
-        Err(e) => eprintln!("error: {e:#}"),
+        Err(e) => crate::log!("error: {e:#}"),
     };
     let workshop: Vec<&str> = sources.iter().filter_map(|s| if let Source::Workshop(i) = s { Some(i.as_str()) } else { None }).collect();
     if !workshop.is_empty() {

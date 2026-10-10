@@ -30,27 +30,35 @@ jobs:
         with:
           name: ${{ matrix.out }}
           path: ${{ matrix.out }}
-  gui:
-    runs-on: windows-latest
+  app:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-22.04] # 22.04: AppImage runs on older distros too
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.13"
-      - run: python test_pzmm.py
-      - run: pip install pyinstaller
-      - run: pyinstaller --onefile --windowed --name PZMM gui.py
+          node-version: 22
+      - run: npm ci && npx tauri build
+        working-directory: app
       - uses: actions/upload-artifact@v4
         with:
-          name: PZMM.exe
-          path: dist/PZMM.exe
+          name: app-${{ runner.os }}
+          path: |
+            target/release/bundle/nsis/*.exe
+            target/release/bundle/appimage/*.AppImage
+            target/release/bundle/deb/*.deb
   publish:
-    needs: [cli, gui]
+    needs: [cli, app]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
+          path: dist
           merge-multiple: true
-      - run: gh release create ${{ github.ref_name }} PZMM.exe pzmm-windows-x64.exe pzmm-linux-x64 --repo ${{ github.repository }} --generate-notes
+      - run: find dist -type f && gh release create ${{ github.ref_name }} $(find dist -type f) --repo ${{ github.repository }} --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}

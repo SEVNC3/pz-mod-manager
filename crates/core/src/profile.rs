@@ -170,6 +170,11 @@ fn active_name(paths: &Paths) -> String {
     Some(state(paths).active).filter(|s| !s.is_empty()).unwrap_or_else(|| "Default".into())
 }
 
+/// Forced default.txt format (41 or 42), or None to keep the file's own.
+pub fn build(paths: &Paths) -> Option<u8> {
+    state(paths).b41.map(|b| if b { 41 } else { 42 })
+}
+
 pub fn set_b41(paths: &Paths, b41: Option<bool>) -> Result<()> {
     save_state(paths, &State { b41, ..state(paths) })
 }

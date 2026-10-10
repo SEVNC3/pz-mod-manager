@@ -11,7 +11,7 @@ pub fn download(spec: &str) -> Result<TempDir> {
     if git_ref.contains(['?', '#', ' ']) {
         bail!("bad GitHub ref: {git_ref}");
     }
-    println!("downloading github:{spec}...");
+    crate::log!("downloading github:{spec}...");
     let url = format!("https://api.github.com/repos/{repo}/zipball{}", if git_ref.is_empty() { String::new() } else { format!("/{git_ref}") });
     let dir = tempfile::tempdir()?;
     super::unzip(&super::http_get(&url)?, dir.path())?;

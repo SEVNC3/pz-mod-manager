@@ -1,0 +1,145 @@
+/* PZMM tokens. Dark = "safehouse at night", light = "daylight". The accent is user-chosen
+   (set as --accent on <html>); everything else derives from it with color-mix(). */
+:root {
+  --bg: #1b2124;
+  --panel: #222a2e;
+  --raised: #2a3337;
+  --line: #354044;
+  --text: #e1e5df;
+  --muted: #93a09a;
+  --danger: #e06a57;
+  --tape: #e6d8ad;
+  --tape-ink: #2a2823;
+  --accent: #d39b3a;
+  --accent-soft: color-mix(in oklab, var(--accent) 18%, transparent);
+  --accent-text: color-mix(in oklab, var(--accent) 85%, white);
+  --focus: color-mix(in oklab, var(--accent) 80%, white);
+  --shadow: 0 8px 28px rgb(0 0 0 / 0.35);
+
+  --font-body: "Atkinson Hyperlegible", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-marker: "Permanent Marker", "Segoe Print", cursive;
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #e9ece8;
+    --panel: #f5f6f3;
+    --raised: #ffffff;
+    --line: #cdd4ce;
+    --text: #1b2124;
+    --muted: #59665f;
+    --danger: #b2402f;
+    --accent-text: color-mix(in oklab, var(--accent) 70%, black);
+    --focus: color-mix(in oklab, var(--accent) 75%, black);
+    --shadow: 0 8px 28px rgb(20 30 30 / 0.15);
+    color-scheme: light;
+  }
+}
+
+:root[data-theme="light"] {
+  --bg: #e9ece8;
+  --panel: #f5f6f3;
+  --raised: #ffffff;
+  --line: #cdd4ce;
+  --text: #1b2124;
+  --muted: #59665f;
+  --danger: #b2402f;
+  --accent-text: color-mix(in oklab, var(--accent) 70%, black);
+  --focus: color-mix(in oklab, var(--accent) 75%, black);
+  --shadow: 0 8px 28px rgb(20 30 30 / 0.15);
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  border-radius: 6px;
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+button:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--accent) 55%, var(--line));
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1b1a17;
+  font-weight: 700;
+}
+button.quiet {
+  background: transparent;
+  border-color: transparent;
+}
+button.quiet:hover:not(:disabled) {
+  background: var(--raised);
+}
+button.danger {
+  color: var(--danger);
+}
+
+input[type="text"],
+input[type="search"],
+select {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+  min-width: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

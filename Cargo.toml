@@ -1,9 +1,17 @@
 [workspace]
-members = ["crates/core", "crates/cli"]
+members = ["crates/core", "crates/cli", "app/src-tauri"]
+default-members = ["crates/core", "crates/cli"]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/SEVNC3/pz-mod-manager"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

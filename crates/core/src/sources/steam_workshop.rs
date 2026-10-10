@@ -47,7 +47,7 @@ fn steamcmd(paths: &Paths) -> Result<PathBuf> {
     let dir = paths.data.join("steamcmd");
     let exe = dir.join(if cfg!(windows) { "steamcmd.exe" } else { "steamcmd.sh" });
     if !exe.exists() {
-        println!("downloading steamcmd...");
+        crate::log!("downloading steamcmd...");
         std::fs::create_dir_all(&dir)?;
         if cfg!(windows) {
             super::unzip(&super::http_get(&format!("{STEAMCMD_URL}steamcmd.zip"))?, &dir)?;
@@ -74,13 +74,13 @@ pub fn download(paths: &Paths, app: &str, ids: &[&str]) -> Result<Vec<(String, O
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
-    println!("downloading {} workshop item(s)...", ids.len());
+    crate::log!("downloading {} workshop item(s)...", ids.len());
     let mut child = cmd.spawn().with_context(|| format!("running {}", exe.display()))?;
     if let Some(out) = child.stdout.take() {
         for line in BufReader::new(out).lines().map_while(Result::ok) {
             let l = line.to_lowercase();
             if l.contains("workshop") || l.contains("error") {
-                println!("{}", line.trim());
+                crate::log!("{}", line.trim());
             }
         }
     }
