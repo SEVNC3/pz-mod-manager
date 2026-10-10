@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { listen } from "@tauri-apps/api/event";
+  import { getVersion } from "@tauri-apps/api/app";
+  import { check, type Update } from "@tauri-apps/plugin-updater";
+  import { relaunch } from "@tauri-apps/plugin-process";
   import { api, describeSource, zbReady, type ModRow, type Row, type View, type ZbStatus } from "$lib/api";
   import Details from "$lib/Details.svelte";
   import Workshop from "$lib/Workshop.svelte";
@@ -9,6 +12,40 @@
 
   let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
   let updates = $state<Set<string>>(new Set());
+
+  // --- PZMM's own updates (signed releases on GitHub) ---
+  let appVersion = $state("");
+  let appUpdate = $state.raw<Update | null>(null);
+  let appProgress = $state<number | null>(null); // 0..100 while downloading
+
+  async function checkAppUpdate(manual = false) {
+    try {
+      appUpdate = await check();
+      if (!appUpdate && manual) say(`PZMM ${appVersion} is the latest version.`);
+    } catch (e) {
+      if (manual) say(`Couldn't check for PZMM updates: ${e}`, true);
+    }
+  }
+
+  async function installAppUpdate() {
+    if (!appUpdate) return;
+    let total = 0;
+    let got = 0;
+    appProgress = 0;
+    try {
+      await appUpdate.downloadAndInstall((ev) => {
+        if (ev.event === "Started") total = ev.data.contentLength ?? 0;
+        else if (ev.event === "Progress") {
+          got += ev.data.chunkLength;
+          appProgress = total ? Math.round((got / total) * 100) : null;
+        } else appProgress = 100;
+      });
+      await relaunch();
+    } catch (e) {
+      say(`Couldn't update PZMM: ${e}`, true);
+      appProgress = null;
+    }
+  }
   let zb = $state<ZbStatus | null>(null);
   const zbNeeded = $derived(!!zb && zb.required_by.length > 0 && !zbReady(zb));
   const refreshZb = () => api.zbStatus().then((s) => (zb = s)).catch(() => {});
@@ -261,6 +298,8 @@
   onMount(() => {
     const unlisten = listen<string>("log", (e) => say(e.payload, e.payload.startsWith("error:")));
     run("Loading", api.load).then(checkUpdates);
+    getVersion().then((v) => (appVersion = v));
+    checkAppUpdate();
     return () => {
       unlisten.then((f) => f());
     };
@@ -313,6 +352,19 @@
     </div>
   </header>
 
+  {#if appUpdate}
+    <div class="app-update" role="status">
+      {#if appProgress === null}
+        <span><strong>PZMM {appUpdate.version} is available.</strong> You have {appVersion}.</span>
+        <button class="quiet" onclick={() => api.openUrl(`https://github.com/SEVNC3/pz-mod-manager/releases/tag/v${appUpdate?.version}`)}>What's new</button>
+        <button class="primary" onclick={installAppUpdate}>Update and restart</button>
+      {:else}
+        <span>Downloading PZMM {appUpdate.version}… {appProgress}%</span>
+        <progress max="100" value={appProgress}></progress>
+      {/if}
+    </div>
+  {/if}
+
   {#if settingsOpen}
     <div class="settings" role="region" aria-label="Settings">
       <label>Theme
@@ -331,6 +383,8 @@
           <option value="41">Build 41</option>
         </select>
       </label>
+      <span class="version">PZMM {appVersion}
+        <button class="quiet" onclick={() => checkAppUpdate(true)}>Check for updates</button></span>
       <div class="paths">
         <span>Zomboid folder <button class="quiet link mono" onclick={() => view && api.openPath(view.zomboid)}>{view?.zomboid}</button></span>
         <span>Steam Workshop folder <span class="mono">{view?.workshop ?? "not found"}</span></span>
@@ -530,6 +584,24 @@
     background: var(--danger);
     margin-left: 6px;
     vertical-align: 2px;
+  }
+  .app-update {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: var(--accent-soft);
+    border-bottom: 1px solid var(--line);
+  }
+  .app-update span {
+    flex: 1;
+  }
+  .app-update progress {
+    width: 220px;
+    accent-color: var(--accent);
+  }
+  .version {
+    color: var(--muted);
   }
   .banner {
     display: flex;

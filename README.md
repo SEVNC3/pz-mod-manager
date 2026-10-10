@@ -12,6 +12,7 @@ A free, open-source mod manager for **Project Zomboid** (Build 41 and 42), for W
 - **Updates:** PZMM checks the Workshop for newer versions of the mods it installed, without downloading them. Every update keeps the previous version, and **Restore previous version** brings it back if an update breaks your save.
 - **Servers and saves:** write a profile into a dedicated server's config (`Mods=`, `WorkshopItems=`, `Map=`), turn a server config into a profile, or load the mods a save was played with.
 - **ZombieBuddy:** one-click setup for [ZombieBuddy](https://github.com/zed-0xff/ZombieBuddy), the loader that Java mods need. PZMM shows each change before applying it and can undo it.
+- **Updates itself:** PZMM checks for new versions when it starts. **Update and restart** downloads the new version, checks its signature and installs it.
 - **Ownership:** PZMM only deletes mods it installed. It never touches your Workshop subscriptions or mods you installed by hand.
 
 ## Download
@@ -84,7 +85,7 @@ How the code is organised:
 | `crates/cli` | The `pzmm` command line |
 | `app/` | The desktop app: Tauri 2 with Svelte 5 |
 
-The full plan is in [docs/FOUNDATION.md](docs/FOUNDATION.md). Pushing a `v*` tag builds every download and publishes a release.
+The full plan is in [docs/FOUNDATION.md](docs/FOUNDATION.md). To release, set the new `version` in `Cargo.toml` (and `app/package.json`), then push a matching `v*` tag. CI builds every download, signs the installers with the updater key (GitHub secret `TAURI_SIGNING_PRIVATE_KEY`; a copy is in the maintainer's 1Password), and publishes `latest.json`, which installed copies check for updates.
 
 ## License
 

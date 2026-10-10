@@ -44,12 +44,17 @@ jobs:
           node-version: 22
       - run: npm ci && npx tauri build
         working-directory: app
+        env: # signs the installers so installed copies accept them as updates
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       - uses: actions/upload-artifact@v4
         with:
           name: app-${{ runner.os }}
           path: |
             target/release/bundle/nsis/*.exe
+            target/release/bundle/nsis/*.exe.sig
             target/release/bundle/appimage/*.AppImage
+            target/release/bundle/appimage/*.AppImage.sig
             target/release/bundle/deb/*.deb
   publish:
     needs: [cli, app]
@@ -59,6 +64,28 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      - name: Write latest.json (what installed copies check for updates)
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        shell: python
+        run: |
+          import datetime, glob, json, os, re, sys
+          tag, repo = os.environ["TAG"], os.environ["REPO"]
+          def entry(pattern):
+              f = glob.glob(f"dist/**/{pattern}", recursive=True)[0]
+              return f, {"signature": open(f + ".sig").read().strip(),
+                         "url": f"https://github.com/{repo}/releases/download/{tag}/{os.path.basename(f)}"}
+          win, win_entry = entry("*_x64-setup.exe")
+          version = re.match(r"PZMM_(.+)_x64-setup\.exe", os.path.basename(win)).group(1)
+          if tag != f"v{version}":
+              sys.exit(f"tag {tag} doesn't match the app version {version}: bump Cargo.toml first")
+          json.dump({
+              "version": version,
+              "notes": f"https://github.com/{repo}/releases/tag/{tag}",
+              "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "platforms": {"windows-x86_64": win_entry, "linux-x86_64": entry("*.AppImage")[1]},
+          }, open("dist/latest.json", "w"), indent=2)
       - run: find dist -type f && gh release create ${{ github.ref_name }} $(find dist -type f) --repo ${{ github.repository }} --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
