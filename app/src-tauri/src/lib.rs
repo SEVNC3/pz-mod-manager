@@ -359,19 +359,88 @@ struct Browse {
     items: Vec<BrowseItem>,
 }
 
+fn with_have(items: Vec<sources::steam_workshop::Item>) -> Vec<BrowseItem> {
+    let have = sources::workshop_available(&Paths::detect());
+    items.into_iter().map(|item| BrowseItem { have: have.contains(&item.id), item }).collect()
+}
+
+/// Run a blocking Workshop request off the UI thread.
+async fn web<T: Send + 'static>(f: impl FnOnce() -> anyhow::Result<T> + Send + 'static) -> Res<T> {
+    tauri::async_runtime::spawn_blocking(move || f().map_err(|e| format!("{e:#}"))).await.map_err(|e| e.to_string())?
+}
+
+/// Details of many items, in their order (the API takes 100 at a time).
+fn details_of(ids: &[String]) -> anyhow::Result<Vec<sources::steam_workshop::Item>> {
+    let mut out = vec![];
+    for chunk in ids.chunks(100) {
+        let refs: Vec<&str> = chunk.iter().map(String::as_str).collect();
+        let mut got = sources::steam_workshop::details(&refs)?;
+        got.sort_by_key(|i| chunk.iter().position(|c| *c == i.id));
+        out.extend(got);
+    }
+    Ok(out)
+}
+
 #[tauri::command]
-async fn workshop_browse(search: String, sort: String, page: u32, build: Option<u8>) -> Res<Browse> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let tag = build.map(|b| format!("Build {b}"));
-        let res = sources::steam_workshop::browse(pz::STEAM_APP, &search, &sort, page, tag.as_deref()).map_err(|e| format!("{e:#}"))?;
-        let have = sources::workshop_available(&Paths::detect());
-        Ok(Browse {
-            total: res.total,
-            items: res.items.into_iter().map(|item| BrowseItem { have: have.contains(&item.id), item }).collect(),
+async fn workshop_browse(query: sources::steam_workshop::Query) -> Res<Browse> {
+    web(move || {
+        let res = sources::steam_workshop::browse(pz::STEAM_APP, &query)?;
+        Ok(Browse { total: res.total, items: with_have(res.items) })
+    })
+    .await
+}
+
+#[derive(Serialize)]
+struct WorkshopItemFull {
+    item: Option<BrowseItem>,
+    screenshots: Vec<String>,
+    videos: Vec<String>,
+    required: Vec<BrowseItem>,
+    /// For a collection: its items, in order.
+    members: Vec<BrowseItem>,
+}
+
+/// Everything for the item panel: full description and counts, screenshots, required items
+/// and, for a collection, its members.
+#[tauri::command]
+async fn workshop_info(id: String) -> Res<WorkshopItemFull> {
+    web(move || {
+        let item = sources::steam_workshop::details(&[id.as_str()])?.into_iter().next();
+        let page = sources::steam_workshop::item_page(&id)?;
+        let members = if item.as_ref().is_some_and(|i| i.collection) {
+            sources::steam_workshop::collections(&[id.as_str()])?.remove(&id).unwrap_or_default()
+        } else {
+            vec![]
+        };
+        Ok(WorkshopItemFull {
+            item: with_have(item.into_iter().collect()).pop(),
+            screenshots: page.screenshots,
+            videos: page.videos,
+            required: with_have(details_of(&page.required)?),
+            members: with_have(details_of(&members)?),
         })
     })
     .await
-    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn workshop_changes(id: String, page: u32) -> Res<Vec<sources::steam_workshop::ChangeNote>> {
+    web(move || sources::steam_workshop::change_notes(&id, page)).await
+}
+
+#[tauri::command]
+async fn workshop_comments(creator: String, id: String, start: u32) -> Res<sources::steam_workshop::Comments> {
+    web(move || sources::steam_workshop::comments(&creator, &id, start)).await
+}
+
+/// One page of an author's Project Zomboid items.
+#[tauri::command]
+async fn workshop_author(creator: String, page: u32) -> Res<Browse> {
+    web(move || {
+        let (total, ids) = sources::steam_workshop::author_items(pz::STEAM_APP, &creator, page)?;
+        Ok(Browse { total, items: with_have(details_of(&ids)?) })
+    })
+    .await
 }
 
 // --- ZombieBuddy (Java mods) ---
@@ -840,7 +909,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
-            details, poster, open_path, open_url, workshop_browse, zb_status, zb_preview, zb_install, zb_uninstall,
+            details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, workshop_comments, workshop_author, zb_status, zb_preview, zb_install, zb_uninstall,
             find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_export, server_import, server_start, save_use,
             mode_preview, mode_switch, doctor, console_errors, profile_export, profile_import
         ])

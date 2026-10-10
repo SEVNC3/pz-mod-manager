@@ -42,7 +42,6 @@
   let queryText = $state("");
   // svelte-ignore state_referenced_locally
   let build = $state(String(defaultBuild ?? 42));
-  let filtersOpen = $state(false);
   let dates = $state({ createdFrom: "", createdTo: "", updatedFrom: "", updatedTo: "" });
   /** What a "needs this" / "collections with this" / author list is about. */
   let context = $state<{ kind: "child" | "author"; item: WorkshopItem } | null>(null);
@@ -204,7 +203,9 @@
   const page = $derived(view === "author" ? authorPage : q.page);
   const compact = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
   const date = (t: number) => new Date(t * 1000).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-  const plain = (s: string) => s.replace(/\[\/?[a-z0-9*]+(=[^\]]*)?\]/gi, "").replace(/\s+/g, " ").trim();
+  /** A card's blurb: no BBCode, images or bare links. */
+  const plain = (s: string) =>
+    s.replace(/\[img\][\s\S]*?\[\/img\]/gi, "").replace(/https?:\/\/\S+/g, "").replace(/\[\/?[a-z0-9*]+(=[^\]]*)?\]/gi, "").replace(/\s+/g, " ").trim();
   const builds = (tags: string[]) => tags.filter((t) => /^Build \d+$/.test(t)).map((t) => t.replace("Build ", "B"));
   const sorts = $derived(q.collections ? COLLECTION_SORTS : ITEM_SORTS);
 
@@ -264,7 +265,7 @@
 {/snippet}
 
 <section class="workshop" aria-label="Steam Workshop">
-  <form class="bar" onsubmit={submit}>
+  <aside class="side" aria-label="Browse options">
     <div class="views" role="tablist" aria-label="Workshop view">
       <button type="button" role="tab" aria-selected={view !== "home"} class:active={view !== "home"} onclick={() => show("browse")}>
         <Icon name="search" size={15} /> Browse
@@ -273,62 +274,62 @@
         <Icon name="flame" size={15} /> Home
       </button>
     </div>
-    <input type="search" bind:value={queryText} placeholder="Search the Workshop" aria-label="Search the Workshop"
-      title={'Steam search: "exact phrase", AND, OR, NOT, +must, -exclude'} />
-    <select bind:value={q.scope} aria-label="Search in" title="Where the words must appear">
-      <option value={0}>Anywhere</option>
-      <option value={1}>Titles</option>
-      <option value={2}>Descriptions</option>
-    </select>
-    <button type="submit"><Icon name="search" size={14} /> Search</button>
-    {#if q.search}
-      <button type="button" class="quiet" onclick={() => { queryText = q.search = ""; go(1); }}>Clear search</button>
-    {/if}
-    <select bind:value={build} onchange={() => { rows = {}; view === "home" ? loadHome() : go(1); }} aria-label="Game build">
-      <option value="42">Build 42</option>
-      <option value="41">Build 41</option>
-      <option value="">Any build</option>
-    </select>
-    {#if viewpoint}
-      <button type="button" onclick={() => { queryText = q.search = "Project Viewpoint"; view = "browse"; context = null; go(1); }}>
-        <Icon name="layers" size={14} /> Viewpoint add-ons
-      </button>
-      <button type="button" class="quiet" onclick={() => api.openUrl(VIEWPOINT_DISCORD)} title="Project Viewpoint's community Discord: help, bug reports, news">
-        <img src="/brand/discord.png" alt="" width="16" height="16" class="brand-img" /> Viewpoint Discord
-      </button>
-    {/if}
-  </form>
 
-  {#if view === "browse"}
-    <div class="bar sub">
-      <div class="seg" role="radiogroup" aria-label="Show">
-        <button type="button" role="radio" aria-checked={!q.collections} class:active={!q.collections} onclick={() => setSection(false)}>Mods</button>
-        <button type="button" role="radio" aria-checked={q.collections} class:active={q.collections} onclick={() => setSection(true)}>Collections</button>
+    <form class="search" onsubmit={submit}>
+      <input type="search" bind:value={queryText} placeholder="Search the Workshop" aria-label="Search the Workshop"
+        title={'Steam search: "exact phrase", AND, OR, NOT, +must, -exclude'} />
+      <div class="pair">
+        <select bind:value={q.scope} aria-label="Search in" title="Where the words must appear">
+          <option value={0}>Anywhere</option>
+          <option value={1}>Titles</option>
+          <option value={2}>Descriptions</option>
+        </select>
+        <button type="submit"><Icon name="search" size={14} /> Search</button>
+      </div>
+      {#if q.search}
+        <button type="button" class="quiet small" onclick={() => { queryText = q.search = ""; go(1); }}><Icon name="x" size={12} /> Clear "{q.search}"</button>
+      {/if}
+    </form>
+
+    <label class="field"><span>Game build</span>
+      <select bind:value={build} onchange={() => { rows = {}; view === "home" ? loadHome() : go(1); }}>
+        <option value="42">Build 42</option>
+        <option value="41">Build 41</option>
+        <option value="">Any build</option>
+      </select>
+    </label>
+
+    {#if view === "browse"}
+      <div class="field"><span>Show</span>
+        <div class="seg" role="radiogroup" aria-label="Show">
+          <button type="button" role="radio" aria-checked={!q.collections} class:active={!q.collections} onclick={() => setSection(false)}>Mods</button>
+          <button type="button" role="radio" aria-checked={q.collections} class:active={q.collections} onclick={() => setSection(true)}>Collections</button>
+        </div>
       </div>
       {#if !q.search}
-        <select bind:value={sortChoice} onchange={() => go(1)} aria-label="Sort">
-          {#each sorts as [v, label]}<option value={v}>{label}</option>{/each}
-        </select>
-        {#if sortChoice === "trend"}
-          <select bind:value={q.days} onchange={() => go(1)} aria-label="Popular over">
-            {#each DAYS as [d, label]}<option value={d}>{label}</option>{/each}
+        <label class="field"><span>Sort by</span>
+          <select bind:value={sortChoice} onchange={() => go(1)}>
+            {#each sorts as [v, label]}<option value={v}>{label}</option>{/each}
           </select>
+        </label>
+        {#if sortChoice === "trend"}
+          <label class="field"><span>Popular over</span>
+            <select bind:value={q.days} onchange={() => go(1)}>
+              {#each DAYS as [d, label]}<option value={d}>{label}</option>{/each}
+            </select>
+          </label>
         {/if}
       {/if}
-      <button type="button" class:active-filter={filterCount > 0} aria-expanded={filtersOpen} onclick={() => (filtersOpen = !filtersOpen)}>
-        <Icon name="settings" size={14} /> Filters{filterCount ? ` (${filterCount})` : ""}
-      </button>
-      <select bind:value={q.per_page} onchange={() => go(1)} aria-label="Results per page">
-        <option value={30}>30 per page</option>
-        <option value={50}>50 per page</option>
-      </select>
-      <span class="count">
-        {#if loading}Loading…{:else if data}{compact.format(data.total)} {q.collections ? "collections" : "mods"}{q.search ? ` for "${q.search}"` : ""}{/if}
-      </span>
-    </div>
-    {#if filtersOpen}
-      <div class="filters">
-        <p class="hint">Click a tag to require it, again to exclude it, once more to clear. Results have every required tag.</p>
+      <label class="field"><span>Per page</span>
+        <select bind:value={q.per_page} onchange={() => go(1)}>
+          <option value={30}>30</option>
+          <option value={50}>50</option>
+        </select>
+      </label>
+
+      <div class="field">
+        <span>Tags{q.required.length + q.excluded.length ? ` (${q.required.length + q.excluded.length})` : ""}</span>
+        <p class="hint">Click to require, again to exclude, again to clear.</p>
         <div class="chips">
           {#each TAGS as t}
             {@const state = q.required.includes(t) ? "in" : q.excluded.includes(t) ? "out" : ""}
@@ -338,16 +339,30 @@
             </button>
           {/each}
         </div>
-        <div class="more">
-          <label>Posted <input type="date" bind:value={dates.createdFrom} onchange={() => go(1)} /> to <input type="date" bind:value={dates.createdTo} onchange={() => go(1)} /></label>
-          <label>Updated <input type="date" bind:value={dates.updatedFrom} onchange={() => go(1)} /> to <input type="date" bind:value={dates.updatedTo} onchange={() => go(1)} /></label>
-          <label class="check"><input type="checkbox" bind:checked={q.incompatible} onchange={() => go(1)} /> Only mods marked incompatible</label>
-          {#if filterCount}<button type="button" class="quiet" onclick={clearFilters}>Clear filters</button>{/if}
-        </div>
+      </div>
+      <div class="field"><span>Posted</span>
+        <div class="dates"><input type="date" bind:value={dates.createdFrom} onchange={() => go(1)} aria-label="Posted from" /><input type="date" bind:value={dates.createdTo} onchange={() => go(1)} aria-label="Posted to" /></div>
+      </div>
+      <div class="field"><span>Updated</span>
+        <div class="dates"><input type="date" bind:value={dates.updatedFrom} onchange={() => go(1)} aria-label="Updated from" /><input type="date" bind:value={dates.updatedTo} onchange={() => go(1)} aria-label="Updated to" /></div>
+      </div>
+      <label class="check"><input type="checkbox" bind:checked={q.incompatible} onchange={() => go(1)} /> Only mods marked incompatible</label>
+      {#if filterCount}<button type="button" class="quiet small" onclick={clearFilters}><Icon name="x" size={12} /> Clear filters</button>{/if}
+    {/if}
+
+    {#if viewpoint}
+      <div class="field vp"><span>Project Viewpoint</span>
+        <button type="button" onclick={() => { queryText = q.search = "Project Viewpoint"; view = "browse"; context = null; go(1); }}>
+          <Icon name="layers" size={14} /> Viewpoint add-ons
+        </button>
+        <button type="button" class="quiet" onclick={() => api.openUrl(VIEWPOINT_DISCORD)} title="Project Viewpoint's community Discord: help, bug reports, news">
+          <img src="/brand/discord.png" alt="" width="16" height="16" class="brand-img" /> Viewpoint Discord
+        </button>
       </div>
     {/if}
-  {/if}
+  </aside>
 
+  <div class="main">
   {#if context}
     <div class="context">
       {#if context.kind === "author"}
@@ -384,6 +399,7 @@
     {:else if data && data.items.length === 0 && !loading}
       <div class="message"><p>Nothing matches. Try fewer words, fewer tags or another build.</p></div>
     {:else if data}
+      <p class="count">{compact.format(data.total)} {view === "author" ? "mods" : q.collections ? "collections" : "mods"}{q.search ? ` for "${q.search}"` : ""}{loading ? " · loading…" : ""}</p>
       <ul class="grid" class:dim={loading}>
         {#each data.items as it (it.id)}{@render card(it)}{/each}
       </ul>
@@ -394,6 +410,7 @@
       </nav>
     {/if}
   </div>
+  </div>
 </section>
 
 {#if open}
@@ -403,24 +420,25 @@
 
 <style>
   .workshop {
+    display: grid;
+    grid-template-columns: 270px 1fr;
+    min-height: 0;
+  }
+  .side {
+    overflow-y: auto;
+    min-height: 0;
+    padding: 12px 14px 24px;
+    border-right: 1px solid var(--line);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .main {
     display: flex;
     flex-direction: column;
     min-height: 0;
-  }
-  .bar {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 8px 16px;
-    border-bottom: 1px solid var(--line);
-  }
-  .bar.sub {
-    padding-top: 6px;
-    padding-bottom: 6px;
-  }
-  .bar input[type="search"] {
-    width: 240px;
+    min-width: 0;
   }
   .views,
   .seg {
@@ -429,11 +447,9 @@
     border-radius: 6px;
     overflow: hidden;
   }
-  .views {
-    margin-right: 6px;
-  }
   .views button,
   .seg button {
+    flex: 1;
     border: 0;
     border-radius: 0;
     background: transparent;
@@ -449,36 +465,61 @@
     color: var(--accent-text);
     font-weight: 700;
   }
-  .active-filter {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
+  .search {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pair {
+    display: flex;
+    gap: 6px;
+  }
+  .pair select {
+    flex: 1;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .field > span {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .field select,
+  .field > button {
+    width: 100%;
+  }
+  .vp {
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+  }
+  .small {
+    align-self: flex-start;
+    padding: 2px 6px;
+    font-size: 12px;
+    color: var(--muted);
   }
   .brand-img {
     border-radius: 3px;
   }
-  .count {
-    margin-left: auto;
-    color: var(--muted);
-  }
-  .filters {
-    padding: 10px 16px 12px;
-    border-bottom: 1px solid var(--line);
-    background: var(--panel);
-  }
   .hint {
-    margin: 0 0 8px;
+    margin: 0;
     font-size: 12px;
     color: var(--muted);
   }
   .chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 5px;
   }
   .chip {
-    padding: 3px 10px;
+    padding: 2px 9px;
     border-radius: 999px;
-    font-size: 13px;
+    font-size: 12px;
     color: var(--muted);
     background: transparent;
   }
@@ -492,25 +533,29 @@
     border-color: color-mix(in oklab, var(--danger) 60%, transparent);
     text-decoration: line-through;
   }
-  .more {
+  .dates {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px 18px;
-    margin-top: 10px;
-    color: var(--muted);
+    gap: 6px;
   }
-  .more input[type="date"] {
+  .dates input {
+    flex: 1;
+    min-width: 0;
     background: var(--raised);
     border: 1px solid var(--line);
     border-radius: 6px;
     padding: 4px 6px;
     color: var(--text);
+    font-size: 12px;
   }
-  .more .check {
-    display: inline-flex;
+  .check {
+    display: flex;
     align-items: center;
     gap: 6px;
+    color: var(--muted);
+  }
+  .count {
+    margin: 0 0 12px;
+    color: var(--muted);
   }
   .context {
     display: flex;
@@ -520,11 +565,28 @@
     border-bottom: 1px solid var(--line);
     background: color-mix(in oklab, var(--accent) 14%, var(--panel));
   }
+  /* blueprint paper, like Spiffo's Workshop on Steam: fine and major grid lines in a cool ink */
   .results {
     flex: 1;
     overflow-y: auto;
     min-height: 0;
     padding: 16px;
+    background-color: #10151b;
+    background-image:
+      radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / 0.05), transparent 60%),
+      linear-gradient(rgb(140 180 215 / 0.14) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(140 180 215 / 0.14) 1px, transparent 1px),
+      linear-gradient(rgb(140 180 215 / 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(140 180 215 / 0.045) 1px, transparent 1px);
+    background-size: 100% 100%, 96px 96px, 96px 96px, 24px 24px, 24px 24px;
+    background-position: 0 0, -1px -1px, -1px -1px, -1px -1px, -1px -1px;
+    background-attachment: local;
+  }
+  .row h2,
+  .count,
+  .pager,
+  .message {
+    text-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
   }
   .dim {
     opacity: 0.5;
