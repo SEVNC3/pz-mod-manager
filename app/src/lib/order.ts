@@ -273,3 +273,19 @@ export function bisectRound(original: Row[], suspects: string[], requires: (id: 
   testing.forEach(add);
   return { on, testing };
 }
+
+/** Mods that only `ids` require (directly or through each other): removing `ids` leaves them unused. */
+export function orphanedRequirements(ids: string[], mods: ModRow[]): string[] {
+  const gone = new Set(ids);
+  const installed = new Set(mods.map((m) => m.id));
+  const out: string[] = [];
+  for (let i = 0; i < out.length + ids.length; i++) {
+    const id = i < ids.length ? ids[i] : out[i - ids.length];
+    for (const r of mods.find((m) => m.id === id)?.requires ?? []) {
+      if (gone.has(r) || !installed.has(r) || mods.some((m) => !gone.has(m.id) && m.requires.includes(r))) continue;
+      gone.add(r);
+      out.push(r);
+    }
+  }
+  return out;
+}

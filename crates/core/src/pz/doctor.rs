@@ -34,9 +34,9 @@ fn warn(subject: &str, text: String) -> Finding {
 /// Check the enabled mods (in load order) for `build` (41/42), against everything
 /// installed (`mods`), plus every server config.
 pub fn check(paths: &Paths, enabled: &[String], mods: &BTreeMap<String, Row>, build: u8) -> Vec<Finding> {
-    let mut out = vec![];
+    let mut out = check_folders();
     // ids the Steam subscriptions provide (the scan shows a local copy instead when both exist)
-    let subscribed: HashSet<String> = crate::sources::steam_workshop::content_dir(super::STEAM_APP)
+    let subscribed: HashSet<String> = super::workshop_dir()
         .map(|ws| super::workshop_mods(&ws).into_iter().map(|m| m.id).collect())
         .unwrap_or_default();
     let pos: HashMap<&str, usize> = enabled.iter().enumerate().map(|(i, id)| (id.as_str(), i)).collect();
@@ -79,6 +79,55 @@ pub fn check(paths: &Paths, enabled: &[String], mods: &BTreeMap<String, Row>, bu
     }
     out.extend(check_servers(paths, mods, build));
     out
+}
+
+/// Folders that are set (by an environment variable or in Settings) but wrong, and folder warnings.
+fn check_folders() -> Vec<Finding> {
+    let mut out = vec![];
+    for f in super::folders::list(&crate::settings::load()) {
+        let Some(p) = &f.path else { continue };
+        let by = match f.env {
+            Some(env) if f.overridden => format!(" (set by {env})"),
+            _ if f.custom => " (set in Settings)".into(),
+            _ => String::new(),
+        };
+        match f.status {
+            "missing" if !by.is_empty() => out.push(err(f.label, format!("{} doesn't exist{by}", p.display()))),
+            "missing" if f.key == "zomboid" => out.push(warn(f.label, format!("{} doesn't exist yet: start the game once", p.display()))),
+            "not_pz" => out.push(warn(f.label, format!("{} doesn't look like the {}{by}", p.display(), f.label))),
+            _ => {}
+        }
+        out.extend(f.warnings.iter().map(|w| warn(f.label, format!("{}: {w}", p.display()))));
+    }
+    out
+}
+
+/// [`mask_user`] with this account's name (its home folder's name).
+pub fn mask_home_user(text: &str) -> String {
+    let user = dirs::home_dir().and_then(|h| h.file_name().map(|n| n.to_string_lossy().into_owned())).unwrap_or_default();
+    mask_user(text, &user)
+}
+
+/// `text` with `user` (the account name) hidden wherever it's a folder in a path
+/// (`C:\Users\<user>\...`, `/home/<user>/...`), for bug reports.
+pub fn mask_user(text: &str, user: &str) -> String {
+    if user.len() < 2 {
+        return text.into();
+    }
+    // ASCII lowercasing keeps byte offsets identical
+    let (hay, needle) = (text.to_ascii_lowercase(), user.to_ascii_lowercase());
+    let (mut out, mut last, mut from) = (String::with_capacity(text.len()), 0, 0);
+    while let Some(i) = hay[from..].find(&needle).map(|i| i + from) {
+        let end = i + needle.len();
+        let after = hay[end..].chars().next().is_none_or(|c| !(c.is_alphanumeric() || "._-".contains(c)));
+        if hay[..i].ends_with(['\\', '/']) && after {
+            out.push_str(&text[last..i]);
+            out.push_str("<user>");
+            last = end;
+        }
+        from = end;
+    }
+    out + &text[last..]
 }
 
 /// Server configs whose Mods=, WorkshopItems= and Map= disagree.
@@ -152,6 +201,16 @@ mod tests {
             supports_41: !versioned,
             supports_42: versioned,
         }
+    }
+
+    #[test]
+    fn masks_the_user_name_in_paths() {
+        let text = r"Zomboid: C:\Users\Sam\Zomboid, data: /home/sam/.local/share/pzmm, Sam's profile, C:\Users\Samuel\x, D:\sam";
+        assert_eq!(
+            mask_user(text, "Sam"),
+            r"Zomboid: C:\Users\<user>\Zomboid, data: /home/<user>/.local/share/pzmm, Sam's profile, C:\Users\Samuel\x, D:\<user>"
+        );
+        assert_eq!(mask_user(r"C:\Users\A\x", "A"), r"C:\Users\A\x", "one letter is too short to mask safely");
     }
 
     #[test]

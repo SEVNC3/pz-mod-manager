@@ -1,6 +1,6 @@
 // Self-check for src/lib/order.ts. Run: node scripts/order-check.ts
 import assert from "node:assert/strict";
-import { autosort, bisectRound, findProblems, groupByCategory, loadList, moveSection, orderOf, placeInOrder, placeInSections, sortLoadOrder, sortMaps, syncOrder } from "../src/lib/order.ts";
+import { autosort, bisectRound, findProblems, groupByCategory, loadList, moveSection, orderOf, orphanedRequirements, placeInOrder, placeInSections, sortLoadOrder, sortMaps, syncOrder } from "../src/lib/order.ts";
 import type { ModRow, Row } from "../src/lib/api.ts";
 
 const mod = (id: string, on = true, extra: Partial<Record<"requires" | "incompatible" | "load_after" | "load_before", string[]>> = {}): Row => ({
@@ -86,5 +86,12 @@ assert.equal(ids(moveSection(secs, 6, 2)!), "+Top #C +c1 #A +a1 +a2 #B +b1", "dr
 assert.equal(ids(moveSection(secs, 1, 8)!), "+Top #B +b1 #C +c1 #A +a1 +a2", "dropped at the end");
 assert.equal(moveSection(secs, 1, 3), null, "inside itself");
 assert.equal(moveSection(secs, 1, 4), null, "right where it is");
+
+// removing a mod: requirements nothing else uses go too, through chains; shared ones stay
+const deps = [mod("A", true, { requires: ["Lib", "Patch"] }), mod("Patch", true, { requires: ["Lib", "Core"] }), mod("Lib"), mod("Core"),
+  mod("B", false, { requires: ["Shared", "Gone"] }), mod("Shared"), mod("C", true, { requires: ["Shared"] })] as ModRow[];
+assert.deepEqual(orphanedRequirements(["A"], deps), ["Patch", "Lib", "Core"]);
+assert.deepEqual(orphanedRequirements(["B"], deps), [], "Shared is still needed by C; Gone isn't installed");
+assert.deepEqual(orphanedRequirements(["B", "C"], deps), ["Shared"]);
 
 console.log("order-check: ok");

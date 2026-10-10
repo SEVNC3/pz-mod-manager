@@ -2,6 +2,7 @@
 
 pub mod profile;
 pub mod pz;
+pub mod settings;
 pub mod sources;
 pub mod store;
 

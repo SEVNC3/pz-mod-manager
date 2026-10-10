@@ -10,10 +10,12 @@ repository.workspace = true
 anyhow = "1.0.104"
 dirs = "7.0.0"
 flate2 = "1.1.10"
+keyring = "4.2.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.151", features = ["preserve_order"] }
 tar = "0.4.46"
 tempfile = "3.27.0"
+trash = "5.2.9"
 ureq = "3.4.2"
 zip = "9.0.1"
 

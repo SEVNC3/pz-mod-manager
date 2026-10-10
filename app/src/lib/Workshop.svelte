@@ -6,6 +6,7 @@
   import InstallButton from "./InstallButton.svelte";
   import Stars from "./Stars.svelte";
   import WorkshopPanel from "./WorkshopPanel.svelte";
+  import { prefs } from "./prefs.svelte";
 
   let { busy, defaultBuild, onInstall, viewpoint = false, hidden = false }: {
     busy: boolean;
@@ -42,8 +43,8 @@
   ];
   const VIEWPOINT_DISCORD = "https://discord.gg/g83XvPhEgQ";
 
-  let view = $state<"home" | "browse" | "author">("browse");
-  let q = $state<Query>(newQuery());
+  let view = $state<"home" | "browse" | "author">(prefs.workshopView);
+  let q = $state<Query>(newQuery({ per_page: prefs.perPage }));
   let sortChoice = $state("totaluniquesubscribers"); // "libraries" is a sort here, a filter for Steam
   let queryText = $state("");
   // svelte-ignore state_referenced_locally
@@ -218,7 +219,7 @@
   const builds = (tags: string[]) => tags.filter((t) => /^Build \d+$/.test(t)).map((t) => t.replace("Build ", "B"));
   const sorts = $derived(q.collections ? COLLECTION_SORTS : ITEM_SORTS);
 
-  onMount(load);
+  onMount(() => (view === "home" ? loadHome() : load()));
 </script>
 
 {#snippet stars(it: WorkshopItem)}

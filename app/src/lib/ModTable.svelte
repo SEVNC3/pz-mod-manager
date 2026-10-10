@@ -4,6 +4,7 @@
   import Icon from "./Icon.svelte";
   import LayerIcon, { overlapLabel } from "./LayerIcon.svelte";
   import { sectionDrop, type Problem } from "./order";
+  import { prefs } from "./prefs.svelte";
 
   // The library: rows, separators as section cards, drag and drop. Edits go back through the callbacks.
   let {
@@ -159,7 +160,7 @@
           <td class="num mono">{place.get(r.id) ?? ""}</td>
           <td class="name">
             <span class="title" title={r.name || r.id}>{r.name || r.id}</span>
-            {#if r.name && r.name !== r.id}<span class="id mono">{r.id}</span>{/if}
+            {#if prefs.showIds && r.name && r.name !== r.id}<span class="id mono">{r.id}</span>{/if}
             {#if r.only41 && (build ?? 42) !== 41}
               <span class="build-badge" title="Built for Build 41 only (no 42/ or common/ folder): on Build 42 it may error or do nothing">B41 only</span>
             {:else if r.only42 && build === 41}
@@ -238,6 +239,9 @@
     padding: 0 8px;
     height: 40px;
     border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+  }
+  :global(html.compact) tr.mod td {
+    height: 30px;
   }
   tr.mod {
     cursor: default;

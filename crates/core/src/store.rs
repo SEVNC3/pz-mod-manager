@@ -9,7 +9,6 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::pz::{self, Paths};
-use crate::sources::steam_workshop;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Entry {
@@ -62,7 +61,7 @@ fn backup_dir(paths: &Paths, id: &str) -> Result<PathBuf> {
     Ok(paths.data.join("backups").join(id))
 }
 
-fn copy_dir(from: &Path, to: &Path) -> Result<()> {
+pub(crate) fn copy_dir(from: &Path, to: &Path) -> Result<()> {
     fs::create_dir_all(to)?;
     for e in fs::read_dir(from)? {
         let e = e?;
@@ -206,13 +205,16 @@ pub fn rollback(paths: &Paths, id: &str) -> Result<()> {
     Ok(())
 }
 
-/// Delete mods PZMM installed. Returns ids it refused because they aren't ours.
-pub fn remove(paths: &Paths, ids: &[String]) -> Result<Vec<String>> {
+/// Remove mods PZMM installed: to the Recycle Bin with `recycle`, else deleted. Returns ids
+/// it refused because they aren't ours.
+pub fn remove(paths: &Paths, ids: &[String], recycle: bool) -> Result<Vec<String>> {
     let mut index = load(paths)?;
     let mut refused = vec![];
     for id in ids {
         if index.contains_key(id) && let Ok(dir) = mod_dir(paths, id) {
-            if dir.exists() {
+            if dir.exists() && recycle {
+                trash::delete(&dir).with_context(|| format!("moving {} to the Recycle Bin", dir.display()))?;
+            } else if dir.exists() {
                 fs::remove_dir_all(dir)?;
             }
             // its backup goes too, so a later install of the same id can't roll back to it
@@ -228,6 +230,46 @@ pub fn remove(paths: &Paths, ids: &[String]) -> Result<Vec<String>> {
     }
     save(paths, &index)?;
     Ok(refused)
+}
+
+/// Each backup (a mod's previous version) with its size and age (its newest file).
+fn backups(paths: &Paths) -> Vec<(PathBuf, pz::files::Stats)> {
+    let dirs = fs::read_dir(paths.data.join("backups")).into_iter().flatten().flatten();
+    dirs.filter(|e| e.file_type().is_ok_and(|t| t.is_dir())).map(|e| (e.path(), pz::files::stats(&e.path()))).collect()
+}
+
+/// Bytes all backups take.
+pub fn backups_size(paths: &Paths) -> u64 {
+    backups(paths).iter().map(|(_, s)| s.size).sum()
+}
+
+/// Delete the oldest backups until all of them fit in `cap` bytes. Returns how many went.
+pub fn prune_backups(paths: &Paths, cap: u64) -> Result<usize> {
+    let mut all = backups(paths);
+    all.sort_by_key(|(_, s)| s.modified);
+    let mut total: u64 = all.iter().map(|(_, s)| s.size).sum();
+    let mut gone = 0;
+    for (dir, s) in all {
+        if total <= cap {
+            break;
+        }
+        fs::remove_dir_all(&dir)?;
+        total -= s.size;
+        gone += 1;
+    }
+    if gone > 0 {
+        crate::log!("Deleted the {gone} oldest backup(s) to keep backups under {} MB", cap >> 20);
+    }
+    Ok(gone)
+}
+
+/// Delete every backup (no mod can be restored to its previous version afterwards).
+pub fn clear_backups(paths: &Paths) -> Result<()> {
+    let dir = paths.data.join("backups");
+    if dir.exists() {
+        fs::remove_dir_all(dir)?;
+    }
+    Ok(())
 }
 
 #[derive(Clone)]
@@ -268,7 +310,7 @@ impl Row {
 pub fn scan(paths: &Paths) -> Result<BTreeMap<String, Row>> {
     let index = load(paths)?;
     let mut out = BTreeMap::new();
-    if let Some(ws) = steam_workshop::content_dir(pz::STEAM_APP) {
+    if let Some(ws) = pz::workshop_dir() {
         for m in pz::workshop_mods(&ws) {
             let item = m.dir.strip_prefix(&ws).ok().and_then(|r| r.iter().next()).map(|s| s.to_string_lossy().into_owned());
             let source = format!("steam:{}", item.unwrap_or_default());
@@ -317,7 +359,7 @@ pub(crate) mod tests {
 
         // manual mods aren't ours to delete
         mod_tree(&paths.mods(), "Manual", "id=Manual\n");
-        assert_eq!(remove(&paths, &["RootMod".into(), "Manual".into()]).unwrap(), ["Manual"]);
+        assert_eq!(remove(&paths, &["RootMod".into(), "Manual".into()], false).unwrap(), ["Manual"]);
         assert!(!paths.mods().join("RootMod").exists() && paths.mods().join("Manual").exists());
     }
 
@@ -330,7 +372,7 @@ pub(crate) mod tests {
         assert!(install(&paths, &t.path().join("evil"), "local:evil").unwrap().is_empty());
         assert!(paths.zomboid.join("Saves").exists(), "Zomboid folder untouched");
         assert!(rollback(&paths, "..").is_err());
-        assert_eq!(remove(&paths, &["..".into()]).unwrap(), [".."]);
+        assert_eq!(remove(&paths, &["..".into()], false).unwrap(), [".."]);
 
         // a hand-installed mod with the same id is left alone
         mod_tree(&paths.mods(), "Hand", "id=Hand\nname=mine\n");
@@ -351,6 +393,27 @@ pub(crate) mod tests {
         rollback(&paths, "M").unwrap();
         assert!(fs::read_to_string(paths.mods().join("M/mod.info")).unwrap().contains("v1"));
         assert!(!paths.data.join("staging/M").exists());
+    }
+
+    #[test]
+    fn prunes_oldest_backups_first() {
+        let (_t, paths) = temp_paths();
+        let old = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000);
+        for (id, bytes, aged) in [("Old", 600, true), ("New", 500, false)] {
+            let d = paths.data.join("backups").join(id);
+            fs::create_dir_all(&d).unwrap();
+            let f = d.join("big.bin");
+            fs::write(&f, vec![0u8; bytes]).unwrap();
+            if aged {
+                fs::File::options().write(true).open(&f).unwrap().set_modified(old).unwrap();
+            }
+        }
+        assert_eq!(backups_size(&paths), 1100);
+        assert_eq!(prune_backups(&paths, 2000).unwrap(), 0, "under the cap: nothing goes");
+        assert_eq!(prune_backups(&paths, 1000).unwrap(), 1);
+        assert!(!paths.data.join("backups/Old").exists() && paths.data.join("backups/New").exists());
+        clear_backups(&paths).unwrap();
+        assert_eq!(backups_size(&paths), 0);
     }
 
     #[test]

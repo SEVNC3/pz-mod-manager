@@ -5,6 +5,7 @@ use std::sync::Mutex;
 
 use pzmm_core::profile::{self, Line, Profile};
 use pzmm_core::pz::{self, Paths};
+use pzmm_core::settings::{self, Settings};
 use pzmm_core::sources::{self, Source};
 use pzmm_core::store;
 use serde::{Deserialize, Serialize};
@@ -174,7 +175,7 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
         adopted,
         created,
         zomboid: paths.zomboid.display().to_string(),
-        workshop: sources::steam_workshop::content_dir(pz::STEAM_APP).map(|d| d.display().to_string()),
+        workshop: pz::workshop_dir().map(|d| d.display().to_string()),
         build: profile::build(paths),
         mode,
         kinds: profile::list(paths).into_iter().map(|n| { let kind = profile::kind_of(paths, &n); (n, kind) }).collect(),
@@ -260,7 +261,7 @@ async fn update_all() -> Res<View> {
 #[tauri::command(async)]
 fn remove(ids: Vec<String>) -> Res<View> {
     locked(|paths| {
-        let refused = store::remove(paths, &ids)?;
+        let refused = store::remove(paths, &ids, settings::load().recycle)?;
         for id in &refused {
             pzmm_core::log!("{id}: not installed by PZMM (Workshop subscription or manual install); left alone");
         }
@@ -900,13 +901,144 @@ fn open_url(app: AppHandle, url: String) -> Res<()> {
         pzmm_core::log!("error: PZMM only opens https links: {url}");
         return Err(format!("refusing to open {url}"));
     }
-    // Workshop pages open in the Steam client when it's running (Subscribe works there);
-    // otherwise in the browser, since a steam:// link would start Steam
+    // Workshop pages open in the Steam client when it's running (Subscribe works there), unless
+    // Settings say browser; otherwise in the browser, since a steam:// link would start Steam
     let workshop = ["https://steamcommunity.com/sharedfiles/", "https://steamcommunity.com/workshop/"].iter().any(|p| url.starts_with(p));
-    let url = if workshop && sources::steam_workshop::client_running() { format!("steam://openurl/{url}") } else { url };
+    let steam = workshop && settings::load().workshop_links != "browser" && sources::steam_workshop::client_running();
+    let url = if steam { format!("steam://openurl/{url}") } else { url };
     app.opener().open_url(&url, None::<&str>).map_err(|e| {
         pzmm_core::log!("error: couldn't open {url}: {e} (is Steam installed?)");
         e.to_string()
+    })
+}
+
+/// The Steam link that starts the game, with `args` (Steam asks once before passing them on).
+fn launch_url(args: &str) -> String {
+    let args = args.split_whitespace().collect::<Vec<_>>().join(" ");
+    if args.is_empty() {
+        return format!("steam://rungameid/{}", pz::STEAM_APP);
+    }
+    let enc: String = args.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-_.=".contains(&b) { char::from(b).to_string() } else { format!("%{b:02X}") }).collect();
+    format!("steam://run/{}//{enc}/", pz::STEAM_APP)
+}
+
+/// Start the game through Steam, with the extra arguments from Settings.
+#[tauri::command(async)]
+fn launch_game(app: AppHandle) -> Res<()> {
+    let url = launch_url(&settings::load().launch_args);
+    app.opener().open_url(&url, None::<&str>).map_err(|e| {
+        pzmm_core::log!("error: couldn't start the game ({url}): {e} (is Steam installed?)");
+        e.to_string()
+    })
+}
+
+// --- settings ---
+
+#[derive(Serialize)]
+struct SettingsView {
+    settings: Settings,
+    folders: Vec<pz::folders::Folder>,
+    /// A GitHub token is saved in the credential store (its value never leaves the backend).
+    token_saved: bool,
+    /// GITHUB_TOKEN is set, so it's used instead.
+    token_env: bool,
+    backups_size: u64,
+}
+
+fn settings_view() -> anyhow::Result<SettingsView> {
+    let s = settings::load();
+    Ok(SettingsView {
+        folders: pz::folders::list(&s),
+        token_saved: settings::token_saved(),
+        token_env: std::env::var("GITHUB_TOKEN").is_ok_and(|t| !t.trim().is_empty()),
+        backups_size: store::backups_size(&Paths::detect()),
+        settings: s,
+    })
+}
+
+#[tauri::command]
+async fn settings_get() -> Res<SettingsView> {
+    blocking(settings_view).await
+}
+
+/// Save everything but the folders (they go through `folder_set`).
+#[tauri::command(async)]
+fn settings_set(settings: Settings) -> Res<()> {
+    let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let folders = settings::load().folders;
+    settings::save(&Settings { folders, ..settings }).map_err(|e| format!("{e:#}"))
+}
+
+/// Set a folder (empty: back to autodetect); PZMM data can move along with it.
+#[tauri::command]
+async fn folder_set(key: String, path: String, move_data: bool) -> Res<SettingsView> {
+    blocking(move || {
+        // the in-process lock only: the data folder's lock file can't stay open while the folder moves
+        let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        *SCAN.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        let path = Some(path.trim()).filter(|p| !p.is_empty()).map(std::path::PathBuf::from);
+        pz::folders::set(&key, path, move_data)?;
+        settings_view()
+    })
+    .await
+}
+
+#[tauri::command]
+async fn pick_folder(app: AppHandle, start: String) -> Res<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    blocking(move || -> anyhow::Result<_> {
+        let mut dialog = app.dialog().file();
+        if std::path::Path::new(&start).is_dir() {
+            dialog = dialog.set_directory(&start);
+        }
+        Ok(dialog.blocking_pick_folder().and_then(|p| p.into_path().ok()).map(|p| p.display().to_string()))
+    })
+    .await
+}
+
+/// Save the GitHub token in the OS credential store (empty: forget it).
+#[tauri::command(async)]
+fn github_token_set(token: String) -> Res<()> {
+    settings::set_github_token(&token).map_err(|e| format!("{e:#}"))
+}
+
+/// Delete every backup; returns what's left (0).
+#[tauri::command(async)]
+fn backups_clear() -> Res<u64> {
+    locked(|paths| {
+        store::clear_backups(paths)?;
+        pzmm_core::log!("Deleted all backups.");
+        Ok(store::backups_size(paths))
+    })
+}
+
+/// A bug report's worth of facts, with the user name masked in paths.
+#[tauri::command(async)]
+fn diagnostics(app: AppHandle) -> Res<String> {
+    use std::fmt::Write;
+    reading(|paths| {
+        let mut out = format!("PZMM {} on {} {}\n", app.package_info().version, std::env::consts::OS, std::env::consts::ARCH);
+        for f in pz::folders::list(&settings::load()) {
+            let by = match f.env {
+                Some(env) if f.overridden => format!(", from {env}"),
+                _ if f.custom => ", set in Settings".into(),
+                _ => String::new(),
+            };
+            let at = f.path.map_or("not found".into(), |p| p.display().to_string());
+            let warnings: String = f.warnings.iter().map(|w| format!("; {w}")).collect();
+            writeln!(out, "{}: {at} ({}{by}){warnings}", f.label, f.status)?;
+        }
+        let p = active(paths)?;
+        let mods = scan(paths)?;
+        let build = profile::effective_build(paths);
+        writeln!(out, "Profile: {} ({}), Build {build}", p.name, profile::kind_of(paths, &p.name))?;
+        writeln!(out, "Mods: {} installed, {} enabled", mods.len(), p.enabled().len())?;
+        let findings = pz::doctor::check(paths, &p.enabled(), &mods, build);
+        writeln!(out, "Check setup: {} finding(s)", findings.len())?;
+        for f in findings {
+            writeln!(out, "- {:?} {}: {}", f.level, f.subject, f.text)?;
+        }
+        Ok(pz::doctor::mask_home_user(&out))
     })
 }
 
@@ -920,6 +1052,8 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
@@ -933,7 +1067,8 @@ pub fn run() {
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
             details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, workshop_comments, workshop_author, zb_status, zb_preview, zb_install, zb_uninstall,
             find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_export, server_import, server_start, save_use,
-            mode_preview, mode_switch, doctor, console_errors, profile_export, profile_import
+            mode_preview, mode_switch, doctor, console_errors, profile_export, profile_import,
+            launch_game, settings_get, settings_set, folder_set, pick_folder, github_token_set, backups_clear, diagnostics
         ])
         .run(tauri::generate_context!())
         .expect("error while running PZMM");
@@ -941,7 +1076,14 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::Row;
+    use super::{Row, launch_url};
+
+    #[test]
+    fn launch_args_go_in_the_steam_link() {
+        assert_eq!(launch_url("  "), "steam://rungameid/108600");
+        assert_eq!(launch_url(" -debug  -nosteam "), "steam://run/108600//-debug%20-nosteam/");
+        assert_eq!(launch_url("-x a/b&c"), "steam://run/108600//-x%20a%2Fb%26c/");
+    }
 
     /// The UI saves slim rows: everything but kind, id/name and on is optional.
     #[test]

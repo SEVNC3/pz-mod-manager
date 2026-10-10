@@ -151,15 +151,11 @@ pub fn export(paths: &Paths, name: &str, enabled: &[String], mods: &std::collect
     Ok(notes)
 }
 
-/// The script that starts a dedicated server: the Dedicated Server tool from Steam
-/// (`PZ_SERVER_DIR` overrides), else the server launcher that ships with the game.
+/// The script that starts a dedicated server: the Dedicated Server tool (`PZ_SERVER_DIR`, the
+/// setting or Steam's libraries), else the server launcher that ships with the game.
 pub fn start_script() -> Option<PathBuf> {
     let names: &[&str] = if cfg!(windows) { &["StartServer64.bat", "ProjectZomboidServer.bat"] } else { &["start-server.sh"] };
-    let dirs = [
-        std::env::var_os("PZ_SERVER_DIR").map(PathBuf::from),
-        crate::sources::steam_workshop::library_path("steamapps/common/Project Zomboid Dedicated Server"),
-        super::zombiebuddy::game_dir(),
-    ];
+    let dirs = [super::folders::path("server", &crate::settings::load()), super::zombiebuddy::game_dir()];
     dirs.into_iter().flatten().flat_map(|d| names.iter().map(move |n| d.join(n))).find(|p| p.is_file())
 }
 

@@ -14,16 +14,20 @@
   import Icon from "$lib/Icon.svelte";
   import ActivityLog from "$lib/ActivityLog.svelte";
   import Findings from "$lib/Findings.svelte";
-  import SettingsPanel from "$lib/SettingsPanel.svelte";
+  import Settings from "$lib/Settings.svelte";
+  import { applyPrefs } from "$lib/prefs.svelte";
   import ModTable from "$lib/ModTable.svelte";
-  import { autosort, bisectRound, findProblems, groupByCategory, loadList, moveSection, orderOf, placeInOrder, placeInSections, sortLoadOrder, syncOrder, tiers } from "$lib/order";
+  import { autosort, bisectRound, findProblems, groupByCategory, loadList, moveSection, orderOf, orphanedRequirements, placeInOrder, placeInSections, sortLoadOrder, syncOrder, tiers } from "$lib/order";
   import LoadOrder from "$lib/LoadOrder.svelte";
   import WindowControls from "$lib/WindowControls.svelte";
   import ProfilePicker from "$lib/ProfilePicker.svelte";
-  import type { Categories, Finding, ModErrors, Overlap, Save, Stats } from "$lib/api";
+  import type { Categories, Finding, ModErrors, Overlap, Save, SettingsView, Stats } from "$lib/api";
 
-  let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
+  let tab = $state<"mods" | "workshop" | "servers" | "zb" | "settings">("mods");
   let updates = $state<Set<string>>(new Set());
+  /** settings.json, folders and the rest of the Settings tab (null until read). */
+  let cfg = $state<SettingsView | null>(null);
+  $effect(applyPrefs);
 
   // shared files between enabled mods: who overrides whom (refreshed after every change)
   let overlaps = $state<Record<string, Overlap>>({});
@@ -68,6 +72,8 @@
     if (tab === "workshop") workshopSeen = true;
   });
   let zb = $state<ZbStatus | null>(null);
+  /** A folder set by hand (or by an environment variable) that isn't there or isn't right. */
+  const folderTrouble = $derived(!!cfg?.folders.some((f) => (f.custom || f.overridden) && f.status !== "found"));
   const zbNeeded = $derived(!!zb && zb.required_by.length > 0 && !zbReady(zb));
   const refreshZb = () => api.zbStatus().then((s) => (zb = s)).catch(() => {});
 
@@ -118,7 +124,6 @@
   let search = $state("");
   let filter = $state<"all" | "on" | "off" | "problems">("all");
   let installText = $state("");
-  let settingsOpen = $state(false);
   let newProfile = $state<string | null>(null);
   let editingSep = $state<number | null>(null);
   let dragFrom = $state<number | null>(null);
@@ -235,7 +240,7 @@
       if (selected && !v.rows.some((r) => r.kind === "mod" && r.id === selected)) selected = null;
       // a profile seen for the first time (first run, New, Import, Viewpoint) without separators gets autosorted
       const fresh = v.created || (knownProfiles && !knownProfiles.includes(v.profile));
-      if (fresh && v.rows.length && !v.rows.some((r) => r.kind === "sep")) await groupLibrary(false);
+      if (fresh && cfg?.settings.autosort_new !== false && v.rows.length && !v.rows.some((r) => r.kind === "sep")) await groupLibrary(false);
       else if (!keepHistory && before.size) await placeNew(before);
       return true;
     } catch (e) {
@@ -318,6 +323,19 @@
       say(`Couldn't check for updates: ${e}`);
     }
   }
+
+  /** The scheduled check (Settings: on start / every few hours), installing what it finds if asked to. */
+  async function autoCheck() {
+    if (busy) return;
+    await checkUpdates();
+    if (updates.size && cfg?.settings.update_action === "install") await updateMods([...updates]);
+  }
+  $effect(() => {
+    const hours = ({ "1h": 1, "3h": 3 } as Record<string, number>)[cfg?.settings.update_check ?? ""];
+    if (!hours) return;
+    const timer = setInterval(autoCheck, hours * 3_600_000);
+    return () => clearInterval(timer);
+  });
 
   let checking = $state(false);
   async function checkUpdatesNow() {
@@ -515,7 +533,7 @@
     commit(next.rows, next.order, false);
   }
 
-  const TAB_IDS = ["mods", "workshop", "servers", "zb"];
+  const TAB_IDS = ["mods", "workshop", "servers", "zb", "settings"];
   const FILTER_IDS = ["all", "on", "off", "problems"];
   /** Left/Right arrows step through a tab list or segmented control and move focus along. */
   function arrowPick(e: KeyboardEvent, ids: string[], current: string, set: (v: string) => void) {
@@ -534,9 +552,8 @@
       document.getElementById("mod-search")?.focus();
       return;
     }
-    if (e.key === "Escape" && !typing && (picked.size || selected || modePlan || settingsOpen)) {
+    if (e.key === "Escape" && !typing && (picked.size || selected || modePlan)) {
       if (modePlan) modePlan = null;
-      else if (settingsOpen) settingsOpen = false;
       else if (picked.size) picked = new Set();
       else selected = null;
       return;
@@ -682,16 +699,24 @@
     const ids = [...picked].filter((id) => mods.get(id) && isOurs(mods.get(id)!));
     if (!ids.length) return say("None of the selected mods were installed by PZMM; unsubscribe Steam mods in Steam.", true);
     const skipped = picked.size - ids.length;
-    if (confirm(`Remove ${ids.length} mod${ids.length === 1 ? "" : "s"}? Their files are deleted from your Zomboid mods folder.${skipped ? ` (${skipped} not installed by PZMM will be left alone.)` : ""}`)) {
-      run(`Removing ${ids.length} mods`, () => api.remove(ids)).then(() => (picked = new Set()));
-    }
+    removeMods(ids, skipped ? ` (${skipped} not installed by PZMM will be left alone.)` : "").then(() => (picked = new Set()));
+  }
+
+  /** Remove mods (asking first), and, as Settings say, the required mods nothing else uses. */
+  async function removeMods(ids: string[], note = "") {
+    const s = cfg?.settings;
+    const where = s?.recycle === false ? "deleted from" : "moved to the Recycle Bin from";
+    const what = ids.length === 1 ? ids[0] : `${ids.length} mods`;
+    if (!confirm(`Remove ${what}? ${ids.length === 1 ? "Its" : "Their"} files are ${where} your Zomboid mods folder.${note}`)) return;
+    let extra = s?.remove_requirements === "never" ? [] : orphanedRequirements(ids, [...mods.values()]).filter((id) => isOurs(mods.get(id)!));
+    if (extra.length && s?.remove_requirements !== "always" &&
+      !confirm(`Also remove ${extra.join(", ")}? Nothing else you have needs ${extra.length === 1 ? "it" : "them"}.`)) extra = [];
+    await run(`Removing ${extra.length ? `${ids.length + extra.length} mods` : what}`, () => api.remove([...ids, ...extra]));
   }
 
   const separators = $derived(rows.flatMap((r) => (r.kind === "sep" && r.name ? [r.name] : [])));
 
-  function remove(id: string) {
-    if (confirm(`Remove ${id}? Its files are deleted from your Zomboid mods folder.`)) run(`Removing ${id}`, () => api.remove([id]));
-  }
+  const remove = (id: string) => removeMods([id]);
 
   function deleteProfile() {
     const name = view?.profile;
@@ -738,13 +763,15 @@
 
   onMount(() => {
     const unlisten = listen<string>("log", (e) => say(e.payload, e.payload.startsWith("error:")));
-    run("Loading", api.load).then(() => {
-      checkUpdates();
+    const settings = api.settingsGet().catch(() => null);
+    run("Loading", api.load).then(async () => {
       refreshStats();
+      cfg = await settings;
+      if (cfg?.settings.update_check !== "off") autoCheck();
+      if (cfg?.settings.app_updates !== false) checkAppUpdate();
     });
     refreshSave();
     getVersion().then((v) => (appVersion = v));
-    checkAppUpdate();
     return () => {
       unlisten.then((f) => f());
     };
@@ -793,8 +820,7 @@
         <button onclick={checkUpdatesNow} disabled={busy || checking} title="Ask the Workshop whether any mod has a newer version">
           <Icon name="refresh" size={14} />{checking ? "Checking…" : "Check for updates"}</button>
       {/if}
-      <button onclick={() => api.openUrl("steam://rungameid/108600")}><Icon name="play" size={14} />Launch game</button>
-      <button class="quiet" aria-expanded={settingsOpen} onclick={() => (settingsOpen = !settingsOpen)}><Icon name="settings" size={14} />Settings</button>
+      <button onclick={api.launchGame} title={cfg?.settings.launch_args ? `Through Steam, with ${cfg.settings.launch_args}` : "Through Steam"}><Icon name="play" size={14} />Launch game</button>
     </div>
   {/snippet}
 
@@ -849,14 +875,11 @@
     </div>
   {/if}
 
-  <SettingsPanel open={settingsOpen} {view} {busy} {appVersion} onBuild={(b) => run("Saving", () => api.setBuild(b))}
-    onRedownload={redownloadAll} onCheckUpdate={() => checkAppUpdate(true)} />
-
   <div class="tabbar">
   <div class="tabs" role="tablist" aria-label="Sections" tabindex="-1" onkeydown={(e) => arrowPick(e, TAB_IDS, tab, (v) => (tab = v as typeof tab))}>
-    {#each [["mods", "My mods"], ["workshop", "Browse Workshop"], ["servers", "Servers & saves"], ["zb", "ZombieBuddy"]] as [id, label]}
+    {#each [["mods", "My mods"], ["workshop", "Browse Workshop"], ["servers", "Servers & saves"], ["zb", "ZombieBuddy"], ["settings", "Settings"]] as [id, label]}
       <button role="tab" aria-selected={tab === id} class:active={tab === id} onclick={() => (tab = id as typeof tab)}>
-        {label}{#if id === "zb" && zbNeeded}<span class="alert" aria-label="needs setup"></span>{/if}
+        {label}{#if (id === "zb" && zbNeeded) || (id === "settings" && folderTrouble)}<span class="alert" aria-label="needs setup"></span>{/if}
       </button>
     {/each}
   </div>
@@ -877,6 +900,10 @@
     <ZombieBuddy status={zb} profile={view?.profile ?? ""} {busy}
       onSetup={async () => { await run("Setting up ZombieBuddy", api.zbInstall, { showLog: true }); }}
       onRemove={async () => { await run("Removing ZombieBuddy", api.zbUninstall, { showLog: true }); }} />
+  {:else if tab === "settings"}
+    <Settings bind:cfg {view} {busy} {appVersion} {say} onBuild={(b) => run("Saving", () => api.setBuild(b))}
+      onRedownload={redownloadAll} onCheckUpdate={() => checkAppUpdate(true)}
+      onFoldersChanged={() => run("Loading", api.load).then(() => { refreshSave(); refreshZb(); })} />
   {:else}
   <section class="mods">
   {#if saveDiff && latestSave && !saveNoticeDismissed}

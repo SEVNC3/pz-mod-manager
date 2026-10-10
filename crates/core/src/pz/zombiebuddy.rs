@@ -26,11 +26,9 @@ fn is_zb_arg(a: &str) -> bool {
     ["-agentlib:zbNative", "-javaagent:ZombieBuddy.jar"].iter().any(|p| a == *p || a.starts_with(&format!("{p}=")))
 }
 
-/// The game's install folder: `PZ_GAME_DIR`, else the Steam library that has it.
+/// The game's install folder: `PZ_GAME_DIR`, else the setting, else the Steam library that has it.
 pub fn game_dir() -> Option<PathBuf> {
-    std::env::var_os("PZ_GAME_DIR")
-        .map(PathBuf::from)
-        .or_else(|| crate::sources::steam_workshop::library_path("steamapps/common/ProjectZomboid"))
+    super::folders::path("game", &crate::settings::load())
 }
 
 /// Folder holding ProjectZomboid64.json: the game root on Windows, `projectzomboid/` on Linux.

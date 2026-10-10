@@ -143,6 +143,34 @@ export type Conflict = { other: string; files: number; wins: boolean; examples: 
 export type Save = { mode: string; name: string; mods: string[]; modified: number };
 export type ServersAndSaves = { servers: string[]; server_dir: string; saves: Save[] };
 
+/** settings.json (see core settings.rs); the GitHub token is never in it. */
+export type Settings = {
+  folders: Record<string, string>;
+  update_check: "off" | "start" | "1h" | "3h";
+  update_action: "notify" | "install";
+  app_updates: boolean;
+  workshop_links: "steam" | "browser";
+  recycle: boolean;
+  remove_requirements: "ask" | "always" | "never";
+  backup_cap_mb: number;
+  launch_args: string;
+  autosort_new: boolean;
+};
+export type Folder = {
+  key: string;
+  label: string;
+  env: string | null;
+  path: string | null;
+  /** The environment variable is set and wins over the setting. */
+  overridden: boolean;
+  /** Set by hand (else autodetected). */
+  custom: boolean;
+  detected: string | null;
+  status: "found" | "missing" | "not_pz";
+  warnings: string[];
+};
+export type SettingsView = { settings: Settings; folders: Folder[]; token_saved: boolean; token_env: boolean; backups_size: number };
+
 export const api = {
   load: () => invoke<View>("load"),
   // the backend only stores order, on/off and separators
@@ -188,6 +216,15 @@ export const api = {
   profileImport: (shared: Shared) => invoke<View>("profile_import", { shared }),
   modePreview: (mode: Mode) => invoke<string[]>("mode_preview", { mode }),
   modeSwitch: (mode: Mode) => invoke<View>("mode_switch", { mode }),
+  settingsGet: () => invoke<SettingsView>("settings_get"),
+  settingsSet: (settings: Settings) => invoke<void>("settings_set", { settings }),
+  /** An empty path goes back to autodetect; `moveData` moves PZMM's data along. */
+  folderSet: (key: string, path: string, moveData: boolean) => invoke<SettingsView>("folder_set", { key, path, moveData }),
+  pickFolder: (start: string) => invoke<string | null>("pick_folder", { start }),
+  githubTokenSet: (token: string) => invoke<void>("github_token_set", { token }),
+  backupsClear: () => invoke<number>("backups_clear"),
+  diagnostics: () => invoke<string>("diagnostics"),
+  launchGame: () => invoke<void>("launch_game").catch(() => {}),
   // failures are logged by the backend (they reach the activity log), so callers needn't handle them
   openPath: (path: string) => invoke<void>("open_path", { path }).catch(() => {}),
   openUrl: (url: string) => invoke<void>("open_url", { url }).catch(() => {}),

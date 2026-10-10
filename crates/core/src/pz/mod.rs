@@ -10,6 +10,7 @@ use anyhow::{Context, Result};
 pub mod category;
 pub mod doctor;
 pub mod files;
+pub mod folders;
 pub mod logs;
 pub mod saves;
 pub mod server;
@@ -26,13 +27,10 @@ pub struct Paths {
 }
 
 impl Paths {
-    /// `PZ_HOME` / `PZMM_DATA` override the defaults.
+    /// `PZ_HOME` / `PZMM_DATA`, else the settings, else the defaults (see [`folders`]).
     pub fn detect() -> Self {
-        let home = dirs::home_dir().unwrap_or_default();
-        let zomboid = std::env::var_os("PZ_HOME").map_or_else(|| home.join("Zomboid"), PathBuf::from);
-        let data = std::env::var_os("PZMM_DATA")
-            .map_or_else(|| dirs::data_local_dir().unwrap_or(home).join("pzmm"), PathBuf::from);
-        Paths { zomboid, data }
+        let s = crate::settings::load();
+        Paths { zomboid: folders::path("zomboid", &s).unwrap_or_default(), data: folders::path("data", &s).unwrap_or_default() }
     }
 
     pub fn mods(&self) -> PathBuf {
@@ -42,6 +40,11 @@ impl Paths {
     pub fn default_txt(&self) -> PathBuf {
         self.mods().join("default.txt")
     }
+}
+
+/// The Steam Workshop content folder for Project Zomboid (the setting, else Steam's libraries).
+pub fn workshop_dir() -> Option<PathBuf> {
+    folders::path("workshop", &crate::settings::load())
 }
 
 pub fn read_info(path: &Path) -> HashMap<String, String> {

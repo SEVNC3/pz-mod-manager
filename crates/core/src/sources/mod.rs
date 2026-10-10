@@ -77,7 +77,7 @@ pub(crate) fn http_get(url: &str) -> Result<Vec<u8>> {
     polite(url, || {
         let mut req = ureq::get(url).header("User-Agent", "pzmm");
         if url.starts_with("https://api.github.com/")
-            && let Ok(token) = std::env::var("GITHUB_TOKEN")
+            && let Some(token) = crate::settings::github_token()
         {
             req = req.header("Authorization", &format!("Bearer {token}"));
         }
@@ -114,7 +114,7 @@ pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
     if resolve && !workshop.is_empty() {
         workshop = expand_workshop(paths, workshop);
     }
-    if let Some(ws) = steam_workshop::content_dir(pz::STEAM_APP) {
+    if let Some(ws) = pz::workshop_dir() {
         workshop.retain(|id| {
             let root = ws.join(id);
             if !steam_workshop::valid_id(id) || !root.is_dir() {
@@ -175,6 +175,10 @@ pub fn install_fetched(paths: &Paths, fetched: &[Fetched]) -> Vec<String> {
             Err(e) => crate::log!("error: {e:#}"),
         }
     }
+    let cap = crate::settings::load().backup_cap_mb << 20;
+    if cap > 0 && let Err(e) = store::prune_backups(paths, cap) {
+        crate::log!("error: pruning backups: {e:#}");
+    }
     ids
 }
 
@@ -185,7 +189,7 @@ pub fn install(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<String> 
 
 /// Workshop ids the game can already load: Steam subscriptions and PZMM installs.
 pub fn workshop_available(paths: &Paths) -> HashSet<String> {
-    let mut have: HashSet<String> = steam_workshop::content_dir(pz::STEAM_APP)
+    let mut have: HashSet<String> = pz::workshop_dir()
         .and_then(|d| std::fs::read_dir(d).ok())
         .into_iter()
         .flatten()

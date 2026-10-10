@@ -104,20 +104,20 @@ This merges their findings. Each item names its source. Work top to bottom; P0 a
 
 ## P5: a real Settings tab
 
-52. [ ] **Settings becomes its own tab** (a blueprint page with cards, like Servers & saves) instead of the strip in the header. Sections: Folders, Downloads and updates, Appearance, Launch, About.
-53. [ ] **Folders**, each with a path field, **Browse…**, **Detect** and **Open**, a status (found / not found / not a PZ folder), and a note when an environment variable is overriding it:
+52. [x] **Settings becomes its own tab** (a blueprint page with cards, like Servers & saves) instead of the strip in the header. Sections: Folders, Downloads and updates, Appearance, Launch, About.
+53. [x] **Folders**, each with a path field, **Browse…**, **Detect** and **Open**, a status (found / not found / not a PZ folder), and a note when an environment variable is overriding it:
     - Project Zomboid install (`PZ_GAME_DIR`), detected from the Steam libraries.
     - Zomboid user folder (`PZ_HOME`): mods, saves, server configs, logs.
     - Dedicated server install (`PZ_SERVER_DIR`).
     - Steam Workshop content folder (`workshop/content/108600`), found from the Steam libraries.
     - PZMM data (`PZMM_DATA`): profiles, installed mods, backups, SteamCMD. Changing it offers to move the existing data.
     - Checks on each path: refuse the game folder or a drive root for PZMM data, warn on OneDrive, no write permission and low disk space.
-54. [ ] **Saved in the config folder**, not the data folder (`%APPDATA%\pzmm\settings.json`), read by the core so the app and CLI agree. Order of precedence: environment variable, then the setting, then autodetect. Bad or missing paths show in Check setup.
-55. [ ] **Downloads and updates**: check mod updates on start and every few hours while open (off / on start / 1 h / 3 h), then notify or install automatically; check app updates on start; open Workshop links in the Steam client or browser; Redownload all; and a GitHub token for rate limits (stored in the OS credential store, never in the file).
-56. [ ] **Removing and backups**: removed mods go to the Recycle Bin or are deleted; when removing a mod, also remove required mods nothing else uses (ask / always / never); backups kept per mod, a total size cap (oldest pruned first), and the current backup size with **Clear backups**.
-57. [ ] **Appearance**: theme, accent and default game build (moved from the header strip), compact rows, show mod IDs beside names, the Workshop's default view and results per page, and the window size and position remembered.
-58. [ ] **Launch**: extra game arguments (`-debug`, `-nosteam`) and autosort on first run of a new profile.
-59. [ ] **About**: version, check for updates, the GitHub, Discord and Ko-fi links, Open log folder, and **Copy diagnostics** (version, folders, profile, mod count and Check setup results, with your user name masked) for bug reports.
+54. [x] **Saved in the config folder**, not the data folder (`%APPDATA%\pzmm\settings.json`), read by the core so the app and CLI agree. Order of precedence: environment variable, then the setting, then autodetect. Bad or missing paths show in Check setup.
+55. [x] **Downloads and updates**: check mod updates on start and every few hours while open (off / on start / 1 h / 3 h), then notify or install automatically; check app updates on start; open Workshop links in the Steam client or browser; Redownload all; and a GitHub token for rate limits (stored in the OS credential store, never in the file).
+56. [x] **Removing and backups**: removed mods go to the Recycle Bin or are deleted; when removing a mod, also remove required mods nothing else uses (ask / always / never); backups kept per mod, a total size cap (oldest pruned first), and the current backup size with **Clear backups**.
+57. [x] **Appearance**: theme, accent and default game build (moved from the header strip), compact rows, show mod IDs beside names, the Workshop's default view and results per page, and the window size and position remembered.
+58. [x] **Launch**: extra game arguments (`-debug`, `-nosteam`) and autosort on first run of a new profile.
+59. [x] **About**: version, check for updates, the GitHub, Discord and Ko-fi links, Open log folder, and **Copy diagnostics** (version, folders, profile, mod count and Check setup results, with your user name masked) for bug reports.
 
 ## Lower-priority core fixes (1.1.x)
 

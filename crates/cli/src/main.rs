@@ -7,7 +7,7 @@ use pzmm_core::store;
 
 /// PZMM - Project Zomboid Mod Manager
 #[derive(Parser)]
-#[command(version, after_help = "Env: PZ_HOME (default ~/Zomboid), PZMM_DATA, PZ_GAME_DIR, PZ_SERVER_DIR, GITHUB_TOKEN")]
+#[command(version, after_help = "Env: PZ_HOME (default ~/Zomboid), PZMM_DATA, PZ_GAME_DIR, PZ_SERVER_DIR, GITHUB_TOKEN. They win over the app's Settings (settings.json in the config folder).")]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -154,7 +154,7 @@ fn run(cli: Cli) -> Result<()> {
             profile::apply(&paths, &p)?;
         }
         Cmd::Remove { ids } => {
-            let refused = store::remove(&paths, &ids)?;
+            let refused = store::remove(&paths, &ids, pzmm_core::settings::load().recycle)?;
             for id in &refused {
                 eprintln!("{id}: not installed by PZMM (Workshop subscription or manual install); left alone");
             }
