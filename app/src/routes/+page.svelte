@@ -15,6 +15,7 @@
   import Icon, { type IconName } from "$lib/Icon.svelte";
   import { autosort, bisectRound, findProblems, placeInSections, sortLoadOrder } from "$lib/order";
   import LoadOrder from "$lib/LoadOrder.svelte";
+  import WindowControls from "$lib/WindowControls.svelte";
   import type { Finding, ModErrors, Overlap, Save, Stats } from "$lib/api";
 
   let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
@@ -673,7 +674,8 @@
 <svelte:window onkeydown={globalKey} />
 
 <div class="app">
-  <header class="top">
+  <header class="top" data-tauri-drag-region>
+    <WindowControls />
     <img class="brand" src="/brand/pzmm.png" alt="PZMM" width="44" height="44" />
 
     <div class="modes" role="radiogroup" aria-label="Game">
@@ -1034,7 +1036,7 @@
                     {:else if problems.has(r.id)}
                       <span class="missing" title={problems.get(r.id)?.text}>⚠ {problems.get(r.id)?.text}</span>
                     {:else if updates.has(r.id)}
-                      <span class="update">Update available</span>
+                      <span class="update"><Icon name="update" size={13} />Update available</span>
                     {:else}
                       <span class="badge" data-kind={r.source.split(":")[0]}>{src.label}</span>
                     {/if}
@@ -1264,11 +1266,13 @@
   }
 
   /* --- top bar --- */
+  /* the top bar is the title bar: drag it to move the window, double-click to maximise */
   .top {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 10px 16px;
+    padding: 10px 150px 10px 16px;
     background: var(--panel);
     border-bottom: 1px solid var(--line);
     flex-wrap: wrap;
@@ -1552,6 +1556,9 @@
     color: var(--text);
   }
   .update {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     color: var(--accent-text);
     font-weight: 700;
     font-size: 12px;
