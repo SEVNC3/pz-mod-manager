@@ -52,6 +52,12 @@
   let authorPage = $state(1);
   let data = $state<Browse | null>(null);
   let rows = $state<Record<string, WorkshopItem[] | null>>({});
+  let rowErrors = $state<Record<string, string>>({});
+  /** Steam's errors in plain words (a 429 is Steam asking us to slow down). */
+  const plainError = (e: unknown) => {
+    const s = String(e);
+    return /429|limiting requests/i.test(s) ? "Steam is limiting requests right now. Wait a minute and try again." : `Couldn't reach the Steam Workshop: ${s.replace(/^Error:\s*/, "")}`;
+  };
   let loading = $state(false);
   let error = $state("");
   let installing = $state<string | null>(null);
@@ -91,19 +97,19 @@
     }
   }
 
+  /** Every Home row at once; a row that fails shows its own retry instead of hiding the others. */
   async function loadHome() {
     const mine = ++seq;
     error = "";
-    for (const [title, over] of HOME_ROWS) {
-      if (rows[title]) continue;
-      try {
-        const r = await api.browse(newQuery({ ...over, required: build ? [`Build ${build}`] : [] }));
-        if (mine !== seq) return;
-        rows[title] = r.items.slice(0, 12);
-      } catch (e) {
-        if (mine === seq) error = String(e);
-        return;
-      }
+    await Promise.all(HOME_ROWS.filter(([title]) => !rows[title]).map(([title, over]) => loadRow(mine, title, over)));
+  }
+  async function loadRow(mine: number, title: string, over: Partial<Query>) {
+    delete rowErrors[title];
+    try {
+      const r = await api.browse(newQuery({ ...over, required: build ? [`Build ${build}`] : [] }));
+      if (mine === seq) rows[title] = r.items.slice(0, 12);
+    } catch (e) {
+      if (mine === seq) rowErrors[title] = plainError(e);
     }
   }
 
@@ -388,7 +394,7 @@
   <div class="results blueprint" aria-busy={loading}>
     {#if error}
       <div class="message">
-        <p>Couldn't reach the Steam Workshop: {error}</p>
+        <p>{plainError(error)}</p>
         <button onclick={() => (view === "home" ? loadHome() : load())}><Icon name="refresh" size={14} /> Try again</button>
       </div>
     {:else if view === "home"}
@@ -400,13 +406,23 @@
           </header>
           {#if rows[title]}
             <ul class="strip">{#each rows[title]! as it (it.id)}{@render card(it, true)}{/each}</ul>
+          {:else if rowErrors[title]}
+            <div class="message inline"><p>{rowErrors[title]}</p>
+              <button onclick={() => loadRow(seq, title, over)}><Icon name="refresh" size={14} />Try again</button></div>
           {:else}
             <p class="loading-row">Loading…</p>
           {/if}
         </section>
       {/each}
+    {:else if !data && loading}
+      <div class="message"><p>Loading the Workshop…</p></div>
     {:else if data && data.items.length === 0 && !loading}
-      <div class="message"><p>Nothing matches. Try fewer words, fewer tags or another build.</p></div>
+      <div class="message"><p>Nothing matches. Try fewer words, fewer tags or another build.</p>
+        <div class="msg-actions">
+          {#if q.search}<button onclick={() => { queryText = q.search = ""; go(1); }}><Icon name="x" size={14} />Clear search</button>{/if}
+          {#if filterCount}<button onclick={clearFilters}><Icon name="x" size={14} />Clear filters</button>{/if}
+        </div>
+      </div>
     {:else if data}
       <p class="count">{compact.format(data.total)} {view === "author" ? "mods" : q.collections ? "collections" : "mods"}{q.search ? ` for "${q.search}"` : ""}{loading ? " · loading…" : ""}</p>
       <ul class="grid" class:dim={loading}>
@@ -583,11 +599,18 @@
     min-height: 0;
     padding: 16px;
   }
-  .row h2,
+  /* words on the blueprint sit on panel strips, like the cards */
   .count,
   .pager,
-  .message {
-    text-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
+  .message,
+  .row header {
+    background: var(--panel);
+    border-radius: 8px;
+    box-shadow: var(--card-shadow);
+  }
+  .count {
+    display: inline-block;
+    padding: 4px 12px;
   }
   .dim {
     opacity: 0.5;
@@ -599,9 +622,10 @@
   }
   .row header {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+    padding: 6px 8px 6px 14px;
   }
   .row h2 {
     margin: 0;
@@ -769,13 +793,25 @@
     justify-content: center;
     align-items: center;
     gap: 14px;
-    padding: 18px 0 6px;
+    width: fit-content;
+    margin: 18px auto 6px;
+    padding: 6px 10px;
     color: var(--muted);
   }
   .message {
     max-width: 480px;
     margin: 10vh auto 0;
+    padding: 18px 22px;
     text-align: center;
     color: var(--muted);
+  }
+  .message.inline {
+    margin: 0;
+    max-width: none;
+  }
+  .msg-actions {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
   }
 </style>
