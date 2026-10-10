@@ -66,6 +66,8 @@ enum Cmd {
         #[arg(long)]
         install: bool,
     },
+    /// Check the active profile and server configs; exits with 1 if anything is broken
+    Doctor,
     /// List mods PZMM installed from the Workshop that have updates waiting
     Outdated,
     /// Write the active profile to Zomboid/Server/<name>.ini, or make a profile from it
@@ -175,6 +177,19 @@ fn run(cli: Cli) -> Result<()> {
                 }
                 _ if install => bail!("no Workshop item clearly provides {mod_id}; install one of the above by id"),
                 _ => {}
+            }
+        }
+        Cmd::Doctor => {
+            use pzmm_core::pz::doctor;
+            let found = doctor::check(&paths, &p.enabled(), &store::scan(&paths)?, profile::effective_build(&paths));
+            for f in &found {
+                let tag = if f.level == doctor::Level::Error { "error  " } else { "warning" };
+                println!("{tag} {}: {}", f.subject, f.text);
+            }
+            let errors = found.iter().filter(|f| f.level == doctor::Level::Error).count();
+            println!("{errors} error(s), {} warning(s)", found.len() - errors);
+            if errors > 0 {
+                std::process::exit(1);
             }
         }
         Cmd::Outdated => {

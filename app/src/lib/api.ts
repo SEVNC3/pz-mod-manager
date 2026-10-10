@@ -65,6 +65,7 @@ export type ZbStatus = {
 };
 export const zbReady = (s: ZbStatus | null) => !!s && s.have_mod && s.files_current && s.launcher_patched && s.enabled;
 
+export type Finding = { level: "error" | "warning"; subject: string; text: string };
 export type Overlap = { wins_over: string[]; loses_to: string[] };
 export type Conflict = { other: string; files: number; wins: boolean; examples: string[] };
 export type Save = { mode: string; name: string; mods: string[]; modified: number };
@@ -100,6 +101,7 @@ export const api = {
   serverExport: (name: string) => invoke<string[]>("server_export", { name }),
   serverImport: (name: string) => invoke<View>("server_import", { name }),
   saveUse: (mode: string, name: string) => invoke<View>("save_use", { mode, name }),
+  doctor: () => invoke<Finding[]>("doctor"),
   modePreview: (mode: Mode) => invoke<string[]>("mode_preview", { mode }),
   modeSwitch: (mode: Mode) => invoke<View>("mode_switch", { mode }),
   openPath: (path: string) => invoke<void>("open_path", { path }),

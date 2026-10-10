@@ -642,6 +642,12 @@ fn save_use(mode: String, name: String) -> Res<View> {
 
 use pzmm_core::pz::viewpoint as vp;
 
+/// Health check of the active profile and server configs.
+#[tauri::command]
+fn doctor() -> Res<Vec<pz::doctor::Finding>> {
+    reading(|paths| Ok(pz::doctor::check(paths, &active(paths)?.enabled(), &scan(paths)?, profile::effective_build(paths))))
+}
+
 /// What switching to `mode` would do, for the confirmation panel.
 #[tauri::command]
 fn mode_preview(mode: String) -> Res<Vec<String>> {
@@ -705,7 +711,7 @@ pub fn run() {
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
             details, poster, open_path, open_url, workshop_browse, zb_status, zb_preview, zb_install, zb_uninstall,
             find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, servers_and_saves, server_export, server_import, save_use,
-            mode_preview, mode_switch
+            mode_preview, mode_switch, doctor
         ])
         .run(tauri::generate_context!())
         .expect("error while running PZMM");

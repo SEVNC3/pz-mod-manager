@@ -12,7 +12,7 @@
   import LayerIcon from "$lib/LayerIcon.svelte";
   import Links from "$lib/Links.svelte";
   import { findProblems, sortLoadOrder } from "$lib/order";
-  import type { Overlap } from "$lib/api";
+  import type { Finding, Overlap } from "$lib/api";
 
   let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
   let updates = $state<Set<string>>(new Set());
@@ -239,6 +239,16 @@
     if (ok) {
       await settleOrder();
       if (unresolved.length) say(`Still missing: ${unresolved.join(", ")}. Select a mod that needs one and use Find to pick a match.`, true);
+    }
+  }
+
+  // --- health check ---
+  let findings = $state<Finding[] | null>(null);
+  async function checkSetup() {
+    try {
+      findings = await api.doctor();
+    } catch (e) {
+      say(`Couldn't check the setup: ${e}`, true);
     }
   }
 
@@ -546,11 +556,29 @@
     {:else}
       <span class="spacer"></span>
     {/if}
+    <button class="quiet" onclick={checkSetup} disabled={busy} title="Check the profile and server configs for problems">Check setup</button>
     <button class="quiet" onclick={undo} disabled={busy || !undoStack.length} title="Undo the last list change (Ctrl+Z)">Undo</button>
     <button class="quiet" onclick={redo} disabled={busy || !redoStack.length} title="Redo (Ctrl+Y)">Redo</button>
     <button class="quiet" onclick={addSeparator} disabled={busy || filtering}>Add separator</button>
   </div>
 
+  {#if findings}
+    <div class="findings" role="region" aria-label="Setup check">
+      <div class="findings-head">
+        <strong>
+          {findings.length === 0 ? "No problems found." : `${findings.filter((f) => f.level === "error").length} errors, ${findings.filter((f) => f.level === "warning").length} warnings`}
+        </strong>
+        <button class="quiet" onclick={() => (findings = null)}>Close</button>
+      </div>
+      {#if findings.length}
+        <ul>
+          {#each findings as f}
+            <li class={f.level}><span class="mono">{f.subject}</span> {f.text}</li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+  {/if}
   <main class:with-details={selected}>
     <div class="list">
       {#if view && rows.length === 0}
@@ -766,6 +794,28 @@
   }
   .version {
     color: var(--muted);
+  }
+  .findings {
+    padding: 8px 16px 10px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    max-height: 30vh;
+    overflow-y: auto;
+  }
+  .findings-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .findings ul {
+    margin: 6px 0 0;
+    padding-left: 18px;
+  }
+  .findings li.error {
+    color: var(--danger);
+  }
+  .findings li.warning {
+    color: var(--text);
   }
   .banner {
     display: flex;
