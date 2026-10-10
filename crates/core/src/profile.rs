@@ -175,6 +175,11 @@ pub fn build(paths: &Paths) -> Option<u8> {
     state(paths).b41.map(|b| if b { 41 } else { 42 })
 }
 
+/// The build being played: the forced format, else what default.txt looks like (B42 if unknown).
+pub fn effective_build(paths: &Paths) -> u8 {
+    build(paths).unwrap_or(if pz::read_default(&paths.default_txt()).b41 { 41 } else { 42 })
+}
+
 pub fn set_b41(paths: &Paths, b41: Option<bool>) -> Result<()> {
     save_state(paths, &State { b41, ..state(paths) })
 }

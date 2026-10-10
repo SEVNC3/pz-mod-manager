@@ -103,7 +103,7 @@ pub fn export(paths: &Paths, name: &str, enabled: &[String], mods: &std::collect
         }
         maps.extend(super::files::maps(&m.dir));
     }
-    let b41 = crate::profile::build(paths).map_or_else(|| super::read_default(&paths.default_txt()).b41, |b| b == 41);
+    let b41 = crate::profile::effective_build(paths) == 41;
     let file = path(paths, name)?;
     write(&file, &ids, &workshop, &maps, b41)?;
     notes.insert(0, format!("Wrote {} mods and {} Workshop items to {}", ids.len(), workshop.len(), file.display()));

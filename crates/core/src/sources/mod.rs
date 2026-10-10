@@ -195,11 +195,20 @@ pub struct Candidate {
     pub confirmed: bool,
     /// The dependent mod's author lists it under "Required items".
     pub required_by_author: bool,
+    /// Tagged for the build being played (or carries no build tag).
+    pub fits_build: bool,
 }
 
-/// Find Workshop items that provide `mod_id`: the "Required items" of the Workshop item
-/// `needed_by` (if any) plus a Workshop search for the id. Best matches first.
-pub fn find_mod(mod_id: &str, needed_by: Option<&str>) -> Result<Vec<Candidate>> {
+impl Candidate {
+    /// Safe to install without asking: it declares the id and suits the build.
+    pub fn sure(&self) -> bool {
+        self.confirmed && self.fits_build
+    }
+}
+
+/// Find Workshop items that provide `mod_id` for `build` (41/42): the "Required items" of
+/// the Workshop item `needed_by` (if any) plus a Workshop search for the id. Best first.
+pub fn find_mod(mod_id: &str, needed_by: Option<&str>, build: u8) -> Result<Vec<Candidate>> {
     // the author's list is a bonus: if Steam won't show the page, the search still works
     let required = needed_by
         .map(|item| {
@@ -210,7 +219,7 @@ pub fn find_mod(mod_id: &str, needed_by: Option<&str>) -> Result<Vec<Candidate>>
         })
         .unwrap_or_default();
     let mut ids = required.clone();
-    for i in steam_workshop::browse(pz::STEAM_APP, mod_id, "", 1, None)?.items.into_iter().take(10) {
+    for i in steam_workshop::browse(pz::STEAM_APP, mod_id, "", 1, None)?.items {
         if !ids.contains(&i.id) {
             ids.push(i.id);
         }
@@ -218,15 +227,21 @@ pub fn find_mod(mod_id: &str, needed_by: Option<&str>) -> Result<Vec<Candidate>>
     let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
     let mut out: Vec<Candidate> = steam_workshop::details(&refs)?
         .into_iter()
-        .map(|item| Candidate {
-            confirmed: pz::workshop_mod_ids(&item.description).iter().any(|m| m.eq_ignore_ascii_case(mod_id)),
-            required_by_author: required.contains(&item.id),
-            item,
+        .map(|item| {
+            let builds: Vec<&String> = item.tags.iter().filter(|t| t.starts_with("Build ")).collect();
+            Candidate {
+                confirmed: pz::workshop_mod_ids(&item.description).iter().any(|m| m.eq_ignore_ascii_case(mod_id)),
+                required_by_author: required.contains(&item.id),
+                fits_build: builds.is_empty() || builds.iter().any(|t| **t == format!("Build {build}")),
+                item,
+            }
         })
         .collect();
-    // author's own list first, then confirmed matches (translations also mention the id,
-    // so the most subscribed wins), then the rest in search order
-    out.sort_by_key(|c| (!(c.required_by_author && c.confirmed), !c.confirmed, std::cmp::Reverse(c.confirmed as u64 * c.item.subscriptions)));
+    // confirmed matches for this build first (the author's own pick before others, then the
+    // most subscribed, since translations mention the id too), then the rest in search order
+    out.sort_by_key(|c| {
+        (!c.sure(), !(c.required_by_author && c.confirmed), !c.confirmed, std::cmp::Reverse(c.confirmed as u64 * c.item.subscriptions))
+    });
     Ok(out)
 }
 

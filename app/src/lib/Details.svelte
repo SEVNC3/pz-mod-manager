@@ -35,7 +35,7 @@
     found[req] = "loading";
     try {
       const list = await api.findRequirement(req, id);
-      if (list[0]?.confirmed) {
+      if (list[0]?.confirmed && list[0]?.fits_build) {
         found[req] = [];
         delete found[req];
         await onInstallWorkshop(list[0].id);
@@ -160,14 +160,14 @@
                 <p class="hint">No result is clearly {r}. Pick the right one:</p>
                 <ul class="cands">
                   {#each list.slice(0, 5) as c (c.id)}
-                    <li class:best={c.confirmed}>
+                    <li class:best={c.confirmed && c.fits_build}>
                       <span>
                         <button class="quiet link" onclick={() => api.openUrl(`https://steamcommunity.com/sharedfiles/filedetails/?id=${c.id}`)}>{c.title}</button>
                         <span class="hint">
-                          {c.subscriptions.toLocaleString()} subscribers{c.confirmed ? " · Mod ID matches" : ""}{c.required_by_author ? " · listed by the author" : ""}
+                          {c.subscriptions.toLocaleString()} subscribers{c.confirmed ? " · Mod ID matches" : ""}{c.required_by_author ? " · listed by the author" : ""}{c.fits_build ? "" : " · not tagged for your game build"}
                         </span>
                       </span>
-                      <button class={c.confirmed ? "primary" : ""} disabled={busy} onclick={() => onInstallWorkshop(c.id)}>Download</button>
+                      <button class={c.confirmed && c.fits_build ? "primary" : ""} disabled={busy} onclick={() => onInstallWorkshop(c.id)}>Download</button>
                     </li>
                   {/each}
                 </ul>

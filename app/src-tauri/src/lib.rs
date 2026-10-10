@@ -395,7 +395,8 @@ fn workshop_item(row: &store::Row) -> Option<&str> {
 async fn find_requirement(mod_id: String, needed_by: String) -> Res<Vec<sources::Candidate>> {
     tauri::async_runtime::spawn_blocking(move || {
         let hint = store::scan(&Paths::detect()).ok().and_then(|m| m.get(&needed_by).and_then(workshop_item).map(String::from));
-        sources::find_mod(&mod_id, hint.as_deref()).map_err(|e| format!("{e:#}"))
+        let build = profile::effective_build(&Paths::detect());
+        sources::find_mod(&mod_id, hint.as_deref(), build).map_err(|e| format!("{e:#}"))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -419,9 +420,10 @@ async fn install_missing() -> Res<(View, Vec<String>)> {
                 }
             }
             let (mut items, mut unresolved) = (vec![], vec![]);
+            let build = profile::effective_build(paths);
             for (id, hint) in wanted {
-                match sources::find_mod(&id, hint.as_deref()) {
-                    Ok(c) if c.first().is_some_and(|c| c.confirmed) => {
+                match sources::find_mod(&id, hint.as_deref(), build) {
+                    Ok(c) if c.first().is_some_and(|c| c.sure()) => {
                         pzmm_core::log!("{id}: found on the Workshop as \"{}\" ({})", c[0].item.title, c[0].item.id);
                         items.push(Source::Workshop(c[0].item.id.clone()));
                     }

@@ -120,8 +120,18 @@ fn walk(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
 pub fn find_mods(root: &Path, depth: usize) -> Vec<FoundMod> {
     let mut infos = vec![];
     walk(root, depth, &mut infos);
-    let mut seen = HashSet::new();
-    let mut out = vec![];
+    // One mod can ship several mod.info files (root for B41, 42.12/, 42.13/...). The game
+    // uses the newest version folder, so prefer that: rank = version numbers, root = [].
+    // ponytail: newest folder, not "newest <= installed game version"; needs the game version to do better
+    let version_of = |info: &Path| -> Vec<u32> {
+        info.parent()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            .filter(|n| *n != "common" && is_version_dir(n))
+            .map(|n| n.split('.').filter_map(|p| p.parse().ok()).collect())
+            .unwrap_or_default()
+    };
+    let mut best: Vec<(PathBuf, PathBuf)> = vec![]; // (mod dir, chosen mod.info), in discovery order
     for info in infos {
         let parent = info.parent().unwrap_or(root);
         let dir = match parent.file_name().and_then(|n| n.to_str()) {
@@ -129,7 +139,15 @@ pub fn find_mods(root: &Path, depth: usize) -> Vec<FoundMod> {
             _ => parent,
         }
         .to_path_buf();
-        if seen.insert(dir.clone()) {
+        match best.iter_mut().find(|(d, _)| *d == dir) {
+            Some((_, chosen)) if version_of(&info) > version_of(chosen) => *chosen = info,
+            Some(_) => {}
+            None => best.push((dir, info)),
+        }
+    }
+    let mut out = vec![];
+    for (dir, info) in best {
+        {
             let mut i = read_info(&info);
             let requires = requires(&i);
             let fallback = dir.file_name().unwrap_or_default().to_string_lossy().into_owned();
@@ -236,6 +254,21 @@ mod tests {
         let ids: Vec<_> = found.iter().map(|m| (m.id.as_str(), m.name.as_str())).collect();
         assert_eq!(ids, [("ModA", "Mod A"), ("ModB", "Mod B")]);
         assert!(found[1].dir.ends_with("ModB"));
+    }
+
+    #[test]
+    fn newest_version_folder_wins() {
+        // Tomb's Player Body - Customisation: 42.12 still requires the old id, 42.13 the new one
+        let t = tempfile::tempdir().unwrap();
+        let m = t.path().join("TombBodyCustom");
+        write(&m.join("mod.info"), "id=TombBodyCustom\nrequire=SpnCharCustom\n");
+        write(&m.join("42.12/mod.info"), "id=TombBodyCustom\nrequire=\\SpnCharCustom\n");
+        write(&m.join("42.13/mod.info"), "id=TombBodyCustom\nrequire=\\SPNCC\n");
+        write(&m.join("42.9/mod.info"), "id=TombBodyCustom\nrequire=\\Old\n");
+        let found = find_mods(t.path(), 3);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].requires, ["SPNCC"]);
+        assert!(found[0].info.ends_with("42.13/mod.info"));
     }
 
     #[test]

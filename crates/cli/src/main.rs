@@ -152,13 +152,13 @@ fn run(cli: Cli) -> Result<()> {
             }
         }
         Cmd::Find { mod_id, install } => {
-            let found = sources::find_mod(&mod_id, None)?;
+            let found = sources::find_mod(&mod_id, None, profile::effective_build(&paths))?;
             for c in found.iter().take(8) {
-                let tag = if c.confirmed { "match" } else { "     " };
+                let tag = if c.sure() { "match" } else if c.confirmed { "other" } else { "     " };
                 println!("{tag} {:>11}  {:<50} {:>9} subs", c.item.id, c.item.title.chars().take(50).collect::<String>(), c.item.subscriptions);
             }
             match found.first() {
-                Some(best) if install && best.confirmed => {
+                Some(best) if install && best.sure() => {
                     let ids = sources::install(&paths, &[Source::Workshop(best.item.id.clone())], true);
                     ids.iter().for_each(|i| p.set(i, true));
                     profile::apply(&paths, &p)?;

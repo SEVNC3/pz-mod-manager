@@ -37,7 +37,7 @@ export type WorkshopItem = {
   have: boolean;
 };
 export type Browse = { total: number; items: WorkshopItem[] };
-export type Candidate = Omit<WorkshopItem, "have"> & { confirmed: boolean; required_by_author: boolean };
+export type Candidate = Omit<WorkshopItem, "have"> & { confirmed: boolean; required_by_author: boolean; fits_build: boolean };
 
 export type ZbStatus = {
   game_dir: string | null;
