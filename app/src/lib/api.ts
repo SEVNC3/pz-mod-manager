@@ -52,6 +52,9 @@ export type WorkshopItem = {
   file_size: number;
   tags: string[];
   num_children: number;
+  /** Steam's 0-5 star rating and its vote count. */
+  stars: number;
+  votes: number;
   have: boolean;
 };
 export type Browse = { total: number; items: WorkshopItem[] };

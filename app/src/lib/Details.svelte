@@ -1,5 +1,6 @@
 <script lang="ts">
   import LayerIcon from "./LayerIcon.svelte";
+  import Icon from "./Icon.svelte";
   import { api, describeSource, type Candidate, type Conflict, type Details, type ModRow } from "./api";
 
   let {
@@ -110,9 +111,9 @@
       <button class={row?.on ? "" : "primary"} onclick={() => onToggle(id)} disabled={busy}>
         {row?.on ? "Disable" : "Enable"}
       </button>
-      <button onclick={() => api.openPath(d!.dir)}>Show files</button>
+      <button onclick={() => api.openPath(d!.dir)}><Icon name="folder" size={14} />Show files</button>
       {#if source.url}
-        <button onclick={() => api.openUrl(source.url!)}>Open {source.label === "GitHub" ? "GitHub" : "Workshop"} page</button>
+        <button onclick={() => api.openUrl(source.url!)}><Icon name={source.label === "GitHub" ? "external" : "steam"} size={14} />{source.label === "GitHub" ? "GitHub" : "Workshop"} page</button>
       {/if}
     </div>
 
@@ -128,7 +129,7 @@
     {#if hasUpdate && d.ours}
       <div class="update">
         <span>A newer version is on the Workshop.</span>
-        <button class="primary" onclick={() => onUpdate(id)} disabled={busy}>Update now</button>
+        <button class="primary" onclick={() => onUpdate(id)} disabled={busy}><Icon name="refresh" size={14} />Update now</button>
       </div>
     {/if}
 
@@ -145,7 +146,7 @@
               {:else}
                 <span class="bad">not installed</span>
                 {#if !found[r]}<button class="find" onclick={() => download(r)} disabled={busy}
-                  title="Find it on the Steam Workshop and download it">Download</button>{/if}
+                  title="Find it on the Steam Workshop and download it"><Icon name="download" size={12} />Download</button>{/if}
               {/if}
             </span>
             {#if !m && found[r] === "loading"}
@@ -167,7 +168,7 @@
                           {c.subscriptions.toLocaleString()} subscribers{c.confirmed ? " · Mod ID matches" : ""}{c.required_by_author ? " · listed by the author" : ""}{c.fits_build ? "" : " · not tagged for your game build"}
                         </span>
                       </span>
-                      <button class={c.confirmed && c.fits_build ? "primary" : ""} disabled={busy} onclick={() => onInstallWorkshop(c.id)}>Download</button>
+                      <button class={c.confirmed && c.fits_build ? "primary" : ""} disabled={busy} onclick={() => onInstallWorkshop(c.id)}><Icon name="download" size={14} />Download</button>
                     </li>
                   {/each}
                 </ul>
@@ -204,9 +205,9 @@
     {#if d.ours}
       <div class="actions owned">
         {#if d.has_backup}
-          <button onclick={() => onRollback(id)} disabled={busy}>Restore previous version</button>
+          <button onclick={() => onRollback(id)} disabled={busy}><Icon name="rollback" size={14} />Restore previous version</button>
         {/if}
-        <button class="danger" onclick={() => onRemove(id)} disabled={busy}>Remove</button>
+        <button class="danger" onclick={() => onRemove(id)} disabled={busy}><Icon name="trash" size={14} />Remove</button>
       </div>
     {:else if d.source.startsWith("steam:")}
       <p class="note">This mod comes from your Steam subscriptions. Unsubscribe in Steam to remove it.</p>

@@ -64,6 +64,9 @@ pub struct Item {
     pub tags: Vec<String>,
     /// Required items (or collection members) Steam lists for it.
     pub num_children: u64,
+    /// Steam's 0-5 star rating and how many votes it's based on (browse results only).
+    pub stars: u64,
+    pub votes: u64,
 }
 
 #[derive(Debug, Default, serde::Serialize)]
@@ -97,6 +100,8 @@ impl Item {
             file_size: num(v, "file_size"),
             tags: v["tags"].as_array().into_iter().flatten().filter_map(|t| t["tag"].as_str().map(String::from)).collect(),
             num_children: num(v, "num_children"),
+            stars: num(v, "star_rating"),
+            votes: num(v, "total_votes"),
         }
     }
 }
@@ -327,7 +332,8 @@ mod tests {
         let inner = serde_json::json!({"queries": [{"state": {"data": {"total_count": 429, "results": [
             {"publishedfileid": "3810071828", "title": "Immersive Snow", "preview_url": "https://x/p.png",
              "short_description": "Footprints", "subscriptions": 8123, "time_updated": 1790000000,
-             "file_size": "1048576", "tags": [{"tag": "Build 42"}], "num_children": 1}
+             "file_size": "1048576", "tags": [{"tag": "Build 42"}], "num_children": 1,
+             "star_rating": 4, "total_votes": 767}
         ]}}}]});
         let html = format!(
             "<html><script type=\"application/json\" id=\"valve-ssr-data\" nonce=\"n\">{}</script></html>",
@@ -337,6 +343,7 @@ mod tests {
         assert_eq!(page.total, 429);
         assert_eq!(page.items[0].id, "3810071828");
         assert_eq!((page.items[0].file_size, page.items[0].tags.clone()), (1_048_576, vec!["Build 42".to_string()]));
+        assert_eq!((page.items[0].stars, page.items[0].votes), (4, 767));
         assert!(parse_browse("<html>maintenance</html>").is_err());
     }
 

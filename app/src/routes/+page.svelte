@@ -12,6 +12,7 @@
   import ServersSaves from "$lib/ServersSaves.svelte";
   import LayerIcon from "$lib/LayerIcon.svelte";
   import Links from "$lib/Links.svelte";
+  import Icon, { type IconName } from "$lib/Icon.svelte";
   import { bisectRound, findProblems, sortLoadOrder } from "$lib/order";
   import type { Finding, ModErrors, Overlap, Save, Stats } from "$lib/api";
 
@@ -117,7 +118,8 @@
     }
   };
   let theme = $state(pref("pzmm.theme", "system"));
-  let accent = $state(pref("pzmm.accent", "#d39b3a"));
+  const DEFAULT_ACCENT = "#fc2684"; // the PZMM logo's pink
+  let accent = $state([pref("pzmm.accent", DEFAULT_ACCENT)].map((a) => (a === "#d39b3a" ? DEFAULT_ACCENT : a))[0]);
   $effect(() => {
     const root = document.documentElement;
     if (theme === "system") delete root.dataset.theme;
@@ -214,6 +216,23 @@
         return rank(x) - rank(y) || name(x).localeCompare(name(y));
       });
   });
+
+  /** The icon for an activity line, from what it says. */
+  function logIcon(text: string, error: boolean): IconName {
+    const t = text.toLowerCase();
+    if (error || t.startsWith("error")) return "error";
+    if (t.startsWith("installed") || t.includes("downloaded") || t.startsWith("downloading")) return "download";
+    if (t.includes("restored")) return "rollback";
+    if (t.includes("update")) return "refresh";
+    if (t.startsWith("delete") || t.startsWith("remove") || t.includes("removed")) return "trash";
+    if (t.startsWith("switched")) return "swap";
+    if (t.includes("requires") || t.includes("found on the workshop") || t.startsWith("collection")) return "layers";
+    if (t.includes("copied a share code")) return "share";
+    if (t.startsWith("started")) return "server";
+    if (t.includes("up to date") || t.includes("set up") || t.startsWith("copied") || t.startsWith("imported") || t.startsWith("picked up")) return "check";
+    if (t.includes("couldn't") || t.includes("isn't") || t.includes("not ")) return "alert";
+    return "info";
+  }
 
   // --- actions ---
   function say(text: string, error = false) {
@@ -611,12 +630,14 @@
 
 <div class="app">
   <header class="top">
-    <div class="brand" aria-label="PZMM">PZMM</div>
+    <img class="brand" src="/brand/pzmm.png" alt="PZMM" width="44" height="44" />
 
     <div class="modes" role="radiogroup" aria-label="Game">
       {#each MODES as [m, label]}
         <button role="radio" aria-checked={view?.mode === m} class:active={(view?.mode ?? "zomboid") === m}
-          disabled={busy} onclick={() => planMode(m)}>{label}</button>
+          disabled={busy} onclick={() => planMode(m)} title={label}>
+          <img src={m === "zomboid" ? "/brand/project-zomboid.png" : "/brand/project-viewpoint.png"} alt={label} height="26" />
+        </button>
       {/each}
     </div>
 
@@ -636,11 +657,11 @@
             <option value={p}>{p}</option>
           {/each}
         </select>
-        <button class="quiet" onclick={() => (newProfile = "")} disabled={busy} title="New profile from the current one">New</button>
-        <button class="quiet" onclick={shareProfile} disabled={busy} title="Copy a code others can import">Share</button>
-        <button class="quiet" onclick={() => (importText = "")} disabled={busy} title="Import a profile from a share code">Import</button>
+        <button class="quiet" onclick={() => (newProfile = "")} disabled={busy} title="New profile from the current one"><Icon name="plus" size={14} />New</button>
+        <button class="quiet" onclick={shareProfile} disabled={busy} title="Copy a code others can import"><Icon name="share" size={14} />Share</button>
+        <button class="quiet" onclick={() => (importText = "")} disabled={busy} title="Import a profile from a share code"><Icon name="upload" size={14} />Import</button>
         {#if modeProfiles.length > 1}
-          <button class="quiet" onclick={deleteProfile} disabled={busy}>Delete</button>
+          <button class="quiet" onclick={deleteProfile} disabled={busy}><Icon name="trash" size={14} />Delete</button>
         {/if}
       {/if}
     </div>
@@ -649,18 +670,18 @@
       <label for="install" class="visually-hidden">Install a mod</label>
       <input id="install" type="text" bind:value={installText} autocomplete="off" spellcheck="false"
         placeholder="Paste a Workshop link, collection or ID, a GitHub repo (owner/repo), or a .zip path" />
-      <button class="primary" type="submit" disabled={busy || !installText.trim()}>Install</button>
+      <button class="primary" type="submit" disabled={busy || !installText.trim()}><Icon name="download" size={15} />Install</button>
     </form>
 
     <div class="right">
       {#if updates.size}
-        <button class="primary" onclick={() => updateMods([...updates])} disabled={busy}>Update {updates.size} {updates.size === 1 ? "mod" : "mods"}</button>
+        <button class="primary" onclick={() => updateMods([...updates])} disabled={busy}><Icon name="refresh" size={14} />Update {updates.size} {updates.size === 1 ? "mod" : "mods"}</button>
       {:else}
         <button onclick={() => { logOpen = true; run("Updating mods", api.updateAll).then(() => (updates = new Set())); }} disabled={busy}
-          title="Re-download every mod PZMM installed">Update all</button>
+          title="Re-download every mod PZMM installed"><Icon name="refresh" size={14} />Update all</button>
       {/if}
-      <button onclick={() => api.openUrl("steam://rungameid/108600")}>Launch game</button>
-      <button class="quiet" aria-expanded={settingsOpen} onclick={() => (settingsOpen = !settingsOpen)}>Settings</button>
+      <button onclick={() => api.openUrl("steam://rungameid/108600")}><Icon name="play" size={14} />Launch game</button>
+      <button class="quiet" aria-expanded={settingsOpen} onclick={() => (settingsOpen = !settingsOpen)}><Icon name="settings" size={15} />Settings</button>
     </div>
   </header>
 
@@ -805,11 +826,11 @@
     <span class="count">{enabledCount} enabled · {mods.size} mods</span>
     {#if missingReqs.size}
       <button class="primary" onclick={installMissing} disabled={busy}
-        title={`Find and install from the Workshop: ${[...missingReqs].join(", ")}`}>Install missing mods ({missingReqs.size})</button>
+        title={`Find and install from the Workshop: ${[...missingReqs].join(", ")}`}><Icon name="download" size={14} />Install missing mods ({missingReqs.size})</button>
     {/if}
     {#if fixable}
       <button class="primary" onclick={fixLoadOrder} disabled={busy}
-        title="Enable required mods and order mods by their require / loadModAfter / loadModBefore rules">Fix load order</button>
+        title="Enable required mods and order mods by their require / loadModAfter / loadModBefore rules"><Icon name="wand" size={14} />Fix load order</button>
     {/if}
     {#if picked.size >= 1}
       <span class="bulk" role="group" aria-label="Selected mods">
@@ -833,10 +854,12 @@
     {:else}
       <span class="spacer"></span>
     {/if}
-    <button class="quiet" onclick={checkSetup} disabled={busy} title="Check the profile and server configs for problems">Check setup</button>
-    <button class="quiet icon" onclick={undo} disabled={busy || !undoStack.length} title="Undo the last list change (Ctrl+Z)" aria-label="Undo">↶</button>
-    <button class="quiet icon" onclick={redo} disabled={busy || !redoStack.length} title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
-    <button class="quiet" onclick={addSeparator} disabled={busy || filtering} title="Add a separator above the selected mod">+ Separator</button>
+    <span class="tools">
+    <button class="quiet" onclick={checkSetup} disabled={busy} title="Check the profile and server configs for problems"><Icon name="pulse" size={14} />Check setup</button>
+    <button class="quiet icon" onclick={undo} disabled={busy || !undoStack.length} title="Undo the last list change (Ctrl+Z)" aria-label="Undo"><Icon name="undo" size={15} /></button>
+    <button class="quiet icon" onclick={redo} disabled={busy || !redoStack.length} title="Redo (Ctrl+Y)" aria-label="Redo"><Icon name="redo" size={15} /></button>
+    <button class="quiet" onclick={addSeparator} disabled={busy || filtering} title="Add a separator above the selected mod"><Icon name="plus" size={14} />Separator</button>
+    </span>
   </div>
 
   {#if bisect}
@@ -996,12 +1019,13 @@
     <button class="quiet bar" aria-expanded={logOpen} onclick={() => (logOpen = !logOpen)}>
       <span class="dot" class:busy aria-hidden="true"></span>
       <span class="label">{busy ? busyLabel + "…" : "Activity"}</span>
+      {#if log.length}<Icon name={logIcon(log.at(-1)!.text, log.at(-1)!.error)} size={13} />{/if}
       <span class="last">{log.at(-1)?.text ?? ""}</span>
     </button>
     {#if logOpen}
       <ol class="log mono" aria-live="polite">
         {#each log as l}
-          <li class:error={l.error}>{l.text}</li>
+          <li class:error={l.error}><Icon name={logIcon(l.text, l.error)} size={13} /><span>{l.text}</span></li>
         {:else}
           <li class="quiet-line">Installs, updates and errors show up here.</li>
         {/each}
@@ -1069,13 +1093,33 @@
     border: 0;
     border-radius: 0;
     background: transparent;
-    padding: 5px 10px;
+    padding: 4px 10px;
     color: var(--muted);
+  }
+  .modes img {
+    display: block;
+    height: 26px;
+    width: auto;
+    opacity: 0.45;
+    transition: opacity 0.15s;
+  }
+  .modes button:hover img {
+    opacity: 0.75;
   }
   .modes button.active {
     background: var(--accent-soft);
-    color: var(--accent-text);
-    font-weight: 700;
+  }
+  .modes button.active img {
+    opacity: 1;
+  }
+  /* the wordmarks are white: darken them on the light theme */
+  :global(:root[data-theme="light"]) .modes img {
+    filter: invert(1);
+  }
+  @media (prefers-color-scheme: light) {
+    :global(:root:not([data-theme="dark"])) .modes img {
+      filter: invert(1);
+    }
   }
   .mode-plan {
     padding: 10px 16px;
@@ -1180,14 +1224,9 @@
     flex-wrap: wrap;
   }
   .brand {
-    font-family: var(--font-mono);
-    font-weight: 400;
-    font-size: 15px;
-    letter-spacing: 0.18em;
-    padding: 3px 8px;
-    border: 1.5px solid var(--accent);
-    color: var(--accent-text);
-    border-radius: 4px;
+    width: 44px;
+    height: 44px;
+    margin: -6px 0;
   }
   .profile,
   .inline,
@@ -1384,6 +1423,12 @@
     margin-left: 10px;
     color: var(--muted);
   }
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+  }
   .icon {
     padding: 4px 8px;
     font-size: 16px;
@@ -1513,6 +1558,7 @@
   .bar {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 10px;
     width: 100%;
     padding: 7px 16px;
@@ -1552,8 +1598,18 @@
     overflow-y: auto;
   }
   .log li {
-    padding: 1px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 2px 0;
     overflow-wrap: anywhere;
+  }
+  .log li :global(.icon) {
+    margin-top: 3px;
+    color: var(--muted);
+  }
+  .log li.error :global(.icon) {
+    color: var(--danger);
   }
   .log .error {
     color: var(--danger);

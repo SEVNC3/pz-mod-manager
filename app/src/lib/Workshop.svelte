@@ -1,27 +1,31 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { api, type Browse } from "./api";
+  import { api, type Browse, type WorkshopItem } from "./api";
+  import Icon from "./Icon.svelte";
 
   let { busy, defaultBuild, onInstall, viewpoint = false }: {
     busy: boolean;
     defaultBuild: number | null;
     onInstall: (id: string) => Promise<boolean>;
-    /** Project Viewpoint mode: offer a shortcut to its add-ons. */
+    /** Project Viewpoint mode: offer its add-ons and community. */
     viewpoint?: boolean;
   } = $props();
 
   const SORTS = [
-    ["trend", "Popular this week"],
     ["totaluniquesubscribers", "Most subscribed"],
     ["toprated", "Top rated"],
+    ["trend", "Popular this week"],
     ["mostrecent", "Newest"],
     ["lastupdated", "Recently updated"],
   ];
   const PER_PAGE = 30;
+  const VIEWPOINT_DISCORD = "https://discord.gg/g83XvPhEgQ";
 
+  /** "hot": this week's most popular, ranked. "browse": search and every sort. */
+  let mode = $state<"hot" | "browse">("hot");
   let query = $state("");
   let search = $state("");
-  let sort = $state("trend");
+  let sort = $state("totaluniquesubscribers");
   // svelte-ignore state_referenced_locally
   let build = $state(String(defaultBuild ?? 42));
   let page = $state(1);
@@ -36,7 +40,9 @@
     loading = true;
     error = "";
     try {
-      const r = await api.browse(search, sort, page, build ? Number(build) : null);
+      const r = mode === "hot"
+        ? await api.browse("", "trend", 1, build ? Number(build) : null)
+        : await api.browse(search, sort, page, build ? Number(build) : null);
       if (mine === seq) data = r;
     } catch (e) {
       if (mine === seq) error = String(e);
@@ -45,9 +51,16 @@
     }
   }
 
+  function show(m: "hot" | "browse") {
+    mode = m;
+    page = 1;
+    load();
+  }
+
   function submit(e: Event) {
     e.preventDefault();
     search = query.trim();
+    mode = "browse";
     page = 1;
     load();
   }
@@ -65,6 +78,7 @@
     if (ok && data) data.items = data.items.map((i) => (i.id === id ? { ...i, have: true } : i));
   }
 
+  const steamPage = (it: WorkshopItem) => api.openUrl(`https://steamcommunity.com/sharedfiles/filedetails/?id=${it.id}`);
   const pages = $derived(data ? Math.max(1, Math.ceil(data.total / PER_PAGE)) : 1);
   const compact = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
   const date = (t: number) => new Date(t * 1000).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
@@ -74,31 +88,59 @@
   onMount(load);
 </script>
 
+{#snippet stars(it: WorkshopItem)}
+  {#if it.votes > 0}
+    <span class="stars" title={`${it.stars} of 5 stars from ${it.votes.toLocaleString()} votes`}>
+      {#each [1, 2, 3, 4, 5] as n}<span class:lit={n <= it.stars}><Icon name="star" size={12} fill /></span>{/each}
+      <span class="votes">{compact.format(it.votes)}</span>
+    </span>
+  {/if}
+{/snippet}
+
+{#snippet installButton(it: WorkshopItem)}
+  {#if it.have}
+    <span class="have"><Icon name="check" size={14} /> Installed</span>
+  {:else}
+    <button class="primary" disabled={busy || installing !== null} onclick={() => install(it.id)}>
+      <Icon name="download" size={14} />{installing === it.id ? "Installing…" : "Install"}
+    </button>
+  {/if}
+{/snippet}
+
 <section class="workshop" aria-label="Steam Workshop">
   <form class="bar" onsubmit={submit}>
+    <div class="views" role="tablist" aria-label="Workshop view">
+      <button type="button" role="tab" aria-selected={mode === "hot"} class:active={mode === "hot"} onclick={() => show("hot")}>
+        <Icon name="flame" size={15} /> What's hot
+      </button>
+      <button type="button" role="tab" aria-selected={mode === "browse"} class:active={mode === "browse"} onclick={() => show("browse")}>
+        <Icon name="search" size={15} /> Browse
+      </button>
+    </div>
     <input type="search" bind:value={query} placeholder="Search the Steam Workshop" aria-label="Search the Steam Workshop" />
-    <button type="submit">Search</button>
-    {#if search}
+    <button type="submit"><Icon name="search" size={14} /> Search</button>
+    {#if mode === "browse" && search}
       <button type="button" class="quiet" onclick={() => { query = search = ""; page = 1; load(); }}>Clear search</button>
-    {:else}
-      <label>Sort
-        <select bind:value={sort} onchange={() => go(1)}>
-          {#each SORTS as [v, label]}<option value={v}>{label}</option>{/each}
-        </select>
-      </label>
-    {/if}
-    {#if viewpoint && search !== "Project Viewpoint"}
-      <button type="button" onclick={() => { query = search = "Project Viewpoint"; page = 1; load(); }}>Viewpoint add-ons</button>
-    {/if}
-    <label>Game
-      <select bind:value={build} onchange={() => go(1)}>
-        <option value="42">Build 42</option>
-        <option value="41">Build 41</option>
-        <option value="">Any build</option>
+    {:else if mode === "browse"}
+      <select bind:value={sort} onchange={() => go(1)} aria-label="Sort">
+        {#each SORTS as [v, label]}<option value={v}>{label}</option>{/each}
       </select>
-    </label>
+    {/if}
+    <select bind:value={build} onchange={() => go(1)} aria-label="Game build">
+      <option value="42">Build 42</option>
+      <option value="41">Build 41</option>
+      <option value="">Any build</option>
+    </select>
+    {#if viewpoint}
+      <button type="button" onclick={() => { query = search = "Project Viewpoint"; mode = "browse"; page = 1; load(); }}>
+        <Icon name="layers" size={14} /> Viewpoint add-ons
+      </button>
+      <button type="button" class="quiet" onclick={() => api.openUrl(VIEWPOINT_DISCORD)} title="Project Viewpoint's community Discord: help, bug reports, news">
+        <Icon name="message" size={14} /> Viewpoint Discord
+      </button>
+    {/if}
     <span class="count">
-      {#if loading}Loading…{:else if data}{compact.format(data.total)} {search ? `results for "${search}"` : "mods"}{/if}
+      {#if loading}Loading…{:else if data && mode === "browse"}{compact.format(data.total)} {search ? `results for "${search}"` : "mods"}{:else if data}Most popular this week{/if}
     </span>
   </form>
 
@@ -106,21 +148,46 @@
     {#if error}
       <div class="message">
         <p>Couldn't reach the Steam Workshop: {error}</p>
-        <button onclick={load}>Try again</button>
+        <button onclick={load}><Icon name="refresh" size={14} /> Try again</button>
       </div>
     {:else if data && data.items.length === 0 && !loading}
       <div class="message"><p>No mods match{search ? ` "${search}"` : ""}. Try fewer words or another build.</p></div>
+    {:else if data && mode === "hot"}
+      <ol class="hot" class:dim={loading}>
+        {#each data.items as it, i (it.id)}
+          <li>
+            <span class="rank" class:top={i < 3}>{i + 1}</span>
+            <button class="hot-thumb" onclick={() => steamPage(it)} aria-label={`Open ${it.title} on Steam`}>
+              {#if it.preview_url}<img src={it.preview_url} alt="" loading="lazy" />{/if}
+            </button>
+            <div class="hot-body">
+              <h3 title={it.title}>{it.title}</h3>
+              <p class="meta">
+                {@render stars(it)}
+                <span>{compact.format(it.subscriptions)} subscribers</span>
+                <span>Updated {date(it.time_updated)}</span>
+                {#each builds(it.tags) as b}<span class="tag">{b}</span>{/each}
+              </p>
+              {#if it.description}<p class="desc one">{plain(it.description)}</p>{/if}
+            </div>
+            <div class="hot-actions">
+              {@render installButton(it)}
+              <button class="quiet" onclick={() => steamPage(it)} title="Open on Steam"><Icon name="steam" size={15} /> Steam</button>
+            </div>
+          </li>
+        {/each}
+      </ol>
     {:else if data}
       <ul class="grid" class:dim={loading}>
         {#each data.items as it (it.id)}
           <li class="card">
-            <button class="thumb" onclick={() => api.openUrl(`https://steamcommunity.com/sharedfiles/filedetails/?id=${it.id}`)}
-              aria-label={`Open ${it.title} on Steam`}>
+            <button class="thumb" onclick={() => steamPage(it)} aria-label={`Open ${it.title} on Steam`}>
               {#if it.preview_url}<img src={it.preview_url} alt="" loading="lazy" />{/if}
             </button>
             <div class="body">
               <h3 title={it.title}>{it.title}</h3>
               <p class="meta">
+                {@render stars(it)}
                 <span>{compact.format(it.subscriptions)} subscribers</span>
                 <span>Updated {date(it.time_updated)}</span>
                 {#each builds(it.tags) as b}<span class="tag">{b}</span>{/each}
@@ -131,14 +198,8 @@
               {/if}
             </div>
             <div class="actions">
-              {#if it.have}
-                <span class="have">✓ Installed</span>
-              {:else}
-                <button class="primary" disabled={busy || installing !== null} onclick={() => install(it.id)}>
-                  {installing === it.id ? "Installing…" : "Install"}
-                </button>
-              {/if}
-              <button class="quiet" onclick={() => api.openUrl(`https://steamcommunity.com/sharedfiles/filedetails/?id=${it.id}`)}>Steam page</button>
+              {@render installButton(it)}
+              <button class="quiet" onclick={() => steamPage(it)}><Icon name="steam" size={15} /> Steam page</button>
             </div>
           </li>
         {/each}
@@ -162,18 +223,30 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 8px;
     padding: 8px 16px;
     border-bottom: 1px solid var(--line);
   }
   .bar input[type="search"] {
-    width: 280px;
+    width: 240px;
   }
-  .bar label {
+  .views {
     display: flex;
-    gap: 8px;
-    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-right: 6px;
+  }
+  .views button {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
     color: var(--muted);
+  }
+  .views button.active {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-weight: 700;
   }
   .count {
     margin-left: auto;
@@ -184,6 +257,61 @@
     min-height: 0;
     padding: 16px;
   }
+  .dim {
+    opacity: 0.5;
+  }
+
+  /* What's hot: a ranked list */
+  .hot {
+    list-style: none;
+    margin: 0 auto;
+    padding: 0;
+    max-width: 1100px;
+  }
+  .hot li {
+    display: grid;
+    grid-template-columns: 44px 112px 1fr auto;
+    gap: 14px;
+    align-items: center;
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  .rank {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    text-align: right;
+    color: var(--muted);
+  }
+  .rank.top {
+    color: var(--accent-text);
+    font-weight: 700;
+  }
+  .hot-thumb {
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    width: 112px;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    background: var(--raised);
+  }
+  .hot-thumb img,
+  .thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .hot-body {
+    min-width: 0;
+  }
+  .hot-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  /* Browse: a card grid */
   .grid {
     list-style: none;
     margin: 0;
@@ -191,9 +319,6 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 14px;
-  }
-  .grid.dim {
-    opacity: 0.5;
   }
   .card {
     display: flex;
@@ -210,12 +335,6 @@
     aspect-ratio: 16 / 10;
     background: var(--raised);
     overflow: hidden;
-  }
-  .thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
   }
   .body {
     padding: 10px 12px 4px;
@@ -234,9 +353,23 @@
   .meta {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 4px 10px;
     margin: 0 0 6px;
     font-size: 12px;
+    color: var(--muted);
+  }
+  .stars {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    color: var(--line);
+  }
+  .stars .lit {
+    color: var(--accent);
+  }
+  .votes {
+    margin-left: 4px;
     color: var(--muted);
   }
   .tag {
@@ -253,6 +386,10 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+  .desc.one {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+  }
   .needs {
     margin: 6px 0 0;
     font-size: 12px;
@@ -265,6 +402,9 @@
     padding: 8px 12px 12px;
   }
   .have {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     color: var(--accent-text);
     font-weight: 700;
   }

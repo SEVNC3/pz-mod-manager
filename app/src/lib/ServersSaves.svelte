@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { api, type ServersAndSaves } from "./api";
+  import Icon from "./Icon.svelte";
 
   let { busy, profile, enabledIds, onImport, onUseSave }: {
     busy: boolean;
@@ -85,8 +86,8 @@
           <li>
             <span class="name mono">{s}.ini</span>
             <span class="btns">
-              <button disabled={busy} onclick={() => start(s)} title="Start this dedicated server">Start server</button>
-              <button disabled={busy} onclick={async () => { if (await onImport(s)) refresh(); }}>Use as profile</button>
+              <button disabled={busy} onclick={() => start(s)} title="Start this dedicated server"><Icon name="server" size={14} />Start server</button>
+              <button disabled={busy} onclick={async () => { if (await onImport(s)) refresh(); }}><Icon name="upload" size={14} />Use as profile</button>
             </span>
           </li>
         {/each}
@@ -107,7 +108,7 @@
               <strong>{s.name}</strong>
               <span class="hint">{s.mode} · {s.mods.length} mods · played {when(s.modified)} · {diff(s.mods)}</span>
             </span>
-            <button disabled={busy} onclick={() => onUseSave(s.mode, s.name)}>Use this save's mods</button>
+            <button disabled={busy} onclick={() => onUseSave(s.mode, s.name)}><Icon name="swap" size={14} />Use this save's mods</button>
           </li>
         {/each}
       </ul>

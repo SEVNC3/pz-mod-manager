@@ -1,16 +1,17 @@
-/* PZMM tokens. Dark = "safehouse at night", light = "daylight". The accent is user-chosen
+/* PZMM tokens. Dark = charcoal, light = "daylight". The accent is user-chosen
    (set as --accent on <html>); everything else derives from it with color-mix(). */
 :root {
-  --bg: #1b2124;
-  --panel: #222a2e;
-  --raised: #2a3337;
-  --line: #354044;
-  --text: #e1e5df;
-  --muted: #93a09a;
-  --danger: #e06a57;
+  /* charcoal: neutral blacks and greys, so the amber accent and mod art carry the colour */
+  --bg: #121212;
+  --panel: #1a1a1a;
+  --raised: #242424;
+  --line: #2e2e2e;
+  --text: #e8e8e6;
+  --muted: #9b9b97;
+  --danger: #e5604f;
   --tape: #e6d8ad;
   --tape-ink: #2a2823;
-  --accent: #d39b3a;
+  --accent: #fc2684;
   --accent-soft: color-mix(in oklab, var(--accent) 18%, transparent);
   --accent-text: color-mix(in oklab, var(--accent) 85%, white);
   --focus: color-mix(in oklab, var(--accent) 80%, white);
@@ -77,6 +78,10 @@ select {
 }
 
 button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   cursor: pointer;
   border: 1px solid var(--line);
   background: var(--raised);

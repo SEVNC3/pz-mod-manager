@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api, zbReady, type ZbStatus } from "./api";
+  import Icon from "./Icon.svelte";
 
   let { status, profile, busy, onSetup, onRemove }: {
     status: ZbStatus | null;
@@ -95,9 +96,9 @@
             </button>
           {/if}
           {#if installedAny}
-            <button class="danger" onclick={() => preview(true)} disabled={busy}>Remove from game folder</button>
+            <button class="danger" onclick={() => preview(true)} disabled={busy}><Icon name="trash" size={14} />Remove from game folder</button>
           {/if}
-          <button class="quiet" onclick={() => api.openUrl("https://github.com/zed-0xff/ZombieBuddy")}>About ZombieBuddy</button>
+          <button class="quiet" onclick={() => api.openUrl("https://github.com/zed-0xff/ZombieBuddy")}><Icon name="external" size={14} />About ZombieBuddy</button>
         </div>
       {/if}
       {#if error}<p class="error">{error}</p>{/if}
