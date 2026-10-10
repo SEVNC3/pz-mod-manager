@@ -115,9 +115,9 @@ This merges their findings. Each item names its source. Work top to bottom; P0 a
 54. [ ] **Saved in the config folder**, not the data folder (`%APPDATA%\pzmm\settings.json`), read by the core so the app and CLI agree. Order of precedence: environment variable, then the setting, then autodetect. Bad or missing paths show in Check setup.
 55. [ ] **Downloads and updates**: check mod updates on start and every few hours while open (off / on start / 1 h / 3 h), then notify or install automatically; check app updates on start; open Workshop links in the Steam client or browser; Redownload all; and a GitHub token for rate limits (stored in the OS credential store, never in the file).
 56. [ ] **Removing and backups**: removed mods go to the Recycle Bin or are deleted; when removing a mod, also remove required mods nothing else uses (ask / always / never); backups kept per mod, a total size cap (oldest pruned first), and the current backup size with **Clear backups**.
-56a. [ ] **Appearance**: theme, accent and default game build (moved from the header strip), compact rows, show mod IDs beside names, the Workshop's default view and results per page, and the window size and position remembered.
-57. [ ] **Launch**: extra game arguments (`-debug`, `-nosteam`) and autosort on first run of a new profile.
-58. [ ] **About**: version, check for updates, the GitHub, Discord and Ko-fi links, Open log folder, and **Copy diagnostics** (version, folders, profile, mod count and Check setup results, with your user name masked) for bug reports.
+57. [ ] **Appearance**: theme, accent and default game build (moved from the header strip), compact rows, show mod IDs beside names, the Workshop's default view and results per page, and the window size and position remembered.
+58. [ ] **Launch**: extra game arguments (`-debug`, `-nosteam`) and autosort on first run of a new profile.
+59. [ ] **About**: version, check for updates, the GitHub, Discord and Ko-fi links, Open log folder, and **Copy diagnostics** (version, folders, profile, mod count and Check setup results, with your user name masked) for bug reports.
 
 ## Lower-priority core fixes (1.1.x)
 
