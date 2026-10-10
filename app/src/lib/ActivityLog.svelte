@@ -1,27 +1,28 @@
 <script lang="ts">
+  import { t } from "./i18n.svelte";
   import Icon, { type IconName } from "./Icon.svelte";
 
   let { log, busy, busyLabel, open = $bindable() }: {
-    log: { text: string; error: boolean }[];
+    log: { text: string; en: string; error: boolean }[];
     busy: boolean;
     busyLabel: string;
     open: boolean;
   } = $props();
 
-  /** The icon for an activity line, from what it says. */
+  /** The icon for an activity line, from what it says (in English: `en`, so it works in every language). */
   function logIcon(text: string, error: boolean): IconName {
     const t = text.toLowerCase();
-    if (error || t.startsWith("error")) return "error";
-    if (t.startsWith("installed") || t.includes("downloaded") || t.startsWith("downloading")) return "download";
-    if (t.includes("restored")) return "rollback";
-    if (t.includes("update")) return "refresh";
-    if (t.startsWith("delete") || t.startsWith("remove") || t.includes("removed")) return "trash";
-    if (t.startsWith("switched")) return "swap";
-    if (t.includes("requires") || t.includes("found on the workshop") || t.startsWith("collection")) return "layers";
-    if (t.includes("copied a share code")) return "share";
-    if (t.startsWith("started")) return "server";
-    if (t.includes("up to date") || t.includes("set up") || t.startsWith("copied") || t.startsWith("imported") || t.startsWith("picked up")) return "check";
-    if (t.includes("couldn't") || t.includes("isn't") || t.includes("not ")) return "alert";
+    if (error || t.startsWith("error")) return "error"; // i18n-ignore
+    if (t.startsWith("installed") || t.includes("downloaded") || t.startsWith("downloading")) return "download"; // i18n-ignore
+    if (t.includes("restored")) return "rollback"; // i18n-ignore
+    if (t.includes("update")) return "refresh"; // i18n-ignore
+    if (t.startsWith("delete") || t.startsWith("remove") || t.includes("removed")) return "trash"; // i18n-ignore
+    if (t.startsWith("switched")) return "swap"; // i18n-ignore
+    if (t.includes("requires") || t.includes("found on the workshop") || t.startsWith("collection")) return "layers"; // i18n-ignore
+    if (t.includes("copied a share code")) return "share"; // i18n-ignore
+    if (t.startsWith("started")) return "server"; // i18n-ignore
+    if (t.includes("up to date") || t.includes("set up") || t.startsWith("copied") || t.startsWith("imported") || t.startsWith("picked up")) return "check"; // i18n-ignore
+    if (t.includes("couldn't") || t.includes("isn't") || t.includes("not ")) return "alert"; // i18n-ignore
     return "info";
   }
 </script>
@@ -29,16 +30,16 @@
 <footer class="activity" class:open>
   <button class="quiet bar" aria-expanded={open} onclick={() => (open = !open)}>
     <span class="dot" class:busy aria-hidden="true"></span>
-    <span class="label">{busy ? busyLabel + "…" : "Activity"}</span>
-    {#if log.length}<Icon name={logIcon(log.at(-1)!.text, log.at(-1)!.error)} size={12} />{/if}
+    <span class="label">{busy ? busyLabel + "…" : t("activity.title")}</span>
+    {#if log.length}<Icon name={logIcon(log.at(-1)!.en, log.at(-1)!.error)} size={12} />{/if}
     <span class="last">{log.at(-1)?.text ?? ""}</span>
   </button>
   {#if open}
     <ol class="log mono" aria-live="polite">
       {#each log as l}
-        <li class:error={l.error}><Icon name={logIcon(l.text, l.error)} size={12} /><span>{l.text}</span></li>
+        <li class:error={l.error}><Icon name={logIcon(l.en, l.error)} size={12} /><span>{l.text}</span></li>
       {:else}
-        <li class="quiet-line">Installs, updates and errors show up here.</li>
+        <li class="quiet-line">{t("activity.empty")}</li>
       {/each}
     </ol>
   {/if}

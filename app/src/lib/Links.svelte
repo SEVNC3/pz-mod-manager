@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api } from "./api";
+  import { t } from "./i18n.svelte";
 
   // An empty url shows the icon as a disabled "coming soon" stub.
   const LINKS = {
@@ -10,16 +11,16 @@
 
   // Each brand's own logo (static/brand/*.png, downloaded once from logo.dev).
   const ICONS = [
-    { key: "github", label: "PZMM on GitHub: source, issues and releases" },
-    { key: "discord", label: "Join the PZMM Discord" },
-    { key: "kofi", label: "Support PZMM on Ko-fi" },
+    { key: "github", label: "links.github" },
+    { key: "discord", label: "links.discord" },
+    { key: "kofi", label: "links.kofi" },
   ] as const;
 </script>
 
-<nav class="links" aria-label="PZMM links">
+<nav class="links" aria-label={t("links.label")}>
   {#each ICONS as icon (icon.key)}
     {@const url = LINKS[icon.key]}
-    {@const label = url ? icon.label : `${icon.label} (coming soon)`}
+    {@const label = url ? t(icon.label) : t("links.comingSoon", { label: t(icon.label) })}
     <button class="quiet" title={label} aria-label={label}
       disabled={!url} onclick={() => api.openUrl(url)}>
       <img src={`/brand/${icon.key}.png`} alt="" width="20" height="20" />

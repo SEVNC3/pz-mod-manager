@@ -1,7 +1,8 @@
 <script lang="ts">
   import LayerIcon from "./LayerIcon.svelte";
   import Icon from "./Icon.svelte";
-  import { workshopUrl } from "./format";
+  import { fmtNum, workshopUrl } from "./format";
+  import { t } from "./i18n.svelte";
   import { api, describeSource, type Candidate, type Conflict, type ModDetails, type ModRow } from "./api";
 
   let {
@@ -87,21 +88,21 @@
   );
   const facts = $derived(
     [
-      ["Author", d?.info.author],
-      ["Mod version", d?.info.modversion],
-      ["Needs game version", d?.info.versionMin ? `${d.info.versionMin} or newer` : undefined],
+      [t("details.author"), d?.info.author],
+      [t("details.modVersion"), d?.info.modversion],
+      [t("details.needsGameVersion"), d?.info.versionMin ? t("details.versionOrNewer", { version: d.info.versionMin }) : undefined],
     ].filter((f): f is [string, string] => !!f[1]),
   );
 </script>
 
-<aside class="details" aria-label="Mod details">
-  <button class="quiet icon close" onclick={onClose} title="Close (Esc) to see the load order" aria-label="Close details"><Icon name="x" size={16} /></button>
+<aside class="details" aria-label={t("details.label")}>
+  <button class="quiet icon close" onclick={onClose} title={t("details.closeTip")} aria-label={t("details.closeLabel")}><Icon name="x" size={16} /></button>
   {#if row?.missing}
     <h2>{id}</h2>
     <p class="warn">
-      This mod is enabled in your profile but isn't installed. Install it, subscribe to it in Steam, or disable it.
+      {t("details.missingWarn")}
     </p>
-    <button onclick={() => onToggle(id)} disabled={busy}><Icon name="x" size={14} />Disable</button>
+    <button onclick={() => onToggle(id)} disabled={busy}><Icon name="x" size={14} />{t("common.disable")}</button>
   {:else if d}
     {#if poster}
       <img class="poster" src={poster} alt="" />
@@ -111,16 +112,16 @@
 
     <div class="actions">
       <button class={row?.on ? "" : "primary"} onclick={() => onToggle(id)} disabled={busy}>
-        <Icon name={row?.on ? "x" : "check"} size={14} />{row?.on ? "Disable" : "Enable"}
+        <Icon name={row?.on ? "x" : "check"} size={14} />{t(row?.on ? "common.disable" : "common.enable")}
       </button>
-      <button onclick={() => api.openPath(d!.dir)}><Icon name="folder" size={14} />Show files</button>
+      <button onclick={() => api.openPath(d!.dir)}><Icon name="folder" size={14} />{t("details.showFiles")}</button>
       {#if source.url}
-        <button onclick={() => api.openUrl(source.url!)}><Icon name={source.label === "GitHub" ? "external" : "steam"} size={14} />{source.label === "GitHub" ? "GitHub" : "Workshop"} page</button>
+        <button onclick={() => api.openUrl(source.url!)}><Icon name={source.label === "GitHub" ? "external" : "steam"} size={14} />{t(source.label === "GitHub" ? "details.githubPage" : "details.workshopPage")}</button>
       {/if}
     </div>
 
     <dl>
-      <dt>Source</dt>
+      <dt>{t("details.source")}</dt>
       <dd>{source.label}{#if d.source.startsWith("local:")}<span class="mono path">{d.source.slice(6)}</span>{/if}</dd>
       {#each facts as [k, v]}
         <dt>{k}</dt>
@@ -130,13 +131,13 @@
 
     {#if hasUpdate && d.ours}
       <div class="update">
-        <span>A newer version is on the Workshop.</span>
-        <button class="primary" onclick={() => onUpdate(id)} disabled={busy}><Icon name="refresh" size={14} />Update now</button>
+        <span>{t("details.newerVersion")}</span>
+        <button class="primary" onclick={() => onUpdate(id)} disabled={busy}><Icon name="refresh" size={14} />{t("details.updateNow")}</button>
       </div>
     {/if}
 
     {#if requires.length}
-      <h3>Requires</h3>
+      <h3>{t("details.requires")}</h3>
       <ul class="requires">
         {#each requires as r}
           {@const m = mods.get(r)}
@@ -144,33 +145,33 @@
             <span class="req">
               <button class="quiet link mono" onclick={() => m && onSelect(r)} disabled={!m}>{r}</button>
               {#if m}
-                <span class={m.on ? "ok" : "bad"}>{m.on ? "enabled" : "disabled"}</span>
+                <span class={m.on ? "ok" : "bad"}>{t(m.on ? "details.reqEnabled" : "details.reqDisabled")}</span>
               {:else}
-                <span class="bad">not installed</span>
+                <span class="bad">{t("details.reqMissing")}</span>
                 {#if !found[r]}<button class="find" onclick={() => download(r)} disabled={busy}
-                  title="Find it on the Steam Workshop and install it"><Icon name="download" size={12} />Install</button>{/if}
+                  title={t("details.findTip")}><Icon name="download" size={12} />{t("common.install")}</button>{/if}
               {/if}
             </span>
             {#if !m && found[r] === "loading"}
-              <p class="hint">Looking for {r} on the Workshop…</p>
+              <p class="hint">{t("details.looking", { id: r })}</p>
             {:else if !m && typeof found[r] === "string"}
               <p class="bad">{found[r]}</p>
             {:else if !m && Array.isArray(found[r])}
               {@const list = found[r] as Candidate[]}
               {#if list.length === 0}
-                <p class="hint">Nothing on the Workshop matches {r}.</p>
+                <p class="hint">{t("details.noMatch", { id: r })}</p>
               {:else}
-                <p class="hint">No result is clearly {r}. Pick the right one:</p>
+                <p class="hint">{t("details.pickOne", { id: r })}</p>
                 <ul class="cands">
                   {#each list.slice(0, 5) as c (c.id)}
                     <li class:best={c.confirmed && c.fits_build}>
                       <span>
                         <button class="quiet link" onclick={() => api.openUrl(workshopUrl(c.id))}>{c.title}</button>
                         <span class="hint">
-                          {c.subscriptions.toLocaleString()} subscribers{c.confirmed ? " · Mod ID matches" : ""}{c.required_by_author ? " · listed by the author" : ""}{c.fits_build ? "" : " · not tagged for your game build"}
+                          {t("details.subscribers", { count: c.subscriptions, n: fmtNum(c.subscriptions) })}{c.confirmed ? ` · ${t("details.idMatches")}` : ""}{c.required_by_author ? ` · ${t("details.listedByAuthor")}` : ""}{c.fits_build ? "" : ` · ${t("details.notTaggedForBuild")}`}
                         </span>
                       </span>
-                      <button class={c.confirmed && c.fits_build ? "primary" : ""} disabled={busy} onclick={() => onInstallWorkshop(c.id)}><Icon name="download" size={14} />Install</button>
+                      <button class={c.confirmed && c.fits_build ? "primary" : ""} disabled={busy} onclick={() => onInstallWorkshop(c.id)}><Icon name="download" size={14} />{t("common.install")}</button>
                     </li>
                   {/each}
                 </ul>
@@ -182,39 +183,39 @@
     {/if}
 
     {#if conflicts.length}
-      <h3>Shared files</h3>
+      <h3>{t("details.sharedFiles")}</h3>
       <ul class="conflicts">
         {#each conflicts as c}
           <li title={c.examples.join(", ")}>
             <span class="who">
-              <LayerIcon wins={c.wins} loses={!c.wins} label={c.wins ? `This mod's copies win over ${c.other}` : `${c.other}'s copies win`} />
+              <LayerIcon wins={c.wins} loses={!c.wins} label={c.wins ? t("details.winsOver", { other: c.other }) : t("details.othersWin", { other: c.other })} />
               <span class="mono">{c.other}</span>
             </span>
             <span class={c.wins ? "ok" : "bad"}>
-              {c.files} {c.files === 1 ? "file" : "files"}, {c.wins ? "this mod's copies win" : `${c.other}'s copies win`}
+              {c.wins ? t("details.filesWin", { count: c.files }) : t("details.filesLose", { count: c.files, other: c.other })}
             </span>
           </li>
         {/each}
       </ul>
-      <p class="note small">The mod lower in the load order wins. Drag it in the load order (close this panel) to change which one's files are used.</p>
+      <p class="note small">{t("details.lowerWins")}</p>
     {/if}
 
     {#if description}
-      <h3>Description</h3>
+      <h3>{t("details.description")}</h3>
       <p class="desc">{description}</p>
     {/if}
 
     {#if d.ours}
       <div class="actions owned">
         {#if d.has_backup}
-          <button onclick={() => onRollback(id)} disabled={busy}><Icon name="rollback" size={14} />Restore previous version</button>
+          <button onclick={() => onRollback(id)} disabled={busy}><Icon name="rollback" size={14} />{t("details.restore")}</button>
         {/if}
-        <button class="danger" onclick={() => onRemove(id)} disabled={busy}><Icon name="trash" size={14} />Remove</button>
+        <button class="danger" onclick={() => onRemove(id)} disabled={busy}><Icon name="trash" size={14} />{t("common.remove")}</button>
       </div>
     {:else if d.source.startsWith("steam:")}
-      <p class="note">This mod comes from your Steam subscriptions. Unsubscribe in Steam to remove it.</p>
+      <p class="note">{t("details.steamNote")}</p>
       {#if source.url}
-        <button onclick={() => api.openUrl(source.url!)}><Icon name="steam" size={14} />Unsubscribe on the Workshop page</button>
+        <button onclick={() => api.openUrl(source.url!)}><Icon name="steam" size={14} />{t("details.unsubscribe")}</button>
       {/if}
     {/if}
   {/if}

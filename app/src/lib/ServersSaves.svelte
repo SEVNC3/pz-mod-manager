@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { api, type ServersAndSaves } from "./api";
+  import { fmtDateTime } from "./format";
+  import { t, th } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
   import MapOrder from "./MapOrder.svelte";
 
@@ -56,88 +58,89 @@
     const theirs = new Set(mods);
     const extra = mods.filter((m) => !mine.has(m)).length;
     const lacking = enabledIds.filter((m) => !theirs.has(m)).length;
-    if (!extra && !lacking) return "Same mods as your current profile";
-    return [extra && `${extra} not in your profile`, lacking && `${lacking} of yours not in it`].filter(Boolean).join(" · ");
+    if (!extra && !lacking) return t("servers.sameMods");
+    return [extra && t("servers.notInProfile", { count: extra }), lacking && t("servers.notInTheirs", { count: lacking })].filter(Boolean).join(" · ");
   }
 
   async function start(name: string) {
     error = "";
     try {
-      notes = [`Started the ${name} server with ${await api.serverStart(name)}. Its console window shows progress.`];
+      notes = [t("servers.started", { name, how: await api.serverStart(name) })];
     } catch (e) {
       error = String(e);
     }
   }
 
-  const when = (t: number) => new Date(t * 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  const when = (time: number) => fmtDateTime(time);
 
   onMount(refresh);
 </script>
 
-<section class="ss blueprint" aria-label="Servers and saves">
+<section class="ss blueprint" aria-label={t("servers.label")}>
   <div class="inner">
   <div class="card">
-    <h2>Dedicated server</h2>
+    <h2>{t("servers.title")}</h2>
     <p class="lede">
-      Send the "{profile}" profile to a server config, so the server loads the same mods in the same order. It sets
-      <span class="mono">Mods=</span>, <span class="mono">WorkshopItems=</span> and, when your mods add maps,
-      <span class="mono">Map=</span>. All other settings are kept.
+      {@html th("servers.lede", { profile })}
     </p>
     <form class="row" onsubmit={exportTo}>
-      <label for="srv">Server config</label>
+      <label for="srv">{t("servers.config")}</label>
       {#if data?.servers.length}
         <select id="srv" bind:value={picked}>
+          <!-- i18n-ignore: file names -->
           {#each data.servers as s}<option value={s}>{s}.ini</option>{/each}
-          <option value={NEW}>New config…</option>
+          <option value={NEW}>{t("servers.newConfig")}</option>
         </select>
       {/if}
       {#if picked === NEW || !data?.servers.length}
-        <input type="text" bind:value={newName} spellcheck="false" aria-label="New server config name" placeholder="servertest" />
+        <!-- i18n-ignore: file name -->
+        <input type="text" bind:value={newName} spellcheck="false" aria-label={t("servers.newNameLabel")} placeholder="servertest" />
       {/if}
-      <button class="primary" type="submit" disabled={busy || !target.trim()}><Icon name="upload" size={14} />Write to {target.trim() || "…"}.ini</button>
+      <button class="primary" type="submit" disabled={busy || !target.trim()}><Icon name="upload" size={14} />{t("servers.writeTo", { name: target.trim() || "…" })}</button>
     </form>
     {#if maps.length}
-      <h3>Map order</h3>
-      <p class="hint">The server loads maps top to bottom: mod maps go before <span class="mono">Muldraugh, KY</span>. Drag or Alt+↑/↓ to arrange; Write saves it.</p>
+      <h3>{t("servers.mapOrder")}</h3>
+      <p class="hint">{@html th("servers.mapOrderHint")}</p>
       <MapOrder bind:maps />
     {/if}
     {#if notes.length}<ul class="notes">{#each notes as n}<li>{n}</li>{/each}</ul>{/if}
     {#if error}<p class="error">{error}</p>{/if}
 
     {#if data?.servers.length}
-      <h3>Join a server's setup</h3>
-      <p class="hint">Make a profile from a server config: missing Workshop mods are installed and the mod order is copied.</p>
+      <h3>{t("servers.join")}</h3>
+      <p class="hint">{t("servers.joinHint")}</p>
       <ul class="list">
         {#each data.servers as s}
           <li>
+            <!-- i18n-ignore: file name -->
             <span class="name mono">{s}.ini</span>
             <span class="btns">
-              <button disabled={busy} onclick={() => start(s)} title="Start this dedicated server"><Icon name="server" size={14} />Start server</button>
-              <button disabled={busy} onclick={async () => { if (await onImport(s)) refresh(); }}><Icon name="upload" size={14} />Use as profile</button>
+              <button disabled={busy} onclick={() => start(s)} title={t("servers.startTip")}><Icon name="server" size={14} />{t("servers.start")}</button>
+              <button disabled={busy} onclick={async () => { if (await onImport(s)) refresh(); }}><Icon name="upload" size={14} />{t("servers.useAsProfile")}</button>
             </span>
           </li>
         {/each}
       </ul>
     {:else if data}
-      <p class="hint">No server configs in <span class="mono">{data.server_dir}</span> yet.</p>
+      <p class="hint">{@html th("servers.noConfigs", { dir: data.server_dir })}</p>
     {/if}
 
   </div>
 
   <div class="card">
-    <h2>Saved games</h2>
-    <p class="lede">Each save remembers the mods it was played with. Load a save's mods before you continue it, so nothing goes missing.</p>
+    <h2>{t("servers.saves.title")}</h2>
+    <p class="lede">{t("servers.saves.lede")}</p>
     {#if data && data.saves.length === 0}
-      <p class="hint">No saves with a mod list yet.</p>
+      <p class="hint">{t("servers.saves.none")}</p>
     {:else if data}
       <ul class="list">
         {#each data.saves as s}
           <li>
             <span class="name">
               <strong>{s.name}</strong>
-              <span class="hint">{s.mode} · {s.mods.length} mods · played {when(s.modified)} · {diff(s.mods)}</span>
+              <span class="hint">{t("servers.saves.info", { mode: s.mode, count: s.mods.length, when: when(s.modified), diff: diff(s.mods) })}</span>
             </span>
-            <button disabled={busy} onclick={() => onUseSave(s.mode, s.name)}><Icon name="swap" size={14} />Use this save's mods</button>
+            <button disabled={busy} onclick={() => onUseSave(s.mode, s.name)}><Icon name="swap" size={14} />{t("servers.saves.useMods")}</button>
           </li>
         {/each}
       </ul>

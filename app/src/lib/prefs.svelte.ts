@@ -1,4 +1,6 @@
 // Look and feel for whoever uses this computer, kept in localStorage (the backend never needs them).
+import { lang } from "./i18n.svelte";
+
 const read = (k: string, d: string) => {
   try {
     return localStorage.getItem(k) ?? d;
@@ -10,6 +12,8 @@ const DEFAULT_ACCENT = "#6e080c"; // the blood on the separator tape (static/blo
 
 export const prefs = $state({
   theme: read("pzmm.theme", "system"),
+  /** UI language ("" follows the system). */
+  lang: read("pzmm.lang", ""),
   // people still on an earlier default (amber, then pink) move to the current one
   accent: [read("pzmm.accent", DEFAULT_ACCENT)].map((a) => (["#d39b3a", "#fc2684"].includes(a) ? DEFAULT_ACCENT : a))[0],
   compact: read("pzmm.compact", "0") === "1",
@@ -34,8 +38,10 @@ export function applyPrefs() {
   root.style.setProperty("--accent", prefs.accent);
   root.style.setProperty("--on-accent", onAccent(prefs.accent));
   root.classList.toggle("compact", prefs.compact);
+  root.lang = lang();
   try {
     localStorage.setItem("pzmm.theme", prefs.theme);
+    localStorage.setItem("pzmm.lang", prefs.lang);
     localStorage.setItem("pzmm.accent", prefs.accent);
     localStorage.setItem("pzmm.compact", prefs.compact ? "1" : "0");
     localStorage.setItem("pzmm.showIds", prefs.showIds ? "1" : "0");

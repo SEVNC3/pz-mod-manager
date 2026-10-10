@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { api, newQuery, type Browse, type Query, type WorkshopItem } from "./api";
-  import { compact, fmtDate, plain } from "./format";
+  import { compact, fmtDate, fmtNum, plain } from "./format";
+  import { t, th } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
   import InstallButton from "./InstallButton.svelte";
   import Stars from "./Stars.svelte";
@@ -19,27 +20,29 @@
   } = $props();
 
   // Steam's own sorts and filters for the Project Zomboid Workshop (docs/WORKSHOP-PARITY.md)
+  // [value, label key]: labels are translated where they're shown
   const ITEM_SORTS: [string, string][] = [
-    ["trend", "Most popular"],
-    ["totaluniquesubscribers", "Most subscribed"],
-    ["toprated", "Top rated"],
-    ["mostrecent", "Newest"],
-    ["lastupdated", "Recently updated"],
-    ["libraries", "Most required (libraries)"],
-    ["num_parent_collections", "In the most collections"],
+    ["trend", "workshop.sorts.popular"],
+    ["totaluniquesubscribers", "workshop.sorts.subscribed"],
+    ["toprated", "workshop.sorts.topRated"],
+    ["mostrecent", "workshop.sorts.newest"],
+    ["lastupdated", "workshop.sorts.updated"],
+    ["libraries", "workshop.sorts.libraries"],
+    ["num_parent_collections", "workshop.sorts.collections"],
   ];
   const COLLECTION_SORTS = ITEM_SORTS.filter(([v]) => ["trend", "toprated", "mostrecent", "lastupdated"].includes(v));
-  const DAYS: [number, string][] = [[1, "Today"], [7, "This week"], [30, "This month"], [90, "3 months"], [180, "6 months"], [365, "This year"]];
+  const DAYS: [number, string][] = [[1, "workshop.days.today"], [7, "workshop.days.week"], [30, "workshop.days.month"], [90, "workshop.days.months3"], [180, "workshop.days.months6"], [365, "workshop.days.year"]];
+  // Steam's tag values; shown as workshop.tagNames.<value without punctuation>
   const TAGS = ["Animals", "Audio", "Balance", "Building", "Clothing/Armor", "Farming", "Food", "Framework", "Hardmode", "Interface", "Items",
     "Language/Translation", "Literature", "Map", "Military", "Misc", "Models", "Multiplayer", "Pop Culture", "QoL", "Realistic", "Silly/Fun",
     "Skills", "Textures", "Traits", "Vehicles", "Weapons", "WIP"];
-  const TAG_LABELS: Record<string, string> = { "Clothing/Armor": "Clothing", "Language/Translation": "Translations", "Silly/Fun": "Silly & fun", "Pop Culture": "Pop culture" };
+  const tagName = (tag: string) => t(`workshop.tagNames.${tag.replace(/\W/g, "")}`);
   const HOME_ROWS: [string, Partial<Query>][] = [
-    ["Popular this week", { sort: "trend", days: 7 }],
-    ["Most subscribed", { sort: "totaluniquesubscribers" }],
-    ["Newest", { sort: "mostrecent" }],
-    ["Recently updated", { sort: "lastupdated" }],
-    ["Most required", { sort: "totaluniquesubscribers", libraries: true }],
+    ["workshop.home.popularWeek", { sort: "trend", days: 7 }],
+    ["workshop.home.subscribed", { sort: "totaluniquesubscribers" }],
+    ["workshop.home.newest", { sort: "mostrecent" }],
+    ["workshop.home.updated", { sort: "lastupdated" }],
+    ["workshop.home.required", { sort: "totaluniquesubscribers", libraries: true }],
   ];
   const VIEWPOINT_DISCORD = "https://discord.gg/g83XvPhEgQ";
 
@@ -60,7 +63,7 @@
   /** Steam's errors in plain words (a 429 is Steam asking us to slow down). */
   const plainError = (e: unknown) => {
     const s = String(e);
-    return /429|limiting requests/i.test(s) ? "Steam is limiting requests right now. Wait a minute and try again." : `Couldn't reach the Steam Workshop: ${s.replace(/^Error:\s*/, "")}`;
+    return /429|limiting requests/i.test(s) ? t("workshop.errors.rateLimited") : t("workshop.errors.unreachable", { error: s.replace(/^Error:\s*/, "") });
   };
   let loading = $state(false);
   let error = $state("");
@@ -68,7 +71,7 @@
   let open = $state<WorkshopItem | null>(null);
   let seq = 0;
 
-  const WITHIN: [number, string][] = [[0, "Any time"], [1, "Last 24 hours"], [7, "Last week"], [30, "Last month"], [90, "Last 3 months"], [180, "Last 6 months"], [365, "Last year"]];
+  const WITHIN: [number, string][] = [[0, "workshop.within.any"], [1, "workshop.within.day"], [7, "workshop.within.week"], [30, "workshop.within.month"], [90, "workshop.within.months3"], [180, "workshop.within.months6"], [365, "workshop.within.year"]];
   const since = (days: number) => (days ? Math.floor(Date.now() / 1000) - days * 86400 : 0);
   /** The request as Steam wants it: build in the tags, libraries as a filter, dates as unix times. */
   function request(over: Partial<Query> = {}): Query {
@@ -113,7 +116,7 @@
       const r = await api.browse(newQuery({ ...over, required: build ? [`Build ${build}`] : [] }));
       if (mine === seq) rows[title] = r.items.slice(0, 12);
     } catch (e) {
-      if (mine === seq) rowErrors[title] = plainError(e);
+      if (mine === seq) rowErrors[title] = String(e);
     }
   }
 
@@ -224,7 +227,7 @@
 
 {#snippet stars(it: WorkshopItem)}
   {#if it.votes > 0}
-    <span class="stars" title={`${it.stars} of 5 stars from ${it.votes.toLocaleString()} votes`}>
+    <span class="stars" title={t("workshop.starsTip", { stars: it.stars, count: it.votes, votes: fmtNum(it.votes) })}>
       <Stars stars={it.stars} />
       <span class="votes">{compact.format(it.votes)}</span>
     </span>
@@ -233,94 +236,94 @@
 
 {#snippet card(it: WorkshopItem, small = false)}
   <li class="card" class:small>
-    <button class="thumb" onclick={() => (open = it)} aria-label={`Details for ${it.title}`}>
+    <button class="thumb" onclick={() => (open = it)} aria-label={t("workshop.detailsLabel", { title: it.title })}>
       {#if it.preview_url}<img src={it.preview_url} alt="" loading="lazy" />{/if}
-      {#if it.collection}<span class="kind"><Icon name="folder" size={12} /> Collection · {it.num_children}</span>{/if}
+      {#if it.collection}<span class="kind"><Icon name="folder" size={12} /> {t("workshop.collectionBadge", { count: it.num_children })}</span>{/if}
     </button>
     <div class="body">
       <button class="title" onclick={() => (open = it)} title={it.title}>{it.title}</button>
       {#if it.author && !small}
-        <button class="quiet author" onclick={() => byAuthor(it)} title="More by this author">by {it.author}</button>
+        <button class="quiet author" onclick={() => byAuthor(it)} title={t("workshop.moreByAuthorTip")}>{t("workshop.byAuthor", { author: it.author })}</button>
       {/if}
       <p class="meta">
         {@render stars(it)}
-        <span title="Current subscribers">{compact.format(it.subscriptions)} subs</span>
+        <span title={t("workshop.subscribersTip")}>{t("workshop.subs", { count: it.subscriptions, n: compact.format(it.subscriptions) })}</span>
         {#if !small}
-          <span title="Favourites"><Icon name="star" size={11} /> {compact.format(it.favorited)}</span>
-          <span title="Comments"><Icon name="message" size={11} /> {compact.format(it.comments)}</span>
-          <span title={`Posted ${fmtDate(it.time_created, "long")}`}>Updated {fmtDate(it.time_updated, "long")}</span>
+          <span title={t("workshop.favouritesTip")}><Icon name="star" size={11} /> {compact.format(it.favorited)}</span>
+          <span title={t("workshop.commentsTip")}><Icon name="message" size={11} /> {compact.format(it.comments)}</span>
+          <span title={t("workshop.postedTip", { date: fmtDate(it.time_created, "long") })}>{t("workshop.updatedOn", { date: fmtDate(it.time_updated, "long") })}</span>
           {#each builds(it.tags) as b}<span class="tag">{b}</span>{/each}
         {/if}
       </p>
       {#if it.description && !small}<p class="desc">{plain(it.description)}</p>{/if}
       {#if it.num_children > 0 && !it.collection && !small}
-        <p class="needs">Needs {it.num_children} other {it.num_children === 1 ? "mod" : "mods"}, installed with it</p>
+        <p class="needs">{t("workshop.needs", { count: it.num_children })}</p>
       {/if}
     </div>
     <div class="actions">
       <InstallButton item={it} {busy} {installing} onInstall={install} />
-      <button class="quiet" onclick={() => (open = it)}>Details</button>
+      <button class="quiet" onclick={() => (open = it)}>{t("workshop.details")}</button>
     </div>
   </li>
 {/snippet}
 
-<section class="workshop" aria-label="Steam Workshop" {hidden}>
-  <aside class="side" aria-label="Browse options">
-    <div class="seg" role="tablist" aria-label="Workshop view">
+<section class="workshop" aria-label={t("workshop.label")} {hidden}>
+  <aside class="side" aria-label={t("workshop.optionsLabel")}>
+    <div class="seg" role="tablist" aria-label={t("workshop.viewLabel")}>
       <button type="button" role="tab" aria-selected={view !== "home"} class:active={view !== "home"} onclick={() => show("browse")}>
-        <Icon name="search" size={14} /> Browse
+        <Icon name="search" size={14} /> {t("workshop.browse")}
       </button>
       <button type="button" role="tab" aria-selected={view === "home"} class:active={view === "home"} onclick={() => show("home")}>
-        <Icon name="flame" size={14} /> Home
+        <Icon name="flame" size={14} /> {t("workshop.homeTab")}
       </button>
     </div>
 
     <form class="search" onsubmit={submit}>
-      <input type="search" bind:value={queryText} placeholder="Search the Workshop" aria-label="Search the Workshop"
-        title={'Steam search: "exact phrase", AND, OR, NOT, +must, -exclude'} />
+      <input type="search" bind:value={queryText} placeholder={t("workshop.searchPlaceholder")} aria-label={t("workshop.searchPlaceholder")}
+        title={t("workshop.searchTip")} />
       <div class="pair">
-        <select bind:value={q.scope} aria-label="Search in" title="Where the words must appear">
-          <option value={0}>Anywhere</option>
-          <option value={1}>Titles</option>
-          <option value={2}>Descriptions</option>
+        <select bind:value={q.scope} aria-label={t("workshop.searchInLabel")} title={t("workshop.searchInTip")}>
+          <option value={0}>{t("workshop.anywhere")}</option>
+          <option value={1}>{t("workshop.titles")}</option>
+          <option value={2}>{t("workshop.descriptions")}</option>
         </select>
-        <button type="submit"><Icon name="search" size={14} /> Search</button>
+        <button type="submit"><Icon name="search" size={14} /> {t("workshop.search")}</button>
       </div>
       {#if q.search}
-        <button type="button" class="quiet small" onclick={() => { queryText = q.search = ""; go(1); }}><Icon name="x" size={12} /> Clear "{q.search}"</button>
+        <button type="button" class="quiet small" onclick={() => { queryText = q.search = ""; go(1); }}><Icon name="x" size={12} /> {t("workshop.clearTerm", { term: q.search })}</button>
       {/if}
     </form>
 
-    <label class="field"><span>Game build</span>
+    <label class="field"><span>{t("workshop.gameBuild")}</span>
       <select bind:value={build} onchange={() => { rows = {}; view === "home" ? loadHome() : go(1); }}>
-        <option value="42">Build 42</option>
-        <option value="41">Build 41</option>
-        <option value="">Any build</option>
+        <option value="42">{t("workshop.buildN", { n: 42 })}</option>
+        <option value="41">{t("workshop.buildN", { n: 41 })}</option>
+        <option value="">{t("workshop.anyBuild")}</option>
       </select>
     </label>
 
     {#if view === "browse"}
-      <div class="field"><span>Show</span>
-        <div class="seg" role="radiogroup" aria-label="Show">
-          <button type="button" role="radio" aria-checked={!q.collections} class:active={!q.collections} onclick={() => setSection(false)}>Mods</button>
-          <button type="button" role="radio" aria-checked={q.collections} class:active={q.collections} onclick={() => setSection(true)}>Collections</button>
+      <div class="field"><span>{t("workshop.show")}</span>
+        <div class="seg" role="radiogroup" aria-label={t("workshop.show")}>
+          <button type="button" role="radio" aria-checked={!q.collections} class:active={!q.collections} onclick={() => setSection(false)}>{t("workshop.mods")}</button>
+          <button type="button" role="radio" aria-checked={q.collections} class:active={q.collections} onclick={() => setSection(true)}>{t("workshop.collections")}</button>
         </div>
       </div>
       {#if !q.search}
-        <label class="field"><span>Sort by</span>
+        <label class="field"><span>{t("workshop.sortBy")}</span>
           <select bind:value={sortChoice} onchange={() => go(1)}>
-            {#each sorts as [v, label]}<option value={v}>{label}</option>{/each}
+            {#each sorts as [v, label]}<option value={v}>{t(label)}</option>{/each}
           </select>
         </label>
         {#if sortChoice === "trend"}
-          <label class="field"><span>Popular over</span>
+          <label class="field"><span>{t("workshop.popularOver")}</span>
             <select bind:value={q.days} onchange={() => go(1)}>
-              {#each DAYS as [d, label]}<option value={d}>{label}</option>{/each}
+              {#each DAYS as [d, label]}<option value={d}>{t(label)}</option>{/each}
             </select>
           </label>
         {/if}
       {/if}
-      <label class="field"><span>Per page</span>
+      <label class="field"><span>{t("workshop.perPage")}</span>
         <select bind:value={q.per_page} onchange={() => go(1)}>
           <option value={30}>30</option>
           <option value={50}>50</option>
@@ -328,39 +331,40 @@
       </label>
 
       <div class="field">
-        <span>Tags{q.required.length + q.excluded.length ? ` (${q.required.length + q.excluded.length})` : ""}</span>
-        <p class="hint">Click to require, again to exclude, again to clear.</p>
+        <span>{q.required.length + q.excluded.length ? t("workshop.tagsHeadingCount", { count: q.required.length + q.excluded.length }) : t("workshop.tagsHeading")}</span>
+        <p class="hint">{t("workshop.tagsHint")}</p>
         <div class="chips">
-          {#each TAGS as t}
-            {@const state = q.required.includes(t) ? "in" : q.excluded.includes(t) ? "out" : ""}
-            <button type="button" class="chip {state}" onclick={() => cycleTag(t)} aria-pressed={state !== ""}
-              title={state === "in" ? `Only ${t}` : state === "out" ? `No ${t}` : t}>
-              <span class="box">{#if state === "in"}<Icon name="check" size={11} />{:else if state === "out"}<Icon name="x" size={11} />{/if}</span>{TAG_LABELS[t] ?? t}
+          {#each TAGS as tag}
+            {@const state = q.required.includes(tag) ? "in" : q.excluded.includes(tag) ? "out" : ""}
+            <button type="button" class="chip {state}" onclick={() => cycleTag(tag)} aria-pressed={state !== ""}
+              title={state === "in" ? t("workshop.tagOnlyTip", { tag }) : state === "out" ? t("workshop.tagNoTip", { tag }) : tag}>
+              <span class="box">{#if state === "in"}<Icon name="check" size={11} />{:else if state === "out"}<Icon name="x" size={11} />{/if}</span>{tagName(tag)}
             </button>
           {/each}
         </div>
       </div>
-      <label class="field"><span>Posted</span>
+      <label class="field"><span>{t("workshop.posted")}</span>
         <select bind:value={within.posted} onchange={() => go(1)}>
-          {#each WITHIN as [d, label]}<option value={d}>{label}</option>{/each}
+          {#each WITHIN as [d, label]}<option value={d}>{t(label)}</option>{/each}
         </select>
       </label>
-      <label class="field"><span>Updated</span>
+      <label class="field"><span>{t("workshop.updated")}</span>
         <select bind:value={within.updated} onchange={() => go(1)}>
-          {#each WITHIN as [d, label]}<option value={d}>{label}</option>{/each}
+          {#each WITHIN as [d, label]}<option value={d}>{t(label)}</option>{/each}
         </select>
       </label>
-      <label class="check"><input type="checkbox" bind:checked={q.incompatible} onchange={() => go(1)} /> Only mods marked incompatible</label>
-      {#if filterCount}<button type="button" class="quiet small" onclick={clearFilters}><Icon name="x" size={12} /> Clear filters</button>{/if}
+      <label class="check"><input type="checkbox" bind:checked={q.incompatible} onchange={() => go(1)} /> {t("workshop.onlyIncompatible")}</label>
+      {#if filterCount}<button type="button" class="quiet small" onclick={clearFilters}><Icon name="x" size={12} /> {t("workshop.clearFilters")}</button>{/if}
     {/if}
 
     {#if viewpoint}
+      <!-- i18n-ignore: the mod's name, also the search sent to Steam -->
       <div class="field vp"><span>Project Viewpoint</span>
         <button type="button" onclick={() => { queryText = q.search = "Project Viewpoint"; view = "browse"; context = null; go(1); }}>
-          <Icon name="layers" size={14} /> Viewpoint add-ons
+          <Icon name="layers" size={14} /> {t("workshop.viewpointAddons")}
         </button>
-        <button type="button" class="quiet" onclick={() => api.openUrl(VIEWPOINT_DISCORD)} title="Project Viewpoint's community Discord: help, bug reports, news">
-          <img src="/brand/discord.png" alt="" width="16" height="16" class="brand-img" /> Viewpoint Discord
+        <button type="button" class="quiet" onclick={() => api.openUrl(VIEWPOINT_DISCORD)} title={t("workshop.viewpointDiscordTip")}>
+          <img src="/brand/discord.png" alt="" width="16" height="16" class="brand-img" /> {t("workshop.viewpointDiscord")}
         </button>
       </div>
     {/if}
@@ -370,13 +374,13 @@
   {#if context}
     <div class="context">
       {#if context.kind === "author"}
-        <span>Mods by <strong>{context.item.author || "this author"}</strong>{data ? ` (${data.total})` : ""}</span>
+        <span>{@html th(data ? "workshop.modsByCount" : "workshop.modsBy", { author: context.item.author || t("workshop.thisAuthor"), count: data?.total ?? 0 })}</span>
       {:else if q.collections}
-        <span>Collections with <strong>{context.item.title}</strong></span>
+        <span>{@html th("workshop.collectionsWith", { title: context.item.title })}</span>
       {:else}
-        <span>Mods that need <strong>{context.item.title}</strong></span>
+        <span>{@html th("workshop.modsThatNeed", { title: context.item.title })}</span>
       {/if}
-      <button class="quiet" onclick={clearContext}><Icon name="x" size={14} /> Back to browsing</button>
+      <button class="quiet" onclick={clearContext}><Icon name="x" size={14} /> {t("workshop.backToBrowsing")}</button>
     </div>
   {/if}
 
@@ -384,43 +388,44 @@
     {#if error}
       <div class="message">
         <p>{plainError(error)}</p>
-        <button onclick={() => (view === "home" ? loadHome() : load())}><Icon name="refresh" size={14} /> Try again</button>
+        <button onclick={() => (view === "home" ? loadHome() : load())}><Icon name="refresh" size={14} /> {t("workshop.tryAgain")}</button>
       </div>
     {:else if view === "home"}
       {#each HOME_ROWS as [title, over]}
         <section class="row">
           <header>
-            <h2>{title}</h2>
-            <button class="quiet" onclick={() => viewAll(over)}>View all</button>
+            <h2>{t(title)}</h2>
+            <button class="quiet" onclick={() => viewAll(over)}>{t("workshop.viewAll")}</button>
           </header>
           {#if rows[title]}
             <ul class="strip">{#each rows[title]! as it (it.id)}{@render card(it, true)}{/each}</ul>
           {:else if rowErrors[title]}
-            <div class="message inline"><p>{rowErrors[title]}</p>
-              <button onclick={() => loadRow(seq, title, over)}><Icon name="refresh" size={14} />Try again</button></div>
+            <div class="message inline"><p>{plainError(rowErrors[title])}</p>
+              <button onclick={() => loadRow(seq, title, over)}><Icon name="refresh" size={14} />{t("workshop.tryAgain")}</button></div>
           {:else}
-            <p class="loading-row">Loading…</p>
+            <p class="loading-row">{t("workshop.loading")}</p>
           {/if}
         </section>
       {/each}
     {:else if !data && loading}
-      <div class="message"><p>Loading the Workshop…</p></div>
+      <div class="message"><p>{t("workshop.loadingWorkshop")}</p></div>
     {:else if data && data.items.length === 0 && !loading}
-      <div class="message"><p>Nothing matches. Try fewer words, fewer tags or another build.</p>
+      <div class="message"><p>{t("workshop.nothingMatches")}</p>
         <div class="msg-actions">
-          {#if q.search}<button onclick={() => { queryText = q.search = ""; go(1); }}><Icon name="x" size={14} />Clear search</button>{/if}
-          {#if filterCount}<button onclick={clearFilters}><Icon name="x" size={14} />Clear filters</button>{/if}
+          {#if q.search}<button onclick={() => { queryText = q.search = ""; go(1); }}><Icon name="x" size={14} />{t("workshop.clearSearch")}</button>{/if}
+          {#if filterCount}<button onclick={clearFilters}><Icon name="x" size={14} />{t("workshop.clearFilters")}</button>{/if}
         </div>
       </div>
     {:else if data}
-      <p class="count">{compact.format(data.total)} {view === "author" ? "mods" : q.collections ? "collections" : "mods"}{q.search ? ` for "${q.search}"` : ""}{loading ? " · loading…" : ""}</p>
+      {@const counted = view !== "author" && q.collections ? "workshop.countCollections" : "workshop.countMods"}
+      <p class="count">{t(q.search ? `${counted}For` : counted, { count: data.total, n: compact.format(data.total), search: q.search })}{loading ? t("workshop.loadingSuffix") : ""}</p>
       <ul class="grid" class:dim={loading}>
         {#each data.items as it (it.id)}{@render card(it)}{/each}
       </ul>
-      <nav class="pager" aria-label="Pages">
-        <button disabled={page <= 1 || loading} onclick={() => go(page - 1)}><Icon name="chevron-left" size={14} />Previous</button>
-        <span>Page {page} of {compact.format(pages)}</span>
-        <button disabled={page >= pages || loading} onclick={() => go(page + 1)}>Next<Icon name="chevron-right" size={14} /></button>
+      <nav class="pager" aria-label={t("workshop.pagesLabel")}>
+        <button disabled={page <= 1 || loading} onclick={() => go(page - 1)}><Icon name="chevron-left" size={14} />{t("workshop.previous")}</button>
+        <span>{t("workshop.pageOf", { page, pages: compact.format(pages) })}</span>
+        <button disabled={page >= pages || loading} onclick={() => go(page + 1)}>{t("workshop.next")}<Icon name="chevron-right" size={14} /></button>
       </nav>
     {/if}
   </div>
@@ -514,6 +519,10 @@
     color: var(--muted);
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: normal; /* longer tag names wrap */
+    overflow-wrap: anywhere;
+    hyphens: auto;
+    text-align: left;
   }
   .chip .box {
     flex: none;

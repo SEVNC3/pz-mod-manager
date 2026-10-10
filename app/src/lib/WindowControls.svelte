@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { t } from "./i18n.svelte";
 
   // The window has no system frame (decorations: false): these replace its buttons.
   const win = getCurrentWindow();
@@ -17,17 +18,17 @@
 </script>
 
 <div class="winctl">
-  <button onclick={() => win.minimize()} aria-label="Minimise" title="Minimise">
+  <button onclick={() => win.minimize()} aria-label={t("window.minimise")} title={t("window.minimise")}>
     <svg viewBox="0 0 10 10" aria-hidden="true"><line x1="0" y1="5.5" x2="10" y2="5.5" /></svg>
   </button>
-  <button onclick={() => win.toggleMaximize()} aria-label={maximized ? "Restore" : "Maximise"} title={maximized ? "Restore" : "Maximise"}>
+  <button onclick={() => win.toggleMaximize()} aria-label={maximized ? t("window.restore") : t("window.maximise")} title={maximized ? t("window.restore") : t("window.maximise")}>
     {#if maximized}
       <svg viewBox="0 0 10 10" aria-hidden="true"><rect x="0.5" y="2.5" width="7" height="7" /><polyline points="2.5 2.5 2.5 0.5 9.5 0.5 9.5 7.5 7.5 7.5" /></svg>
     {:else}
       <svg viewBox="0 0 10 10" aria-hidden="true"><rect x="0.5" y="0.5" width="9" height="9" /></svg>
     {/if}
   </button>
-  <button class="close" onclick={() => win.close()} aria-label="Close" title="Close">
+  <button class="close" onclick={() => win.close()} aria-label={t("common.close")} title={t("common.close")}>
     <svg viewBox="0 0 10 10" aria-hidden="true"><line x1="0" y1="0" x2="10" y2="10" /><line x1="10" y1="0" x2="0" y2="10" /></svg>
   </button>
 </div>

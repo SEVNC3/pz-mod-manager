@@ -1,0 +1,1071 @@
+{
+  "tabs": {
+    "mods": "Meus mods",
+    "workshop": "Explorar a Oficina",
+    "maps": "Mapas",
+    "servers": "Servidores e saves",
+    "zb": "ZombieBuddy",
+    "settings": "Configurações"
+  },
+  "app": {
+    "newProfilePlaceholder": "Nome, ex.: Servidor dos amigos",
+    "create": "Criar",
+    "share": "Compartilhar",
+    "shareTip": "Copiar um código que outras pessoas podem importar",
+    "importTip": "Importar um perfil de um código de compartilhamento",
+    "installLabel": "Instalar um mod",
+    "installPlaceholder": "Cole um link, coleção ou ID da Oficina, um repositório do GitHub (dono/repo) ou o caminho de um .zip",
+    "updateMods": {
+      "one": "Atualizar {count} mod",
+      "other": "Atualizar {count} mods"
+    },
+    "checkUpdatesTip": "Perguntar à Oficina se algum mod tem uma versão mais nova",
+    "checking": "Verificando…",
+    "checkUpdates": "Verificar atualizações",
+    "launchTip": "Pela Steam",
+    "launchTipArgs": "Pela Steam, com {args}",
+    "launch": "Iniciar jogo",
+    "importIntro": "<strong>Importar um perfil</strong>: cole o código de compartilhamento que alguém enviou para você. Os mods da Oficina que faltam são instalados.",
+    "switchGameLabel": "Trocar de jogo",
+    "switchToViewpoint": "Mudar para o Project Viewpoint (3D)?",
+    "switchToZomboid": "Voltar para o Project Zomboid?",
+    "viewpointNote": "O Viewpoint está no início do desenvolvimento. Ele carrega pelo ZombieBuddy, que pede uma única vez, quando o jogo inicia, que você aprove o código Java dele.",
+    "switch": "Mudar",
+    "checkingNeeded": "Verificando o que é necessário…",
+    "updateAvailable": "<strong>O PZMM {version} está disponível.</strong> Você tem a {current}.",
+    "whatsNew": "Novidades",
+    "later": "Depois",
+    "waitTip": "Aguarde a tarefa atual terminar",
+    "updateRestart": "Atualizar e reiniciar",
+    "downloading": "Baixando o PZMM {version}… {progress}%",
+    "sectionsLabel": "Seções",
+    "needsSetup": "precisa de configuração",
+    "saveDiff": "Seu save mais recente, <strong>{save}</strong>, foi jogado com uma lista de mods diferente: {diffs}. Continuar com esta lista pode quebrá-lo.",
+    "saveMissing": {
+      "one": "{count} dos mods dele não está ativado",
+      "other": "{count} dos mods dele não estão ativados"
+    },
+    "saveExtra": {
+      "one": "{count} mod ativado não estava nele",
+      "other": "{count} mods ativados não estavam nele"
+    },
+    "useSaveMods": "Usar os mods deste save",
+    "dismiss": "Dispensar",
+    "zbNeeded": {
+      "one": "{count} mod ativado precisa do ZombieBuddy, que não está configurado.",
+      "other": "{count} mods ativados precisam do ZombieBuddy, que não está configurado."
+    },
+    "zbNeededPartial": {
+      "one": "{count} mod ativado precisa do ZombieBuddy, que não está totalmente configurado (uma atualização do jogo pode tê-lo redefinido).",
+      "other": "{count} mods ativados precisam do ZombieBuddy, que não está totalmente configurado (uma atualização do jogo pode tê-lo redefinido)."
+    },
+    "zbSetup": "Configurar ZombieBuddy"
+  },
+  "mods": {
+    "searchPlaceholder": "Buscar mods  ( / )",
+    "searchLabel": "Buscar mods",
+    "showLabel": "Mostrar",
+    "filterAll": "Todos",
+    "filterProblems": "Problemas",
+    "filterProblemsN": "Problemas ({count})",
+    "sortLabel": "Ordenar a lista",
+    "sortOrder": "Ordem da biblioteca",
+    "sortName": "Nome",
+    "sortSize": "Tamanho",
+    "sortUpdated": "Última alteração",
+    "sortStatus": "Problemas primeiro",
+    "count": {
+      "one": "Ativos: {enabled} · {count} mod",
+      "other": "Ativos: {enabled} · {count} mods"
+    },
+    "installMissingTip": "Encontrar e instalar da Oficina: {ids}",
+    "installMissing": "Instalar mods que faltam ({count})",
+    "fixTip": "Ativar os mods exigidos e ordenar os mods pelas regras require / loadModAfter / loadModBefore",
+    "fix": "Corrigir ordem de carregamento",
+    "selectedLabel": "Mods selecionados",
+    "selected": {
+      "one": "{count} selecionado",
+      "other": "{count} selecionados"
+    },
+    "moveLabel": "Mover os mods selecionados",
+    "moveTo": "Mover para…",
+    "moveTop": "Topo da lista",
+    "moveUnder": "Abaixo de “{name}”",
+    "moveBottom": "Fim da lista",
+    "hintFiltering": "Limpe a busca e o filtro e ordene pela ordem da biblioteca para reordenar.",
+    "hint": "Arraste ou use Alt+↑/↓ para organizar · Space alterna · Ctrl/Shift+clique seleciona",
+    "checkSetupTip": "Verificar problemas no perfil e nas configurações de servidor",
+    "checkSetup": "Verificar configuração",
+    "undoTip": "Desfazer a última mudança na lista (Ctrl+Z)",
+    "undo": "Desfazer",
+    "redoTip": "Refazer (Ctrl+Y)",
+    "redo": "Refazer",
+    "separatorTip": "Adicionar um separador acima do mod selecionado",
+    "separator": "Separador",
+    "groupTip": "Organize seus mods em uma seção por categoria, a partir das tags da Oficina. A ordem de carregamento não muda.",
+    "group": "Agrupar por categoria",
+    "loading": "Carregando seus mods…",
+    "emptyTitle": "Nada no estoque ainda.",
+    "emptyHint": "Cole um link da Oficina Steam acima para instalar um mod ou se inscreva em mods na Steam: as inscrições aparecem aqui automaticamente.",
+    "newSection": "Nova seção",
+    "newSectionN": "Nova seção {n}"
+  },
+  "busy": {
+    "loading": "Carregando",
+    "saving": "Salvando",
+    "viewpointSetup": "Configurando o Project Viewpoint",
+    "toZomboid": "Mudando para o Project Zomboid",
+    "switchingTo": "Mudando para “{name}”",
+    "switchingProfile": "Mudando de perfil",
+    "readingTags": "Lendo as tags da Oficina",
+    "updatingOne": "Atualizando {name}",
+    "updatingMany": {
+      "one": "Atualizando {count} mod",
+      "other": "Atualizando {count} mods"
+    },
+    "installingWorkshop": "Instalando o mod da Oficina {id}",
+    "installingOne": "Instalando {name}",
+    "installingMany": {
+      "one": "Instalando {count} mod",
+      "other": "Instalando {count} mods"
+    },
+    "findingMissing": {
+      "one": "Procurando {count} mod que falta na Oficina",
+      "other": "Procurando {count} mods que faltam na Oficina"
+    },
+    "importing": "Importando “{name}”",
+    "importingServer": "Importando {name}.ini",
+    "loadingSave": "Carregando os mods de {name}",
+    "creatingProfile": "Criando o perfil “{name}”",
+    "deletingProfile": "Excluindo o perfil “{name}”",
+    "removingOne": "Removendo {name}",
+    "removingMany": {
+      "one": "Removendo {count} mod",
+      "other": "Removendo {count} mods"
+    },
+    "restoring": "Restaurando {id}",
+    "zbSetup": "Configurando o ZombieBuddy",
+    "zbRemove": "Removendo o ZombieBuddy"
+  },
+  "log": {
+    "appLatest": "O PZMM {version} é a versão mais recente.",
+    "appCheckFailed": "Não foi possível verificar atualizações do PZMM: {error}",
+    "appUpdateFailed": "Não foi possível atualizar o PZMM: {error}",
+    "adopted": "Alterações feitas no menu de mods do jogo foram incorporadas (perfil “{profile}”).",
+    "tagsFailedSorted": "Não foi possível ler as tags da Oficina, então só as regras de carregamento foram corrigidas ({error}).",
+    "autosorted": "Ordem de carregamento ordenada automaticamente. Ctrl+Z traz a ordem antiga de volta.",
+    "tagsFailed": "Não foi possível ler as tags da Oficina ({error}).",
+    "grouped": {
+      "one": "Seus mods foram agrupados em {count} categoria.",
+      "other": "Seus mods foram agrupados em {count} categorias."
+    },
+    "groupedUndo": {
+      "one": "Seus mods foram agrupados em {count} categoria. Ctrl+Z traz suas seções de volta.",
+      "other": "Seus mods foram agrupados em {count} categorias. Ctrl+Z traz suas seções de volta."
+    },
+    "updatesFound": {
+      "one": "{count} mod tem atualização na Oficina.",
+      "other": "{count} mods têm atualizações na Oficina."
+    },
+    "updatesCheckFailed": "Não foi possível verificar atualizações: {error}",
+    "upToDate": "Seus mods estão atualizados.",
+    "nothingToRedownload": "O PZMM não instalou nenhum mod para baixar de novo (a Steam mantém as inscrições atualizadas).",
+    "stillMissing": "Ainda faltam: {ids}. Selecione um mod que precise de um deles e use Encontrar para escolher a correspondência.",
+    "shareCopied": "Código de compartilhamento de “{profile}” copiado. Cole-o para um amigo; ele usa Importar no PZMM.",
+    "shareFailed": "Não foi possível copiar o código de compartilhamento: {error}",
+    "checkSetupFailed": "Não foi possível verificar a configuração: {error}",
+    "bisectNeedsTwo": "Ative pelo menos dois mods para procurar um quebrado.",
+    "bisectFound": "Encontrado: {id} causa o problema. Sua lista de mods foi restaurada.",
+    "bisectNone": "O problema não acompanhou nenhum mod específico. Sua lista de mods foi restaurada.",
+    "sectionExists": "Já existe uma seção chamada “{name}”. Escolha outro nome.",
+    "noneOurs": "Nenhum dos mods selecionados foi instalado pelo PZMM; cancele a inscrição de mods da Steam na própria Steam."
+  },
+  "confirm": {
+    "group": "Agrupar por categoria substitui suas seções ({sections}) por seções de categoria. Ctrl+Z desfaz. Agrupar agora?",
+    "redownload": {
+      "one": "Baixar de novo o {count} mod instalado pelo PZMM? Ele mantém a versão atual como backup.",
+      "other": "Baixar de novo todos os {count} mods instalados pelo PZMM? Cada um mantém a versão atual como backup."
+    },
+    "updateInSave": {
+      "one": "{mods} é usado pelo seu save mais recente ({save}). Atualizações podem quebrar um save em andamento. Cada mod atualizado mantém a versão anterior (Restaurar versão anterior). Atualizar agora?",
+      "other": "{mods} são usados pelo seu save mais recente ({save}). Atualizações podem quebrar um save em andamento. Cada mod atualizado mantém a versão anterior (Restaurar versão anterior). Atualizar agora?"
+    },
+    "removeRecycleOne": "Remover {name}? Os arquivos dele vão da sua pasta de mods do Zomboid para a Lixeira.",
+    "removeRecycleMany": {
+      "one": "Remover {count} mod? Os arquivos dele vão da sua pasta de mods do Zomboid para a Lixeira.",
+      "other": "Remover {count} mods? Os arquivos deles vão da sua pasta de mods do Zomboid para a Lixeira."
+    },
+    "removeDeleteOne": "Remover {name}? Os arquivos dele são excluídos da sua pasta de mods do Zomboid.",
+    "removeDeleteMany": {
+      "one": "Remover {count} mod? Os arquivos dele são excluídos da sua pasta de mods do Zomboid.",
+      "other": "Remover {count} mods? Os arquivos deles são excluídos da sua pasta de mods do Zomboid."
+    },
+    "removeSkipped": {
+      "one": " ({count} não instalado pelo PZMM será mantido.)",
+      "other": " ({count} não instalados pelo PZMM serão mantidos.)"
+    },
+    "alsoRemove": {
+      "one": "Remover também {ids}? Nada mais que você tem precisa dele.",
+      "other": "Remover também {ids}? Nada mais que você tem precisa deles."
+    },
+    "deleteProfile": "Excluir o perfil “{name}”? Seus mods continuam instalados. O PZMM vai mudar para “{other}”."
+  },
+  "common": {
+    "cancel": "Cancelar",
+    "close": "Fechar",
+    "install": "Instalar",
+    "installing": "Instalando…",
+    "installed": "Instalado",
+    "remove": "Remover",
+    "enable": "Ativar",
+    "disable": "Desativar",
+    "enabled": "Ativado",
+    "disabled": "Desativado",
+    "delete": "Excluir",
+    "import": "Importar",
+    "clear": "Limpar",
+    "workshop": "Oficina",
+    "refresh": "Recarregar"
+  },
+  "format": {
+    "gb": "{n} GB",
+    "mb": "{n} MB",
+    "kb": "{n} KB"
+  },
+  "problems": {
+    "needsMissing": "Precisa de {id} (não instalado)",
+    "needsDisabled": "Precisa de {id} (desativado)",
+    "loadFirst": "{id} precisa carregar antes",
+    "incompatible": "Incompatível com {id}",
+    "loadAfter": "Deveria carregar depois de {id}",
+    "loadBefore": "Deveria carregar antes de {id}"
+  },
+  "source": {
+    "workshop": "Oficina",
+    "steam": "Inscrito",
+    "local": "Arquivo local",
+    "manual": "Manual"
+  },
+  "api": {
+    "badShareCode": "Isso não é um código de perfil do PZMM."
+  },
+  "maps": {
+    "label": "Mapas",
+    "worldMap": "Mapa do mundo",
+    "help": {
+      "button": "Ajuda",
+      "label": "Ajuda dos mapas",
+      "gridTitle": "Como ler a grade",
+      "grid": "Cada quadrado é uma célula do mundo da Build {build} (células da B42 têm 256 tiles, as da B41 têm 300, então só dá para comparar mapas da mesma build). <strong>Cinza</strong> é o mapa do próprio jogo, <strong>verde-azulado</strong> o rio dele; <strong>azul</strong> é uma célula preenchida por um mapa, <strong>dourado</strong> um mapa construído sobre uma área vanilla (geralmente de propósito), <strong>vermelho</strong> dois ou mais mapas disputando uma célula: só um deles carrega ali. Cores por mapa dão a cada mapa exibido sua própria cor.",
+      "previewTitle": "Pré-visualizar ou ativar",
+      "preview": "Mapas ativados são sempre exibidos. Marque um mapa, ou clique na linha dele, para <em>pré-visualizá-lo</em>: ele é desenhado e verificado quanto a conflitos, mas nada muda na sua lista de mods até você ativá-lo. Clique em células para listar os mapas nelas; Shift+clique adiciona mais células.",
+      "workshopTitle": "Mapas da Oficina",
+      "workshop": "Com os mapas da Oficina ligados, o PZMM lista todos os itens da Oficina com a tag Mapa para esta build, inclusive os que você não instalou: na hora, a partir do índice embutido, e depois lê na Steam as listas de arquivos dos itens atualizados desde então (sem download, nada é instalado), relendo um item só quando ele é atualizado. Cole uma coleção em “Verificar um mapa da Oficina” para pré-visualizar todos os mapas dela. Pré-visualize-os como mapas instalados e depois instale os que quiser."
+    },
+    "lede": "A grade mostra os mapas ativados e os que você pré-visualiza. Role para dar zoom, arraste para mover, clique em uma célula para listar os mapas nela.",
+    "legend": {
+      "more": {
+        "one": "+{count} a mais",
+        "other": "+{count} a mais"
+      },
+      "map": "Um mapa",
+      "over": "Sobre vanilla ({count})",
+      "conflict": "Conflito ({count})",
+      "vanilla": "Vanilla",
+      "river": "Rio"
+    },
+    "hideVanilla": "Ocultar vanilla",
+    "perMapColours": "Cores por mapa",
+    "zoomIn": "Aumentar zoom",
+    "zoomOut": "Diminuir zoom",
+    "fit": "Ajustar",
+    "gridLabel": "Grade de células: {maps} mapas exibidos, {conflicts} células em conflito, {over} sobre vanilla",
+    "cell": "Célula {x}, {y}",
+    "kind": {
+      "vanilla": "Área vanilla",
+      "water": "Rio vanilla",
+      "over": "Sobre uma área vanilla",
+      "conflict": "Conflito: estes mapas dividem esta célula"
+    },
+    "empty": "Vazia",
+    "readingFiles": "Lendo os arquivos do mapa…",
+    "noVanilla": "As áreas vanilla não são exibidas: a instalação do jogo não foi encontrada ou não é da Build {build}. Verifique as pastas nas Configurações.",
+    "mapMods": "Mods de mapa",
+    "undoTip": "Desfazer a última mudança de pré-visualização, seleção rápida, predefinição ou ativação/desativação (Ctrl+Z)",
+    "undoLabel": "Desfazer",
+    "workshopSource": "Mapas da Oficina que você não instalou",
+    "workshopSourceNote": "Lista todos os itens da Oficina com a tag Mapa a partir do índice embutido do PZMM e depois lê na Steam só os itens atualizados desde então (listas de arquivos; nada é baixado).",
+    "scan": {
+      "limited": "A Steam está limitando as solicitações agora. Aguarde um minuto e recarregue.",
+      "stopping": "Parando…",
+      "stop": "Parar",
+      "summary": {
+        "one": "Não instalados: {n}, de {count} item da Oficina lido.",
+        "other": "Não instalados: {n}, de {count} itens da Oficina lidos."
+      },
+      "listing": "Listando itens da Oficina com a tag Mapa… {done} de {total}",
+      "reading": "Lendo listas de arquivos… {done} de {total}",
+      "readingFailed": "Lendo listas de arquivos… {done} de {total} ({failed} falharam)",
+      "failed": {
+        "one": "Não foi possível ler a lista de arquivos de {count} item da Oficina (o registro de atividades explica o motivo).",
+        "other": "Não foi possível ler as listas de arquivos de {count} itens da Oficina (o registro de atividades explica o motivo)."
+      },
+      "refreshTip": "Listar de novo os itens com a tag Mapa e ler os novos e atualizados"
+    },
+    "searchPlaceholder": "Buscar nome, mod ID, ID da Oficina, pasta, autor, tag",
+    "searchLabel": "Buscar mapas",
+    "filterLabel": "Mostrar mapas",
+    "sortLabel": "Ordenar mapas",
+    "filter": {
+      "all": "Todos os mapas",
+      "conflict": "Em conflito",
+      "over": "Sobre vanilla"
+    },
+    "sort": {
+      "name": "Nome",
+      "cells": "Mais células",
+      "conflicts": "Mais conflitos",
+      "state": "Ativados primeiro",
+      "subs": "Mais inscritos",
+      "updated": "Atualizados recentemente",
+      "newest": "Mais recentes"
+    },
+    "pickedCells": "Células <span class=\"mono\">{cells}</span>",
+    "mapCount": {
+      "one": "{count} mapa",
+      "other": "{count} mapas"
+    },
+    "clearCells": "Limpar células",
+    "quickSelect": "Máximo de mapas que cabem",
+    "quickSelecting": "Procurando o máximo que cabe…",
+    "quickSelectTip": "Pré-visualizar o máximo de mapas listados que não dividem nenhuma célula entre si nem com os ativados (mapas instalados e populares vencem empates)",
+    "quickSelectDone": {
+      "one": "Pré-visualizando {count} mapa: o máximo de mapas listados que cabem juntos em volta dos ativados.",
+      "other": "Pré-visualizando {count} mapas: o máximo de mapas listados que cabem juntos em volta dos ativados."
+    },
+    "quickSelectNone": "Todo mapa listado divide células com um mapa ativado.",
+    "previewListed": "Pré-visualizar listados",
+    "unpreviewListed": "Tirar listados da prévia",
+    "enabledOnly": "Só ativados",
+    "enabledOnlyTip": "Limpar a pré-visualização: a grade mostra só os mapas ativados",
+    "enablePreviewed": {
+      "one": "Ativar {count} pré-visualizado",
+      "other": "Ativar {count} pré-visualizados"
+    },
+    "disableListed": {
+      "one": "Desativar {count} listado",
+      "other": "Desativar {count} listados"
+    },
+    "unhide": {
+      "one": "Reexibir {count}",
+      "other": "Reexibir {count}"
+    },
+    "unhideTip": "Desenhar de novo na grade todos os mapas exibidos",
+    "noMaps": "Nenhum mod instalado adiciona mapas para a Build {build}. Ligue os mapas da Oficina acima ou verifique um abaixo antes de instalá-lo.",
+    "previewLabel": "Pré-visualizar {name} na grade",
+    "alwaysShownTip": "Mapas ativados são sempre exibidos",
+    "previewTip": "Mostrar na grade sem ativar",
+    "notInstalled": "Não instalado",
+    "showOnGrid": "Mostrar na grade",
+    "showOnGridTip": "Desenhá-lo na grade de novo",
+    "hideOnGrid": "Ocultar na grade",
+    "hideOnGridTip": "Deixá-lo fora da grade para ver o que há embaixo (ele continua na exportação e nos requisitos)",
+    "cellCount": {
+      "one": "{count} célula",
+      "other": "{count} células"
+    },
+    "byAuthor": "por {author}",
+    "subscribers": {
+      "one": "{n} inscrito",
+      "other": "{n} inscritos"
+    },
+    "conflictsWith": {
+      "one": "Conflita com {name} na célula <span class=\"mono\">{cells}</span>",
+      "other": "Conflita com {name} nas células <span class=\"mono\">{cells}</span>"
+    },
+    "swap": "Trocar",
+    "swapTip": "Mostrar este mapa no lugar: ocultar os mapas pré-visualizados com que ele conflita e desativar os ativados",
+    "andMore": {
+      "one": "…e mais {count}",
+      "other": "…e mais {count}"
+    },
+    "cellsOverVanilla": {
+      "one": "{count} célula sobre vanilla",
+      "other": "{count} células sobre vanilla"
+    },
+    "packMember": {
+      "one": "1 de {count} mods neste item da Oficina",
+      "other": "1 de {count} mods neste item da Oficina"
+    },
+    "workshopItem": "Item da Oficina {id}",
+    "dupeMod": "O mod ID {id} também está em {item}: só uma cópia carrega",
+    "dupeModMore": {
+      "one": "O mod ID {id} também está em {item} e em mais {count}: só uma cópia carrega",
+      "other": "O mod ID {id} também está em {item} e em mais {count}: só uma cópia carrega"
+    },
+    "dupeFolder": "A pasta de mapa {folder} também é adicionada por {names}",
+    "dupeFolderMore": {
+      "one": "A pasta de mapa {folder} também é adicionada por {names} e mais {count}",
+      "other": "A pasta de mapa {folder} também é adicionada por {names} e mais {count}"
+    },
+    "openWorkshopTip": "Abrir a página dele na Oficina",
+    "alsoTurnsOnTip": "Também liga os mods de que ele precisa",
+    "installTip": "Instalá-lo com os itens que ele exige",
+    "showMore": {
+      "one": "Mostrar mais {count} de {total}",
+      "other": "Mostrar mais {count} de {total}"
+    },
+    "req": {
+      "title": "Requisitos",
+      "viewLabel": "Visualização dos requisitos",
+      "neededBy": "Necessário para",
+      "neededByTip": "Cada requisito e os mapas exibidos que precisam dele",
+      "tree": "Árvore",
+      "treeTip": "Cada mapa exibido e do que ele precisa, em todos os níveis",
+      "lede": "Do que os mapas exibidos precisam, diretamente ou através do que eles precisam: mods exigidos (<span class=\"mono\">require=</span>) e outros mapas sobre os quais eles são construídos (<span class=\"mono\">lots=</span>).",
+      "nothingElse": "Os mapas exibidos não precisam de mais nada.",
+      "showOne": "Mostre ou ative um mapa para ver do que ele precisa.",
+      "groups": {
+        "enabled": "Necessários para mapas ativados",
+        "preview": "Necessários para mapas pré-visualizados",
+        "missing": "Necessários para mapas que você não instalou"
+      },
+      "on": "Ligado",
+      "off": "Desligado",
+      "findTip": "Encontrar na Oficina Steam e instalar",
+      "pickInDetails": "Escolher nos detalhes",
+      "looking": "Procurando {id} na Oficina…",
+      "noClearResult": "Nenhum resultado é claramente ele: escolha um nos detalhes de um mapa que precise dele.",
+      "noMatch": "Nada na Oficina corresponde a {id}.",
+      "neededByMap": "mapa {folder} · necessário para {names}",
+      "neededByFolder": "pasta de mapa · necessária para {names}",
+      "neededByOnly": "necessário para {names}",
+      "loop": "(precisa de si mesmo: um loop)",
+      "map": "mapa {folder}"
+    },
+    "export": {
+      "title": "Ordem dos mapas e exportação",
+      "lede": "Copie os mapas exibidos para um amigo ou um servidor: os links da Oficina e os mod IDs deles, do que eles precisam e as linhas <span class=\"mono\">Mods=</span>, <span class=\"mono\">WorkshopItems=</span> e <span class=\"mono\">Map=</span>.",
+      "orderTitle": "Ordem dos mapas",
+      "orderHint": "O jogo carrega os mapas de cima para baixo: mapas de mods vêm antes de <span class=\"mono\">Muldraugh, KY</span>. Arraste ou use Alt+↑/↓ para organizar; a ordem fica salva no seu perfil, é usada pela exportação e pelo cartão do servidor e é gravada na lista de mods do jogo para os mapas ativados.",
+      "copy": {
+        "one": "Copiar {count} mapa para a área de transferência",
+        "other": "Copiar {count} mapas para a área de transferência"
+      },
+      "copied": {
+        "one": "{count} mapa copiado: links da Oficina, mod IDs, requisitos e as linhas Mods=, WorkshopItems= e Map=.",
+        "other": "{count} mapas copiados: links da Oficina, mod IDs, requisitos e as linhas Mods=, WorkshopItems= e Map=."
+      }
+    },
+    "presets": {
+      "title": "Predefinições",
+      "hint": "Salve os mapas exibidos com um nome e pré-visualize-os de novo depois.",
+      "label": "Predefinição",
+      "pick": "Escolher uma predefinição",
+      "preview": "Pré-visualizar",
+      "namePlaceholder": "Nome da predefinição",
+      "save": {
+        "one": "Salvar {count} exibido",
+        "other": "Salvar {count} exibidos"
+      },
+      "confirmReplace": "Substituir a predefinição “{name}”?",
+      "saved": {
+        "one": "{count} mapa exibido salvo como “{name}”.",
+        "other": "{count} mapas exibidos salvos como “{name}”."
+      },
+      "previewing": "Pré-visualizando “{name}”.",
+      "previewingMissing": "Pré-visualizando “{name}”; não encontrados: {ids} (instale-os ou ligue os mapas da Oficina)."
+    },
+    "compare": {
+      "title": "Comparar com um servidor",
+      "lede": "Os mapas que uma configuração de servidor carrega (<span class=\"mono\">Map=</span>) comparados com os exibidos aqui.",
+      "serverLabel": "Configuração do servidor",
+      "compare": "Comparar",
+      "noServers": "Nenhuma configuração de servidor em Zomboid/Server ainda.",
+      "same": "Mesmos mapas que {server}.ini.",
+      "onlyServer": "No servidor, não exibidos aqui",
+      "noKnownMap": "nenhum mapa conhecido da Oficina o adiciona",
+      "on": "ativado",
+      "installed": "instalado",
+      "notInstalled": "não instalado",
+      "preview": "Pré-visualizar",
+      "onlyYou": "Exibidos aqui, não no servidor"
+    },
+    "check": {
+      "title": "Verificar um mapa da Oficina antes de instalar",
+      "lede": "Veja primeiro onde um mapa (ou cada mapa de uma coleção) fica e com o que ele conflita. O PZMM lê a lista de arquivos do item na Steam (nada é baixado nem instalado) e guarda só as células dele.",
+      "placeholder": "Link da Oficina ou de coleção, ou ID",
+      "checking": "Verificando…",
+      "check": "Verificar",
+      "pasteId": "Cole um link da Oficina ou o ID de um item.",
+      "noItem": "Não existe item da Oficina {id}.",
+      "alreadyInstalled": "{title} já está instalado: se ele adiciona mapas, eles estão na lista.",
+      "confirmDownload": "A Steam não forneceu a lista de arquivos de “{title}” ({error}). Baixá-lo ({size}) para ler as células dele? Nada é instalado e o download é apagado depois.",
+      "read": "{title} lido: ele aparece pré-visualizado na grade e na lista como não instalado.",
+      "noMaps": "{title} não adiciona mapas para a Build {build}.",
+      "readingMember": "Lendo {title} ({n} de {total})…",
+      "collection": {
+        "one": "{title}: pré-visualizando {count} mapa de {items} itens.",
+        "other": "{title}: pré-visualizando {count} mapas de {items} itens."
+      },
+      "collectionFailed": "Não foi possível ler {titles}: verifique-os um por um.",
+      "collectionUntagged": {
+        "one": "{count} outro item não tem a tag Mapa, então não foi lido.",
+        "other": "{count} outros itens não têm a tag Mapa, então não foram lidos."
+      }
+    }
+  },
+  "mapOrder": {
+    "label": "Ordem dos mapas",
+    "top": "Topo",
+    "topTip": "Carregá-lo primeiro",
+    "topLabel": "Mover {name} para o topo",
+    "autosort": "Ordenar mapas automaticamente",
+    "autosortTip": "Mapas de mods primeiro, na ordem atual, depois Muldraugh, KY"
+  },
+  "layerIcon": {
+    "overrides": "Substitui arquivos de {mods}",
+    "overriddenBy": "Alguns arquivos são substituídos por {mods}"
+  },
+  "modTable": {
+    "col": {
+      "move": "Mover",
+      "loadOrder": "Ordem de carregamento",
+      "mod": "Mod",
+      "size": "Tamanho",
+      "lastChanged": "Última alteração",
+      "sharedFiles": "Arquivos compartilhados",
+      "source": "Origem"
+    },
+    "sepNameLabel": "Nome do separador (vazio o remove)",
+    "expandLabel": "Expandir {name}",
+    "collapseLabel": "Recolher {name}",
+    "renameTip": "Clique duas vezes para renomear",
+    "sectionCount": "{on} de {total} ativados",
+    "removeSepTip": "Remover este separador (Delete). Os mods dele ficam onde estão.",
+    "removeSepLabel": "Remover o separador {name}",
+    "enableLabel": "Ativar {name}",
+    "b41Only": "Só B41",
+    "b41OnlyTip": "Feito só para a Build 41 (sem pasta 42/ ou common/): na Build 42 pode dar erro ou não fazer nada",
+    "b42Only": "Só B42",
+    "b42OnlyTip": "Feito só para a Build 42",
+    "notInstalled": "Não instalado",
+    "updateAvailable": "Atualização disponível",
+    "sourceHint": {
+      "steam": "Inscrito na Steam; a Steam o mantém atualizado",
+      "workshop": "Baixado da Oficina pelo PZMM",
+      "github": "Instalado do GitHub pelo PZMM",
+      "local": "Instalado de um arquivo pelo PZMM",
+      "manual": "Adicionado à pasta de mods fora do PZMM"
+    }
+  },
+  "details": {
+    "label": "Detalhes do mod",
+    "closeTip": "Fechar (Esc) para ver a ordem de carregamento",
+    "closeLabel": "Fechar detalhes",
+    "missingWarn": "Este mod está ativado no seu perfil, mas não está instalado. Instale-o, inscreva-se nele na Steam ou desative-o.",
+    "showFiles": "Mostrar arquivos",
+    "githubPage": "Página no GitHub",
+    "workshopPage": "Página na Oficina",
+    "source": "Origem",
+    "author": "Autor",
+    "modVersion": "Versão do mod",
+    "needsGameVersion": "Requer a versão do jogo",
+    "versionOrNewer": "{version} ou mais recente",
+    "newerVersion": "Há uma versão mais recente na Oficina.",
+    "updateNow": "Atualizar agora",
+    "requires": "Requer",
+    "reqEnabled": "ativado",
+    "reqDisabled": "desativado",
+    "reqMissing": "não instalado",
+    "findTip": "Encontrar na Oficina Steam e instalar",
+    "looking": "Procurando {id} na Oficina…",
+    "noMatch": "Nada na Oficina corresponde a {id}.",
+    "pickOne": "Nenhum resultado é claramente {id}. Escolha o certo:",
+    "subscribers": {
+      "one": "{n} inscrito",
+      "other": "{n} inscritos"
+    },
+    "idMatches": "Mod ID corresponde",
+    "listedByAuthor": "listado pelo autor",
+    "notTaggedForBuild": "sem tag para a build do seu jogo",
+    "sharedFiles": "Arquivos compartilhados",
+    "winsOver": "As cópias deste mod prevalecem sobre {other}",
+    "othersWin": "As cópias de {other} prevalecem",
+    "filesWin": {
+      "one": "{count} arquivo, as cópias deste mod prevalecem",
+      "other": "{count} arquivos, as cópias deste mod prevalecem"
+    },
+    "filesLose": {
+      "one": "{count} arquivo, as cópias de {other} prevalecem",
+      "other": "{count} arquivos, as cópias de {other} prevalecem"
+    },
+    "lowerWins": "Prevalece o mod mais abaixo na ordem de carregamento. Arraste-o na ordem de carregamento (feche este painel) para mudar de qual deles os arquivos são usados.",
+    "description": "Descrição",
+    "restore": "Restaurar versão anterior",
+    "steamNote": "Este mod vem das suas inscrições na Steam. Cancele a inscrição na Steam para removê-lo.",
+    "unsubscribe": "Cancelar inscrição na página da Oficina"
+  },
+  "loadOrder": {
+    "title": "Ordem de carregamento",
+    "lede": "Os mods carregam de cima para baixo. Quando dois alteram o mesmo arquivo, prevalece o de baixo. A biblioteca à esquerda é sua para organizar: a ordem dela não muda esta.",
+    "problems": "Problemas",
+    "overridden": "Substituídos",
+    "overriddenTip": "Mods ativados com arquivos que outro mod substitui",
+    "autosort": "Ordenar automaticamente",
+    "step": {
+      "needs": "Liga os mods de que seus mods ativados precisam.",
+      "tiers": "Coloca frameworks primeiro, para que tudo o que depende deles carregue depois, e traduções por último, para que o texto delas prevaleça (pelas tags dos mods na Oficina).",
+      "rules": "Move os mods para que toda regra <span class=\"mono\">require</span>, <span class=\"mono\">loadModAfter</span> e <span class=\"mono\">loadModBefore</span> seja respeitada.",
+      "keep": "Mantém sua ordem no resto. Ctrl+Z traz a ordem antiga de volta."
+    },
+    "fix": {
+      "one": "Corrigir {count} problema sem ordenar automaticamente",
+      "other": "Corrigir {count} problemas sem ordenar automaticamente"
+    },
+    "modsInOrder": "Mods na ordem de carregamento",
+    "dragHint": "Arraste ou use Alt+↑/↓ para reordenar · Enter ou clique duplo abre um mod",
+    "notInstalled": "Não instalado",
+    "librarySections": "Seções da biblioteca"
+  },
+  "findings": {
+    "findBroken": "Encontrar o mod quebrado",
+    "round": "Procurando o mod quebrado, rodada {round}:",
+    "suspects": {
+      "one": "Resta {count} suspeito; ativos neste teste: {testing} (mais o que eles precisam).",
+      "other": "Restam {count} suspeitos; ativos neste teste: {testing} (mais o que eles precisam)."
+    },
+    "testHint": "Inicie o jogo, veja se o problema acontece e depois volte aqui.",
+    "stillHappens": "O problema ainda acontece",
+    "gone": "O problema sumiu",
+    "stop": "Parar e restaurar minha lista",
+    "setupCheck": "Verificação da configuração",
+    "noProblems": "Nenhum problema encontrado.",
+    "summary": "{errors}, {warnings}",
+    "errors": {
+      "one": "{count} erro",
+      "other": "{count} erros"
+    },
+    "warnings": {
+      "one": "{count} aviso",
+      "other": "{count} avisos"
+    },
+    "luaErrors": "<strong>Erros de Lua na sua última sessão de jogo</strong> (do console.txt):",
+    "errorCount": {
+      "one": "{count} erro, o primeiro em <span class=\"mono\">{example}</span>",
+      "other": "{count} erros, o primeiro em <span class=\"mono\">{example}</span>"
+    },
+    "unexplained": "Algo quebra, mas nada acima explica?",
+    "halves": "O PZMM divide seus mods ativados pela metade a cada vez que você testa o jogo."
+  },
+  "settings": {
+    "label": "Configurações",
+    "saveFailed": "Não foi possível salvar as configurações: {error}",
+    "tokenSaved": "Token do GitHub salvo no armazenamento de credenciais do sistema.",
+    "tokenForgot": "Token do GitHub esquecido.",
+    "confirmClearBackups": "Excluir todos os backups ({size})? Depois disso, os mods não poderão voltar à versão anterior.",
+    "diagnosticsCopied": "Diagnóstico copiado (seu nome de usuário está mascarado). Cole-o em um relatório de bug.",
+    "diagnosticsFailed": "Não foi possível copiar o diagnóstico: {error}",
+    "language": "Idioma",
+    "languageSystem": "Seguir o sistema ({name})",
+    "folders": {
+      "title": "Pastas",
+      "lede": "O PZMM encontra estas pastas sozinho. Defina uma só se ela estiver em outro lugar. Uma variável de ambiente prevalece sobre o que estiver definido aqui.",
+      "status": {
+        "found": "Encontrada",
+        "missing": "Não encontrada",
+        "not_pz": "Não é uma pasta do PZ"
+      },
+      "hintData": "perfis, mods instalados, backups, SteamCMD",
+      "hintZomboid": "mods, saves, configurações de servidor, logs",
+      "overriddenBy": "substituída por <span class=\"mono\">{env}</span>",
+      "detected": "detectada",
+      "browse": "Procurar…",
+      "detect": "Detectar",
+      "detectTip": "Esquecer a pasta definida aqui e encontrá-la de novo",
+      "open": "Abrir",
+      "moveLabel": "Mover dados do PZMM",
+      "moveConfirm": "Mover seus dados do PZMM de <span class=\"mono\">{from}</span> para <span class=\"mono\">{to}</span>? Sem mover, o PZMM começa vazio lá.",
+      "moveData": "Mover dados",
+      "switchWithoutMoving": "Mudar sem mover",
+      "reading": "Lendo as pastas…"
+    },
+    "downloads": {
+      "title": "Downloads e atualizações",
+      "check": "Verificar atualizações dos mods",
+      "checkOff": "Nunca (use Verificar atualizações)",
+      "checkStart": "Quando o PZMM iniciar",
+      "check1h": "Ao iniciar e depois a cada hora",
+      "check3h": "Ao iniciar e depois a cada 3 horas",
+      "whenFound": "Quando houver atualizações",
+      "notify": "Avisar",
+      "install": "Instalar",
+      "openIn": "Abrir páginas da Oficina",
+      "inSteam": "Na Steam (quando estiver aberta)",
+      "inBrowser": "No navegador",
+      "appUpdates": "Verificar novas versões do PZMM ao iniciar"
+    },
+    "token": {
+      "title": "Token do GitHub",
+      "hint": "Para mods instalados do GitHub: um token aumenta o limite do GitHub de 60 downloads por hora. Ele fica no armazenamento de credenciais do sistema, nunca em um arquivo.",
+      "envSet": "GITHUB_TOKEN está definido, então ele é usado.",
+      "savedPlaceholder": "Há um token salvo",
+      "save": "Salvar token",
+      "forget": "Esquecer"
+    },
+    "repair": {
+      "title": "Reparar",
+      "redownload": "Baixar de novo os mods instalados pelo PZMM",
+      "redownloadTip": "Repara cópias danificadas; cada um mantém a versão atual como backup"
+    },
+    "removing": {
+      "title": "Remoção e backups",
+      "removed": "Mods removidos",
+      "recycle": "Vão para a Lixeira",
+      "deleted": "São excluídos",
+      "removeRequirements": "Também remover mods exigidos que nada mais usa",
+      "ask": "Perguntar",
+      "always": "Sempre",
+      "never": "Nunca",
+      "backupCap": "Backups podem usar até",
+      "mb": "MB",
+      "backupCapHint": "0 = sem limite; os mais antigos saem primeiro",
+      "backupsHint": "Uma atualização mantém a versão anterior do mod como backup (Restaurar versão anterior nos detalhes dele).",
+      "backupsUse": "Os backups usam <strong>{size}</strong>",
+      "clearBackups": "Limpar backups"
+    },
+    "appearance": {
+      "title": "Aparência",
+      "theme": "Tema",
+      "themeSystem": "Seguir o sistema",
+      "dark": "Escuro",
+      "light": "Claro",
+      "accent": "Cor de destaque",
+      "build": "Build do jogo",
+      "buildDetect": "Detectar pelo default.txt",
+      "build42": "Build 42",
+      "build41": "Build 41",
+      "workshopView": "A Oficina abre em",
+      "browse": "Navegar",
+      "home": "Início",
+      "perPage": "Resultados da Oficina por página",
+      "compact": "Linhas compactas",
+      "showIds": "Mostrar mod IDs ao lado dos nomes",
+      "windowHint": "A janela lembra o tamanho e a posição dela."
+    },
+    "launch": {
+      "title": "Inicialização",
+      "args": "Argumentos extras do jogo",
+      "argsHint": "Iniciar jogo passa estes argumentos pela Steam, que pede permissão uma vez.",
+      "autosort": "Agrupar os mods de um perfil novo por categoria na primeira vez que ele for usado"
+    },
+    "about": {
+      "title": "Sobre",
+      "version": "PZMM {version}",
+      "checkUpdates": "Verificar atualizações",
+      "openLogs": "Abrir pasta de logs",
+      "diagnostics": "Copiar diagnóstico",
+      "diagnosticsTip": "Versão, pastas, perfil, número de mods e resultados de Verificar configuração, com seu nome de usuário mascarado",
+      "keys": "Teclado: <kbd>/</kbd> busca · <kbd>↑</kbd><kbd>↓</kbd> mover entre linhas · <kbd>Enter</kbd> detalhes · <kbd>Space</kbd> ativar/desativar · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> reordenar · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> desfazer/refazer · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+clique seleciona vários · <kbd>Esc</kbd> limpar seleção"
+    }
+  },
+  "servers": {
+    "label": "Servidores e saves",
+    "sameMods": "Mesmos mods do seu perfil atual",
+    "notInProfile": {
+      "one": "{count} fora do seu perfil",
+      "other": "{count} fora do seu perfil"
+    },
+    "notInTheirs": {
+      "one": "{count} dos seus fora dele",
+      "other": "{count} dos seus fora dele"
+    },
+    "started": "Servidor {name} iniciado com {how}. A janela de console dele mostra o progresso.",
+    "title": "Servidor dedicado",
+    "lede": "Envie o perfil “{profile}” para uma configuração de servidor, para que o servidor carregue os mesmos mods na mesma ordem. Isso define <span class=\"mono\">Mods=</span>, <span class=\"mono\">WorkshopItems=</span> e, quando seus mods adicionam mapas, <span class=\"mono\">Map=</span>. Todas as outras configurações são mantidas.",
+    "config": "Configuração do servidor",
+    "newConfig": "Nova configuração…",
+    "newNameLabel": "Nome da nova configuração de servidor",
+    "writeTo": "Gravar em {name}.ini",
+    "mapOrder": "Ordem dos mapas",
+    "mapOrderHint": "O servidor carrega os mapas de cima para baixo: mapas de mods vêm antes de <span class=\"mono\">Muldraugh, KY</span>. Arraste ou use Alt+↑/↓ para organizar; Gravar salva a ordem.",
+    "join": "Copiar a configuração de um servidor",
+    "joinHint": "Crie um perfil a partir de uma configuração de servidor: os mods da Oficina que faltam são instalados e a ordem dos mods é copiada.",
+    "startTip": "Iniciar este servidor dedicado",
+    "start": "Iniciar servidor",
+    "useAsProfile": "Usar como perfil",
+    "noConfigs": "Nenhuma configuração de servidor em <span class=\"mono\">{dir}</span> ainda.",
+    "saves": {
+      "title": "Jogos salvos",
+      "lede": "Cada save lembra os mods com que foi jogado. Carregue os mods de um save antes de continuá-lo, para que nada fique faltando.",
+      "none": "Nenhum save com lista de mods ainda.",
+      "info": {
+        "one": "{mode} · {count} mod · jogado {when} · {diff}",
+        "other": "{mode} · {count} mods · jogado {when} · {diff}"
+      },
+      "useMods": "Usar os mods deste save"
+    }
+  },
+  "zb": {
+    "title": "ZombieBuddy",
+    "lede": "Alguns mods incluem código Java que muda o jogo de formas que mods em Lua não conseguem. O ZombieBuddy é o carregador de que esses mods precisam. Configurá-lo exige duas alterações fora da sua pasta de mods, e o PZMM faz as duas para você.",
+    "caution": "<strong>Mods em Java podem fazer qualquer coisa no seu computador.</strong> O ZombieBuddy pergunta antes de carregar cada mod Java novo ou alterado. Só aprove mods de autores em quem você confia.",
+    "checks": {
+      "mod": "Mod ZombieBuddy baixado",
+      "modHint": "Inscrito na Steam ou instalado pelo PZMM",
+      "agent": "Arquivos do agente Java na pasta do jogo",
+      "gameNotFound": "Pasta do jogo não encontrada",
+      "flag": "Parâmetro de inicialização no ProjectZomboid64.json",
+      "flagHint": "Carrega o ZombieBuddy quando você inicia o jogo pela Steam",
+      "enabled": "Ativado no perfil “{profile}”",
+      "enabledHint": "Para que os mods que precisam dele possam carregar"
+    },
+    "done": "feito",
+    "notDone": "pendente",
+    "neededBy": {
+      "one": "Necessário para {count} mod ativado: <span class=\"mono\">{ids}</span>",
+      "other": "Necessário para {count} mods ativados: <span class=\"mono\">{ids}</span>"
+    },
+    "changesLabel": "Alterações a aplicar",
+    "confirmRemove": "Remover o ZombieBuddy da pasta do jogo?",
+    "willDo": "O PZMM vai:",
+    "nothing": "Nada a alterar.",
+    "apply": "Aplicar alterações",
+    "repair": "Reparar ZombieBuddy",
+    "setUp": "Configurar ZombieBuddy",
+    "removeFromGame": "Remover da pasta do jogo",
+    "about": "Sobre o ZombieBuddy",
+    "fine": "Atualizações do jogo e a opção “Verificar integridade dos arquivos do jogo” da Steam removem o parâmetro de inicialização. Se isso acontecer, esta página mostra <em>Reparar</em>. O PZMM altera só o inicializador normal.",
+    "useInstallerBefore": "Se você usa o inicializador alternativo ou opções de inicialização da Steam, use o",
+    "installer": "instalador oficial",
+    "useInstallerAfter": "em vez disso."
+  },
+  "profile": {
+    "tip": "Perfil: a lista de mods que você está jogando",
+    "menuLabel": "Perfis",
+    "newProfile": "Novo perfil…",
+    "setUpViewpoint": "Configurar o Project Viewpoint…"
+  },
+  "activity": {
+    "title": "Atividade",
+    "empty": "Instalações, atualizações e erros aparecem aqui."
+  },
+  "links": {
+    "label": "Links do PZMM",
+    "github": "PZMM no GitHub: código-fonte, issues e lançamentos",
+    "discord": "Entre no Discord do PZMM",
+    "kofi": "Apoie o PZMM no Ko-fi",
+    "comingSoon": "{label} (em breve)"
+  },
+  "window": {
+    "minimise": "Minimizar",
+    "maximise": "Maximizar",
+    "restore": "Restaurar"
+  },
+  "workshop": {
+    "sorts": {
+      "popular": "Mais populares",
+      "subscribed": "Mais inscritos",
+      "topRated": "Mais bem avaliados",
+      "newest": "Mais recentes",
+      "updated": "Atualizados recentemente",
+      "libraries": "Mais exigidos (bibliotecas)",
+      "collections": "Em mais coleções"
+    },
+    "days": {
+      "today": "Hoje",
+      "week": "Esta semana",
+      "month": "Este mês",
+      "months3": "3 meses",
+      "months6": "6 meses",
+      "year": "Este ano"
+    },
+    "within": {
+      "any": "Qualquer data",
+      "day": "Últimas 24 horas",
+      "week": "Última semana",
+      "month": "Último mês",
+      "months3": "Últimos 3 meses",
+      "months6": "Últimos 6 meses",
+      "year": "Último ano"
+    },
+    "tagNames": {
+      "Animals": "Animais",
+      "Audio": "Áudio",
+      "Balance": "Equilíbrio",
+      "Building": "Construção",
+      "ClothingArmor": "Roupas",
+      "Farming": "Agricultura",
+      "Food": "Comida",
+      "Framework": "Framework",
+      "Hardmode": "Modo difícil",
+      "Interface": "Interface",
+      "Items": "Itens",
+      "LanguageTranslation": "Traduções",
+      "Literature": "Literatura",
+      "Map": "Mapa",
+      "Military": "Militar",
+      "Misc": "Diversos",
+      "Models": "Modelos",
+      "Multiplayer": "Multijogador",
+      "PopCulture": "Cultura pop",
+      "QoL": "QoL",
+      "Realistic": "Realista",
+      "SillyFun": "Bobo e divertido",
+      "Skills": "Habilidades",
+      "Textures": "Texturas",
+      "Traits": "Traços",
+      "Vehicles": "Veículos",
+      "Weapons": "Armas",
+      "WIP": "WIP"
+    },
+    "home": {
+      "popularWeek": "Populares nesta semana",
+      "subscribed": "Mais inscritos",
+      "newest": "Mais recentes",
+      "updated": "Atualizados recentemente",
+      "required": "Mais exigidos"
+    },
+    "errors": {
+      "rateLimited": "A Steam está limitando as solicitações agora. Aguarde um minuto e tente de novo.",
+      "unreachable": "Não foi possível acessar a Oficina Steam: {error}"
+    },
+    "starsTip": {
+      "one": "{stars} de 5 estrelas, de {votes} voto",
+      "other": "{stars} de 5 estrelas, de {votes} votos"
+    },
+    "detailsLabel": "Detalhes de {title}",
+    "collectionBadge": "Coleção · {count}",
+    "moreByAuthorTip": "Mais deste autor",
+    "byAuthor": "por {author}",
+    "subscribersTip": "Inscritos atuais",
+    "subs": {
+      "one": "{n} inscrito",
+      "other": "{n} inscritos"
+    },
+    "favouritesTip": "Favoritos",
+    "commentsTip": "Comentários",
+    "postedTip": "Publicado em {date}",
+    "updatedOn": "Atualizado em {date}",
+    "needs": {
+      "one": "Precisa de {count} outro mod, instalado junto",
+      "other": "Precisa de {count} outros mods, instalados junto"
+    },
+    "details": "Detalhes",
+    "label": "Oficina Steam",
+    "optionsLabel": "Opções de navegação",
+    "viewLabel": "Visualização da Oficina",
+    "browse": "Navegar",
+    "homeTab": "Início",
+    "searchPlaceholder": "Buscar na Oficina",
+    "searchTip": "Busca da Steam: \"frase exata\", AND, OR, NOT, +obrigatório, -excluir",
+    "searchInLabel": "Buscar em",
+    "searchInTip": "Onde as palavras devem aparecer",
+    "anywhere": "Qualquer lugar",
+    "titles": "Títulos",
+    "descriptions": "Descrições",
+    "search": "Buscar",
+    "clearTerm": "Limpar “{term}”",
+    "gameBuild": "Build do jogo",
+    "buildN": "Build {n}",
+    "anyBuild": "Qualquer build",
+    "show": "Mostrar",
+    "mods": "Mods",
+    "collections": "Coleções",
+    "sortBy": "Ordenar por",
+    "popularOver": "Populares em",
+    "perPage": "Por página",
+    "tagsHeading": "Tags",
+    "tagsHeadingCount": "Tags ({count})",
+    "tagsHint": "Clique para exigir, de novo para excluir, de novo para limpar.",
+    "tagOnlyTip": "Só {tag}",
+    "tagNoTip": "Sem {tag}",
+    "posted": "Publicado",
+    "updated": "Atualizado",
+    "onlyIncompatible": "Só mods marcados como incompatíveis",
+    "clearFilters": "Limpar filtros",
+    "viewpointAddons": "Complementos do Viewpoint",
+    "viewpointDiscordTip": "Discord da comunidade do Project Viewpoint: ajuda, relatos de bugs, novidades",
+    "viewpointDiscord": "Discord do Viewpoint",
+    "modsBy": "Mods de <strong>{author}</strong>",
+    "modsByCount": "Mods de <strong>{author}</strong> ({count})",
+    "thisAuthor": "este autor",
+    "collectionsWith": "Coleções com <strong>{title}</strong>",
+    "modsThatNeed": "Mods que precisam de <strong>{title}</strong>",
+    "backToBrowsing": "Voltar à navegação",
+    "tryAgain": "Tentar de novo",
+    "viewAll": "Ver tudo",
+    "loading": "Carregando…",
+    "loadingWorkshop": "Carregando a Oficina…",
+    "nothingMatches": "Nada corresponde. Tente menos palavras, menos tags ou outra build.",
+    "clearSearch": "Limpar busca",
+    "countMods": {
+      "one": "{n} mod",
+      "other": "{n} mods"
+    },
+    "countCollections": {
+      "one": "{n} coleção",
+      "other": "{n} coleções"
+    },
+    "countModsFor": {
+      "one": "{n} mod para “{search}”",
+      "other": "{n} mods para “{search}”"
+    },
+    "countCollectionsFor": {
+      "one": "{n} coleção para “{search}”",
+      "other": "{n} coleções para “{search}”"
+    },
+    "loadingSuffix": " · carregando…",
+    "pagesLabel": "Páginas",
+    "previous": "Anterior",
+    "pageOf": "Página {page} de {pages}",
+    "next": "Próxima"
+  },
+  "panel": {
+    "moreByAuthorTip": "Mais mods deste autor",
+    "byAuthor": "por {author}",
+    "closeTip": "Fechar (Esc)",
+    "screenshotLabel": "Captura de tela {n}",
+    "youtubeTip": "Assistir no YouTube",
+    "youtubeLabel": "Assistir ao vídeo no YouTube",
+    "installAll": {
+      "one": "Instalar {count} mod",
+      "other": "Instalar todos os {count} mods"
+    },
+    "workshopPage": "Página na Oficina",
+    "rating": "Avaliação",
+    "subscribers": "Inscritos",
+    "visitors": "Visitantes",
+    "favourites": "Favoritos",
+    "comments": "Comentários",
+    "size": "Tamanho",
+    "posted": "Publicado",
+    "updated": "Atualizado",
+    "modsThatNeed": "Mods que precisam deste",
+    "collectionsWith": "Coleções com este",
+    "moreBy": "Mais de {author}",
+    "thisAuthor": "este autor",
+    "needs": {
+      "one": "Precisa de {count} outro mod (instalado junto)",
+      "other": "Precisa de {count} outros mods (instalados junto)"
+    },
+    "items": {
+      "one": "{count} item nesta coleção",
+      "other": "{count} itens nesta coleção"
+    },
+    "description": "Descrição",
+    "changeNotes": "Notas de alteração",
+    "commentsTab": "Comentários ({n})",
+    "loading": "Carregando…",
+    "noOlderChanges": "Nenhuma nota de alteração mais antiga.",
+    "noChanges": "Nenhuma nota de alteração.",
+    "newer": "Mais recentes",
+    "older": "Mais antigas",
+    "noComments": "Nenhum comentário ainda.",
+    "commentsRange": "{from}–{to} de {total}",
+    "postHint": "Para comentar, use a página na Oficina."
+  },
+  "installButton": {
+    "installAll": "Instalar tudo"
+  }
+}

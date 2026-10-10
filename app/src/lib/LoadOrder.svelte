@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from "svelte";
   import Icon from "./Icon.svelte";
+  import { t, th } from "./i18n.svelte";
   import LayerIcon, { overlapLabel } from "./LayerIcon.svelte";
   import type { ModRow, Overlap, Row } from "./api";
   import type { Problem } from "./order";
@@ -69,34 +70,35 @@
   }
 </script>
 
-<aside class="panel" aria-label="Load order">
-  <h2>Load order</h2>
-  <p class="lede">Mods load top to bottom. When two change the same file, the lower one wins. The library on the left is yours to organise: its order doesn't change this one.</p>
+<aside class="panel" aria-label={t("loadOrder.title")}>
+  <h2>{t("loadOrder.title")}</h2>
+  <p class="lede">{t("loadOrder.lede")}</p>
 
   <dl class="facts">
-    <div><dt>Enabled</dt><dd>{order.length}</dd></div>
-    <div class:bad={problems.size}><dt>Problems</dt><dd>{problems.size}</dd></div>
-    <div><dt>Overridden</dt><dd title="Enabled mods with files another mod replaces">{overridden}</dd></div>
+    <div><dt>{t("common.enabled")}</dt><dd>{order.length}</dd></div>
+    <div class:bad={problems.size}><dt>{t("loadOrder.problems")}</dt><dd>{problems.size}</dd></div>
+    <div><dt>{t("loadOrder.overridden")}</dt><dd title={t("loadOrder.overriddenTip")}>{overridden}</dd></div>
   </dl>
 
-  <button class="primary wide" onclick={onAutosort} disabled={busy}><Icon name="wand" size={14} />Autosort</button>
+  <button class="primary wide" onclick={onAutosort} disabled={busy}><Icon name="wand" size={14} />{t("loadOrder.autosort")}</button>
   <ol class="steps">
-    <li>Turns on mods that your enabled mods need.</li>
-    <li>Puts frameworks first, so everything built on them loads after, and translations last, so their text wins (from the mods' Workshop tags).</li>
-    <li>Moves mods so every <span class="mono">require</span>, <span class="mono">loadModAfter</span> and <span class="mono">loadModBefore</span> rule holds.</li>
-    <li>Keeps your order otherwise. Ctrl+Z puts the old order back.</li>
+    <li>{t("loadOrder.step.needs")}</li>
+    <li>{t("loadOrder.step.tiers")}</li>
+    <li>{@html th("loadOrder.step.rules")}</li>
+    <li>{t("loadOrder.step.keep")}</li>
   </ol>
 
   {#if fixable}
-    <button class="wide" onclick={onFix} disabled={busy}><Icon name="wand" size={14} />Fix {fixable} {fixable === 1 ? "problem" : "problems"} without autosorting</button>
+    <button class="wide" onclick={onFix} disabled={busy}><Icon name="wand" size={14} />{t("loadOrder.fix", { count: fixable })}</button>
   {/if}
 
   {#if order.length}
-    <h3>Mods in load order</h3>
-    <p class="hint">Drag or Alt+↑/↓ to reorder · Enter or double-click opens a mod</p>
-    <ol class="drag-list" role="listbox" aria-label="Mods in load order" bind:this={list}>
+    <h3>{t("loadOrder.modsInOrder")}</h3>
+    <p class="hint">{t("loadOrder.dragHint")}</p>
+    <ol class="drag-list" role="listbox" aria-label={t("loadOrder.modsInOrder")} bind:this={list}>
       {#each order as id, i (id)}
         {@const m = mods.get(id)}
+        {@const p = problems.get(id)}
         <li role="option" aria-selected={current === id} class:selected={current === id} class:drop={dropAt === i} class:dragging={dragFrom === i} tabindex="0" draggable={!busy}
           onclick={() => (current = id)} ondblclick={() => onSelect(id)} onkeydown={(e) => key(e, i, id)}
           ondragstart={() => (dragFrom = i)} ondragend={() => { dragFrom = dropAt = null; }}
@@ -108,7 +110,7 @@
             {#if m?.name && m.name !== id}<span class="id mono">{id}</span>{/if}
           </span>
           {#if m?.missing || problems.has(id)}
-            <span class="problem" title={m?.missing ? "Not installed" : problems.get(id)?.text}><Icon name="alert" size={12} /></span>
+            <span class="problem" title={m?.missing ? t("loadOrder.notInstalled") : p && t(p.key, { id: p.id })}><Icon name="alert" size={12} /></span>
           {/if}
           {#if overlaps[id]}
             <LayerIcon wins={overlaps[id].wins_over.length > 0} loses={overlaps[id].loses_to.length > 0} label={overlapLabel(overlaps[id])} />
@@ -122,7 +124,7 @@
   {/if}
 
   {#if sections.length}
-    <h3>Library sections</h3>
+    <h3>{t("loadOrder.librarySections")}</h3>
     <ul class="sections">
       {#each sections as s}
         <li><span>{s.name}</span><span class="mono">{s.on}/{s.total}</span></li>
@@ -178,6 +180,7 @@
   }
   .wide {
     width: 100%;
+    white-space: normal; /* long translations wrap inside the panel */
   }
   .steps {
     margin: 10px 0 14px;

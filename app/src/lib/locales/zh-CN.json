@@ -1,0 +1,1006 @@
+{
+  "tabs": {
+    "mods": "我的模组",
+    "workshop": "浏览创意工坊",
+    "maps": "地图",
+    "servers": "服务器与存档",
+    "zb": "ZombieBuddy",
+    "settings": "设置"
+  },
+  "app": {
+    "newProfilePlaceholder": "名称，例如：好友服务器",
+    "create": "创建",
+    "share": "分享",
+    "shareTip": "复制一段可供他人导入的代码",
+    "importTip": "从分享码导入配置方案",
+    "installLabel": "安装模组",
+    "installPlaceholder": "粘贴创意工坊链接、合集或 ID、GitHub 仓库（owner/repo）或 .zip 路径",
+    "updateMods": {
+      "other": "更新 {count} 个模组"
+    },
+    "checkUpdatesTip": "向创意工坊查询是否有模组推出了新版本",
+    "checking": "正在检查…",
+    "checkUpdates": "检查更新",
+    "launchTip": "通过 Steam 启动",
+    "launchTipArgs": "通过 Steam 启动，附带参数 {args}",
+    "launch": "启动游戏",
+    "importIntro": "<strong>导入配置方案</strong>：粘贴别人发给你的分享码。缺少的创意工坊模组会自动安装。",
+    "switchGameLabel": "切换游戏",
+    "switchToViewpoint": "切换到 Project Viewpoint（3D）？",
+    "switchToZomboid": "切换回 Project Zomboid？",
+    "viewpointNote": "Viewpoint 尚处于早期开发阶段。它通过 ZombieBuddy 加载，游戏启动时 ZombieBuddy 会询问你一次，是否批准其 Java 代码。",
+    "switch": "切换",
+    "checkingNeeded": "正在检查所需内容…",
+    "updateAvailable": "<strong>PZMM {version} 已发布。</strong>你当前的版本是 {current}。",
+    "whatsNew": "更新内容",
+    "later": "稍后",
+    "waitTip": "请等待当前任务完成",
+    "updateRestart": "更新并重启",
+    "downloading": "正在下载 PZMM {version}… {progress}%",
+    "sectionsLabel": "分组",
+    "needsSetup": "需要设置",
+    "saveDiff": "你最近的存档 <strong>{save}</strong> 使用的模组列表与当前不同：{diffs}。用此列表继续游戏可能会损坏存档。",
+    "saveMissing": {
+      "other": "其中 {count} 个模组未启用"
+    },
+    "saveExtra": {
+      "other": "{count} 个已启用的模组不在其中"
+    },
+    "useSaveMods": "使用此存档的模组",
+    "dismiss": "忽略",
+    "zbNeeded": {
+      "other": "{count} 个已启用的模组需要 ZombieBuddy，但它尚未设置。"
+    },
+    "zbNeededPartial": {
+      "other": "{count} 个已启用的模组需要 ZombieBuddy，但它未完全设置（可能被游戏更新重置了）。"
+    },
+    "zbSetup": "设置 ZombieBuddy"
+  },
+  "mods": {
+    "searchPlaceholder": "搜索模组  ( / )",
+    "searchLabel": "搜索模组",
+    "showLabel": "显示",
+    "filterAll": "全部",
+    "filterProblems": "问题",
+    "filterProblemsN": "问题（{count}）",
+    "sortLabel": "列表排序",
+    "sortOrder": "库顺序",
+    "sortName": "名称",
+    "sortSize": "大小",
+    "sortUpdated": "最后修改",
+    "sortStatus": "问题优先",
+    "count": {
+      "other": "已启用 {enabled} · 共 {count} 个模组"
+    },
+    "installMissingTip": "在创意工坊中查找并安装：{ids}",
+    "installMissing": "安装缺失的模组（{count}）",
+    "fixTip": "启用必需的模组，并按 require / loadModAfter / loadModBefore 规则排列模组",
+    "fix": "修复加载顺序",
+    "selectedLabel": "已选模组",
+    "selected": {
+      "other": "已选 {count} 个"
+    },
+    "moveLabel": "移动所选模组",
+    "moveTo": "移动到…",
+    "moveTop": "列表顶部",
+    "moveUnder": "“{name}”下方",
+    "moveBottom": "列表底部",
+    "hintFiltering": "清除搜索和筛选，并按库顺序排序，即可调整顺序。",
+    "hint": "拖动或 Alt+↑/↓ 整理 · Space 切换启用 · Ctrl/Shift+点击 多选",
+    "checkSetupTip": "检查配置方案和服务器配置中的问题",
+    "checkSetup": "检查设置",
+    "undoTip": "撤销上一次列表更改（Ctrl+Z）",
+    "undo": "撤销",
+    "redoTip": "重做（Ctrl+Y）",
+    "redo": "重做",
+    "separatorTip": "在所选模组上方添加分隔符",
+    "separator": "分隔符",
+    "groupTip": "根据创意工坊标签，将模组按类别各归入一个分组。加载顺序不变。",
+    "group": "按类别分组",
+    "loading": "正在加载你的模组…",
+    "emptyTitle": "物资库里还什么都没有。",
+    "emptyHint": "在上方粘贴 Steam 创意工坊链接即可安装模组，或在 Steam 中订阅模组：订阅的模组会自动显示在这里。",
+    "newSection": "新分组",
+    "newSectionN": "新分组 {n}"
+  },
+  "busy": {
+    "loading": "正在加载",
+    "saving": "正在保存",
+    "viewpointSetup": "正在设置 Project Viewpoint",
+    "toZomboid": "正在切换到 Project Zomboid",
+    "switchingTo": "正在切换到“{name}”",
+    "switchingProfile": "正在切换配置方案",
+    "readingTags": "正在读取创意工坊标签",
+    "updatingOne": "正在更新 {name}",
+    "updatingMany": {
+      "other": "正在更新 {count} 个模组"
+    },
+    "installingWorkshop": "正在安装创意工坊模组 {id}",
+    "installingOne": "正在安装 {name}",
+    "installingMany": {
+      "other": "正在安装 {count} 个模组"
+    },
+    "findingMissing": {
+      "other": "正在创意工坊中查找 {count} 个缺失的模组"
+    },
+    "importing": "正在导入“{name}”",
+    "importingServer": "正在导入 {name}.ini",
+    "loadingSave": "正在加载 {name} 的模组",
+    "creatingProfile": "正在创建配置方案“{name}”",
+    "deletingProfile": "正在删除配置方案“{name}”",
+    "removingOne": "正在移除 {name}",
+    "removingMany": {
+      "other": "正在移除 {count} 个模组"
+    },
+    "restoring": "正在恢复 {id}",
+    "zbSetup": "正在设置 ZombieBuddy",
+    "zbRemove": "正在移除 ZombieBuddy"
+  },
+  "log": {
+    "appLatest": "PZMM {version} 已是最新版本。",
+    "appCheckFailed": "无法检查 PZMM 更新：{error}",
+    "appUpdateFailed": "无法更新 PZMM：{error}",
+    "adopted": "已同步游戏内模组菜单中的更改（配置方案“{profile}”）。",
+    "tagsFailedSorted": "无法读取创意工坊标签，因此只修复了加载规则（{error}）。",
+    "autosorted": "已自动排序加载顺序。按 Ctrl+Z 可恢复原顺序。",
+    "tagsFailed": "无法读取创意工坊标签（{error}）。",
+    "grouped": {
+      "other": "已将你的模组归入 {count} 个类别。"
+    },
+    "groupedUndo": {
+      "other": "已将你的模组归入 {count} 个类别。按 Ctrl+Z 可恢复你原来的分组。"
+    },
+    "updatesFound": {
+      "other": "{count} 个模组在创意工坊上有更新。"
+    },
+    "updatesCheckFailed": "无法检查更新：{error}",
+    "upToDate": "你的模组均为最新版本。",
+    "nothingToRedownload": "PZMM 没有安装过可重新下载的模组（Steam 会自动更新订阅的模组）。",
+    "stillMissing": "仍然缺失：{ids}。选择一个需要它的模组，然后使用“查找”选择匹配项。",
+    "shareCopied": "已复制“{profile}”的分享码。发给好友，对方在 PZMM 中使用“导入”即可。",
+    "shareFailed": "无法复制分享码：{error}",
+    "checkSetupFailed": "无法检查设置：{error}",
+    "bisectNeedsTwo": "至少启用两个模组才能查找出问题的模组。",
+    "bisectFound": "找到了：{id} 导致了该问题。你的模组列表已恢复。",
+    "bisectNone": "该问题与任何单个模组都无关。你的模组列表已恢复。",
+    "sectionExists": "已存在名为“{name}”的分组。请换一个名称。",
+    "noneOurs": "所选模组都不是由 PZMM 安装的；Steam 模组请在 Steam 中取消订阅。"
+  },
+  "confirm": {
+    "group": "“按类别分组”会将你自己的分组（{sections}）替换为类别分组。按 Ctrl+Z 可撤销。现在分组吗？",
+    "redownload": {
+      "other": "重新下载 PZMM 安装的全部 {count} 个模组？每个模组都会将当前版本保留为备份。"
+    },
+    "updateInSave": {
+      "other": "{mods} 正被你最近的存档（{save}）使用。更新可能会损坏进行中的存档。每个更新的模组都会保留其旧版本（“恢复旧版本”）。现在更新吗？"
+    },
+    "removeRecycleOne": "移除 {name}？其文件将从你的 Zomboid 模组文件夹移至回收站。",
+    "removeRecycleMany": {
+      "other": "移除 {count} 个模组？它们的文件将从你的 Zomboid 模组文件夹移至回收站。"
+    },
+    "removeDeleteOne": "移除 {name}？其文件将从你的 Zomboid 模组文件夹中删除。",
+    "removeDeleteMany": {
+      "other": "移除 {count} 个模组？它们的文件将从你的 Zomboid 模组文件夹中删除。"
+    },
+    "removeSkipped": {
+      "other": " （{count} 个非 PZMM 安装的模组将保持不动。）"
+    },
+    "alsoRemove": {
+      "other": "同时移除 {ids}？你没有其他模组需要它们。"
+    },
+    "deleteProfile": "删除配置方案“{name}”？你的模组仍会保持安装。PZMM 将切换到“{other}”。"
+  },
+  "common": {
+    "cancel": "取消",
+    "close": "关闭",
+    "install": "安装",
+    "installing": "正在安装…",
+    "installed": "已安装",
+    "remove": "移除",
+    "enable": "启用",
+    "disable": "禁用",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "delete": "删除",
+    "import": "导入",
+    "clear": "清除",
+    "workshop": "创意工坊",
+    "refresh": "刷新"
+  },
+  "format": {
+    "gb": "{n} GB",
+    "mb": "{n} MB",
+    "kb": "{n} KB"
+  },
+  "problems": {
+    "needsMissing": "需要 {id}（未安装）",
+    "needsDisabled": "需要 {id}（已禁用）",
+    "loadFirst": "{id} 必须先加载",
+    "incompatible": "与 {id} 不兼容",
+    "loadAfter": "应在 {id} 之后加载",
+    "loadBefore": "应在 {id} 之前加载"
+  },
+  "source": {
+    "workshop": "创意工坊",
+    "steam": "已订阅",
+    "local": "本地文件",
+    "manual": "手动"
+  },
+  "api": {
+    "badShareCode": "这不是 PZMM 配置方案代码。"
+  },
+  "maps": {
+    "label": "地图",
+    "worldMap": "世界地图",
+    "help": {
+      "button": "帮助",
+      "label": "地图帮助",
+      "gridTitle": "如何看懂网格",
+      "grid": "每个方块代表 Build {build} 世界中的一个单元格（B42 单元格为 256 图块，B41 为 300 图块，因此只能比较同一版本的地图）。<strong>灰色</strong>是游戏原版地图，<strong>青色</strong>是原版河流；<strong>蓝色</strong>是被某张地图占用的单元格，<strong>金色</strong>是建在原版区域上的地图（通常是有意为之），<strong>红色</strong>是两张或更多地图争夺同一单元格：只有其中一张会在那里加载。“按地图着色”则为每张显示的地图分配各自的颜色。",
+      "previewTitle": "预览或启用",
+      "preview": "已启用的地图始终显示。勾选一张地图或点击其所在行即可<em>预览</em>：它会被绘制出来并检查冲突，但在你启用之前，模组列表不会有任何改变。点击单元格可列出该处的地图；Shift+点击可添加更多单元格。",
+      "workshopTitle": "创意工坊地图",
+      "workshop": "开启“创意工坊地图”后，PZMM 会列出此版本所有带“地图”标签的创意工坊物品，包括你尚未安装的：先立即从内置索引中列出，然后从 Steam 读取此后有更新的物品的文件列表（不下载、不安装），每个物品仅在更新后才会重新读取。在“安装前检查创意工坊地图”中粘贴合集，即可预览其中的所有地图。像已安装的地图一样预览它们，然后安装你想要的。"
+    },
+    "lede": "网格显示已启用的地图和你预览的地图。滚动缩放，拖动平移，点击单元格可列出该处的地图。",
+    "legend": {
+      "more": {
+        "other": "+{count} 个"
+      },
+      "map": "地图",
+      "over": "覆盖原版（{count}）",
+      "conflict": "冲突（{count}）",
+      "vanilla": "原版",
+      "river": "河流"
+    },
+    "hideVanilla": "隐藏原版",
+    "perMapColours": "按地图着色",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "fit": "适应",
+    "gridLabel": "单元格网格：显示 {maps} 张地图，{conflicts} 个单元格冲突，{over} 个覆盖原版",
+    "cell": "单元格 {x}, {y}",
+    "kind": {
+      "vanilla": "原版区域",
+      "water": "原版河流",
+      "over": "覆盖原版区域",
+      "conflict": "冲突：这些地图共用此单元格"
+    },
+    "empty": "空",
+    "readingFiles": "正在读取地图文件…",
+    "noVanilla": "未显示原版区域：找不到游戏安装，或其不是 Build {build}。请检查“设置”中的文件夹。",
+    "mapMods": "地图模组",
+    "undoTip": "撤销上一次预览更改、快速选择、预设或启用/禁用（Ctrl+Z）",
+    "undoLabel": "撤销",
+    "workshopSource": "你尚未安装的创意工坊地图",
+    "workshopSourceNote": "从 PZMM 内置索引列出所有带“地图”标签的创意工坊物品，然后仅从 Steam 读取此后有更新的物品（仅文件列表，不下载任何内容）。",
+    "scan": {
+      "limited": "Steam 当前正在限制请求。请等待一分钟后刷新。",
+      "stopping": "正在停止…",
+      "stop": "停止",
+      "summary": {
+        "other": "已读取 {count} 个创意工坊物品，其中 {n} 个未安装。"
+      },
+      "listing": "正在列出带“地图”标签的创意工坊物品… {done}/{total}",
+      "reading": "正在读取文件列表… {done}/{total}",
+      "readingFailed": "正在读取文件列表… {done}/{total}（{failed} 个失败）",
+      "failed": {
+        "other": "{count} 个创意工坊物品的文件列表无法读取（原因见活动日志）。"
+      },
+      "refreshTip": "重新列出带“地图”标签的物品，并读取新增和更新的物品"
+    },
+    "searchPlaceholder": "搜索名称、mod ID、创意工坊 ID、文件夹、作者、标签",
+    "searchLabel": "搜索地图",
+    "filterLabel": "显示地图",
+    "sortLabel": "地图排序",
+    "filter": {
+      "all": "全部地图",
+      "conflict": "有冲突",
+      "over": "覆盖原版"
+    },
+    "sort": {
+      "name": "名称",
+      "cells": "单元格最多",
+      "conflicts": "冲突最多",
+      "state": "已启用优先",
+      "subs": "订阅最多",
+      "updated": "最近更新",
+      "newest": "最新"
+    },
+    "pickedCells": "单元格 <span class=\"mono\">{cells}</span>",
+    "mapCount": {
+      "other": "{count} 张地图"
+    },
+    "clearCells": "清除单元格",
+    "quickSelect": "最多共存地图",
+    "quickSelecting": "正在寻找最多可共存的地图…",
+    "quickSelectTip": "预览列表中彼此之间以及与已启用地图之间都不共用单元格的最多地图（已安装和热门的地图优先）",
+    "quickSelectDone": {
+      "other": "正在预览 {count} 张地图：列表中能围绕已启用地图共存的最多地图。"
+    },
+    "quickSelectNone": "列表中的每张地图都与某张已启用的地图共用单元格。",
+    "previewListed": "预览所列地图",
+    "unpreviewListed": "取消预览所列地图",
+    "enabledOnly": "仅已启用",
+    "enabledOnlyTip": "清除预览：网格仅显示已启用的地图",
+    "enablePreviewed": {
+      "other": "启用 {count} 张预览地图"
+    },
+    "disableListed": {
+      "other": "禁用 {count} 张所列地图"
+    },
+    "unhide": {
+      "other": "取消隐藏 {count} 张"
+    },
+    "unhideTip": "在网格上重新绘制所有显示的地图",
+    "noMaps": "没有已安装的模组为 Build {build} 添加地图。请开启上方的“创意工坊地图”，或在安装前于下方检查一张地图。",
+    "previewLabel": "在网格上预览 {name}",
+    "alwaysShownTip": "已启用的地图始终显示",
+    "previewTip": "在网格上显示但不启用",
+    "notInstalled": "未安装",
+    "showOnGrid": "在网格上显示",
+    "showOnGridTip": "在网格上重新绘制",
+    "hideOnGrid": "在网格上隐藏",
+    "hideOnGridTip": "不在网格上绘制，以便查看其下方的内容（它仍会保留在导出和依赖项中）",
+    "cellCount": {
+      "other": "{count} 个单元格"
+    },
+    "byAuthor": "作者：{author}",
+    "subscribers": {
+      "other": "{n} 人订阅"
+    },
+    "conflictsWith": {
+      "other": "与 {name} 在单元格 <span class=\"mono\">{cells}</span> 冲突"
+    },
+    "swap": "替换",
+    "swapTip": "改为显示此地图：隐藏与其冲突的预览地图，并关闭与其冲突的已启用地图",
+    "andMore": {
+      "other": "…以及另外 {count} 个"
+    },
+    "cellsOverVanilla": {
+      "other": "{count} 个单元格覆盖原版"
+    },
+    "packMember": {
+      "other": "此创意工坊物品中 {count} 个模组之一"
+    },
+    "workshopItem": "创意工坊物品 {id}",
+    "dupeMod": "mod ID {id} 也存在于 {item} 中：只会加载其中一份",
+    "dupeModMore": {
+      "other": "mod ID {id} 也存在于 {item} 及另外 {count} 个物品中：只会加载其中一份"
+    },
+    "dupeFolder": "地图文件夹 {folder} 也由 {names} 添加",
+    "dupeFolderMore": {
+      "other": "地图文件夹 {folder} 也由 {names} 及另外 {count} 个模组添加"
+    },
+    "openWorkshopTip": "打开其创意工坊页面",
+    "alsoTurnsOnTip": "同时启用它所需的模组",
+    "installTip": "连同其所需的物品一起安装",
+    "showMore": {
+      "other": "再显示 {count} 个（共 {total} 个）"
+    },
+    "req": {
+      "title": "依赖项",
+      "viewLabel": "依赖项视图",
+      "neededBy": "被依赖",
+      "neededByTip": "每个依赖项以及需要它的已显示地图",
+      "tree": "树状",
+      "treeTip": "每张显示的地图及其所需内容，逐层展开",
+      "lede": "显示的地图直接或间接需要的内容：必需的模组（<span class=\"mono\">require=</span>）以及它们所基于的其他地图（<span class=\"mono\">lots=</span>）。",
+      "nothingElse": "显示的地图不需要其他内容。",
+      "showOne": "显示或启用一张地图以查看其所需内容。",
+      "groups": {
+        "enabled": "已启用地图所需",
+        "preview": "预览地图所需",
+        "missing": "未安装地图所需"
+      },
+      "on": "已启用",
+      "off": "未启用",
+      "findTip": "在 Steam 创意工坊中查找并安装",
+      "pickInDetails": "在详情中选择",
+      "looking": "正在创意工坊中查找 {id}…",
+      "noClearResult": "没有明确匹配的结果：请在需要它的地图详情中选择一个。",
+      "noMatch": "创意工坊中没有与 {id} 匹配的内容。",
+      "neededByMap": "地图 {folder} · {names} 需要",
+      "neededByFolder": "地图文件夹 · {names} 需要",
+      "neededByOnly": "{names} 需要",
+      "loop": "（需要自身：循环依赖）",
+      "map": "地图 {folder}"
+    },
+    "export": {
+      "title": "地图顺序与导出",
+      "lede": "为好友或服务器复制显示的地图：包括创意工坊链接和 mod ID、所需内容，以及 <span class=\"mono\">Mods=</span>、<span class=\"mono\">WorkshopItems=</span> 和 <span class=\"mono\">Map=</span> 行。",
+      "orderTitle": "地图顺序",
+      "orderHint": "游戏按从上到下的顺序加载地图：模组地图要放在 <span class=\"mono\">Muldraugh, KY</span> 之前。拖动或按 Alt+↑/↓ 调整；该顺序随配置方案保存，用于导出和服务器卡片，并会为已启用的地图写入游戏的模组列表。",
+      "copy": {
+        "other": "将 {count} 张地图复制到剪贴板"
+      },
+      "copied": {
+        "other": "已复制 {count} 张地图：创意工坊链接、mod ID、依赖项以及 Mods=、WorkshopItems= 和 Map= 行。"
+      }
+    },
+    "presets": {
+      "title": "预设",
+      "hint": "将显示的地图以某个名称保存，之后可再次预览。",
+      "label": "预设",
+      "pick": "选择预设",
+      "preview": "预览",
+      "namePlaceholder": "预设名称",
+      "save": {
+        "other": "保存显示的 {count} 张"
+      },
+      "confirmReplace": "替换预设“{name}”？",
+      "saved": {
+        "other": "已将显示的 {count} 张地图保存为“{name}”。"
+      },
+      "previewing": "正在预览“{name}”。",
+      "previewingMissing": "正在预览“{name}”；未找到：{ids}（请安装它们，或开启“创意工坊地图”）。"
+    },
+    "compare": {
+      "title": "与服务器比较",
+      "lede": "服务器配置加载的地图（<span class=\"mono\">Map=</span>）与此处显示的地图对比。",
+      "serverLabel": "服务器配置",
+      "compare": "比较",
+      "noServers": "Zomboid/Server 中还没有服务器配置。",
+      "same": "与 {server}.ini 的地图相同。",
+      "onlyServer": "服务器上有，此处未显示",
+      "noKnownMap": "没有已知的创意工坊地图添加它",
+      "on": "已启用",
+      "installed": "已安装",
+      "notInstalled": "未安装",
+      "preview": "预览",
+      "onlyYou": "此处显示，服务器上没有"
+    },
+    "check": {
+      "title": "安装前检查创意工坊地图",
+      "lede": "先查看一张地图（或合集中的每张地图）的位置及其冲突。PZMM 从 Steam 读取该物品的文件列表（不下载、不安装），只保留其单元格信息。",
+      "placeholder": "创意工坊或合集链接，或 ID",
+      "checking": "正在检查…",
+      "check": "检查",
+      "pasteId": "请粘贴创意工坊链接或物品 ID。",
+      "noItem": "不存在创意工坊物品 {id}。",
+      "alreadyInstalled": "{title} 已安装：如果它添加了地图，它们已在列表中。",
+      "confirmDownload": "Steam 未提供“{title}”的文件列表（{error}）。是否改为下载它（{size}）来读取其单元格？不会安装任何内容，下载的文件随后会被删除。",
+      "read": "已读取 {title}：它已在网格上预览，并以未安装状态显示在列表中。",
+      "noMaps": "{title} 没有为 Build {build} 添加地图。",
+      "readingMember": "正在读取 {title}（{n}/{total}）…",
+      "collection": {
+        "other": "{title}：正在预览来自 {items} 个物品的 {count} 张地图。"
+      },
+      "collectionFailed": "无法读取 {titles}：请逐个检查。",
+      "collectionUntagged": {
+        "other": "另有 {count} 个物品没有“地图”标签，因此未读取。"
+      }
+    }
+  },
+  "mapOrder": {
+    "label": "地图顺序",
+    "top": "置顶",
+    "topTip": "最先加载",
+    "topLabel": "将 {name} 移到顶部",
+    "autosort": "自动排序地图",
+    "autosortTip": "模组地图在前，保持当前顺序，然后是 Muldraugh, KY"
+  },
+  "layerIcon": {
+    "overrides": "覆盖了 {mods} 的文件",
+    "overriddenBy": "部分文件被 {mods} 覆盖"
+  },
+  "modTable": {
+    "col": {
+      "move": "移动",
+      "loadOrder": "加载顺序",
+      "mod": "模组",
+      "size": "大小",
+      "lastChanged": "最后修改",
+      "sharedFiles": "共享文件",
+      "source": "来源"
+    },
+    "sepNameLabel": "分隔符名称（留空则移除）",
+    "expandLabel": "展开 {name}",
+    "collapseLabel": "折叠 {name}",
+    "renameTip": "双击重命名",
+    "sectionCount": "已启用 {on}/{total}",
+    "removeSepTip": "移除此分隔符（Delete）。其中的模组位置不变。",
+    "removeSepLabel": "移除分隔符 {name}",
+    "enableLabel": "启用 {name}",
+    "b41Only": "仅限 B41",
+    "b41OnlyTip": "仅为 Build 41 制作（没有 42/ 或 common/ 文件夹）：在 Build 42 上可能报错或不起作用",
+    "b42Only": "仅限 B42",
+    "b42OnlyTip": "仅为 Build 42 制作",
+    "notInstalled": "未安装",
+    "updateAvailable": "有可用更新",
+    "sourceHint": {
+      "steam": "已在 Steam 中订阅，由 Steam 保持更新",
+      "workshop": "由 PZMM 从创意工坊下载",
+      "github": "由 PZMM 从 GitHub 安装",
+      "local": "由 PZMM 从文件安装",
+      "manual": "在 PZMM 之外添加到模组文件夹"
+    }
+  },
+  "details": {
+    "label": "模组详情",
+    "closeTip": "关闭（Esc）以查看加载顺序",
+    "closeLabel": "关闭详情",
+    "missingWarn": "此模组已在你的配置方案中启用，但尚未安装。请安装它、在 Steam 中订阅它，或将其禁用。",
+    "showFiles": "显示文件",
+    "githubPage": "GitHub 页面",
+    "workshopPage": "创意工坊页面",
+    "source": "来源",
+    "author": "作者",
+    "modVersion": "模组版本",
+    "needsGameVersion": "需要的游戏版本",
+    "versionOrNewer": "{version} 或更新版本",
+    "newerVersion": "创意工坊上有更新的版本。",
+    "updateNow": "立即更新",
+    "requires": "依赖",
+    "reqEnabled": "已启用",
+    "reqDisabled": "已禁用",
+    "reqMissing": "未安装",
+    "findTip": "在 Steam 创意工坊中查找并安装",
+    "looking": "正在创意工坊中查找 {id}…",
+    "noMatch": "创意工坊中没有与 {id} 匹配的内容。",
+    "pickOne": "没有明确是 {id} 的结果。请选择正确的一项：",
+    "subscribers": {
+      "other": "{n} 人订阅"
+    },
+    "idMatches": "mod ID 匹配",
+    "listedByAuthor": "作者列出",
+    "notTaggedForBuild": "未标记适用于你的游戏版本",
+    "sharedFiles": "共享文件",
+    "winsOver": "此模组的文件优先于 {other}",
+    "othersWin": "{other} 的文件优先",
+    "filesWin": {
+      "other": "{count} 个文件，此模组的文件优先"
+    },
+    "filesLose": {
+      "other": "{count} 个文件，{other} 的文件优先"
+    },
+    "lowerWins": "加载顺序中靠下的模组优先。在加载顺序中拖动它（关闭此面板）即可改变使用哪个模组的文件。",
+    "description": "描述",
+    "restore": "恢复旧版本",
+    "steamNote": "此模组来自你的 Steam 订阅。请在 Steam 中取消订阅以移除它。",
+    "unsubscribe": "在创意工坊页面取消订阅"
+  },
+  "loadOrder": {
+    "title": "加载顺序",
+    "lede": "模组按从上到下的顺序加载。当两个模组修改同一个文件时，靠下的那个优先。左侧的库由你自由整理：它的顺序不会影响这里。",
+    "problems": "问题",
+    "overridden": "被覆盖",
+    "overriddenTip": "有文件被其他模组替换的已启用模组",
+    "autosort": "自动排序",
+    "step": {
+      "needs": "启用你已启用的模组所需的模组。",
+      "tiers": "将框架放在最前面，使所有基于它们的模组随后加载；将翻译放在最后，使其文本生效（依据模组的创意工坊标签）。",
+      "rules": "移动模组，使每条 <span class=\"mono\">require</span>、<span class=\"mono\">loadModAfter</span> 和 <span class=\"mono\">loadModBefore</span> 规则都得到满足。",
+      "keep": "其余保持你的顺序。按 Ctrl+Z 可恢复原顺序。"
+    },
+    "fix": {
+      "other": "修复 {count} 个问题，不自动排序"
+    },
+    "modsInOrder": "按加载顺序排列的模组",
+    "dragHint": "拖动或 Alt+↑/↓ 调整顺序 · Enter 或双击打开模组",
+    "notInstalled": "未安装",
+    "librarySections": "库分组"
+  },
+  "findings": {
+    "findBroken": "查找出问题的模组",
+    "round": "正在查找出问题的模组，第 {round} 轮：",
+    "suspects": {
+      "other": "剩余 {count} 个嫌疑模组，本次测试启用 {testing} 个（以及它们所需的模组）。"
+    },
+    "testHint": "启动游戏，检查问题是否出现，然后回到这里。",
+    "stillHappens": "问题仍然存在",
+    "gone": "问题消失了",
+    "stop": "停止并恢复我的列表",
+    "setupCheck": "设置检查",
+    "noProblems": "未发现问题。",
+    "summary": "{errors}，{warnings}",
+    "errors": {
+      "other": "{count} 个错误"
+    },
+    "warnings": {
+      "other": "{count} 个警告"
+    },
+    "luaErrors": "<strong>上次游戏中的 Lua 错误</strong>（来自 console.txt）：",
+    "errorCount": {
+      "other": "{count} 个错误，首个位于 <span class=\"mono\">{example}</span>"
+    },
+    "unexplained": "有东西出错，但上面的内容都无法解释？",
+    "halves": "每次你测试游戏时，PZMM 都会将已启用的模组减半。"
+  },
+  "settings": {
+    "label": "设置",
+    "saveFailed": "无法保存设置：{error}",
+    "tokenSaved": "已将 GitHub 令牌保存到系统凭据存储中。",
+    "tokenForgot": "已清除 GitHub 令牌。",
+    "confirmClearBackups": "删除所有备份（{size}）？之后将无法把模组恢复到旧版本。",
+    "diagnosticsCopied": "已复制诊断信息（你的用户名已隐去）。请将其粘贴到错误报告中。",
+    "diagnosticsFailed": "无法复制诊断信息：{error}",
+    "language": "语言",
+    "languageSystem": "跟随系统（{name}）",
+    "folders": {
+      "title": "文件夹",
+      "lede": "PZMM 会自动找到这些文件夹。仅当它们位于其他位置时才需要设置。环境变量优先于此处的设置。",
+      "status": {
+        "found": "已找到",
+        "missing": "未找到",
+        "not_pz": "不是 PZ 文件夹"
+      },
+      "hintData": "配置方案、已安装的模组、备份、SteamCMD",
+      "hintZomboid": "模组、存档、服务器配置、日志",
+      "overriddenBy": "被 <span class=\"mono\">{env}</span> 覆盖",
+      "detected": "自动检测",
+      "browse": "浏览…",
+      "detect": "检测",
+      "detectTip": "忘记此处设置的文件夹并重新查找",
+      "open": "打开",
+      "moveLabel": "移动 PZMM 数据",
+      "moveConfirm": "将你的 PZMM 数据从 <span class=\"mono\">{from}</span> 移动到 <span class=\"mono\">{to}</span>？如果不移动，PZMM 在新位置将从空白开始。",
+      "moveData": "移动数据",
+      "switchWithoutMoving": "切换但不移动",
+      "reading": "正在读取文件夹…"
+    },
+    "downloads": {
+      "title": "下载与更新",
+      "check": "检查模组更新",
+      "checkOff": "从不（使用“检查更新”）",
+      "checkStart": "PZMM 启动时",
+      "check1h": "启动时，之后每小时",
+      "check3h": "启动时，之后每 3 小时",
+      "whenFound": "发现更新时",
+      "notify": "通知我",
+      "install": "直接安装",
+      "openIn": "创意工坊页面打开方式",
+      "inSteam": "Steam（运行时）",
+      "inBrowser": "浏览器",
+      "appUpdates": "PZMM 启动时检查新版本"
+    },
+    "token": {
+      "title": "GitHub 令牌",
+      "hint": "用于从 GitHub 安装的模组：令牌可提高 GitHub 每小时 60 次下载的限制。它保存在系统凭据存储中，绝不会写入文件。",
+      "envSet": "已设置 GITHUB_TOKEN，因此将使用该令牌。",
+      "savedPlaceholder": "已保存令牌",
+      "save": "保存令牌",
+      "forget": "清除"
+    },
+    "repair": {
+      "title": "修复",
+      "redownload": "重新下载 PZMM 安装的模组",
+      "redownloadTip": "修复损坏的副本；每个模组都会将当前版本保留为备份"
+    },
+    "removing": {
+      "title": "移除与备份",
+      "removed": "移除的模组",
+      "recycle": "移至回收站",
+      "deleted": "直接删除",
+      "removeRequirements": "同时移除没有其他模组使用的依赖模组",
+      "ask": "询问",
+      "always": "始终",
+      "never": "从不",
+      "backupCap": "备份最多占用",
+      "mb": "MB",
+      "backupCapHint": "0 = 无限制；最旧的先删除",
+      "backupsHint": "更新时会将模组的旧版本保留为备份（在其详情中点击“恢复旧版本”）。",
+      "backupsUse": "备份占用 <strong>{size}</strong>",
+      "clearBackups": "清除备份"
+    },
+    "appearance": {
+      "title": "外观",
+      "theme": "主题",
+      "themeSystem": "跟随系统",
+      "dark": "深色",
+      "light": "浅色",
+      "accent": "强调色",
+      "build": "游戏版本",
+      "buildDetect": "从 default.txt 检测",
+      "build42": "Build 42",
+      "build41": "Build 41",
+      "workshopView": "创意工坊默认打开",
+      "browse": "浏览",
+      "home": "首页",
+      "perPage": "创意工坊每页结果数",
+      "compact": "紧凑行",
+      "showIds": "在名称旁显示 mod ID",
+      "windowHint": "窗口会记住其大小和位置。"
+    },
+    "launch": {
+      "title": "启动",
+      "args": "额外游戏参数",
+      "argsHint": "“启动游戏”会通过 Steam 传递这些参数，Steam 会询问一次是否允许。",
+      "autosort": "首次使用新配置方案时，按类别对其模组分组"
+    },
+    "about": {
+      "title": "关于",
+      "version": "PZMM {version}",
+      "checkUpdates": "检查更新",
+      "openLogs": "打开日志文件夹",
+      "diagnostics": "复制诊断信息",
+      "diagnosticsTip": "版本、文件夹、配置方案、模组数量和“检查设置”结果，用户名已隐去",
+      "keys": "键盘：<kbd>/</kbd> 搜索 · <kbd>↑</kbd><kbd>↓</kbd> 在行间移动 · <kbd>Enter</kbd> 详情 · <kbd>Space</kbd> 启用/禁用 · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> 调整顺序 · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> 撤销/重做 · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+点击 多选 · <kbd>Esc</kbd> 清除选择"
+    }
+  },
+  "servers": {
+    "label": "服务器与存档",
+    "sameMods": "与当前配置方案的模组相同",
+    "notInProfile": {
+      "other": "{count} 个不在你的配置方案中"
+    },
+    "notInTheirs": {
+      "other": "你有 {count} 个不在其中"
+    },
+    "started": "已用 {how} 启动 {name} 服务器。其控制台窗口会显示进度。",
+    "title": "专用服务器",
+    "lede": "将“{profile}”配置方案写入服务器配置，使服务器以相同顺序加载相同的模组。它会设置 <span class=\"mono\">Mods=</span>、<span class=\"mono\">WorkshopItems=</span>，当你的模组添加地图时还会设置 <span class=\"mono\">Map=</span>。其他设置均保持不变。",
+    "config": "服务器配置",
+    "newConfig": "新建配置…",
+    "newNameLabel": "新服务器配置名称",
+    "writeTo": "写入 {name}.ini",
+    "mapOrder": "地图顺序",
+    "mapOrderHint": "服务器按从上到下的顺序加载地图：模组地图要放在 <span class=\"mono\">Muldraugh, KY</span> 之前。拖动或按 Alt+↑/↓ 调整；点击“写入”保存。",
+    "join": "沿用服务器的配置",
+    "joinHint": "根据服务器配置创建配置方案：缺少的创意工坊模组会被安装，并复制模组顺序。",
+    "startTip": "启动此专用服务器",
+    "start": "启动服务器",
+    "useAsProfile": "用作配置方案",
+    "noConfigs": "<span class=\"mono\">{dir}</span> 中还没有服务器配置。",
+    "saves": {
+      "title": "存档",
+      "lede": "每个存档都会记住游玩时使用的模组。继续游戏前先加载存档的模组，就不会缺少任何东西。",
+      "none": "还没有带模组列表的存档。",
+      "info": {
+        "other": "{mode} · {count} 个模组 · 游玩于 {when} · {diff}"
+      },
+      "useMods": "使用此存档的模组"
+    }
+  },
+  "zb": {
+    "title": "ZombieBuddy",
+    "lede": "有些模组包含 Java 代码，能以 Lua 模组无法实现的方式修改游戏。ZombieBuddy 就是这些模组所需的加载器。设置它需要在模组文件夹之外进行两处更改，PZMM 会为你完成。",
+    "caution": "<strong>Java 模组可以在你的电脑上做任何事。</strong>ZombieBuddy 在加载每个新的或已更改的 Java 模组前都会询问你。请只批准你信任的作者的模组。",
+    "checks": {
+      "mod": "已下载 ZombieBuddy 模组",
+      "modHint": "已在 Steam 中订阅或由 PZMM 安装",
+      "agent": "游戏文件夹中的 Java agent 文件",
+      "gameNotFound": "未找到游戏文件夹",
+      "flag": "ProjectZomboid64.json 中的启动标志",
+      "flagHint": "从 Steam 启动游戏时加载 ZombieBuddy",
+      "enabled": "已在“{profile}”配置方案中启用",
+      "enabledHint": "这样需要它的模组才能加载"
+    },
+    "done": "已完成",
+    "notDone": "未完成",
+    "neededBy": {
+      "other": "{count} 个已启用的模组需要它：<span class=\"mono\">{ids}</span>"
+    },
+    "changesLabel": "要应用的更改",
+    "confirmRemove": "从游戏文件夹中移除 ZombieBuddy？",
+    "willDo": "PZMM 将：",
+    "nothing": "无需更改。",
+    "apply": "应用更改",
+    "repair": "修复 ZombieBuddy",
+    "setUp": "设置 ZombieBuddy",
+    "removeFromGame": "从游戏文件夹中移除",
+    "about": "关于 ZombieBuddy",
+    "fine": "游戏更新和 Steam 的“验证游戏文件的完整性”会移除启动标志。如果发生这种情况，此页面会显示<em>修复</em>。PZMM 只修改普通启动器。",
+    "useInstallerBefore": "如果你使用备用启动器或 Steam 启动选项，请改用",
+    "installer": "官方安装程序",
+    "useInstallerAfter": "。"
+  },
+  "profile": {
+    "tip": "配置方案：你正在游玩的模组列表",
+    "menuLabel": "配置方案",
+    "newProfile": "新建配置方案…",
+    "setUpViewpoint": "设置 Project Viewpoint…"
+  },
+  "activity": {
+    "title": "活动",
+    "empty": "安装、更新和错误信息会显示在这里。"
+  },
+  "links": {
+    "label": "PZMM 链接",
+    "github": "GitHub 上的 PZMM：源代码、问题反馈和版本发布",
+    "discord": "加入 PZMM Discord",
+    "kofi": "在 Ko-fi 上支持 PZMM",
+    "comingSoon": "{label}（即将推出）"
+  },
+  "window": {
+    "minimise": "最小化",
+    "maximise": "最大化",
+    "restore": "还原"
+  },
+  "workshop": {
+    "sorts": {
+      "popular": "最热门",
+      "subscribed": "订阅最多",
+      "topRated": "评分最高",
+      "newest": "最新",
+      "updated": "最近更新",
+      "libraries": "被依赖最多（前置库）",
+      "collections": "被收录合集最多"
+    },
+    "days": {
+      "today": "今天",
+      "week": "本周",
+      "month": "本月",
+      "months3": "3 个月",
+      "months6": "6 个月",
+      "year": "今年"
+    },
+    "within": {
+      "any": "任意时间",
+      "day": "最近 24 小时",
+      "week": "最近一周",
+      "month": "最近一个月",
+      "months3": "最近 3 个月",
+      "months6": "最近 6 个月",
+      "year": "最近一年"
+    },
+    "tagNames": {
+      "Animals": "动物",
+      "Audio": "音频",
+      "Balance": "平衡",
+      "Building": "建造",
+      "ClothingArmor": "服装",
+      "Farming": "农业",
+      "Food": "食物",
+      "Framework": "框架",
+      "Hardmode": "困难模式",
+      "Interface": "界面",
+      "Items": "物品",
+      "LanguageTranslation": "翻译",
+      "Literature": "文学",
+      "Map": "地图",
+      "Military": "军事",
+      "Misc": "杂项",
+      "Models": "模型",
+      "Multiplayer": "多人游戏",
+      "PopCulture": "流行文化",
+      "QoL": "便利性",
+      "Realistic": "写实",
+      "SillyFun": "搞笑娱乐",
+      "Skills": "技能",
+      "Textures": "纹理",
+      "Traits": "特质",
+      "Vehicles": "载具",
+      "Weapons": "武器",
+      "WIP": "开发中"
+    },
+    "home": {
+      "popularWeek": "本周热门",
+      "subscribed": "订阅最多",
+      "newest": "最新",
+      "updated": "最近更新",
+      "required": "被依赖最多"
+    },
+    "errors": {
+      "rateLimited": "Steam 当前正在限制请求。请等待一分钟后重试。",
+      "unreachable": "无法连接 Steam 创意工坊：{error}"
+    },
+    "starsTip": {
+      "other": "{stars}/5 星，共 {votes} 票"
+    },
+    "detailsLabel": "{title} 的详情",
+    "collectionBadge": "合集 · {count}",
+    "moreByAuthorTip": "该作者的更多作品",
+    "byAuthor": "作者：{author}",
+    "subscribersTip": "当前订阅者",
+    "subs": {
+      "other": "{n} 订阅"
+    },
+    "favouritesTip": "收藏",
+    "commentsTip": "评论",
+    "postedTip": "发布于 {date}",
+    "updatedOn": "更新于 {date}",
+    "needs": {
+      "other": "需要另外 {count} 个模组，将一并安装"
+    },
+    "details": "详情",
+    "label": "Steam 创意工坊",
+    "optionsLabel": "浏览选项",
+    "viewLabel": "创意工坊视图",
+    "browse": "浏览",
+    "homeTab": "首页",
+    "searchPlaceholder": "搜索创意工坊",
+    "searchTip": "Steam 搜索：\"精确短语\"、AND、OR、NOT、+必须包含、-排除",
+    "searchInLabel": "搜索范围",
+    "searchInTip": "关键词必须出现的位置",
+    "anywhere": "任意位置",
+    "titles": "标题",
+    "descriptions": "描述",
+    "search": "搜索",
+    "clearTerm": "清除“{term}”",
+    "gameBuild": "游戏版本",
+    "buildN": "Build {n}",
+    "anyBuild": "任意版本",
+    "show": "显示",
+    "mods": "模组",
+    "collections": "合集",
+    "sortBy": "排序方式",
+    "popularOver": "热门时段",
+    "perPage": "每页",
+    "tagsHeading": "标签",
+    "tagsHeadingCount": "标签（{count}）",
+    "tagsHint": "点击设为必需，再次点击设为排除，再点击一次清除。",
+    "tagOnlyTip": "仅限“{tag}”",
+    "tagNoTip": "排除“{tag}”",
+    "posted": "发布时间",
+    "updated": "更新时间",
+    "onlyIncompatible": "仅显示标记为不兼容的模组",
+    "clearFilters": "清除筛选",
+    "viewpointAddons": "Viewpoint 附加内容",
+    "viewpointDiscordTip": "Project Viewpoint 社区 Discord：帮助、错误报告、新闻",
+    "viewpointDiscord": "Viewpoint Discord",
+    "modsBy": "<strong>{author}</strong> 的模组",
+    "modsByCount": "<strong>{author}</strong> 的模组（{count}）",
+    "thisAuthor": "该作者",
+    "collectionsWith": "包含 <strong>{title}</strong> 的合集",
+    "modsThatNeed": "需要 <strong>{title}</strong> 的模组",
+    "backToBrowsing": "返回浏览",
+    "tryAgain": "重试",
+    "viewAll": "查看全部",
+    "loading": "正在加载…",
+    "loadingWorkshop": "正在加载创意工坊…",
+    "nothingMatches": "没有匹配的结果。请尝试减少关键词或标签，或换一个版本。",
+    "clearSearch": "清除搜索",
+    "countMods": {
+      "other": "{n} 个模组"
+    },
+    "countCollections": {
+      "other": "{n} 个合集"
+    },
+    "countModsFor": {
+      "other": "{n} 个与“{search}”相关的模组"
+    },
+    "countCollectionsFor": {
+      "other": "{n} 个与“{search}”相关的合集"
+    },
+    "loadingSuffix": " · 正在加载…",
+    "pagesLabel": "页码",
+    "previous": "上一页",
+    "pageOf": "第 {page} 页，共 {pages} 页",
+    "next": "下一页"
+  },
+  "panel": {
+    "moreByAuthorTip": "该作者的更多模组",
+    "byAuthor": "作者：{author}",
+    "closeTip": "关闭（Esc）",
+    "screenshotLabel": "截图 {n}",
+    "youtubeTip": "在 YouTube 上观看",
+    "youtubeLabel": "在 YouTube 上观看视频",
+    "installAll": {
+      "other": "安装全部 {count} 个模组"
+    },
+    "workshopPage": "创意工坊页面",
+    "rating": "评分",
+    "subscribers": "订阅者",
+    "visitors": "访客",
+    "favourites": "收藏",
+    "comments": "评论",
+    "size": "大小",
+    "posted": "发布时间",
+    "updated": "更新时间",
+    "modsThatNeed": "需要此项的模组",
+    "collectionsWith": "包含此项的合集",
+    "moreBy": "{author} 的更多作品",
+    "thisAuthor": "该作者",
+    "needs": {
+      "other": "需要另外 {count} 个模组（将一并安装）"
+    },
+    "items": {
+      "other": "此合集中有 {count} 个物品"
+    },
+    "description": "描述",
+    "changeNotes": "更新日志",
+    "commentsTab": "评论（{n}）",
+    "loading": "正在加载…",
+    "noOlderChanges": "没有更早的更新日志。",
+    "noChanges": "没有更新日志。",
+    "newer": "较新",
+    "older": "较旧",
+    "noComments": "还没有评论。",
+    "commentsRange": "第 {from}–{to} 条，共 {total} 条",
+    "postHint": "要发表评论，请前往创意工坊页面。"
+  },
+  "installButton": {
+    "installAll": "全部安装"
+  }
+}

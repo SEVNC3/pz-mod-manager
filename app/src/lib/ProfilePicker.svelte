@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from "svelte";
   import type { Mode, View } from "./api";
+  import { t } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
 
   // One picker for "which mod list am I playing": every profile, grouped under its game.
@@ -62,7 +63,7 @@
 
 <div class="picker" bind:this={root}>
   <button bind:this={trigger} class="trigger" onclick={toggle} disabled={busy || !view} aria-haspopup="menu" aria-expanded={open}
-    title="Profile: the mod list you're playing">
+    title={t("profile.tip")}>
     <img src={current[2]} alt={current[1]} height="20" />
     <span class="dot" aria-hidden="true">·</span>
     <span class="name">{view?.profile ?? "…"}</span>
@@ -71,7 +72,7 @@
 
   {#if open}
     <!-- svelte-ignore a11y_interactive_supports_focus -->
-    <div class="menu" role="menu" aria-label="Profiles" tabindex="-1" onkeydown={menuKey}>
+    <div class="menu" role="menu" aria-label={t("profile.menuLabel")} tabindex="-1" onkeydown={menuKey}>
       {#each groups as g}
         {#if g.profiles.length}
           <div class="group" role="presentation">
@@ -86,11 +87,11 @@
       {/each}
       <div class="sep" role="separator"></div>
       <button role="menuitem" class="item" onclick={() => { close(false); onNew(); }}>
-        <span class="tick"><Icon name="plus" size={14} /></span>New profile…
+        <span class="tick"><Icon name="plus" size={14} /></span>{t("profile.newProfile")}
       </button>
       {#if !hasViewpoint}
         <button role="menuitem" class="item" onclick={() => { close(); onSwitchGame("viewpoint"); }}>
-          <span class="tick"><Icon name="swap" size={14} /></span>Set up Project Viewpoint…
+          <span class="tick"><Icon name="swap" size={14} /></span>{t("profile.setUpViewpoint")}
         </button>
       {/if}
     </div>

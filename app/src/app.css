@@ -113,6 +113,11 @@ body {
   font: 14px/1.45 var(--font-body);
   -webkit-font-smoothing: antialiased;
 }
+/* Korean wraps between words, not inside them */
+:root:lang(ko) {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
 
 button,
 input,

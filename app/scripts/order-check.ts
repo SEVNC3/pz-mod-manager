@@ -20,9 +20,9 @@ const rows: Row[] = [
   mod("Off", false),
 ];
 const p = findProblems(rows);
-assert.equal(p.get("App")?.text, "Needs Lib (disabled)");
-assert.equal(p.get("Patch")?.text, "Should load after Big");
-assert.equal(p.get("Early")?.text, "Should load before App");
+assert.deepEqual(p.get("App"), { key: "problems.needsDisabled", id: "Lib", fixable: true });
+assert.deepEqual(p.get("Patch"), { key: "problems.loadAfter", id: "Big", fixable: true });
+assert.deepEqual(p.get("Early"), { key: "problems.loadBefore", id: "App", fixable: true });
 
 const sorted = sortLoadOrder(rows);
 assert.equal(ids(sorted), "#Top +Big +Patch +Lib +Early +App -Off"); // fewest moves: only App shifts later
@@ -31,7 +31,7 @@ assert.deepEqual(sortLoadOrder(sorted), sorted, "sorting is stable once valid");
 
 // incompatible is reported, not "fixed"
 const inc = [mod("A", true, { incompatible: ["B"] }), mod("B")];
-assert.deepEqual(findProblems(inc).get("A"), { text: "Incompatible with B", fixable: false });
+assert.deepEqual(findProblems(inc).get("A"), { key: "problems.incompatible", id: "B", fixable: false });
 
 // a cycle keeps its order instead of looping
 const cyc = [mod("X", true, { load_after: ["Y"] }), mod("Y", true, { load_after: ["X"] })];

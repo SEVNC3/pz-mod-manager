@@ -1,0 +1,1071 @@
+{
+  "tabs": {
+    "mods": "Meine Mods",
+    "workshop": "Workshop durchsuchen",
+    "maps": "Karten",
+    "servers": "Server & Spielstände",
+    "zb": "ZombieBuddy",
+    "settings": "Einstellungen"
+  },
+  "app": {
+    "newProfilePlaceholder": "Name, z. B. Server mit Freunden",
+    "create": "Erstellen",
+    "share": "Teilen",
+    "shareTip": "Einen Code kopieren, den andere importieren können",
+    "importTip": "Ein Profil aus einem Teilen-Code importieren",
+    "installLabel": "Mod installieren",
+    "installPlaceholder": "Workshop-Link, Kollektion oder ID, GitHub-Repo (owner/repo) oder .zip-Pfad einfügen",
+    "updateMods": {
+      "one": "{count} Mod aktualisieren",
+      "other": "{count} Mods aktualisieren"
+    },
+    "checkUpdatesTip": "Im Workshop nachsehen, ob es neuere Versionen deiner Mods gibt",
+    "checking": "Wird geprüft…",
+    "checkUpdates": "Nach Updates suchen",
+    "launchTip": "Über Steam",
+    "launchTipArgs": "Über Steam, mit {args}",
+    "launch": "Spiel starten",
+    "importIntro": "<strong>Profil importieren</strong>: Füge den Teilen-Code ein, den dir jemand geschickt hat. Fehlende Workshop-Mods werden installiert.",
+    "switchGameLabel": "Spiel wechseln",
+    "switchToViewpoint": "Zu Project Viewpoint (3D) wechseln?",
+    "switchToZomboid": "Zurück zu Project Zomboid wechseln?",
+    "viewpointNote": "Viewpoint ist noch früh in der Entwicklung. Es wird über ZombieBuddy geladen, das dich beim Spielstart einmal bittet, seinen Java-Code zu erlauben.",
+    "switch": "Wechseln",
+    "checkingNeeded": "Prüfe, was benötigt wird…",
+    "updateAvailable": "<strong>PZMM {version} ist verfügbar.</strong> Du hast {current}.",
+    "whatsNew": "Neuigkeiten",
+    "later": "Später",
+    "waitTip": "Warte, bis der aktuelle Vorgang fertig ist",
+    "updateRestart": "Aktualisieren und neu starten",
+    "downloading": "PZMM {version} wird heruntergeladen… {progress} %",
+    "sectionsLabel": "Abschnitte",
+    "needsSetup": "muss eingerichtet werden",
+    "saveDiff": "Dein letzter Spielstand, <strong>{save}</strong>, wurde mit einer anderen Modliste gespielt: {diffs}. Wenn du ihn mit dieser Liste fortsetzt, kann er kaputtgehen.",
+    "saveMissing": {
+      "one": "{count} seiner Mods ist nicht aktiviert",
+      "other": "{count} seiner Mods sind nicht aktiviert"
+    },
+    "saveExtra": {
+      "one": "{count} aktivierter Mod war nicht dabei",
+      "other": "{count} aktivierte Mods waren nicht dabei"
+    },
+    "useSaveMods": "Mods dieses Spielstands verwenden",
+    "dismiss": "Ausblenden",
+    "zbNeeded": {
+      "one": "{count} aktivierter Mod braucht ZombieBuddy, das nicht eingerichtet ist.",
+      "other": "{count} aktivierte Mods brauchen ZombieBuddy, das nicht eingerichtet ist."
+    },
+    "zbNeededPartial": {
+      "one": "{count} aktivierter Mod braucht ZombieBuddy, das nicht vollständig eingerichtet ist (vielleicht hat ein Spielupdate es zurückgesetzt).",
+      "other": "{count} aktivierte Mods brauchen ZombieBuddy, das nicht vollständig eingerichtet ist (vielleicht hat ein Spielupdate es zurückgesetzt)."
+    },
+    "zbSetup": "ZombieBuddy einrichten"
+  },
+  "mods": {
+    "searchPlaceholder": "Mods durchsuchen  ( / )",
+    "searchLabel": "Mods durchsuchen",
+    "showLabel": "Anzeigen",
+    "filterAll": "Alle",
+    "filterProblems": "Probleme",
+    "filterProblemsN": "Probleme ({count})",
+    "sortLabel": "Liste sortieren",
+    "sortOrder": "Bibliotheksreihenfolge",
+    "sortName": "Name",
+    "sortSize": "Größe",
+    "sortUpdated": "Zuletzt geändert",
+    "sortStatus": "Probleme zuerst",
+    "count": {
+      "one": "{enabled} aktiviert · {count} Mod",
+      "other": "{enabled} aktiviert · {count} Mods"
+    },
+    "installMissingTip": "Im Workshop suchen und installieren: {ids}",
+    "installMissing": "Fehlende Mods installieren ({count})",
+    "fixTip": "Benötigte Mods aktivieren und Mods nach ihren require-/loadModAfter-/loadModBefore-Regeln ordnen",
+    "fix": "Ladereihenfolge korrigieren",
+    "selectedLabel": "Ausgewählte Mods",
+    "selected": {
+      "one": "{count} ausgewählt",
+      "other": "{count} ausgewählt"
+    },
+    "moveLabel": "Ausgewählte Mods verschieben",
+    "moveTo": "Verschieben nach…",
+    "moveTop": "An den Anfang der Liste",
+    "moveUnder": "Unter „{name}“",
+    "moveBottom": "Ans Ende der Liste",
+    "hintFiltering": "Leere Suche und Filter und sortiere nach Bibliotheksreihenfolge, um umzusortieren.",
+    "hint": "Ziehen oder Alt+↑/↓ zum Ordnen · Space schaltet um · Ctrl/Shift+Klick wählt aus",
+    "checkSetupTip": "Profil und Serverkonfigurationen auf Probleme prüfen",
+    "checkSetup": "Setup prüfen",
+    "undoTip": "Letzte Änderung an der Liste rückgängig machen (Ctrl+Z)",
+    "undo": "Rückgängig",
+    "redoTip": "Wiederholen (Ctrl+Y)",
+    "redo": "Wiederholen",
+    "separatorTip": "Trenner über dem ausgewählten Mod einfügen",
+    "separator": "Trenner",
+    "groupTip": "Sortiere deine Mods anhand ihrer Workshop-Tags in je einen Abschnitt pro Kategorie. Die Ladereihenfolge ändert sich nicht.",
+    "group": "Nach Kategorie gruppieren",
+    "loading": "Deine Mods werden geladen…",
+    "emptyTitle": "Noch nichts im Vorratslager.",
+    "emptyHint": "Füge oben einen Steam-Workshop-Link ein, um einen Mod zu installieren, oder abonniere Mods in Steam: Abos erscheinen hier automatisch.",
+    "newSection": "Neuer Abschnitt",
+    "newSectionN": "Neuer Abschnitt {n}"
+  },
+  "busy": {
+    "loading": "Wird geladen",
+    "saving": "Wird gespeichert",
+    "viewpointSetup": "Project Viewpoint wird eingerichtet",
+    "toZomboid": "Wechsel zu Project Zomboid",
+    "switchingTo": "Wechsel zu „{name}“",
+    "switchingProfile": "Profil wird gewechselt",
+    "readingTags": "Workshop-Tags werden gelesen",
+    "updatingOne": "{name} wird aktualisiert",
+    "updatingMany": {
+      "one": "{count} Mod wird aktualisiert",
+      "other": "{count} Mods werden aktualisiert"
+    },
+    "installingWorkshop": "Workshop-Mod {id} wird installiert",
+    "installingOne": "{name} wird installiert",
+    "installingMany": {
+      "one": "{count} Mod wird installiert",
+      "other": "{count} Mods werden installiert"
+    },
+    "findingMissing": {
+      "one": "{count} fehlender Mod wird im Workshop gesucht",
+      "other": "{count} fehlende Mods werden im Workshop gesucht"
+    },
+    "importing": "„{name}“ wird importiert",
+    "importingServer": "{name}.ini wird importiert",
+    "loadingSave": "Mods von {name} werden geladen",
+    "creatingProfile": "Profil „{name}“ wird erstellt",
+    "deletingProfile": "Profil „{name}“ wird gelöscht",
+    "removingOne": "{name} wird entfernt",
+    "removingMany": {
+      "one": "{count} Mod wird entfernt",
+      "other": "{count} Mods werden entfernt"
+    },
+    "restoring": "{id} wird wiederhergestellt",
+    "zbSetup": "ZombieBuddy wird eingerichtet",
+    "zbRemove": "ZombieBuddy wird entfernt"
+  },
+  "log": {
+    "appLatest": "PZMM {version} ist die neueste Version.",
+    "appCheckFailed": "Konnte nicht nach PZMM-Updates suchen: {error}",
+    "appUpdateFailed": "Konnte PZMM nicht aktualisieren: {error}",
+    "adopted": "Änderungen aus dem Modmenü des Spiels übernommen (Profil „{profile}“).",
+    "tagsFailedSorted": "Workshop-Tags konnten nicht gelesen werden, daher wurden nur die Laderegeln korrigiert ({error}).",
+    "autosorted": "Ladereihenfolge automatisch sortiert. Ctrl+Z stellt die alte Reihenfolge wieder her.",
+    "tagsFailed": "Workshop-Tags konnten nicht gelesen werden ({error}).",
+    "grouped": {
+      "one": "Deine Mods wurden in {count} Kategorie gruppiert.",
+      "other": "Deine Mods wurden in {count} Kategorien gruppiert."
+    },
+    "groupedUndo": {
+      "one": "Deine Mods wurden in {count} Kategorie gruppiert. Ctrl+Z stellt deine Abschnitte wieder her.",
+      "other": "Deine Mods wurden in {count} Kategorien gruppiert. Ctrl+Z stellt deine Abschnitte wieder her."
+    },
+    "updatesFound": {
+      "one": "Für {count} Mod gibt es ein Update im Workshop.",
+      "other": "Für {count} Mods gibt es Updates im Workshop."
+    },
+    "updatesCheckFailed": "Konnte nicht nach Updates suchen: {error}",
+    "upToDate": "Deine Mods sind auf dem neuesten Stand.",
+    "nothingToRedownload": "PZMM hat keine Mods installiert, die erneut heruntergeladen werden könnten (Steam hält Abos aktuell).",
+    "stillMissing": "Fehlt noch: {ids}. Wähle einen Mod aus, der etwas davon braucht, und nutze Suchen, um einen Treffer auszuwählen.",
+    "shareCopied": "Teilen-Code für „{profile}“ kopiert. Schick ihn einem Freund; er nutzt Importieren in PZMM.",
+    "shareFailed": "Teilen-Code konnte nicht kopiert werden: {error}",
+    "checkSetupFailed": "Setup konnte nicht geprüft werden: {error}",
+    "bisectNeedsTwo": "Aktiviere mindestens zwei Mods, um nach einem fehlerhaften zu suchen.",
+    "bisectFound": "Gefunden: {id} verursacht das Problem. Deine Modliste ist wiederhergestellt.",
+    "bisectNone": "Das Problem hing an keinem einzelnen Mod. Deine Modliste ist wiederhergestellt.",
+    "sectionExists": "Es gibt schon einen Abschnitt namens „{name}“. Wähle einen anderen Namen.",
+    "noneOurs": "Keiner der ausgewählten Mods wurde von PZMM installiert; Steam-Mods deabonnierst du in Steam."
+  },
+  "confirm": {
+    "group": "Nach Kategorie gruppieren ersetzt deine eigenen Abschnitte ({sections}) durch Kategorie-Abschnitte. Ctrl+Z macht es rückgängig. Jetzt gruppieren?",
+    "redownload": {
+      "one": "Den {count} von PZMM installierten Mod erneut herunterladen? Seine aktuelle Version bleibt als Backup erhalten.",
+      "other": "Alle {count} von PZMM installierten Mods erneut herunterladen? Die aktuelle Version jedes Mods bleibt als Backup erhalten."
+    },
+    "updateInSave": {
+      "one": "{mods} wird von deinem letzten Spielstand ({save}) verwendet. Updates können einen laufenden Spielstand kaputtmachen. Jeder aktualisierte Mod behält seine vorherige Version (Vorherige Version wiederherstellen). Jetzt aktualisieren?",
+      "other": "{mods} werden von deinem letzten Spielstand ({save}) verwendet. Updates können einen laufenden Spielstand kaputtmachen. Jeder aktualisierte Mod behält seine vorherige Version (Vorherige Version wiederherstellen). Jetzt aktualisieren?"
+    },
+    "removeRecycleOne": "{name} entfernen? Seine Dateien werden aus deinem Zomboid-Modordner in den Papierkorb verschoben.",
+    "removeRecycleMany": {
+      "one": "{count} Mod entfernen? Die Dateien werden aus deinem Zomboid-Modordner in den Papierkorb verschoben.",
+      "other": "{count} Mods entfernen? Ihre Dateien werden aus deinem Zomboid-Modordner in den Papierkorb verschoben."
+    },
+    "removeDeleteOne": "{name} entfernen? Seine Dateien werden aus deinem Zomboid-Modordner gelöscht.",
+    "removeDeleteMany": {
+      "one": "{count} Mod entfernen? Die Dateien werden aus deinem Zomboid-Modordner gelöscht.",
+      "other": "{count} Mods entfernen? Ihre Dateien werden aus deinem Zomboid-Modordner gelöscht."
+    },
+    "removeSkipped": {
+      "one": " ({count} nicht von PZMM installierter Mod bleibt unberührt.)",
+      "other": " ({count} nicht von PZMM installierte Mods bleiben unberührt.)"
+    },
+    "alsoRemove": {
+      "one": "Auch {ids} entfernen? Nichts anderes bei dir braucht ihn.",
+      "other": "Auch {ids} entfernen? Nichts anderes bei dir braucht sie."
+    },
+    "deleteProfile": "Profil „{name}“ löschen? Deine Mods bleiben installiert. PZMM wechselt zu „{other}“."
+  },
+  "common": {
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "install": "Installieren",
+    "installing": "Wird installiert…",
+    "installed": "Installiert",
+    "remove": "Entfernen",
+    "enable": "Aktivieren",
+    "disable": "Deaktivieren",
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert",
+    "delete": "Löschen",
+    "import": "Importieren",
+    "clear": "Leeren",
+    "workshop": "Workshop",
+    "refresh": "Aktualisieren"
+  },
+  "format": {
+    "gb": "{n} GB",
+    "mb": "{n} MB",
+    "kb": "{n} KB"
+  },
+  "problems": {
+    "needsMissing": "Braucht {id} (nicht installiert)",
+    "needsDisabled": "Braucht {id} (deaktiviert)",
+    "loadFirst": "{id} muss zuerst laden",
+    "incompatible": "Inkompatibel mit {id}",
+    "loadAfter": "Sollte nach {id} laden",
+    "loadBefore": "Sollte vor {id} laden"
+  },
+  "source": {
+    "workshop": "Workshop",
+    "steam": "Abonniert",
+    "local": "Lokale Datei",
+    "manual": "Manuell"
+  },
+  "api": {
+    "badShareCode": "Das ist kein PZMM-Profilcode."
+  },
+  "maps": {
+    "label": "Karten",
+    "worldMap": "Weltkarte",
+    "help": {
+      "button": "Hilfe",
+      "label": "Hilfe zu Karten",
+      "gridTitle": "Das Raster lesen",
+      "grid": "Jedes Quadrat ist eine Zelle der Welt von Build {build} (B42-Zellen haben 256 Tiles, B41-Zellen 300, daher lassen sich nur Karten desselben Builds vergleichen). <strong>Grau</strong> ist die Karte des Spiels, <strong>Petrol</strong> ihr Fluss; <strong>Blau</strong> ist eine Zelle, die eine Karte füllt, <strong>Gold</strong> eine Karte, die über ein Vanilla-Gebiet gebaut ist (meist mit Absicht), <strong>Rot</strong> zwei oder mehr Karten, die sich um eine Zelle streiten: Dort lädt nur eine davon. Mit Farben pro Karte bekommt stattdessen jede angezeigte Karte ihren eigenen Farbton.",
+      "previewTitle": "Vorschau oder aktivieren",
+      "preview": "Aktivierte Karten werden immer angezeigt. Hake eine Karte an oder klicke auf ihre Zeile, um sie in der <em>Vorschau</em> zu sehen: Sie wird gezeichnet und auf Konflikte geprüft, aber an deiner Modliste ändert sich nichts, bis du sie aktivierst. Klicke auf Zellen, um die Karten dort aufzulisten; Shift+Klick fügt weitere Zellen hinzu.",
+      "workshopTitle": "Workshop-Karten",
+      "workshop": "Mit eingeschalteten Workshop-Karten listet PZMM jedes Workshop-Objekt mit dem Tag Map für diesen Build auf, auch nicht installierte: sofort aus seinem eingebauten Index, danach liest es von Steam die Dateilisten der seitdem aktualisierten Objekte (kein Download, nichts wird installiert) und liest ein Objekt erst wieder, wenn es aktualisiert wird. Füge eine Kollektion unter „Workshop-Karte prüfen“ ein, um alle ihre Karten in der Vorschau zu sehen. Sieh sie dir wie installierte Karten in der Vorschau an und installiere dann die gewünschten."
+    },
+    "lede": "Das Raster zeigt aktivierte Karten und die in der Vorschau. Scrollen zum Zoomen, Ziehen zum Verschieben, Klick auf eine Zelle listet die Karten dort.",
+    "legend": {
+      "more": {
+        "one": "+{count} weitere",
+        "other": "+{count} weitere"
+      },
+      "map": "Eine Karte",
+      "over": "Über Vanilla ({count})",
+      "conflict": "Konflikt ({count})",
+      "vanilla": "Vanilla",
+      "river": "Fluss"
+    },
+    "hideVanilla": "Vanilla ausblenden",
+    "perMapColours": "Farben pro Karte",
+    "zoomIn": "Vergrößern",
+    "zoomOut": "Verkleinern",
+    "fit": "Einpassen",
+    "gridLabel": "Zellenraster: {maps} Karten angezeigt, {conflicts} Zellen im Konflikt, {over} über Vanilla",
+    "cell": "Zelle {x}, {y}",
+    "kind": {
+      "vanilla": "Vanilla-Gebiet",
+      "water": "Vanilla-Fluss",
+      "over": "Über einem Vanilla-Gebiet",
+      "conflict": "Konflikt: Diese Karten teilen sich diese Zelle"
+    },
+    "empty": "Leer",
+    "readingFiles": "Kartendateien werden gelesen…",
+    "noVanilla": "Vanilla-Gebiete werden nicht angezeigt: Die Spielinstallation wurde nicht gefunden oder ist nicht Build {build}. Prüfe die Ordner in den Einstellungen.",
+    "mapMods": "Karten-Mods",
+    "undoTip": "Letzte Änderung an Vorschau, Schnellauswahl, Preset oder Aktivierung rückgängig machen (Ctrl+Z)",
+    "undoLabel": "Rückgängig",
+    "workshopSource": "Workshop-Karten, die du nicht installiert hast",
+    "workshopSourceNote": "Listet jedes Workshop-Objekt mit dem Tag Map aus PZMMs eingebautem Index auf und liest dann von Steam nur die seitdem aktualisierten Objekte (Dateilisten; nichts wird heruntergeladen).",
+    "scan": {
+      "limited": "Steam begrenzt gerade die Anfragen. Warte eine Minute und aktualisiere dann.",
+      "stopping": "Wird angehalten…",
+      "stop": "Anhalten",
+      "summary": {
+        "one": "{n} nicht installiert, aus {count} gelesenen Workshop-Objekt.",
+        "other": "{n} nicht installiert, aus {count} gelesenen Workshop-Objekten."
+      },
+      "listing": "Workshop-Objekte mit Tag Map werden aufgelistet… {done} von {total}",
+      "reading": "Dateilisten werden gelesen… {done} von {total}",
+      "readingFailed": "Dateilisten werden gelesen… {done} von {total} ({failed} fehlgeschlagen)",
+      "failed": {
+        "one": "Die Dateiliste von {count} Workshop-Objekt konnte nicht gelesen werden (das Aktivitätsprotokoll sagt, warum).",
+        "other": "Die Dateilisten von {count} Workshop-Objekten konnten nicht gelesen werden (das Aktivitätsprotokoll sagt, warum)."
+      },
+      "refreshTip": "Objekte mit Tag Map erneut auflisten und neue und aktualisierte lesen"
+    },
+    "searchPlaceholder": "Name, Mod-ID, Workshop-ID, Ordner, Autor, Tag suchen",
+    "searchLabel": "Karten durchsuchen",
+    "filterLabel": "Karten anzeigen",
+    "sortLabel": "Karten sortieren",
+    "filter": {
+      "all": "Alle Karten",
+      "conflict": "Im Konflikt",
+      "over": "Über Vanilla"
+    },
+    "sort": {
+      "name": "Name",
+      "cells": "Meiste Zellen",
+      "conflicts": "Meiste Konflikte",
+      "state": "Aktivierte zuerst",
+      "subs": "Meiste Abonnenten",
+      "updated": "Kürzlich aktualisiert",
+      "newest": "Neueste"
+    },
+    "pickedCells": "Zellen <span class=\"mono\">{cells}</span>",
+    "mapCount": {
+      "one": "{count} Karte",
+      "other": "{count} Karten"
+    },
+    "clearCells": "Zellen leeren",
+    "quickSelect": "Meiste passende Karten",
+    "quickSelecting": "Suche die meisten passenden…",
+    "quickSelectTip": "Möglichst viele der gelisteten Karten in der Vorschau zeigen, die sich keine Zelle miteinander oder mit den aktivierten teilen (bei Gleichstand gewinnen installierte und beliebte Karten)",
+    "quickSelectDone": {
+      "one": "Vorschau von {count} Karte: die meisten gelisteten Karten, die rund um die aktivierten zusammenpassen.",
+      "other": "Vorschau von {count} Karten: die meisten gelisteten Karten, die rund um die aktivierten zusammenpassen."
+    },
+    "quickSelectNone": "Jede gelistete Karte teilt sich Zellen mit einer aktivierten.",
+    "previewListed": "Gelistete in Vorschau",
+    "unpreviewListed": "Gelistete aus Vorschau",
+    "enabledOnly": "Nur aktivierte",
+    "enabledOnlyTip": "Vorschau leeren: Das Raster zeigt nur aktivierte Karten",
+    "enablePreviewed": {
+      "one": "{count} aus Vorschau aktivieren",
+      "other": "{count} aus Vorschau aktivieren"
+    },
+    "disableListed": {
+      "one": "{count} gelistete deaktivieren",
+      "other": "{count} gelistete deaktivieren"
+    },
+    "unhide": {
+      "one": "{count} einblenden",
+      "other": "{count} einblenden"
+    },
+    "unhideTip": "Alle angezeigten Karten wieder auf dem Raster zeichnen",
+    "noMaps": "Kein installierter Mod fügt Karten für Build {build} hinzu. Schalte oben Workshop-Karten ein oder prüfe unten eine, bevor du sie installierst.",
+    "previewLabel": "Vorschau von {name} auf dem Raster",
+    "alwaysShownTip": "Aktivierte Karten werden immer angezeigt",
+    "previewTip": "Auf dem Raster zeigen, ohne zu aktivieren",
+    "notInstalled": "Nicht installiert",
+    "showOnGrid": "Auf Raster zeigen",
+    "showOnGridTip": "Wieder auf dem Raster zeichnen",
+    "hideOnGrid": "Auf Raster ausblenden",
+    "hideOnGridTip": "Nicht auf dem Raster zeichnen, um zu sehen, was darunter liegt (bleibt im Export und in den Abhängigkeiten)",
+    "cellCount": {
+      "one": "{count} Zelle",
+      "other": "{count} Zellen"
+    },
+    "byAuthor": "von {author}",
+    "subscribers": {
+      "one": "{n} Abonnent",
+      "other": "{n} Abonnenten"
+    },
+    "conflictsWith": {
+      "one": "Konflikt mit {name} in Zelle <span class=\"mono\">{cells}</span>",
+      "other": "Konflikt mit {name} in den Zellen <span class=\"mono\">{cells}</span>"
+    },
+    "swap": "Tauschen",
+    "swapTip": "Stattdessen diese Karte zeigen: Karten in der Vorschau, mit denen sie kollidiert, ausblenden und aktivierte deaktivieren",
+    "andMore": {
+      "one": "…und {count} weitere",
+      "other": "…und {count} weitere"
+    },
+    "cellsOverVanilla": {
+      "one": "{count} Zelle über Vanilla",
+      "other": "{count} Zellen über Vanilla"
+    },
+    "packMember": {
+      "one": "1 von {count} Mods in diesem Workshop-Objekt",
+      "other": "1 von {count} Mods in diesem Workshop-Objekt"
+    },
+    "workshopItem": "Workshop-Objekt {id}",
+    "dupeMod": "Mod-ID {id} ist auch in {item}: Nur eine Kopie wird geladen",
+    "dupeModMore": {
+      "one": "Mod-ID {id} ist auch in {item} und {count} weiterem: Nur eine Kopie wird geladen",
+      "other": "Mod-ID {id} ist auch in {item} und {count} weiteren: Nur eine Kopie wird geladen"
+    },
+    "dupeFolder": "Kartenordner {folder} wird auch von {names} hinzugefügt",
+    "dupeFolderMore": {
+      "one": "Kartenordner {folder} wird auch von {names} und {count} weiteren hinzugefügt",
+      "other": "Kartenordner {folder} wird auch von {names} und {count} weiteren hinzugefügt"
+    },
+    "openWorkshopTip": "Workshop-Seite öffnen",
+    "alsoTurnsOnTip": "Aktiviert auch die Mods, die sie braucht",
+    "installTip": "Mit den benötigten Objekten installieren",
+    "showMore": {
+      "one": "{count} weitere von {total} zeigen",
+      "other": "{count} weitere von {total} zeigen"
+    },
+    "req": {
+      "title": "Abhängigkeiten",
+      "viewLabel": "Ansicht der Abhängigkeiten",
+      "neededBy": "Benötigt von",
+      "neededByTip": "Jede Abhängigkeit und die angezeigten Karten, die sie brauchen",
+      "tree": "Baum",
+      "treeTip": "Jede angezeigte Karte und was sie braucht, bis ganz nach unten",
+      "lede": "Was die angezeigten Karten direkt oder über ihre Abhängigkeiten brauchen: benötigte Mods (<span class=\"mono\">require=</span>) und andere Karten, auf denen sie aufbauen (<span class=\"mono\">lots=</span>).",
+      "nothingElse": "Die angezeigten Karten brauchen nichts weiter.",
+      "showOne": "Zeige oder aktiviere eine Karte, um zu sehen, was sie braucht.",
+      "groups": {
+        "enabled": "Benötigt von aktivierten Karten",
+        "preview": "Benötigt von Karten in der Vorschau",
+        "missing": "Benötigt von Karten, die du nicht installiert hast"
+      },
+      "on": "An",
+      "off": "Aus",
+      "findTip": "Im Steam Workshop suchen und installieren",
+      "pickInDetails": "In Details auswählen",
+      "looking": "Suche {id} im Workshop…",
+      "noClearResult": "Kein Ergebnis passt eindeutig: Wähle eines in den Details einer Karte aus, die es braucht.",
+      "noMatch": "Nichts im Workshop passt zu {id}.",
+      "neededByMap": "Karte {folder} · benötigt von {names}",
+      "neededByFolder": "Kartenordner · benötigt von {names}",
+      "neededByOnly": "benötigt von {names}",
+      "loop": "(braucht sich selbst: eine Schleife)",
+      "map": "Karte {folder}"
+    },
+    "export": {
+      "title": "Kartenreihenfolge und Export",
+      "lede": "Kopiere die angezeigten Karten für einen Freund oder einen Server: ihre Workshop-Links und Mod-IDs, was sie brauchen, und die Zeilen <span class=\"mono\">Mods=</span>, <span class=\"mono\">WorkshopItems=</span> und <span class=\"mono\">Map=</span>.",
+      "orderTitle": "Kartenreihenfolge",
+      "orderHint": "Das Spiel lädt Karten von oben nach unten: Mod-Karten kommen vor <span class=\"mono\">Muldraugh, KY</span>. Ziehen oder Alt+↑/↓ zum Anordnen; die Reihenfolge wird mit deinem Profil gespeichert, für den Export und die Serverkarte verwendet und für die aktivierten Karten in die Modliste des Spiels geschrieben.",
+      "copy": {
+        "one": "{count} Karte in die Zwischenablage kopieren",
+        "other": "{count} Karten in die Zwischenablage kopieren"
+      },
+      "copied": {
+        "one": "{count} Karte kopiert: Workshop-Links, Mod-IDs, Abhängigkeiten und die Zeilen Mods=, WorkshopItems= und Map=.",
+        "other": "{count} Karten kopiert: Workshop-Links, Mod-IDs, Abhängigkeiten und die Zeilen Mods=, WorkshopItems= und Map=."
+      }
+    },
+    "presets": {
+      "title": "Presets",
+      "hint": "Speichere die angezeigten Karten unter einem Namen und zeig sie später wieder in der Vorschau.",
+      "label": "Preset",
+      "pick": "Preset auswählen",
+      "preview": "Vorschau",
+      "namePlaceholder": "Name des Presets",
+      "save": {
+        "one": "{count} angezeigte speichern",
+        "other": "{count} angezeigte speichern"
+      },
+      "confirmReplace": "Preset „{name}“ ersetzen?",
+      "saved": {
+        "one": "Die {count} angezeigte Karte als „{name}“ gespeichert.",
+        "other": "Die {count} angezeigten Karten als „{name}“ gespeichert."
+      },
+      "previewing": "Vorschau von „{name}“.",
+      "previewingMissing": "Vorschau von „{name}“; nicht gefunden: {ids} (installiere sie oder schalte Workshop-Karten ein)."
+    },
+    "compare": {
+      "title": "Mit einem Server vergleichen",
+      "lede": "Die Karten, die eine Serverkonfiguration lädt (<span class=\"mono\">Map=</span>), im Vergleich zu den hier angezeigten.",
+      "serverLabel": "Serverkonfiguration",
+      "compare": "Vergleichen",
+      "noServers": "Noch keine Serverkonfigurationen in Zomboid/Server.",
+      "same": "Dieselben Karten wie {server}.ini.",
+      "onlyServer": "Auf dem Server, hier nicht angezeigt",
+      "noKnownMap": "keine bekannte Workshop-Karte fügt sie hinzu",
+      "on": "an",
+      "installed": "installiert",
+      "notInstalled": "nicht installiert",
+      "preview": "Vorschau",
+      "onlyYou": "Hier angezeigt, nicht auf dem Server"
+    },
+    "check": {
+      "title": "Workshop-Karte vor der Installation prüfen",
+      "lede": "Sieh vorher, wo eine Karte (oder jede Karte einer Kollektion) liegt und womit sie kollidiert. PZMM liest die Dateiliste des Objekts von Steam (nichts wird heruntergeladen oder installiert) und behält nur seine Zellen.",
+      "placeholder": "Workshop- oder Kollektionslink oder ID",
+      "checking": "Wird geprüft…",
+      "check": "Prüfen",
+      "pasteId": "Füge einen Workshop-Link oder eine Objekt-ID ein.",
+      "noItem": "Es gibt kein Workshop-Objekt {id}.",
+      "alreadyInstalled": "{title} ist bereits installiert: Falls es Karten hinzufügt, stehen sie in der Liste.",
+      "confirmDownload": "Steam hat die Dateiliste von „{title}“ nicht geliefert ({error}). Stattdessen herunterladen ({size}), um die Zellen zu lesen? Nichts wird installiert, und der Download wird danach gelöscht.",
+      "read": "{title} gelesen: Es ist auf dem Raster und in der Liste als nicht installiert in der Vorschau.",
+      "noMaps": "{title} fügt keine Karten für Build {build} hinzu.",
+      "readingMember": "{title} wird gelesen ({n} von {total})…",
+      "collection": {
+        "one": "{title}: Vorschau von {count} Karte aus {items} Objekten.",
+        "other": "{title}: Vorschau von {count} Karten aus {items} Objekten."
+      },
+      "collectionFailed": "{titles} konnte nicht gelesen werden: Prüfe sie einzeln.",
+      "collectionUntagged": {
+        "one": "{count} weiteres Objekt hat nicht den Tag Map und wurde daher nicht gelesen.",
+        "other": "{count} weitere Objekte haben nicht den Tag Map und wurden daher nicht gelesen."
+      }
+    }
+  },
+  "mapOrder": {
+    "label": "Kartenreihenfolge",
+    "top": "Nach oben",
+    "topTip": "Zuerst laden",
+    "topLabel": "{name} nach oben verschieben",
+    "autosort": "Karten automatisch sortieren",
+    "autosortTip": "Zuerst Mod-Karten in ihrer aktuellen Reihenfolge, dann Muldraugh, KY"
+  },
+  "layerIcon": {
+    "overrides": "Überschreibt Dateien von {mods}",
+    "overriddenBy": "Einige Dateien werden von {mods} überschrieben"
+  },
+  "modTable": {
+    "col": {
+      "move": "Verschieben",
+      "loadOrder": "Ladereihenfolge",
+      "mod": "Mod",
+      "size": "Größe",
+      "lastChanged": "Zuletzt geändert",
+      "sharedFiles": "Gemeinsame Dateien",
+      "source": "Quelle"
+    },
+    "sepNameLabel": "Name des Trenners (leer entfernt ihn)",
+    "expandLabel": "{name} ausklappen",
+    "collapseLabel": "{name} einklappen",
+    "renameTip": "Doppelklick zum Umbenennen",
+    "sectionCount": "{on} von {total} aktiviert",
+    "removeSepTip": "Diesen Trenner entfernen (Delete). Seine Mods bleiben, wo sie sind.",
+    "removeSepLabel": "Trenner {name} entfernen",
+    "enableLabel": "{name} aktivieren",
+    "b41Only": "Nur B41",
+    "b41OnlyTip": "Nur für Build 41 gebaut (kein Ordner 42/ oder common/): Unter Build 42 kann er Fehler verursachen oder nichts tun",
+    "b42Only": "Nur B42",
+    "b42OnlyTip": "Nur für Build 42 gebaut",
+    "notInstalled": "Nicht installiert",
+    "updateAvailable": "Update verfügbar",
+    "sourceHint": {
+      "steam": "In Steam abonniert; Steam hält ihn aktuell",
+      "workshop": "Von PZMM aus dem Workshop heruntergeladen",
+      "github": "Von PZMM aus GitHub installiert",
+      "local": "Von PZMM aus einer Datei installiert",
+      "manual": "Außerhalb von PZMM in den Modordner gelegt"
+    }
+  },
+  "details": {
+    "label": "Mod-Details",
+    "closeTip": "Schließen (Esc), um die Ladereihenfolge zu sehen",
+    "closeLabel": "Details schließen",
+    "missingWarn": "Dieser Mod ist in deinem Profil aktiviert, aber nicht installiert. Installiere ihn, abonniere ihn in Steam oder deaktiviere ihn.",
+    "showFiles": "Dateien zeigen",
+    "githubPage": "GitHub-Seite",
+    "workshopPage": "Workshop-Seite",
+    "source": "Quelle",
+    "author": "Autor",
+    "modVersion": "Mod-Version",
+    "needsGameVersion": "Benötigt Spielversion",
+    "versionOrNewer": "{version} oder neuer",
+    "newerVersion": "Im Workshop gibt es eine neuere Version.",
+    "updateNow": "Jetzt aktualisieren",
+    "requires": "Benötigt",
+    "reqEnabled": "aktiviert",
+    "reqDisabled": "deaktiviert",
+    "reqMissing": "nicht installiert",
+    "findTip": "Im Steam Workshop suchen und installieren",
+    "looking": "Suche {id} im Workshop…",
+    "noMatch": "Nichts im Workshop passt zu {id}.",
+    "pickOne": "Kein Ergebnis ist eindeutig {id}. Wähle das richtige aus:",
+    "subscribers": {
+      "one": "{n} Abonnent",
+      "other": "{n} Abonnenten"
+    },
+    "idMatches": "Mod-ID passt",
+    "listedByAuthor": "vom Autor angegeben",
+    "notTaggedForBuild": "nicht für deinen Spiel-Build getaggt",
+    "sharedFiles": "Gemeinsame Dateien",
+    "winsOver": "Die Kopien dieses Mods setzen sich gegen {other} durch",
+    "othersWin": "Die Kopien von {other} setzen sich durch",
+    "filesWin": {
+      "one": "{count} Datei, die Kopie dieses Mods setzt sich durch",
+      "other": "{count} Dateien, die Kopien dieses Mods setzen sich durch"
+    },
+    "filesLose": {
+      "one": "{count} Datei, die Kopie von {other} setzt sich durch",
+      "other": "{count} Dateien, die Kopien von {other} setzen sich durch"
+    },
+    "lowerWins": "Der Mod weiter unten in der Ladereihenfolge setzt sich durch. Zieh ihn in der Ladereihenfolge (schließe dieses Panel), um zu ändern, wessen Dateien verwendet werden.",
+    "description": "Beschreibung",
+    "restore": "Vorherige Version wiederherstellen",
+    "steamNote": "Dieser Mod stammt aus deinen Steam-Abos. Deabonniere ihn in Steam, um ihn zu entfernen.",
+    "unsubscribe": "Auf der Workshop-Seite deabonnieren"
+  },
+  "loadOrder": {
+    "title": "Ladereihenfolge",
+    "lede": "Mods laden von oben nach unten. Wenn zwei dieselbe Datei ändern, setzt sich der untere durch. Die Bibliothek links kannst du frei ordnen: Ihre Reihenfolge ändert diese hier nicht.",
+    "problems": "Probleme",
+    "overridden": "Überschrieben",
+    "overriddenTip": "Aktivierte Mods mit Dateien, die ein anderer Mod ersetzt",
+    "autosort": "Automatisch sortieren",
+    "step": {
+      "needs": "Aktiviert Mods, die deine aktivierten Mods brauchen.",
+      "tiers": "Setzt Frameworks an den Anfang, damit alles, was darauf aufbaut, danach lädt, und Übersetzungen ans Ende, damit sich ihr Text durchsetzt (anhand der Workshop-Tags der Mods).",
+      "rules": "Verschiebt Mods so, dass jede <span class=\"mono\">require</span>-, <span class=\"mono\">loadModAfter</span>- und <span class=\"mono\">loadModBefore</span>-Regel erfüllt ist.",
+      "keep": "Behält ansonsten deine Reihenfolge bei. Ctrl+Z stellt die alte Reihenfolge wieder her."
+    },
+    "fix": {
+      "one": "{count} Problem ohne automatisches Sortieren beheben",
+      "other": "{count} Probleme ohne automatisches Sortieren beheben"
+    },
+    "modsInOrder": "Mods in Ladereihenfolge",
+    "dragHint": "Ziehen oder Alt+↑/↓ zum Umsortieren · Enter oder Doppelklick öffnet einen Mod",
+    "notInstalled": "Nicht installiert",
+    "librarySections": "Bibliotheksabschnitte"
+  },
+  "findings": {
+    "findBroken": "Fehlerhaften Mod finden",
+    "round": "Suche nach dem fehlerhaften Mod, Runde {round}:",
+    "suspects": {
+      "one": "{count} Verdächtiger übrig, {testing} für diesen Test aktiviert (plus was sie brauchen).",
+      "other": "{count} Verdächtige übrig, {testing} für diesen Test aktiviert (plus was sie brauchen)."
+    },
+    "testHint": "Starte das Spiel, prüfe, ob das Problem auftritt, und komm dann hierher zurück.",
+    "stillHappens": "Das Problem tritt noch auf",
+    "gone": "Das Problem ist weg",
+    "stop": "Abbrechen und meine Liste wiederherstellen",
+    "setupCheck": "Setup-Prüfung",
+    "noProblems": "Keine Probleme gefunden.",
+    "summary": "{errors}, {warnings}",
+    "errors": {
+      "one": "{count} Fehler",
+      "other": "{count} Fehler"
+    },
+    "warnings": {
+      "one": "{count} Warnung",
+      "other": "{count} Warnungen"
+    },
+    "luaErrors": "<strong>Lua-Fehler in deiner letzten Spielsitzung</strong> (aus console.txt):",
+    "errorCount": {
+      "one": "{count} Fehler, zuerst bei <span class=\"mono\">{example}</span>",
+      "other": "{count} Fehler, zuerst bei <span class=\"mono\">{example}</span>"
+    },
+    "unexplained": "Etwas geht kaputt, aber nichts oben erklärt es?",
+    "halves": "PZMM halbiert deine aktivierten Mods bei jedem Spieltest."
+  },
+  "settings": {
+    "label": "Einstellungen",
+    "saveFailed": "Die Einstellungen konnten nicht gespeichert werden: {error}",
+    "tokenSaved": "GitHub-Token in der Anmeldeinformationsverwaltung des Systems gespeichert.",
+    "tokenForgot": "GitHub-Token entfernt.",
+    "confirmClearBackups": "Alle Backups löschen ({size})? Mods lassen sich danach nicht mehr auf ihre vorherige Version zurücksetzen.",
+    "diagnosticsCopied": "Diagnosedaten kopiert (dein Benutzername ist maskiert). Füge sie in einen Fehlerbericht ein.",
+    "diagnosticsFailed": "Diagnosedaten konnten nicht kopiert werden: {error}",
+    "language": "Sprache",
+    "languageSystem": "Wie System ({name})",
+    "folders": {
+      "title": "Ordner",
+      "lede": "PZMM findet diese selbst. Lege einen nur fest, wenn er woanders liegt. Eine Umgebungsvariable hat Vorrang vor dem, was hier eingestellt ist.",
+      "status": {
+        "found": "Gefunden",
+        "missing": "Nicht gefunden",
+        "not_pz": "Kein PZ-Ordner"
+      },
+      "hintData": "Profile, installierte Mods, Backups, SteamCMD",
+      "hintZomboid": "Mods, Spielstände, Serverkonfigurationen, Logs",
+      "overriddenBy": "überschrieben durch <span class=\"mono\">{env}</span>",
+      "detected": "erkannt",
+      "browse": "Durchsuchen…",
+      "detect": "Erkennen",
+      "detectTip": "Den hier festgelegten Ordner vergessen und neu suchen",
+      "open": "Öffnen",
+      "moveLabel": "PZMM-Daten verschieben",
+      "moveConfirm": "Deine PZMM-Daten von <span class=\"mono\">{from}</span> nach <span class=\"mono\">{to}</span> verschieben? Ohne Verschieben startet PZMM dort leer.",
+      "moveData": "Daten verschieben",
+      "switchWithoutMoving": "Wechseln ohne Verschieben",
+      "reading": "Ordner werden gelesen…"
+    },
+    "downloads": {
+      "title": "Downloads und Updates",
+      "check": "Mods auf Updates prüfen",
+      "checkOff": "Nie (Nach Updates suchen verwenden)",
+      "checkStart": "Beim Start von PZMM",
+      "check1h": "Beim Start, dann stündlich",
+      "check3h": "Beim Start, dann alle 3 Stunden",
+      "whenFound": "Wenn Updates gefunden werden",
+      "notify": "Mir Bescheid geben",
+      "install": "Installieren",
+      "openIn": "Workshop-Seiten öffnen in",
+      "inSteam": "Steam (wenn es läuft)",
+      "inBrowser": "Browser",
+      "appUpdates": "Beim Start nach neuen PZMM-Versionen suchen"
+    },
+    "token": {
+      "title": "GitHub-Token",
+      "hint": "Für Mods, die von GitHub installiert werden: Ein Token hebt GitHubs Limit von 60 Downloads pro Stunde an. Er wird in der Anmeldeinformationsverwaltung des Systems gespeichert, nie in einer Datei.",
+      "envSet": "GITHUB_TOKEN ist gesetzt, daher wird dieser verwendet.",
+      "savedPlaceholder": "Ein Token ist gespeichert",
+      "save": "Token speichern",
+      "forget": "Entfernen"
+    },
+    "repair": {
+      "title": "Reparieren",
+      "redownload": "Von PZMM installierte Mods erneut herunterladen",
+      "redownloadTip": "Repariert beschädigte Kopien; die aktuelle Version jedes Mods bleibt als Backup erhalten"
+    },
+    "removing": {
+      "title": "Entfernen und Backups",
+      "removed": "Entfernte Mods",
+      "recycle": "kommen in den Papierkorb",
+      "deleted": "werden gelöscht",
+      "removeRequirements": "Auch benötigte Mods entfernen, die sonst nichts nutzt",
+      "ask": "Fragen",
+      "always": "Immer",
+      "never": "Nie",
+      "backupCap": "Maximale Größe der Backups",
+      "mb": "MB",
+      "backupCapHint": "0 = kein Limit; die ältesten werden zuerst gelöscht",
+      "backupsHint": "Ein Update behält die vorherige Version des Mods als Backup (Vorherige Version wiederherstellen in seinen Details).",
+      "backupsUse": "Backups belegen <strong>{size}</strong>",
+      "clearBackups": "Backups löschen"
+    },
+    "appearance": {
+      "title": "Darstellung",
+      "theme": "Design",
+      "themeSystem": "Wie System",
+      "dark": "Dunkel",
+      "light": "Hell",
+      "accent": "Akzentfarbe",
+      "build": "Spiel-Build",
+      "buildDetect": "Aus default.txt erkennen",
+      "build42": "Build 42",
+      "build41": "Build 41",
+      "workshopView": "Workshop öffnet mit",
+      "browse": "Durchsuchen",
+      "home": "Startseite",
+      "perPage": "Workshop-Ergebnisse pro Seite",
+      "compact": "Kompakte Zeilen",
+      "showIds": "Mod-IDs neben Namen anzeigen",
+      "windowHint": "Das Fenster merkt sich seine Größe und Position."
+    },
+    "launch": {
+      "title": "Start",
+      "args": "Zusätzliche Spielargumente",
+      "argsHint": "Spiel starten übergibt sie über Steam, das einmal fragt, ob sie erlaubt werden sollen.",
+      "autosort": "Mods eines neuen Profils bei der ersten Verwendung nach Kategorie gruppieren"
+    },
+    "about": {
+      "title": "Über",
+      "version": "PZMM {version}",
+      "checkUpdates": "Nach Updates suchen",
+      "openLogs": "Log-Ordner öffnen",
+      "diagnostics": "Diagnosedaten kopieren",
+      "diagnosticsTip": "Version, Ordner, Profil, Anzahl der Mods und Ergebnisse von Setup prüfen, mit maskiertem Benutzernamen",
+      "keys": "Tastatur: <kbd>/</kbd> Suche · <kbd>↑</kbd><kbd>↓</kbd> zwischen Zeilen wechseln · <kbd>Enter</kbd> Details · <kbd>Space</kbd> aktivieren/deaktivieren · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> umsortieren · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> rückgängig/wiederholen · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+Klick mehrere auswählen · <kbd>Esc</kbd> Auswahl aufheben"
+    }
+  },
+  "servers": {
+    "label": "Server und Spielstände",
+    "sameMods": "Dieselben Mods wie dein aktuelles Profil",
+    "notInProfile": {
+      "one": "{count} nicht in deinem Profil",
+      "other": "{count} nicht in deinem Profil"
+    },
+    "notInTheirs": {
+      "one": "{count} von deinen fehlt dort",
+      "other": "{count} von deinen fehlen dort"
+    },
+    "started": "Server {name} mit {how} gestartet. Sein Konsolenfenster zeigt den Fortschritt.",
+    "title": "Dedizierter Server",
+    "lede": "Übertrage das Profil „{profile}“ in eine Serverkonfiguration, damit der Server dieselben Mods in derselben Reihenfolge lädt. Gesetzt werden <span class=\"mono\">Mods=</span>, <span class=\"mono\">WorkshopItems=</span> und, wenn deine Mods Karten hinzufügen, <span class=\"mono\">Map=</span>. Alle anderen Einstellungen bleiben erhalten.",
+    "config": "Serverkonfiguration",
+    "newConfig": "Neue Konfiguration…",
+    "newNameLabel": "Name der neuen Serverkonfiguration",
+    "writeTo": "In {name}.ini schreiben",
+    "mapOrder": "Kartenreihenfolge",
+    "mapOrderHint": "Der Server lädt Karten von oben nach unten: Mod-Karten kommen vor <span class=\"mono\">Muldraugh, KY</span>. Ziehen oder Alt+↑/↓ zum Anordnen; Schreiben speichert die Reihenfolge.",
+    "join": "Setup eines Servers übernehmen",
+    "joinHint": "Erstelle ein Profil aus einer Serverkonfiguration: Fehlende Workshop-Mods werden installiert und die Modreihenfolge wird übernommen.",
+    "startTip": "Diesen dedizierten Server starten",
+    "start": "Server starten",
+    "useAsProfile": "Als Profil verwenden",
+    "noConfigs": "Noch keine Serverkonfigurationen in <span class=\"mono\">{dir}</span>.",
+    "saves": {
+      "title": "Spielstände",
+      "lede": "Jeder Spielstand merkt sich die Mods, mit denen er gespielt wurde. Lade die Mods eines Spielstands, bevor du ihn fortsetzt, damit nichts fehlt.",
+      "none": "Noch keine Spielstände mit Modliste.",
+      "info": {
+        "one": "{mode} · {count} Mod · gespielt {when} · {diff}",
+        "other": "{mode} · {count} Mods · gespielt {when} · {diff}"
+      },
+      "useMods": "Mods dieses Spielstands verwenden"
+    }
+  },
+  "zb": {
+    "title": "ZombieBuddy",
+    "lede": "Manche Mods enthalten Java-Code, der das Spiel auf eine Weise verändert, die Lua-Mods nicht können. ZombieBuddy ist der Loader, den diese Mods brauchen. Die Einrichtung erfordert zwei Änderungen außerhalb deines Modordners, und PZMM erledigt beide für dich.",
+    "caution": "<strong>Java-Mods können auf deinem Computer alles tun.</strong> ZombieBuddy fragt dich, bevor es einen neuen oder geänderten Java-Mod lädt. Erlaube nur Mods von Autoren, denen du vertraust.",
+    "checks": {
+      "mod": "ZombieBuddy-Mod heruntergeladen",
+      "modHint": "In Steam abonniert oder von PZMM installiert",
+      "agent": "Java-Agent-Dateien im Spielordner",
+      "gameNotFound": "Spielordner nicht gefunden",
+      "flag": "Startparameter in ProjectZomboid64.json",
+      "flagHint": "Lädt ZombieBuddy, wenn du das Spiel über Steam startest",
+      "enabled": "Im Profil „{profile}“ aktiviert",
+      "enabledHint": "Damit Mods, die es brauchen, laden können"
+    },
+    "done": "erledigt",
+    "notDone": "nicht erledigt",
+    "neededBy": {
+      "one": "Benötigt von {count} aktivierten Mod: <span class=\"mono\">{ids}</span>",
+      "other": "Benötigt von {count} aktivierten Mods: <span class=\"mono\">{ids}</span>"
+    },
+    "changesLabel": "Anzuwendende Änderungen",
+    "confirmRemove": "ZombieBuddy aus dem Spielordner entfernen?",
+    "willDo": "PZMM wird:",
+    "nothing": "Nichts zu ändern.",
+    "apply": "Änderungen anwenden",
+    "repair": "ZombieBuddy reparieren",
+    "setUp": "ZombieBuddy einrichten",
+    "removeFromGame": "Aus dem Spielordner entfernen",
+    "about": "Über ZombieBuddy",
+    "fine": "Spielupdates und Steams „Spieldateien auf Fehler überprüfen“ entfernen den Startparameter. Wenn das passiert, zeigt diese Seite <em>Reparieren</em>. PZMM ändert nur den normalen Launcher.",
+    "useInstallerBefore": "Wenn du den alternativen Launcher oder Steam-Startoptionen nutzt, verwende den",
+    "installer": "offiziellen Installer",
+    "useInstallerAfter": "stattdessen."
+  },
+  "profile": {
+    "tip": "Profil: die Modliste, mit der du spielst",
+    "menuLabel": "Profile",
+    "newProfile": "Neues Profil…",
+    "setUpViewpoint": "Project Viewpoint einrichten…"
+  },
+  "activity": {
+    "title": "Aktivität",
+    "empty": "Installationen, Updates und Fehler erscheinen hier."
+  },
+  "links": {
+    "label": "PZMM-Links",
+    "github": "PZMM auf GitHub: Quellcode, Issues und Releases",
+    "discord": "Dem PZMM-Discord beitreten",
+    "kofi": "PZMM auf Ko-fi unterstützen",
+    "comingSoon": "{label} (bald verfügbar)"
+  },
+  "window": {
+    "minimise": "Minimieren",
+    "maximise": "Maximieren",
+    "restore": "Wiederherstellen"
+  },
+  "workshop": {
+    "sorts": {
+      "popular": "Am beliebtesten",
+      "subscribed": "Meiste Abonnenten",
+      "topRated": "Am besten bewertet",
+      "newest": "Neueste",
+      "updated": "Kürzlich aktualisiert",
+      "libraries": "Am häufigsten benötigt (Bibliotheken)",
+      "collections": "In den meisten Kollektionen"
+    },
+    "days": {
+      "today": "Heute",
+      "week": "Diese Woche",
+      "month": "Diesen Monat",
+      "months3": "3 Monate",
+      "months6": "6 Monate",
+      "year": "Dieses Jahr"
+    },
+    "within": {
+      "any": "Jederzeit",
+      "day": "Letzte 24 Stunden",
+      "week": "Letzte Woche",
+      "month": "Letzter Monat",
+      "months3": "Letzte 3 Monate",
+      "months6": "Letzte 6 Monate",
+      "year": "Letztes Jahr"
+    },
+    "tagNames": {
+      "Animals": "Tiere",
+      "Audio": "Audio",
+      "Balance": "Balance",
+      "Building": "Bauen",
+      "ClothingArmor": "Kleidung",
+      "Farming": "Landwirtschaft",
+      "Food": "Essen",
+      "Framework": "Framework",
+      "Hardmode": "Schwer",
+      "Interface": "Oberfläche",
+      "Items": "Gegenstände",
+      "LanguageTranslation": "Übersetzungen",
+      "Literature": "Literatur",
+      "Map": "Karte",
+      "Military": "Militär",
+      "Misc": "Sonstiges",
+      "Models": "Modelle",
+      "Multiplayer": "Mehrspieler",
+      "PopCulture": "Popkultur",
+      "QoL": "QoL",
+      "Realistic": "Realistisch",
+      "SillyFun": "Albern & lustig",
+      "Skills": "Fähigkeiten",
+      "Textures": "Texturen",
+      "Traits": "Eigenschaften",
+      "Vehicles": "Fahrzeuge",
+      "Weapons": "Waffen",
+      "WIP": "WIP"
+    },
+    "home": {
+      "popularWeek": "Diese Woche beliebt",
+      "subscribed": "Meiste Abonnenten",
+      "newest": "Neueste",
+      "updated": "Kürzlich aktualisiert",
+      "required": "Am häufigsten benötigt"
+    },
+    "errors": {
+      "rateLimited": "Steam begrenzt gerade die Anfragen. Warte eine Minute und versuch es erneut.",
+      "unreachable": "Steam Workshop nicht erreichbar: {error}"
+    },
+    "starsTip": {
+      "one": "{stars} von 5 Sternen aus {votes} Bewertung",
+      "other": "{stars} von 5 Sternen aus {votes} Bewertungen"
+    },
+    "detailsLabel": "Details zu {title}",
+    "collectionBadge": "Kollektion · {count}",
+    "moreByAuthorTip": "Mehr von diesem Autor",
+    "byAuthor": "von {author}",
+    "subscribersTip": "Aktuelle Abonnenten",
+    "subs": {
+      "one": "{n} Abo",
+      "other": "{n} Abos"
+    },
+    "favouritesTip": "Favoriten",
+    "commentsTip": "Kommentare",
+    "postedTip": "Veröffentlicht am {date}",
+    "updatedOn": "Aktualisiert am {date}",
+    "needs": {
+      "one": "Braucht {count} weiteren Mod, wird mitinstalliert",
+      "other": "Braucht {count} weitere Mods, werden mitinstalliert"
+    },
+    "details": "Details",
+    "label": "Steam Workshop",
+    "optionsLabel": "Suchoptionen",
+    "viewLabel": "Workshop-Ansicht",
+    "browse": "Durchsuchen",
+    "homeTab": "Startseite",
+    "searchPlaceholder": "Workshop durchsuchen",
+    "searchTip": "Steam-Suche: „exakte Phrase“, AND, OR, NOT, +muss, -ausschließen",
+    "searchInLabel": "Suchen in",
+    "searchInTip": "Wo die Wörter vorkommen müssen",
+    "anywhere": "Überall",
+    "titles": "Titel",
+    "descriptions": "Beschreibungen",
+    "search": "Suchen",
+    "clearTerm": "„{term}“ entfernen",
+    "gameBuild": "Spiel-Build",
+    "buildN": "Build {n}",
+    "anyBuild": "Jeder Build",
+    "show": "Anzeigen",
+    "mods": "Mods",
+    "collections": "Kollektionen",
+    "sortBy": "Sortieren nach",
+    "popularOver": "Beliebt im Zeitraum",
+    "perPage": "Pro Seite",
+    "tagsHeading": "Tags",
+    "tagsHeadingCount": "Tags ({count})",
+    "tagsHint": "Klicken zum Verlangen, erneut zum Ausschließen, erneut zum Zurücksetzen.",
+    "tagOnlyTip": "Nur {tag}",
+    "tagNoTip": "Kein {tag}",
+    "posted": "Veröffentlicht",
+    "updated": "Aktualisiert",
+    "onlyIncompatible": "Nur als inkompatibel markierte Mods",
+    "clearFilters": "Filter zurücksetzen",
+    "viewpointAddons": "Viewpoint-Add-ons",
+    "viewpointDiscordTip": "Community-Discord von Project Viewpoint: Hilfe, Fehlerberichte, News",
+    "viewpointDiscord": "Viewpoint-Discord",
+    "modsBy": "Mods von <strong>{author}</strong>",
+    "modsByCount": "Mods von <strong>{author}</strong> ({count})",
+    "thisAuthor": "diesem Autor",
+    "collectionsWith": "Kollektionen mit <strong>{title}</strong>",
+    "modsThatNeed": "Mods, die <strong>{title}</strong> brauchen",
+    "backToBrowsing": "Zurück zur Übersicht",
+    "tryAgain": "Erneut versuchen",
+    "viewAll": "Alle anzeigen",
+    "loading": "Wird geladen…",
+    "loadingWorkshop": "Workshop wird geladen…",
+    "nothingMatches": "Keine Treffer. Versuch es mit weniger Wörtern, weniger Tags oder einem anderen Build.",
+    "clearSearch": "Suche leeren",
+    "countMods": {
+      "one": "{n} Mod",
+      "other": "{n} Mods"
+    },
+    "countCollections": {
+      "one": "{n} Kollektion",
+      "other": "{n} Kollektionen"
+    },
+    "countModsFor": {
+      "one": "{n} Mod für „{search}“",
+      "other": "{n} Mods für „{search}“"
+    },
+    "countCollectionsFor": {
+      "one": "{n} Kollektion für „{search}“",
+      "other": "{n} Kollektionen für „{search}“"
+    },
+    "loadingSuffix": " · wird geladen…",
+    "pagesLabel": "Seiten",
+    "previous": "Zurück",
+    "pageOf": "Seite {page} von {pages}",
+    "next": "Weiter"
+  },
+  "panel": {
+    "moreByAuthorTip": "Mehr Mods von diesem Autor",
+    "byAuthor": "von {author}",
+    "closeTip": "Schließen (Esc)",
+    "screenshotLabel": "Screenshot {n}",
+    "youtubeTip": "Auf YouTube ansehen",
+    "youtubeLabel": "Video auf YouTube ansehen",
+    "installAll": {
+      "one": "{count} Mod installieren",
+      "other": "Alle {count} Mods installieren"
+    },
+    "workshopPage": "Workshop-Seite",
+    "rating": "Bewertung",
+    "subscribers": "Abonnenten",
+    "visitors": "Besucher",
+    "favourites": "Favoriten",
+    "comments": "Kommentare",
+    "size": "Größe",
+    "posted": "Veröffentlicht",
+    "updated": "Aktualisiert",
+    "modsThatNeed": "Mods, die diesen brauchen",
+    "collectionsWith": "Kollektionen mit diesem",
+    "moreBy": "Mehr von {author}",
+    "thisAuthor": "diesem Autor",
+    "needs": {
+      "one": "Braucht {count} weiteren Mod (wird mitinstalliert)",
+      "other": "Braucht {count} weitere Mods (werden mitinstalliert)"
+    },
+    "items": {
+      "one": "{count} Objekt in dieser Kollektion",
+      "other": "{count} Objekte in dieser Kollektion"
+    },
+    "description": "Beschreibung",
+    "changeNotes": "Änderungshinweise",
+    "commentsTab": "Kommentare ({n})",
+    "loading": "Wird geladen…",
+    "noOlderChanges": "Keine älteren Änderungshinweise.",
+    "noChanges": "Keine Änderungshinweise.",
+    "newer": "Neuer",
+    "older": "Älter",
+    "noComments": "Noch keine Kommentare.",
+    "commentsRange": "{from}–{to} von {total}",
+    "postHint": "Um einen Kommentar zu schreiben, nutze die Workshop-Seite."
+  },
+  "installButton": {
+    "installAll": "Alle installieren"
+  }
+}

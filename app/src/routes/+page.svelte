@@ -23,6 +23,7 @@
   import WindowControls from "$lib/WindowControls.svelte";
   import ProfilePicker from "$lib/ProfilePicker.svelte";
   import type { Categories, Finding, ModErrors, Overlap, Save, SettingsView, Stats } from "$lib/api";
+  import { t, th, type Vars } from "$lib/i18n.svelte";
 
   let tab = $state<"mods" | "workshop" | "maps" | "servers" | "zb" | "settings">("mods");
   let updates = $state<Set<string>>(new Set());
@@ -42,9 +43,9 @@
   async function checkAppUpdate(manual = false) {
     try {
       appUpdate = await check();
-      if (!appUpdate && manual) say(`PZMM ${appVersion} is the latest version.`);
+      if (!appUpdate && manual) say("log.appLatest", { version: appVersion });
     } catch (e) {
-      if (manual) say(`Couldn't check for PZMM updates: ${e}`, true);
+      if (manual) say("log.appCheckFailed", { error: String(e) }, true);
     }
   }
 
@@ -63,7 +64,7 @@
       });
       await relaunch();
     } catch (e) {
-      say(`Couldn't update PZMM: ${e}`, true);
+      say("log.appUpdateFailed", { error: String(e) }, true);
       appProgress = null;
     }
   }
@@ -101,7 +102,7 @@
       if (modePlan?.target === target) modePlan.lines = lines;
     } catch (e) {
       if (modePlan?.target === target) modePlan.error = String(e);
-      else say(String(e), true);
+      else say(String(e), {}, true);
     }
   }
 
@@ -109,10 +110,10 @@
     if (!modePlan) return;
     const { target, profile } = modePlan;
     modePlan = null;
-    const label = target === "viewpoint" ? "Setting up Project Viewpoint" : "Switching to Project Zomboid";
+    const label = t(target === "viewpoint" ? "busy.viewpointSetup" : "busy.toZomboid");
     if (!(await run(label, () => api.modeSwitch(target), { showLog: true }))) return;
     // the switch lands on that game's last profile; go on to the one that was picked
-    if (profile && view && profile !== view.profile && view.profiles.includes(profile)) await run(`Switching to "${profile}"`, () => api.profileUse(profile));
+    if (profile && view && profile !== view.profile && view.profiles.includes(profile)) await run(t("busy.switchingTo", { name: profile }), () => api.profileUse(profile));
     await settleOrder();
   }
   let selected = $state<string | null>(null);
@@ -120,7 +121,7 @@
   let pending = $state(0);
   const busy = $derived(pending > 0);
   let busyLabel = $state("");
-  let log = $state<{ text: string; error: boolean }[]>([]);
+  let log = $state<{ text: string; en: string; error: boolean }[]>([]);
   let logOpen = $state(false);
   let search = $state("");
   let filter = $state<"all" | "on" | "off" | "problems">("all");
@@ -209,14 +210,15 @@
       order = v.order;
       if (v.adopted) {
         undoStack = redoStack = [];
-        say(`Picked up changes made in the game's mod menu (profile "${v.profile}").`);
+        say("log.adopted", { profile: v.profile });
       }
     } catch {}
   }
 
   // --- actions ---
-  function say(text: string, error = false) {
-    log.push({ text, error });
+  /** An activity line: a key from the locale files, or text as is (the backend's). Its English text picks the icon. */
+  function say(key: string, vars: Vars = {}, error = false) {
+    log.push({ text: t(key, vars), en: t(key, vars, "en"), error });
     if (error) logOpen = true;
   }
 
@@ -237,7 +239,7 @@
       view = v;
       rows = v.rows;
       order = v.order;
-      if (v.adopted) say(`Picked up changes made in the game's mod menu (profile "${v.profile}").`);
+      if (v.adopted) say("log.adopted", { profile: v.profile });
       if (selected && !v.rows.some((r) => r.kind === "mod" && r.id === selected)) selected = null;
       // a profile seen for the first time (first run, New, Import, Viewpoint) without separators gets autosorted
       const fresh = v.created || (knownProfiles && !knownProfiles.includes(v.profile));
@@ -245,7 +247,7 @@
       else if (!keepHistory && before.size) await placeNew(before);
       return true;
     } catch (e) {
-      say(String(e), true);
+      say(String(e), {}, true);
       // resync with what's on disk
       try {
         view = await api.load();
@@ -265,7 +267,7 @@
   /** The Workshop categories (kept for placing enabled mods), behind the busy label. */
   async function categories(): Promise<Categories> {
     pending++;
-    busyLabel = "Reading Workshop tags";
+    busyLabel = t("busy.readingTags");
     try {
       return (cats = await api.categories());
     } finally {
@@ -280,10 +282,10 @@
       c = await categories();
     } catch (e) {
       // no tags (offline, rate-limited): still fix the load rules
-      if (await commitList(sortLoadOrder(list))) say(`Couldn't read Workshop tags, so only the load rules were fixed (${e}).`, true);
+      if (await commitList(sortLoadOrder(list))) say("log.tagsFailedSorted", { error: String(e) }, true);
       return;
     }
-    if (await commitList(autosort(list, c.of, c.order))) say("Autosorted the load order. Ctrl+Z puts the old order back.");
+    if (await commitList(autosort(list, c.of, c.order))) say("log.autosorted");
   }
 
   /** Group the library into one section per category. `record` keeps it undoable (and asks before replacing your own sections). */
@@ -292,13 +294,13 @@
     try {
       c = await categories();
     } catch (e) {
-      return say(`Couldn't read Workshop tags (${e}).`, true);
+      return say("log.tagsFailed", { error: String(e) }, true);
     }
     const own = separators.filter((s) => !c.order.includes(s));
-    if (record && own.length && !confirm(`Group by category replaces your own sections (${own.slice(0, 4).join(", ")}${own.length > 4 ? ", …" : ""}) with category sections. Ctrl+Z undoes it. Group now?`)) return;
+    if (record && own.length && !confirm(t("confirm.group", { sections: own.slice(0, 4).join(", ") + (own.length > 4 ? ", …" : "") }))) return;
     const next = groupByCategory(rows, c.of, c.order);
     const sections = next.filter((r) => r.kind === "sep").length;
-    if (await commit(next, order, record)) say(`Grouped your mods into ${sections} categories.${record ? " Ctrl+Z puts your sections back." : ""}`);
+    if (await commit(next, order, record)) say(record ? "log.groupedUndo" : "log.grouped", { count: sections });
   }
 
   /** In a library sorted into categories, file newly installed mods under theirs. */
@@ -319,9 +321,9 @@
   async function checkUpdates() {
     try {
       updates = new Set(await api.checkUpdates());
-      if (updates.size) say(`${updates.size} mod${updates.size === 1 ? " has an update" : "s have updates"} on the Workshop.`);
+      if (updates.size) say("log.updatesFound", { count: updates.size });
     } catch (e) {
-      say(`Couldn't check for updates: ${e}`);
+      say("log.updatesCheckFailed", { error: String(e) });
     }
   }
 
@@ -343,14 +345,14 @@
     checking = true;
     await checkUpdates();
     checking = false;
-    if (!updates.size) say("Your mods are up to date.");
+    if (!updates.size) say("log.upToDate");
   }
 
   /** Re-download everything PZMM installed (repairs damaged copies); asks first, like an update. */
   async function redownloadAll() {
     const ours = [...mods.values()].filter((m) => /^(workshop|github|local):/.test(m.source)).map((m) => m.id);
-    if (!ours.length) return say("PZMM hasn't installed any mods to re-download (Steam keeps subscriptions up to date).");
-    if (!confirm(`Re-download all ${ours.length} mods PZMM installed? Each keeps its current version as a backup.`)) return;
+    if (!ours.length) return say("log.nothingToRedownload");
+    if (!confirm(t("confirm.redownload", { count: ours.length }))) return;
     await updateMods(ours);
   }
 
@@ -358,13 +360,10 @@
     const inSave = latestSave ? ids.filter((i) => latestSave!.mods.includes(i)) : [];
     if (
       inSave.length &&
-      !confirm(
-        `${inSave.join(", ")} ${inSave.length === 1 ? "is" : "are"} used by your latest save (${latestSave!.name}). ` +
-          "Updates can break a save in progress. Each updated mod keeps its previous version (Restore previous version). Update now?",
-      )
+      !confirm(t("confirm.updateInSave", { count: inSave.length, mods: inSave.join(", "), save: latestSave!.name }))
     )
       return;
-    if (await run(`Updating ${ids.length === 1 ? ids[0] : `${ids.length} mods`}`, () => api.updateMods(ids), { showLog: true })) {
+    if (await run(ids.length === 1 ? t("busy.updatingOne", { name: ids[0] }) : t("busy.updatingMany", { count: ids.length }), () => api.updateMods(ids), { showLog: true })) {
       updates = new Set([...updates].filter((u) => !ids.includes(u)));
     }
   }
@@ -385,16 +384,16 @@
     return ok;
   }
 
-  const installWorkshop = (id: string) => installAndSettle(`Installing Workshop mod ${id}`, () => api.install([id]));
+  const installWorkshop = (id: string) => installAndSettle(t("busy.installingWorkshop", { id }), () => api.install([id]));
 
   async function installMissing() {
     let unresolved: string[] = [];
-    const ok = await installAndSettle(`Finding ${missingReqs.size} missing ${missingReqs.size === 1 ? "mod" : "mods"} on the Workshop`, async () => {
+    const ok = await installAndSettle(t("busy.findingMissing", { count: missingReqs.size }), async () => {
       const [v, left] = await api.installMissing();
       unresolved = left;
       return v;
     });
-    if (ok && unresolved.length) say(`Still missing: ${unresolved.join(", ")}. Select a mod that needs one and use Find to pick a match.`, true);
+    if (ok && unresolved.length) say("log.stillMissing", { ids: unresolved.join(", ") }, true);
   }
 
   // --- save safety: the latest save vs the active profile ---
@@ -417,10 +416,10 @@
   async function shareProfile() {
     try {
       await navigator.clipboard.writeText(encodeShare(await api.profileExport()));
-      say(`Copied a share code for "${view?.profile}". Paste it to a friend; they use Import in PZMM.`);
+      say("log.shareCopied", { profile: view?.profile ?? "" });
       logOpen = true;
     } catch (e) {
-      say(`Couldn't copy the share code: ${e}`, true);
+      say("log.shareFailed", { error: String(e) }, true);
     }
   }
 
@@ -430,9 +429,9 @@
     importText = null;
     try {
       const shared = decodeShare(text);
-      await run(`Importing "${shared.name}"`, () => api.profileImport(shared), { showLog: true });
+      await run(t("busy.importing", { name: shared.name }), () => api.profileImport(shared), { showLog: true });
     } catch (err) {
-      say(String(err), true);
+      say(String(err), {}, true);
     }
   }
 
@@ -443,7 +442,7 @@
     try {
       [findings, gameErrors] = await Promise.all([api.doctor(), api.consoleErrors().catch(() => [])]);
     } catch (e) {
-      say(`Couldn't check the setup: ${e}`, true);
+      say("log.checkSetupFailed", { error: String(e) }, true);
     }
   }
 
@@ -460,7 +459,7 @@
 
   function bisectStart() {
     const suspects = [...mods.values()].filter((m) => m.on && !m.missing).map((m) => m.id);
-    if (suspects.length < 2) return say("Enable at least two mods to search for a broken one.", true);
+    if (suspects.length < 2) return say("log.bisectNeedsTwo", {}, true);
     findings = null;
     undoStack = redoStack = []; // undoing into a half-disabled test list would be a trap
     bisectApply({ original: $state.snapshot({ rows, order }), suspects, testing: [], round: 1 });
@@ -474,7 +473,7 @@
       bisect = null;
       undoStack = redoStack = [];
       commit(original.rows, original.order, false);
-      say(suspects.length ? `Found it: ${suspects[0]} causes the problem. Your mod list is restored.` : "The problem didn't follow any single mod. Your mod list is restored.", !!suspects.length);
+      say(suspects.length ? "log.bisectFound" : "log.bisectNone", { id: suspects[0] ?? "" }, !!suspects.length);
       logOpen = true;
       if (suspects.length) selected = suspects[0];
       return;
@@ -503,7 +502,7 @@
     }
     rows = next;
     order = syncOrder(next, nextOrder);
-    return run("Saving", () => api.save(rows, order), { keepHistory: true });
+    return run(t("busy.saving"), () => api.save(rows, order), { keepHistory: true });
   };
 
   /** Save a sorted load list: its order, and the mods it turned on. */
@@ -629,15 +628,15 @@
     const sources = installText.split(/\s+/).filter(Boolean);
     if (!sources.length) return;
     installText = "";
-    await installAndSettle(`Installing ${sources.length === 1 ? sources[0] : `${sources.length} mods`}`, () => api.install(sources));
+    await installAndSettle(sources.length === 1 ? t("busy.installingOne", { name: sources[0] }) : t("busy.installingMany", { count: sources.length }), () => api.install(sources));
   }
 
   /** A new separator above the selected mod (or at the top), ready to rename. */
   async function addSeparator() {
     const at = Math.max(0, selected ? rows.findIndex((r) => r.kind === "mod" && r.id === selected) : 0);
     const taken = new Set(separators);
-    let name = "New section";
-    for (let n = 2; taken.has(name); n++) name = `New section ${n}`;
+    let name = t("mods.newSection");
+    for (let n = 2; taken.has(name); n++) name = t("mods.newSectionN", { n });
     await commit([...rows.slice(0, at), { kind: "sep", name }, ...rows.slice(at)]);
     editingSep = at;
   }
@@ -664,7 +663,7 @@
     const r = rows[i];
     if (r?.kind !== "sep") return;
     if (!name.trim()) removeSep(i);
-    else if (name.trim() !== r.name && separators.includes(name.trim())) say(`There's already a section called "${name.trim()}". Pick another name.`, true);
+    else if (name.trim() !== r.name && separators.includes(name.trim())) say("log.sectionExists", { name: name.trim() }, true);
     else commit(rows.map((x, j) => (j === i ? { kind: "sep", name: name.trim() } : x)));
   }
 
@@ -672,7 +671,7 @@
     e.preventDefault();
     const name = newProfile?.trim();
     newProfile = null;
-    if (name) await run(`Creating profile "${name}"`, () => api.profileNew(name));
+    if (name) await run(t("busy.creatingProfile", { name }), () => api.profileNew(name));
   }
 
   // --- bulk selection: Ctrl/Cmd+click toggles, Shift+click selects a range ---
@@ -713,21 +712,21 @@
 
   function bulkRemove() {
     const ids = [...picked].filter((id) => mods.get(id) && isOurs(mods.get(id)!));
-    if (!ids.length) return say("None of the selected mods were installed by PZMM; unsubscribe Steam mods in Steam.", true);
+    if (!ids.length) return say("log.noneOurs", {}, true);
     const skipped = picked.size - ids.length;
-    removeMods(ids, skipped ? ` (${skipped} not installed by PZMM will be left alone.)` : "").then(() => (picked = new Set()));
+    removeMods(ids, skipped ? t("confirm.removeSkipped", { count: skipped }) : "").then(() => (picked = new Set()));
   }
 
   /** Remove mods (asking first), and, as Settings say, the required mods nothing else uses. */
   async function removeMods(ids: string[], note = "") {
     const s = cfg?.settings;
-    const where = s?.recycle === false ? "deleted from" : "moved to the Recycle Bin from";
-    const what = ids.length === 1 ? ids[0] : `${ids.length} mods`;
-    if (!confirm(`Remove ${what}? ${ids.length === 1 ? "Its" : "Their"} files are ${where} your Zomboid mods folder.${note}`)) return;
+    const ask = `confirm.remove${s?.recycle === false ? "Delete" : "Recycle"}${ids.length === 1 ? "One" : "Many"}`;
+    if (!confirm(t(ask, { count: ids.length, name: ids[0] }) + note)) return;
     let extra = s?.remove_requirements === "never" ? [] : orphanedRequirements(ids, [...mods.values()]).filter((id) => isOurs(mods.get(id)!));
     if (extra.length && s?.remove_requirements !== "always" &&
-      !confirm(`Also remove ${extra.join(", ")}? Nothing else you have needs ${extra.length === 1 ? "it" : "them"}.`)) extra = [];
-    await run(`Removing ${extra.length ? `${ids.length + extra.length} mods` : what}`, () => api.remove([...ids, ...extra]));
+      !confirm(t("confirm.alsoRemove", { count: extra.length, ids: extra.join(", ") }))) extra = [];
+    const all = ids.length + extra.length;
+    await run(all === 1 ? t("busy.removingOne", { name: ids[0] }) : t("busy.removingMany", { count: all }), () => api.remove([...ids, ...extra]));
   }
 
   const separators = $derived(rows.flatMap((r) => (r.kind === "sep" && r.name ? [r.name] : [])));
@@ -738,8 +737,8 @@
     const name = view?.profile;
     const other = modeProfiles.find((p) => p !== name); // stay in this game: switching game goes through the mode plan
     if (!name || !other) return;
-    if (confirm(`Delete the profile "${name}"? Your mods stay installed. PZMM will switch to "${other}".`)) {
-      run(`Deleting profile "${name}"`, async () => {
+    if (confirm(t("confirm.deleteProfile", { name, other }))) {
+      run(t("busy.deletingProfile", { name }), async () => {
         await api.profileUse(other);
         return api.profileDelete(name);
       });
@@ -778,9 +777,9 @@
   }
 
   onMount(() => {
-    const unlisten = listen<string>("log", (e) => say(e.payload, e.payload.startsWith("error:")));
+    const unlisten = listen<string>("log", (e) => say(e.payload, {}, e.payload.startsWith("error:")));
     const settings = api.settingsGet().catch(() => null);
-    run("Loading", api.load).then(async () => {
+    run(t("busy.loading"), api.load).then(async () => {
       refreshStats();
       cfg = await settings;
       if (cfg?.settings.update_check !== "off") autoCheck();
@@ -799,79 +798,80 @@
 <div class="app">
   <header class="top" data-tauri-drag-region>
     <WindowControls />
+    <!-- i18n-ignore -->
     <img class="brand" src="/brand/pzmm.png" alt="PZMM" width="44" height="44" />
 
     <div class="profile">
       {#if newProfile !== null}
         <form onsubmit={createProfile} class="inline">
           <!-- svelte-ignore a11y_autofocus -->
-          <input type="text" bind:value={newProfile} placeholder="Name, e.g. Friends server" autofocus
+          <input type="text" bind:value={newProfile} placeholder={t("app.newProfilePlaceholder")} autofocus
             onkeydown={(e) => e.key === "Escape" && (newProfile = null)} />
-          <button type="submit" disabled={!newProfile.trim()}><Icon name="plus" size={14} />Create</button>
+          <button type="submit" disabled={!newProfile.trim()}><Icon name="plus" size={14} />{t("app.create")}</button>
         </form>
       {:else}
-        <ProfilePicker {view} {busy} onUse={(p) => run("Switching profile", () => api.profileUse(p))}
+        <ProfilePicker {view} {busy} onUse={(p) => run(t("busy.switchingProfile"), () => api.profileUse(p))}
           onSwitchGame={planMode} onNew={() => (newProfile = "")} />
-        <button class="quiet" onclick={shareProfile} disabled={busy} title="Copy a code others can import"><Icon name="share" size={14} />Share</button>
-        <button class="quiet" onclick={() => (importText = "")} disabled={busy} title="Import a profile from a share code"><Icon name="upload" size={14} />Import</button>
+        <button class="quiet" onclick={shareProfile} disabled={busy} title={t("app.shareTip")}><Icon name="share" size={14} />{t("app.share")}</button>
+        <button class="quiet" onclick={() => (importText = "")} disabled={busy} title={t("app.importTip")}><Icon name="upload" size={14} />{t("common.import")}</button>
         {#if modeProfiles.length > 1}
-          <button class="quiet" onclick={deleteProfile} disabled={busy}><Icon name="trash" size={14} />Delete</button>
+          <button class="quiet" onclick={deleteProfile} disabled={busy}><Icon name="trash" size={14} />{t("common.delete")}</button>
         {/if}
       {/if}
     </div>
 
     <form class="install" onsubmit={install}>
-      <label for="install" class="visually-hidden">Install a mod</label>
+      <label for="install" class="visually-hidden">{t("app.installLabel")}</label>
       <input id="install" type="text" bind:value={installText} autocomplete="off" spellcheck="false"
-        placeholder="Paste a Workshop link, collection or ID, a GitHub repo (owner/repo), or a .zip path" />
-      <button class="primary" type="submit" disabled={busy || !installText.trim()}><Icon name="download" size={14} />Install</button>
+        placeholder={t("app.installPlaceholder")} />
+      <button class="primary" type="submit" disabled={busy || !installText.trim()}><Icon name="download" size={14} />{t("common.install")}</button>
     </form>
 
   </header>
   {#snippet actions()}
     <div class="right">
       {#if updates.size}
-        <button class="primary" onclick={() => updateMods([...updates])} disabled={busy}><Icon name="refresh" size={14} />Update {updates.size} {updates.size === 1 ? "mod" : "mods"}</button>
+        <button class="primary" onclick={() => updateMods([...updates])} disabled={busy}><Icon name="refresh" size={14} />{t("app.updateMods", { count: updates.size })}</button>
       {:else}
-        <button onclick={checkUpdatesNow} disabled={busy || checking} title="Ask the Workshop whether any mod has a newer version">
-          <Icon name="refresh" size={14} />{checking ? "Checking…" : "Check for updates"}</button>
+        <button onclick={checkUpdatesNow} disabled={busy || checking} title={t("app.checkUpdatesTip")}>
+          <Icon name="refresh" size={14} />{checking ? t("app.checking") : t("app.checkUpdates")}</button>
       {/if}
-      <button onclick={api.launchGame} title={cfg?.settings.launch_args ? `Through Steam, with ${cfg.settings.launch_args}` : "Through Steam"}><Icon name="play" size={14} />Launch game</button>
+      <button onclick={api.launchGame} title={cfg?.settings.launch_args ? t("app.launchTipArgs", { args: cfg.settings.launch_args }) : t("app.launchTip")}><Icon name="play" size={14} />{t("app.launch")}</button>
     </div>
   {/snippet}
 
   {#if importText !== null}
     <form class="mode-plan" onsubmit={importProfile}>
-      <label for="import-code"><strong>Import a profile</strong>: paste the share code someone sent you. Missing Workshop mods are installed.</label>
+      <label for="import-code">{@html th("app.importIntro")}</label>
       <div class="row">
-        <!-- svelte-ignore a11y_autofocus -->
+        <!-- svelte-ignore a11y_autofocus --><!-- i18n-ignore: the share code's prefix -->
         <input id="import-code" type="text" bind:value={importText} onkeydown={(e) => e.key === "Escape" && (importText = null)} placeholder="PZMM1:…" autofocus spellcheck="false" style="flex: 1" />
-        <button class="primary" type="submit" disabled={!importText.trim()}><Icon name="upload" size={14} />Import</button>
-        <button class="quiet" type="button" onclick={() => (importText = null)}><Icon name="x" size={14} />Cancel</button>
+        <button class="primary" type="submit" disabled={!importText.trim()}><Icon name="upload" size={14} />{t("common.import")}</button>
+        <button class="quiet" type="button" onclick={() => (importText = null)}><Icon name="x" size={14} />{t("common.cancel")}</button>
       </div>
     </form>
   {/if}
 
   {#if modePlan}
-    <div class="mode-plan" role="region" aria-label="Switch game">
+    <div class="mode-plan" role="region" aria-label={t("app.switchGameLabel")}>
       {#if modePlan.error}
         <p class="error">{modePlan.error}</p>
-        <button class="quiet" onclick={() => (modePlan = null)}><Icon name="x" size={14} />Close</button>
+        <button class="quiet" onclick={() => (modePlan = null)}><Icon name="x" size={14} />{t("common.close")}</button>
       {:else}
         <p>
-          <strong>{modePlan.target === "viewpoint" ? "Switch to Project Viewpoint (3D)?" : "Switch back to Project Zomboid?"}</strong>
+          <strong>{t(modePlan.target === "viewpoint" ? "app.switchToViewpoint" : "app.switchToZomboid")}</strong>
           {#if modePlan.target === "viewpoint"}
-            Viewpoint is early in development. It loads through ZombieBuddy, which asks you once, when the game starts, to approve its Java code.
+            {t("app.viewpointNote")}
           {/if}
         </p>
         {#if modePlan.lines.length}
           <ul class="mono">{#each modePlan.lines as l}<li>{l}</li>{/each}</ul>
           <div class="row">
-            <button class="primary" onclick={switchMode} disabled={busy}><Icon name="swap" size={14} />Switch</button>
-            <button class="quiet" onclick={() => (modePlan = null)}><Icon name="x" size={14} />Cancel</button>
+            <button class="primary" onclick={switchMode} disabled={busy}><Icon name="swap" size={14} />{t("app.switch")}</button>
+            <button class="quiet" onclick={() => (modePlan = null)}><Icon name="x" size={14} />{t("common.cancel")}</button>
           </div>
         {:else}
-          <p class="hint-line">Checking what's needed…</p>
+          <p class="hint-line">{t("app.checkingNeeded")}</p>
         {/if}
       {/if}
     </div>
@@ -880,22 +880,22 @@
   {#if appUpdate && !appUpdateLater}
     <div class="app-update" role="status">
       {#if appProgress === null}
-        <span><strong>PZMM {appUpdate.version} is available.</strong> You have {appVersion}.</span>
-        <button class="quiet" onclick={() => api.openUrl(`https://github.com/SEVNC3/pz-mod-manager/releases/tag/v${appUpdate?.version}`)}>What's new</button>
-        <button class="quiet" onclick={() => (appUpdateLater = true)}>Later</button>
-        <button class="primary" onclick={installAppUpdate} disabled={busy} title={busy ? "Wait for the current job to finish" : ""}><Icon name="update" size={14} />Update and restart</button>
+        <span>{@html th("app.updateAvailable", { version: appUpdate.version, current: appVersion })}</span>
+        <button class="quiet" onclick={() => api.openUrl(`https://github.com/SEVNC3/pz-mod-manager/releases/tag/v${appUpdate?.version}`)}>{t("app.whatsNew")}</button>
+        <button class="quiet" onclick={() => (appUpdateLater = true)}>{t("app.later")}</button>
+        <button class="primary" onclick={installAppUpdate} disabled={busy} title={busy ? t("app.waitTip") : ""}><Icon name="update" size={14} />{t("app.updateRestart")}</button>
       {:else}
-        <span>Downloading PZMM {appUpdate.version}… {appProgress}%</span>
+        <span>{t("app.downloading", { version: appUpdate.version, progress: appProgress })}</span>
         <progress max="100" value={appProgress}></progress>
       {/if}
     </div>
   {/if}
 
   <div class="tabbar">
-  <div class="tabs" role="tablist" aria-label="Sections" tabindex="-1" onkeydown={(e) => arrowPick(e, TAB_IDS, tab, (v) => (tab = v as typeof tab))}>
-    {#each [["mods", "My mods"], ["workshop", "Browse Workshop"], ["maps", "Maps"], ["servers", "Servers & saves"], ["zb", "ZombieBuddy"], ["settings", "Settings"]] as [id, label]}
+  <div class="tabs" role="tablist" aria-label={t("app.sectionsLabel")} tabindex="-1" onkeydown={(e) => arrowPick(e, TAB_IDS, tab, (v) => (tab = v as typeof tab))}>
+    {#each TAB_IDS as id}
       <button role="tab" aria-selected={tab === id} class:active={tab === id} onclick={() => (tab = id as typeof tab)}>
-        {label}{#if (id === "zb" && zbNeeded) || (id === "settings" && folderTrouble)}<span class="alert" aria-label="needs setup"></span>{/if}
+        {t(`tabs.${id}`)}{#if (id === "zb" && zbNeeded) || (id === "settings" && folderTrouble)}<span class="alert" aria-label={t("app.needsSetup")}></span>{/if}
       </button>
     {/each}
   </div>
@@ -913,90 +913,88 @@
       canUndo={undoStack.length > 0} onUndo={undo} />
   {:else if tab === "servers"}
     <ServersSaves {busy} profile={view?.profile ?? ""} enabledIds={order}
-      onImport={(name) => run(`Importing ${name}.ini`, () => api.serverImport(name), { showLog: true })}
-      onUseSave={(mode, name) => run(`Loading the mods of ${name}`, () => api.saveUse(mode, name))} />
+      onImport={(name) => run(t("busy.importingServer", { name }), () => api.serverImport(name), { showLog: true })}
+      onUseSave={(mode, name) => run(t("busy.loadingSave", { name }), () => api.saveUse(mode, name))} />
   {:else if tab === "zb"}
     <ZombieBuddy status={zb} profile={view?.profile ?? ""} {busy}
-      onSetup={async () => { await run("Setting up ZombieBuddy", api.zbInstall, { showLog: true }); }}
-      onRemove={async () => { await run("Removing ZombieBuddy", api.zbUninstall, { showLog: true }); }} />
+      onSetup={async () => { await run(t("busy.zbSetup"), api.zbInstall, { showLog: true }); }}
+      onRemove={async () => { await run(t("busy.zbRemove"), api.zbUninstall, { showLog: true }); }} />
   {:else if tab === "settings"}
-    <Settings bind:cfg {view} {busy} {appVersion} {say} onBuild={(b) => run("Saving", () => api.setBuild(b))}
+    <Settings bind:cfg {view} {busy} {appVersion} {say} onBuild={(b) => run(t("busy.saving"), () => api.setBuild(b))}
       onRedownload={redownloadAll} onCheckUpdate={() => checkAppUpdate(true)}
-      onFoldersChanged={() => run("Loading", api.load).then(() => { refreshSave(); refreshZb(); })} />
+      onFoldersChanged={() => run(t("busy.loading"), api.load).then(() => { refreshSave(); refreshZb(); })} />
   {:else}
   <section class="mods">
   {#if saveDiff && latestSave && !saveNoticeDismissed}
     <div class="banner save" role="status">
       <Icon name="alert" size={16} />
       <span>
-        Your latest save, <strong>{latestSave.name}</strong>, was played with a different mod list:
-        {[saveDiff.missing.length && `${saveDiff.missing.length} of its mods aren't enabled`, saveDiff.extra.length && `${saveDiff.extra.length} enabled mods weren't in it`].filter(Boolean).join(", ")}.
-        Continuing it with this list can break it.
+        {@html th("app.saveDiff", { save: latestSave.name, diffs: [saveDiff.missing.length && t("app.saveMissing", { count: saveDiff.missing.length }), saveDiff.extra.length && t("app.saveExtra", { count: saveDiff.extra.length })].filter(Boolean).join(", ") })}
       </span>
-      <button onclick={() => latestSave && run(`Loading the mods of ${latestSave.name}`, () => api.saveUse(latestSave!.mode, latestSave!.name))}><Icon name="swap" size={14} />Use this save's mods</button>
-      <button class="quiet" onclick={() => (saveNoticeDismissed = true)}>Dismiss</button>
+      <button onclick={() => latestSave && run(t("busy.loadingSave", { name: latestSave.name }), () => api.saveUse(latestSave!.mode, latestSave!.name))}><Icon name="swap" size={14} />{t("app.useSaveMods")}</button>
+      <button class="quiet" onclick={() => (saveNoticeDismissed = true)}>{t("app.dismiss")}</button>
     </div>
   {/if}
   {#if zbNeeded}
     <div class="banner" role="status">
       <Icon name="alert" size={16} />
-      <span>{zb?.required_by.length} enabled {zb?.required_by.length === 1 ? "mod needs" : "mods need"} ZombieBuddy, which isn't set up{zb?.files_current || zb?.launcher_patched ? " completely (a game update may have reset it)" : ""}.</span>
-      <button onclick={() => (tab = "zb")}><Icon name="settings" size={14} />Set up ZombieBuddy</button>
+      <span>{t(zb?.files_current || zb?.launcher_patched ? "app.zbNeededPartial" : "app.zbNeeded", { count: zb?.required_by.length ?? 0 })}</span>
+      <button onclick={() => (tab = "zb")}><Icon name="settings" size={14} />{t("app.zbSetup")}</button>
     </div>
   {/if}
   <div class="filters">
-    <input id="mod-search" type="search" bind:value={search} placeholder="Search mods  ( / )" aria-label="Search mods" />
-    <div class="seg" role="radiogroup" aria-label="Show" tabindex="-1" onkeydown={(e) => arrowPick(e, FILTER_IDS, filter, (v) => (filter = v as typeof filter))}>
-      {#each [["all", "All"], ["on", "Enabled"], ["off", "Disabled"], ["problems", `Problems${problemCount ? ` (${problemCount})` : ""}`]] as [v, label]}
+    <input id="mod-search" type="search" bind:value={search} placeholder={t("mods.searchPlaceholder")} aria-label={t("mods.searchLabel")} />
+    <div class="seg" role="radiogroup" aria-label={t("mods.showLabel")} tabindex="-1" onkeydown={(e) => arrowPick(e, FILTER_IDS, filter, (v) => (filter = v as typeof filter))}>
+      {#each [["all", t("mods.filterAll")], ["on", t("common.enabled")], ["off", t("common.disabled")], ["problems", problemCount ? t("mods.filterProblemsN", { count: problemCount }) : t("mods.filterProblems")]] as [v, label]}
         <button role="radio" aria-checked={filter === v} class:active={filter === v} onclick={() => (filter = v as typeof filter)}>{label}</button>
       {/each}
     </div>
     <label class="sort">
-      <select bind:value={sortBy} aria-label="Sort the list" title="Sort the list">
-        <option value="order">Library order</option>
-        <option value="name">Name</option>
-        <option value="size">Size</option>
-        <option value="updated">Last changed</option>
-        <option value="status">Problems first</option>
+      <select bind:value={sortBy} aria-label={t("mods.sortLabel")} title={t("mods.sortLabel")}>
+        <option value="order">{t("mods.sortOrder")}</option>
+        <option value="name">{t("mods.sortName")}</option>
+        <option value="size">{t("mods.sortSize")}</option>
+        <option value="updated">{t("mods.sortUpdated")}</option>
+        <option value="status">{t("mods.sortStatus")}</option>
       </select>
     </label>
-    <span class="count">{enabledCount} enabled · {mods.size} mods</span>
+    <span class="count">{t("mods.count", { enabled: enabledCount, count: mods.size })}</span>
     {#if missingReqs.size}
       <button class="primary" onclick={installMissing} disabled={busy}
-        title={`Find and install from the Workshop: ${[...missingReqs].join(", ")}`}><Icon name="download" size={14} />Install missing mods ({missingReqs.size})</button>
+        title={t("mods.installMissingTip", { ids: [...missingReqs].join(", ") })}><Icon name="download" size={14} />{t("mods.installMissing", { count: missingReqs.size })}</button>
     {/if}
     {#if fixable}
       <button class="primary" onclick={fixLoadOrder} disabled={busy}
-        title="Enable required mods and order mods by their require / loadModAfter / loadModBefore rules"><Icon name="wand" size={14} />Fix load order</button>
+        title={t("mods.fixTip")}><Icon name="wand" size={14} />{t("mods.fix")}</button>
     {/if}
     {#if picked.size >= 2}
-      <span class="bulk" role="group" aria-label="Selected mods">
-        <strong>{picked.size} selected</strong>
-        <button onclick={() => bulkSet(true)} disabled={busy}><Icon name="check" size={14} />Enable</button>
-        <button onclick={() => bulkSet(false)} disabled={busy}><Icon name="x" size={14} />Disable</button>
-        <select aria-label="Move selected mods" disabled={busy || filtering}
+      <span class="bulk" role="group" aria-label={t("mods.selectedLabel")}>
+        <strong>{t("mods.selected", { count: picked.size })}</strong>
+        <button onclick={() => bulkSet(true)} disabled={busy}><Icon name="check" size={14} />{t("common.enable")}</button>
+        <button onclick={() => bulkSet(false)} disabled={busy}><Icon name="x" size={14} />{t("common.disable")}</button>
+        <select aria-label={t("mods.moveLabel")} disabled={busy || filtering}
           onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ""; if (v) bulkMove(v); }}>
-          <option value="">Move to…</option>
-          <option value="top">Top of the list</option>
-          {#each separators as s}<option value={s}>Under "{s}"</option>{/each}
-          <option value="bottom">Bottom of the list</option>
+          <option value="">{t("mods.moveTo")}</option>
+          <option value="top">{t("mods.moveTop")}</option>
+          {#each separators as s}<option value={s}>{t("mods.moveUnder", { name: s })}</option>{/each}
+          <option value="bottom">{t("mods.moveBottom")}</option>
         </select>
-        <button class="danger" onclick={bulkRemove} disabled={busy}><Icon name="trash" size={14} />Remove</button>
-        <button class="quiet" onclick={() => (picked = new Set())}><Icon name="x" size={14} />Clear</button>
+        <button class="danger" onclick={bulkRemove} disabled={busy}><Icon name="trash" size={14} />{t("common.remove")}</button>
+        <button class="quiet" onclick={() => (picked = new Set())}><Icon name="x" size={14} />{t("common.clear")}</button>
       </span>
     {:else if !missingReqs.size && !fixable}
       <span class="hint">
-        {filtering ? "Clear the search and filter, and sort by library order, to reorder." : "Drag or Alt+↑/↓ to organise · Space toggles · Ctrl/Shift+click selects"}
+        {t(filtering ? "mods.hintFiltering" : "mods.hint")}
       </span>
     {:else}
       <span class="spacer"></span>
     {/if}
     <span class="tools">
-    <button class="quiet" onclick={checkSetup} disabled={busy} title="Check the profile and server configs for problems"><Icon name="pulse" size={14} />Check setup</button>
-    <button class="quiet icon" onclick={undo} disabled={busy || !undoStack.length} title="Undo the last list change (Ctrl+Z)" aria-label="Undo"><Icon name="undo" size={16} /></button>
-    <button class="quiet icon" onclick={redo} disabled={busy || !redoStack.length} title="Redo (Ctrl+Y)" aria-label="Redo"><Icon name="redo" size={16} /></button>
-    <button class="quiet" onclick={addSeparator} disabled={busy || filtering} title="Add a separator above the selected mod"><Icon name="plus" size={14} />Separator</button>
-    <button class="quiet" onclick={() => groupLibrary()} disabled={busy} title="Sort your mods into one section per category, from their Workshop tags. The load order doesn't change."><Icon name="layers" size={14} />Group by category</button>
+    <button class="quiet" onclick={checkSetup} disabled={busy} title={t("mods.checkSetupTip")}><Icon name="pulse" size={14} />{t("mods.checkSetup")}</button>
+    <button class="quiet icon" onclick={undo} disabled={busy || !undoStack.length} title={t("mods.undoTip")} aria-label={t("mods.undo")}><Icon name="undo" size={16} /></button>
+    <button class="quiet icon" onclick={redo} disabled={busy || !redoStack.length} title={t("mods.redoTip")} aria-label={t("mods.redo")}><Icon name="redo" size={16} /></button>
+    <button class="quiet" onclick={addSeparator} disabled={busy || filtering} title={t("mods.separatorTip")}><Icon name="plus" size={14} />{t("mods.separator")}</button>
+    <button class="quiet" onclick={() => groupLibrary()} disabled={busy} title={t("mods.groupTip")}><Icon name="layers" size={14} />{t("mods.group")}</button>
     </span>
   </div>
 
@@ -1005,11 +1003,11 @@
   <main class:with-details={selected} class:with-panel={!selected && rows.length}>
     <div class="list blueprint">
       {#if !view}
-        <p class="loading">Loading your mods…</p>
+        <p class="loading">{t("mods.loading")}</p>
       {:else if rows.length === 0}
         <div class="empty">
-          <p class="marker">Nothing in the stockpile yet.</p>
-          <p>Paste a Steam Workshop link above to install a mod, or subscribe to mods in Steam: subscriptions show up here automatically.</p>
+          <p class="marker">{t("mods.emptyTitle")}</p>
+          <p>{t("mods.emptyHint")}</p>
         </div>
       {:else}
         <ModTable {rows} {order} {visible} {sectionOf} {filtering} {busy} build={view?.build ?? null} {stats} {overlaps} {problems} {updates}
@@ -1021,7 +1019,7 @@
     {#if selected}
       <Details id={selected} {mods} {busy} hasUpdate={updates.has(selected)} onUpdate={(id) => updateMods([id])} onInstallWorkshop={installWorkshop}
         onToggle={toggle} onSelect={(id) => (selected = id)}
-        onRemove={remove} onRollback={(id) => run(`Restoring ${id}`, () => api.rollback(id))} onClose={() => (selected = null)} />
+        onRemove={remove} onRollback={(id) => run(t("busy.restoring", { id }), () => api.rollback(id))} onClose={() => (selected = null)} />
     {:else if rows.length}
       <LoadOrder {rows} {order} {mods} {problems} {fixable} {overlaps} {busy} onAutosort={autosortList} onFix={fixLoadOrder}
         onMove={moveInOrder} onSelect={(id) => (selected = id)} />
@@ -1043,13 +1041,21 @@
     flex: 1;
     min-height: 0;
   }
+  /* banners, filters and findings take what they need; the list gets the rest, and at least enough to use
+     (the tab scrolls when long translations and banners leave less) */
   .mods {
-    display: grid;
-    grid-template-rows: auto auto 1fr;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .mods > :global(*) {
+    flex: none;
   }
 
+  /* long tab names (and narrow windows) wrap rather than push the actions off-screen */
   .tabbar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     padding: 0 12px;
     border-bottom: 1px solid var(--line);
@@ -1057,6 +1063,7 @@
   }
   .tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 2px;
   }
   .tabs button {
@@ -1213,7 +1220,8 @@
   main {
     display: grid;
     grid-template-columns: 1fr;
-    min-height: 0;
+    flex: 1;
+    min-height: 200px;
   }
   main.with-details,
   main.with-panel {
@@ -1286,6 +1294,9 @@
     }
     .hint {
       display: none;
+    }
+    .tabs button {
+      padding: 9px 9px 8px;
     }
   }
 </style>

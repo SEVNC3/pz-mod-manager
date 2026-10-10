@@ -1,0 +1,1006 @@
+{
+  "tabs": {
+    "mods": "내 모드",
+    "workshop": "창작마당 둘러보기",
+    "maps": "맵",
+    "servers": "서버 및 세이브",
+    "zb": "ZombieBuddy",
+    "settings": "설정"
+  },
+  "app": {
+    "newProfilePlaceholder": "이름 (예: 친구 서버)",
+    "create": "만들기",
+    "share": "공유",
+    "shareTip": "다른 사람이 가져올 수 있는 코드 복사",
+    "importTip": "공유 코드로 프로필 가져오기",
+    "installLabel": "모드 설치",
+    "installPlaceholder": "창작마당 링크, 컬렉션 또는 ID, GitHub 저장소(owner/repo), .zip 경로를 붙여 넣으세요",
+    "updateMods": {
+      "other": "모드 {count}개 업데이트"
+    },
+    "checkUpdatesTip": "창작마당에 새 버전이 나온 모드가 있는지 확인해요",
+    "checking": "확인 중…",
+    "checkUpdates": "업데이트 확인",
+    "launchTip": "Steam으로 실행",
+    "launchTipArgs": "Steam으로 실행, 인수: {args}",
+    "launch": "게임 실행",
+    "importIntro": "<strong>프로필 가져오기</strong>: 받은 공유 코드를 붙여 넣으세요. 없는 창작마당 모드는 자동으로 설치돼요.",
+    "switchGameLabel": "게임 전환",
+    "switchToViewpoint": "Project Viewpoint(3D)로 전환할까요?",
+    "switchToZomboid": "Project Zomboid로 돌아갈까요?",
+    "viewpointNote": "Viewpoint는 아직 개발 초기 단계예요. ZombieBuddy를 통해 로드되며, 게임을 시작할 때 Java 코드 승인을 한 번 요청해요.",
+    "switch": "전환",
+    "checkingNeeded": "필요한 항목 확인 중…",
+    "updateAvailable": "<strong>PZMM {version} 버전이 나왔어요.</strong> 현재 버전: {current}",
+    "whatsNew": "새로운 기능",
+    "later": "나중에",
+    "waitTip": "현재 작업이 끝날 때까지 기다려 주세요",
+    "updateRestart": "업데이트 후 재시작",
+    "downloading": "PZMM {version} 다운로드 중… {progress}%",
+    "sectionsLabel": "섹션",
+    "needsSetup": "설정 필요",
+    "saveDiff": "최근 세이브 <strong>{save}</strong>의 모드 목록이 지금과 달라요: {diffs}. 이 목록으로 이어서 하면 세이브가 망가질 수 있어요.",
+    "saveMissing": {
+      "other": "세이브의 모드 {count}개가 비활성화됨"
+    },
+    "saveExtra": {
+      "other": "활성화된 모드 {count}개가 세이브에 없음"
+    },
+    "useSaveMods": "이 세이브의 모드 사용",
+    "dismiss": "닫기",
+    "zbNeeded": {
+      "other": "활성화된 모드 {count}개에 ZombieBuddy가 필요하지만 아직 설정되지 않았어요."
+    },
+    "zbNeededPartial": {
+      "other": "활성화된 모드 {count}개에 ZombieBuddy가 필요하지만 설정이 완전하지 않아요(게임 업데이트로 초기화되었을 수 있어요)."
+    },
+    "zbSetup": "ZombieBuddy 설정"
+  },
+  "mods": {
+    "searchPlaceholder": "모드 검색  ( / )",
+    "searchLabel": "모드 검색",
+    "showLabel": "표시",
+    "filterAll": "전체",
+    "filterProblems": "문제",
+    "filterProblemsN": "문제 ({count})",
+    "sortLabel": "목록 정렬",
+    "sortOrder": "라이브러리 순서",
+    "sortName": "이름",
+    "sortSize": "크기",
+    "sortUpdated": "최근 변경",
+    "sortStatus": "문제 먼저",
+    "count": {
+      "other": "{enabled}개 활성화 · 모드 {count}개"
+    },
+    "installMissingTip": "창작마당에서 찾아 설치: {ids}",
+    "installMissing": "없는 모드 설치 ({count})",
+    "fixTip": "필요한 모드를 활성화하고 require / loadModAfter / loadModBefore 규칙에 맞게 모드를 정렬해요",
+    "fix": "로드 순서 수정",
+    "selectedLabel": "선택한 모드",
+    "selected": {
+      "other": "{count}개 선택됨"
+    },
+    "moveLabel": "선택한 모드 이동",
+    "moveTo": "위치 이동…",
+    "moveTop": "목록 맨 위",
+    "moveUnder": "“{name}” 아래",
+    "moveBottom": "목록 맨 아래",
+    "hintFiltering": "순서를 바꾸려면 검색과 필터를 지우고 라이브러리 순서로 정렬하세요.",
+    "hint": "드래그 또는 Alt+↑/↓로 정리 · Space로 켜기/끄기 · Ctrl/Shift+클릭으로 선택",
+    "checkSetupTip": "프로필과 서버 설정에 문제가 있는지 확인해요",
+    "checkSetup": "설정 점검",
+    "undoTip": "마지막 목록 변경 실행 취소 (Ctrl+Z)",
+    "undo": "실행 취소",
+    "redoTip": "다시 실행 (Ctrl+Y)",
+    "redo": "다시 실행",
+    "separatorTip": "선택한 모드 위에 구분선 추가",
+    "separator": "구분선",
+    "groupTip": "창작마당 태그를 기준으로 모드를 카테고리별 섹션으로 나눠요. 로드 순서는 바뀌지 않아요.",
+    "group": "카테고리별 그룹화",
+    "loading": "모드 불러오는 중…",
+    "emptyTitle": "창고가 아직 비어 있어요.",
+    "emptyHint": "위에 Steam 창작마당 링크를 붙여 넣어 모드를 설치하거나, Steam에서 모드를 구독하세요. 구독한 모드는 여기에 자동으로 나타나요.",
+    "newSection": "새 섹션",
+    "newSectionN": "새 섹션 {n}"
+  },
+  "busy": {
+    "loading": "불러오는 중",
+    "saving": "저장 중",
+    "viewpointSetup": "Project Viewpoint 설정 중",
+    "toZomboid": "Project Zomboid로 전환 중",
+    "switchingTo": "“{name}” 프로필로 전환 중",
+    "switchingProfile": "프로필 전환 중",
+    "readingTags": "창작마당 태그 읽는 중",
+    "updatingOne": "{name} 업데이트 중",
+    "updatingMany": {
+      "other": "모드 {count}개 업데이트 중"
+    },
+    "installingWorkshop": "창작마당 모드 {id} 설치 중",
+    "installingOne": "{name} 설치 중",
+    "installingMany": {
+      "other": "모드 {count}개 설치 중"
+    },
+    "findingMissing": {
+      "other": "창작마당에서 없는 모드 {count}개 찾는 중"
+    },
+    "importing": "“{name}” 가져오는 중",
+    "importingServer": "{name}.ini 가져오는 중",
+    "loadingSave": "{name}의 모드 불러오는 중",
+    "creatingProfile": "“{name}” 프로필 만드는 중",
+    "deletingProfile": "“{name}” 프로필 삭제 중",
+    "removingOne": "{name} 제거 중",
+    "removingMany": {
+      "other": "모드 {count}개 제거 중"
+    },
+    "restoring": "{id} 복원 중",
+    "zbSetup": "ZombieBuddy 설정 중",
+    "zbRemove": "ZombieBuddy 제거 중"
+  },
+  "log": {
+    "appLatest": "최신 버전(PZMM {version})을 사용 중이에요.",
+    "appCheckFailed": "PZMM 업데이트를 확인하지 못했어요: {error}",
+    "appUpdateFailed": "PZMM을 업데이트하지 못했어요: {error}",
+    "adopted": "게임의 모드 메뉴에서 바꾼 내용을 반영했어요(“{profile}” 프로필).",
+    "tagsFailedSorted": "창작마당 태그를 읽지 못해서 로드 규칙만 수정했어요({error}).",
+    "autosorted": "로드 순서를 자동 정렬했어요. Ctrl+Z로 이전 순서를 되돌릴 수 있어요.",
+    "tagsFailed": "창작마당 태그를 읽지 못했어요({error}).",
+    "grouped": {
+      "other": "모드를 카테고리 {count}개로 묶었어요."
+    },
+    "groupedUndo": {
+      "other": "모드를 카테고리 {count}개로 묶었어요. Ctrl+Z로 원래 섹션을 되돌릴 수 있어요."
+    },
+    "updatesFound": {
+      "other": "창작마당에 업데이트가 있는 모드가 {count}개 있어요."
+    },
+    "updatesCheckFailed": "업데이트를 확인하지 못했어요: {error}",
+    "upToDate": "모드가 모두 최신 상태예요.",
+    "nothingToRedownload": "PZMM이 설치한 모드가 없어서 다시 받을 게 없어요(구독한 모드는 Steam이 최신 상태로 유지해요).",
+    "stillMissing": "아직 없음: {ids}. 이 항목이 필요한 모드를 선택하고 찾기로 맞는 항목을 고르세요.",
+    "shareCopied": "“{profile}” 프로필의 공유 코드를 복사했어요. 친구에게 붙여 넣어 보내면 PZMM의 가져오기로 불러올 수 있어요.",
+    "shareFailed": "공유 코드를 복사하지 못했어요: {error}",
+    "checkSetupFailed": "설정을 점검하지 못했어요: {error}",
+    "bisectNeedsTwo": "문제 모드를 찾으려면 모드를 두 개 이상 활성화하세요.",
+    "bisectFound": "찾았어요: {id} 때문에 문제가 생겨요. 모드 목록은 복원했어요.",
+    "bisectNone": "특정 모드 하나 때문에 생긴 문제가 아니에요. 모드 목록은 복원했어요.",
+    "sectionExists": "“{name}” 섹션이 이미 있어요. 다른 이름을 고르세요.",
+    "noneOurs": "선택한 모드 중 PZMM이 설치한 모드가 없어요. Steam 모드는 Steam에서 구독을 취소하세요."
+  },
+  "confirm": {
+    "group": "카테고리별 그룹화를 하면 직접 만든 섹션({sections})이 카테고리 섹션으로 바뀌어요. Ctrl+Z로 되돌릴 수 있어요. 지금 그룹화할까요?",
+    "redownload": {
+      "other": "PZMM이 설치한 모드 {count}개를 다시 받을까요? 각 모드의 현재 버전은 백업으로 보관돼요."
+    },
+    "updateInSave": {
+      "other": "최근 세이브({save})에서 사용 중인 모드: {mods}. 업데이트하면 진행 중인 세이브가 망가질 수 있어요. 업데이트한 모드는 이전 버전을 보관해요(이전 버전 복원). 지금 업데이트할까요?"
+    },
+    "removeRecycleOne": "{name} 모드를 제거할까요? 파일은 Zomboid 모드 폴더에서 휴지통으로 이동해요.",
+    "removeRecycleMany": {
+      "other": "모드 {count}개를 제거할까요? 파일은 Zomboid 모드 폴더에서 휴지통으로 이동해요."
+    },
+    "removeDeleteOne": "{name} 모드를 제거할까요? 파일은 Zomboid 모드 폴더에서 삭제돼요.",
+    "removeDeleteMany": {
+      "other": "모드 {count}개를 제거할까요? 파일은 Zomboid 모드 폴더에서 삭제돼요."
+    },
+    "removeSkipped": {
+      "other": " (PZMM이 설치하지 않은 {count}개는 그대로 둬요.)"
+    },
+    "alsoRemove": {
+      "other": "{ids}도 제거할까요? 이 모드가 필요한 다른 모드가 없어요."
+    },
+    "deleteProfile": "“{name}” 프로필을 삭제할까요? 모드는 설치된 채로 남아요. PZMM은 “{other}” 프로필로 전환해요."
+  },
+  "common": {
+    "cancel": "취소",
+    "close": "닫기",
+    "install": "설치",
+    "installing": "설치 중…",
+    "installed": "설치됨",
+    "remove": "제거",
+    "enable": "활성화",
+    "disable": "비활성화",
+    "enabled": "활성화됨",
+    "disabled": "비활성화됨",
+    "delete": "삭제",
+    "import": "가져오기",
+    "clear": "지우기",
+    "workshop": "창작마당",
+    "refresh": "새로 고침"
+  },
+  "format": {
+    "gb": "{n} GB",
+    "mb": "{n} MB",
+    "kb": "{n} KB"
+  },
+  "problems": {
+    "needsMissing": "{id} 필요 (설치 안 됨)",
+    "needsDisabled": "{id} 필요 (비활성화됨)",
+    "loadFirst": "{id}을(를) 먼저 로드해야 함",
+    "incompatible": "호환되지 않음: {id}",
+    "loadAfter": "{id} 다음에 로드해야 함",
+    "loadBefore": "{id} 이전에 로드해야 함"
+  },
+  "source": {
+    "workshop": "창작마당",
+    "steam": "구독",
+    "local": "로컬 파일",
+    "manual": "수동"
+  },
+  "api": {
+    "badShareCode": "PZMM 프로필 코드가 아니에요."
+  },
+  "maps": {
+    "label": "맵",
+    "worldMap": "월드 맵",
+    "help": {
+      "button": "도움말",
+      "label": "맵 도움말",
+      "gridTitle": "격자 보는 법",
+      "grid": "각 칸은 Build {build} 월드의 셀 하나예요(B42 셀은 256타일, B41 셀은 300타일이라 같은 빌드의 맵끼리만 비교할 수 있어요). <strong>회색</strong>은 게임 기본 맵, <strong>청록색</strong>은 강이에요. <strong>파란색</strong>은 맵 하나가 채운 셀, <strong>금색</strong>은 바닐라 지역 위에 만든 맵(대개 의도된 것), <strong>빨간색</strong>은 두 개 이상의 맵이 겹치는 셀로, 그중 하나만 로드돼요. 맵별 색상을 켜면 표시된 맵마다 고유한 색을 써요.",
+      "previewTitle": "미리 보기 또는 활성화",
+      "preview": "활성화된 맵은 항상 표시돼요. 맵에 체크하거나 행을 클릭하면 <em>미리 보기</em>할 수 있어요. 격자에 그려지고 충돌도 검사하지만, 활성화하기 전까지 모드 목록은 바뀌지 않아요. 셀을 클릭하면 그 셀의 맵 목록이 나오고, Shift+클릭으로 셀을 더 추가할 수 있어요.",
+      "workshopTitle": "창작마당 맵",
+      "workshop": "창작마당 맵을 켜면 PZMM이 이 빌드에서 Map 태그가 붙은 창작마당 항목을 설치하지 않은 것까지 모두 보여줘요. 먼저 내장 색인에서 바로 불러온 다음, 그 이후 업데이트된 항목의 파일 목록을 Steam에서 읽어요(다운로드나 설치 없음). 항목은 업데이트됐을 때만 다시 읽어요. “설치 전에 창작마당 맵 확인”에 컬렉션을 붙여 넣으면 그 안의 맵을 모두 미리 볼 수 있어요. 설치된 맵처럼 미리 본 뒤 원하는 것만 설치하세요."
+    },
+    "lede": "격자에는 활성화된 맵과 미리 보는 맵이 표시돼요. 스크롤로 확대/축소, 드래그로 이동하고, 셀을 클릭하면 그 셀의 맵 목록이 나와요.",
+    "legend": {
+      "more": {
+        "other": "+{count}개 더"
+      },
+      "map": "맵",
+      "over": "바닐라 위 ({count})",
+      "conflict": "충돌 ({count})",
+      "vanilla": "바닐라",
+      "river": "강"
+    },
+    "hideVanilla": "바닐라 숨기기",
+    "perMapColours": "맵별 색상",
+    "zoomIn": "확대",
+    "zoomOut": "축소",
+    "fit": "맞추기",
+    "gridLabel": "셀 격자: 맵 {maps}개 표시, 충돌 셀 {conflicts}개, 바닐라 위 셀 {over}개",
+    "cell": "셀 {x}, {y}",
+    "kind": {
+      "vanilla": "바닐라 지역",
+      "water": "바닐라 강",
+      "over": "바닐라 지역 위",
+      "conflict": "충돌: 이 맵들이 같은 셀을 사용해요"
+    },
+    "empty": "비어 있음",
+    "readingFiles": "맵 파일 읽는 중…",
+    "noVanilla": "바닐라 지역이 표시되지 않아요. 게임 설치를 찾지 못했거나 Build {build} 버전이 아니에요. 설정에서 폴더를 확인하세요.",
+    "mapMods": "맵 모드",
+    "undoTip": "마지막 미리 보기 변경, 빠른 선택, 프리셋 또는 활성화/비활성화 실행 취소 (Ctrl+Z)",
+    "undoLabel": "실행 취소",
+    "workshopSource": "설치하지 않은 창작마당 맵",
+    "workshopSourceNote": "PZMM 내장 색인에서 Map 태그가 붙은 창작마당 항목을 모두 보여주고, 그 이후 업데이트된 항목만 Steam에서 읽어요(파일 목록만, 다운로드 없음).",
+    "scan": {
+      "limited": "Steam이 지금 요청을 제한하고 있어요. 잠시 기다린 뒤 새로 고치세요.",
+      "stopping": "중지하는 중…",
+      "stop": "중지",
+      "summary": {
+        "other": "설치 안 됨 {n}개 (창작마당 항목 {count}개 읽음)."
+      },
+      "listing": "Map 태그 창작마당 항목 나열 중… {done}/{total}",
+      "reading": "파일 목록 읽는 중… {done}/{total}",
+      "readingFailed": "파일 목록 읽는 중… {done}/{total} ({failed}개 실패)",
+      "failed": {
+        "other": "창작마당 항목 {count}개의 파일 목록을 읽지 못했어요(이유는 활동 로그에 있어요)."
+      },
+      "refreshTip": "Map 태그 항목을 다시 나열하고 새 항목과 업데이트된 항목을 읽어요"
+    },
+    "searchPlaceholder": "이름, 모드 ID, 창작마당 ID, 폴더, 제작자, 태그 검색",
+    "searchLabel": "맵 검색",
+    "filterLabel": "맵 표시",
+    "sortLabel": "맵 정렬",
+    "filter": {
+      "all": "모든 맵",
+      "conflict": "충돌하는 맵",
+      "over": "바닐라 위"
+    },
+    "sort": {
+      "name": "이름",
+      "cells": "셀 많은 순",
+      "conflicts": "충돌 많은 순",
+      "state": "활성화된 맵 먼저",
+      "subs": "구독자 많은 순",
+      "updated": "최근 업데이트순",
+      "newest": "최신순"
+    },
+    "pickedCells": "셀 <span class=\"mono\">{cells}</span>",
+    "mapCount": {
+      "other": "맵 {count}개"
+    },
+    "clearCells": "셀 선택 해제",
+    "quickSelect": "겹치지 않게 최대 선택",
+    "quickSelecting": "겹치지 않는 최대 조합 찾는 중…",
+    "quickSelectTip": "서로 또는 활성화된 맵과 셀이 겹치지 않는 목록의 맵을 최대한 많이 미리 봐요(동점이면 설치된 맵과 인기 있는 맵 우선)",
+    "quickSelectDone": {
+      "other": "맵 {count}개 미리 보는 중: 활성화된 맵과 겹치지 않고 함께 들어가는 목록의 맵 중 최대 개수예요."
+    },
+    "quickSelectNone": "목록의 모든 맵이 활성화된 맵과 셀이 겹쳐요.",
+    "previewListed": "목록 미리 보기",
+    "unpreviewListed": "목록 미리 보기 해제",
+    "enabledOnly": "활성화된 맵만",
+    "enabledOnlyTip": "미리 보기 지우기: 격자에 활성화된 맵만 표시해요",
+    "enablePreviewed": {
+      "other": "미리 본 맵 {count}개 활성화"
+    },
+    "disableListed": {
+      "other": "목록의 맵 {count}개 비활성화"
+    },
+    "unhide": {
+      "other": "{count}개 다시 표시"
+    },
+    "unhideTip": "표시된 모든 맵을 격자에 다시 그려요",
+    "noMaps": "Build {build}용 맵을 추가하는 설치된 모드가 없어요. 위에서 창작마당 맵을 켜거나, 설치하기 전에 아래에서 맵을 확인하세요.",
+    "previewLabel": "격자에서 {name} 미리 보기",
+    "alwaysShownTip": "활성화된 맵은 항상 표시돼요",
+    "previewTip": "활성화하지 않고 격자에 표시",
+    "notInstalled": "설치 안 됨",
+    "showOnGrid": "격자에 표시",
+    "showOnGridTip": "격자에 다시 그려요",
+    "hideOnGrid": "격자에서 숨기기",
+    "hideOnGridTip": "격자에서 빼고 아래에 무엇이 있는지 봐요(내보내기와 요구 사항에는 그대로 남아요)",
+    "cellCount": {
+      "other": "셀 {count}개"
+    },
+    "byAuthor": "제작자: {author}",
+    "subscribers": {
+      "other": "구독자 {n}명"
+    },
+    "conflictsWith": {
+      "other": "셀 <span class=\"mono\">{cells}</span>에서 충돌: {name}"
+    },
+    "swap": "교체",
+    "swapTip": "이 맵을 대신 표시: 충돌하는 미리 보기 맵은 숨기고, 충돌하는 활성화된 맵은 꺼요",
+    "andMore": {
+      "other": "…외 {count}개"
+    },
+    "cellsOverVanilla": {
+      "other": "바닐라 위 셀 {count}개"
+    },
+    "packMember": {
+      "other": "이 창작마당 항목에 든 모드 {count}개 중 하나"
+    },
+    "workshopItem": "창작마당 항목 {id}",
+    "dupeMod": "{item}에도 모드 ID {id} 있음: 하나만 로드돼요",
+    "dupeModMore": {
+      "other": "{item} 외 {count}개에도 모드 ID {id} 있음: 하나만 로드돼요"
+    },
+    "dupeFolder": "맵 폴더 {folder} 중복: {names}도 추가함",
+    "dupeFolderMore": {
+      "other": "맵 폴더 {folder} 중복: {names} 외 {count}개도 추가함"
+    },
+    "openWorkshopTip": "창작마당 페이지 열기",
+    "alsoTurnsOnTip": "필요한 모드도 함께 켜요",
+    "installTip": "필요한 항목과 함께 설치",
+    "showMore": {
+      "other": "{total}개 중 {count}개 더 보기"
+    },
+    "req": {
+      "title": "요구 사항",
+      "viewLabel": "요구 사항 보기",
+      "neededBy": "필요로 하는 곳",
+      "neededByTip": "각 요구 사항과 그것이 필요한 표시된 맵",
+      "tree": "트리",
+      "treeTip": "표시된 각 맵과 그 맵에 필요한 것을 끝까지",
+      "lede": "표시된 맵에 직접 또는 간접적으로 필요한 것: 필수 모드(<span class=\"mono\">require=</span>)와 기반이 되는 다른 맵(<span class=\"mono\">lots=</span>).",
+      "nothingElse": "표시된 맵에 더 필요한 건 없어요.",
+      "showOne": "맵을 표시하거나 활성화하면 필요한 것을 볼 수 있어요.",
+      "groups": {
+        "enabled": "활성화된 맵에 필요",
+        "preview": "미리 보는 맵에 필요",
+        "missing": "설치하지 않은 맵에 필요"
+      },
+      "on": "켜짐",
+      "off": "꺼짐",
+      "findTip": "Steam 창작마당에서 찾아 설치",
+      "pickInDetails": "상세 정보에서 선택",
+      "looking": "창작마당에서 {id} 찾는 중…",
+      "noClearResult": "확실히 일치하는 결과가 없어요. 이 항목이 필요한 맵의 상세 정보에서 직접 고르세요.",
+      "noMatch": "{id}에 맞는 항목이 창작마당에 없어요.",
+      "neededByMap": "맵 {folder} · {names}에서 필요",
+      "neededByFolder": "맵 폴더 · {names}에서 필요",
+      "neededByOnly": "{names}에서 필요",
+      "loop": "(자기 자신이 필요함: 순환)",
+      "map": "맵 {folder}"
+    },
+    "export": {
+      "title": "맵 순서 및 내보내기",
+      "lede": "표시된 맵을 친구나 서버용으로 복사해요: 창작마당 링크와 모드 ID, 필요한 것, 그리고 <span class=\"mono\">Mods=</span>, <span class=\"mono\">WorkshopItems=</span>, <span class=\"mono\">Map=</span> 줄.",
+      "orderTitle": "맵 순서",
+      "orderHint": "게임은 맵을 위에서 아래로 로드해요. 모드 맵은 <span class=\"mono\">Muldraugh, KY</span>보다 위에 둬야 해요. 드래그하거나 Alt+↑/↓로 정렬하세요. 순서는 프로필에 저장되고, 내보내기와 서버 카드에 쓰이며, 활성화된 맵의 경우 게임의 모드 목록에도 기록돼요.",
+      "copy": {
+        "other": "맵 {count}개를 클립보드에 복사"
+      },
+      "copied": {
+        "other": "맵 {count}개를 복사했어요: 창작마당 링크, 모드 ID, 요구 사항, Mods=, WorkshopItems=, Map= 줄."
+      }
+    },
+    "presets": {
+      "title": "프리셋",
+      "hint": "표시된 맵에 이름을 붙여 저장하고, 나중에 다시 미리 볼 수 있어요.",
+      "label": "프리셋",
+      "pick": "프리셋 선택",
+      "preview": "미리 보기",
+      "namePlaceholder": "프리셋 이름",
+      "save": {
+        "other": "표시된 {count}개 저장"
+      },
+      "confirmReplace": "“{name}” 프리셋을 덮어쓸까요?",
+      "saved": {
+        "other": "표시된 맵 {count}개를 “{name}” 프리셋에 저장했어요."
+      },
+      "previewing": "“{name}” 미리 보는 중.",
+      "previewingMissing": "“{name}” 미리 보는 중. 찾을 수 없음: {ids} (설치하거나 창작마당 맵을 켜세요)."
+    },
+    "compare": {
+      "title": "서버와 비교",
+      "lede": "서버 설정이 로드하는 맵(<span class=\"mono\">Map=</span>)과 여기 표시된 맵을 비교해요.",
+      "serverLabel": "서버 설정",
+      "compare": "비교",
+      "noServers": "Zomboid/Server에 서버 설정이 아직 없어요.",
+      "same": "{server}.ini와 맵이 같아요.",
+      "onlyServer": "서버에만 있고 여기엔 없음",
+      "noKnownMap": "이 맵을 추가하는 알려진 창작마당 맵 없음",
+      "on": "켜짐",
+      "installed": "설치됨",
+      "notInstalled": "설치 안 됨",
+      "preview": "미리 보기",
+      "onlyYou": "여기에만 있고 서버엔 없음"
+    },
+    "check": {
+      "title": "설치 전에 창작마당 맵 확인",
+      "lede": "맵(또는 컬렉션의 모든 맵)이 어디에 놓이고 무엇과 충돌하는지 먼저 확인하세요. PZMM은 Steam에서 항목의 파일 목록을 읽고(다운로드나 설치 없음) 셀 정보만 보관해요.",
+      "placeholder": "창작마당 또는 컬렉션 링크, 또는 ID",
+      "checking": "확인 중…",
+      "check": "확인",
+      "pasteId": "창작마당 링크나 항목 ID를 붙여 넣으세요.",
+      "noItem": "창작마당에 {id} 항목이 없어요.",
+      "alreadyInstalled": "이미 설치됨: {title}. 맵을 추가하는 모드라면 목록에 있어요.",
+      "confirmDownload": "Steam에서 “{title}”의 파일 목록을 받지 못했어요({error}). 대신 다운로드({size})해서 셀을 읽을까요? 아무것도 설치되지 않고, 다운로드한 파일은 나중에 삭제돼요.",
+      "read": "{title} 읽기 완료: 격자와 목록에 미설치 상태로 미리 표시돼요.",
+      "noMaps": "{title}에는 Build {build}용 맵이 없어요.",
+      "readingMember": "{title} 읽는 중 ({n}/{total})…",
+      "collection": {
+        "other": "{title}: 항목 {items}개에서 맵 {count}개 미리 보는 중."
+      },
+      "collectionFailed": "읽지 못함: {titles}. 하나씩 확인하세요.",
+      "collectionUntagged": {
+        "other": "다른 항목 {count}개는 Map 태그가 없어서 읽지 않았어요."
+      }
+    }
+  },
+  "mapOrder": {
+    "label": "맵 순서",
+    "top": "맨 위",
+    "topTip": "가장 먼저 로드",
+    "topLabel": "{name} 맨 위로 이동",
+    "autosort": "맵 자동 정렬",
+    "autosortTip": "모드 맵을 현재 순서대로 먼저, 그다음 Muldraugh, KY"
+  },
+  "layerIcon": {
+    "overrides": "{mods}의 파일을 덮어씀",
+    "overriddenBy": "일부 파일이 {mods}에 의해 덮어써짐"
+  },
+  "modTable": {
+    "col": {
+      "move": "이동",
+      "loadOrder": "로드 순서",
+      "mod": "모드",
+      "size": "크기",
+      "lastChanged": "최근 변경",
+      "sharedFiles": "공유 파일",
+      "source": "출처"
+    },
+    "sepNameLabel": "구분선 이름 (비우면 제거)",
+    "expandLabel": "{name} 펼치기",
+    "collapseLabel": "{name} 접기",
+    "renameTip": "더블클릭해서 이름 바꾸기",
+    "sectionCount": "{total}개 중 {on}개 활성화",
+    "removeSepTip": "이 구분선 제거 (Delete). 모드는 그 자리에 그대로 있어요.",
+    "removeSepLabel": "구분선 {name} 제거",
+    "enableLabel": "{name} 활성화",
+    "b41Only": "B41 전용",
+    "b41OnlyTip": "Build 41 전용 (42/ 또는 common/ 폴더 없음): Build 42에서는 오류가 나거나 작동하지 않을 수 있어요",
+    "b42Only": "B42 전용",
+    "b42OnlyTip": "Build 42 전용",
+    "notInstalled": "설치 안 됨",
+    "updateAvailable": "업데이트 있음",
+    "sourceHint": {
+      "steam": "Steam에서 구독함. Steam이 업데이트를 관리해요",
+      "workshop": "PZMM이 창작마당에서 다운로드함",
+      "github": "PZMM이 GitHub에서 설치함",
+      "local": "PZMM이 파일에서 설치함",
+      "manual": "PZMM 밖에서 모드 폴더에 추가함"
+    }
+  },
+  "details": {
+    "label": "모드 상세 정보",
+    "closeTip": "닫고 로드 순서 보기 (Esc)",
+    "closeLabel": "상세 정보 닫기",
+    "missingWarn": "이 모드는 프로필에서 활성화돼 있지만 설치되지 않았어요. 설치하거나, Steam에서 구독하거나, 비활성화하세요.",
+    "showFiles": "파일 보기",
+    "githubPage": "GitHub 페이지",
+    "workshopPage": "창작마당 페이지",
+    "source": "출처",
+    "author": "제작자",
+    "modVersion": "모드 버전",
+    "needsGameVersion": "필요한 게임 버전",
+    "versionOrNewer": "{version} 이상",
+    "newerVersion": "창작마당에 새 버전이 있어요.",
+    "updateNow": "지금 업데이트",
+    "requires": "필수 모드",
+    "reqEnabled": "활성화됨",
+    "reqDisabled": "비활성화됨",
+    "reqMissing": "설치 안 됨",
+    "findTip": "Steam 창작마당에서 찾아 설치",
+    "looking": "창작마당에서 {id} 찾는 중…",
+    "noMatch": "{id}에 맞는 항목이 창작마당에 없어요.",
+    "pickOne": "확실히 {id}인 결과가 없어요. 맞는 것을 고르세요:",
+    "subscribers": {
+      "other": "구독자 {n}명"
+    },
+    "idMatches": "모드 ID 일치",
+    "listedByAuthor": "제작자가 명시함",
+    "notTaggedForBuild": "현재 게임 빌드 태그 없음",
+    "sharedFiles": "공유 파일",
+    "winsOver": "이 모드의 파일이 {other}보다 우선해요",
+    "othersWin": "{other}의 파일이 우선해요",
+    "filesWin": {
+      "other": "파일 {count}개, 이 모드의 파일이 우선"
+    },
+    "filesLose": {
+      "other": "파일 {count}개, {other}의 파일이 우선"
+    },
+    "lowerWins": "로드 순서에서 아래에 있는 모드가 우선해요. 어느 모드의 파일을 쓸지 바꾸려면 이 패널을 닫고 로드 순서에서 드래그하세요.",
+    "description": "설명",
+    "restore": "이전 버전 복원",
+    "steamNote": "이 모드는 Steam 구독으로 설치됐어요. 제거하려면 Steam에서 구독을 취소하세요.",
+    "unsubscribe": "창작마당 페이지에서 구독 취소"
+  },
+  "loadOrder": {
+    "title": "로드 순서",
+    "lede": "모드는 위에서 아래로 로드돼요. 두 모드가 같은 파일을 바꾸면 아래쪽 모드가 우선해요. 왼쪽 라이브러리는 마음대로 정리해도 돼요. 그 순서는 이 순서에 영향을 주지 않아요.",
+    "problems": "문제",
+    "overridden": "덮어써짐",
+    "overriddenTip": "다른 모드가 파일을 대체하는 활성화된 모드",
+    "autosort": "자동 정렬",
+    "step": {
+      "needs": "활성화된 모드에 필요한 모드를 켜요.",
+      "tiers": "프레임워크를 맨 앞에 둬서 그 위에 만든 모드가 뒤에 로드되게 하고, 번역은 맨 뒤에 둬서 번역 텍스트가 우선하게 해요(모드의 창작마당 태그 기준).",
+      "rules": "모든 <span class=\"mono\">require</span>, <span class=\"mono\">loadModAfter</span>, <span class=\"mono\">loadModBefore</span> 규칙이 지켜지도록 모드를 옮겨요.",
+      "keep": "그 밖에는 기존 순서를 유지해요. Ctrl+Z로 이전 순서를 되돌릴 수 있어요."
+    },
+    "fix": {
+      "other": "자동 정렬 없이 문제 {count}개 수정"
+    },
+    "modsInOrder": "로드 순서대로 본 모드",
+    "dragHint": "드래그 또는 Alt+↑/↓로 순서 변경 · Enter 또는 더블클릭으로 모드 열기",
+    "notInstalled": "설치 안 됨",
+    "librarySections": "라이브러리 섹션"
+  },
+  "findings": {
+    "findBroken": "문제 모드 찾기",
+    "round": "문제 모드 찾기, {round}회차:",
+    "suspects": {
+      "other": "의심 모드 {count}개 남음, 이번 테스트에서 {testing}개 활성화 (필요한 모드 포함)."
+    },
+    "testHint": "게임을 시작해서 문제가 생기는지 확인한 뒤 여기로 돌아오세요.",
+    "stillHappens": "문제가 여전히 생겨요",
+    "gone": "문제가 사라졌어요",
+    "stop": "중지하고 목록 복원",
+    "setupCheck": "설정 점검",
+    "noProblems": "문제가 없어요.",
+    "summary": "{errors}, {warnings}",
+    "errors": {
+      "other": "오류 {count}개"
+    },
+    "warnings": {
+      "other": "경고 {count}개"
+    },
+    "luaErrors": "<strong>지난 게임 세션의 Lua 오류</strong> (console.txt 기준):",
+    "errorCount": {
+      "other": "오류 {count}개, 첫 오류 위치: <span class=\"mono\">{example}</span>"
+    },
+    "unexplained": "뭔가 고장 났는데 위 내용으로 설명이 안 되나요?",
+    "halves": "게임을 테스트할 때마다 PZMM이 활성화된 모드를 절반으로 줄여요."
+  },
+  "settings": {
+    "label": "설정",
+    "saveFailed": "설정을 저장하지 못했어요: {error}",
+    "tokenSaved": "GitHub 토큰을 시스템 자격 증명 저장소에 저장했어요.",
+    "tokenForgot": "GitHub 토큰을 삭제했어요.",
+    "confirmClearBackups": "모든 백업({size})을 삭제할까요? 삭제하면 모드를 이전 버전으로 복원할 수 없어요.",
+    "diagnosticsCopied": "진단 정보를 복사했어요(사용자 이름은 가려져 있어요). 버그 신고에 붙여 넣으세요.",
+    "diagnosticsFailed": "진단 정보를 복사하지 못했어요: {error}",
+    "language": "언어",
+    "languageSystem": "시스템 설정 따르기 ({name})",
+    "folders": {
+      "title": "폴더",
+      "lede": "PZMM이 알아서 찾아요. 다른 곳에 있을 때만 지정하세요. 환경 변수가 여기 설정보다 우선해요.",
+      "status": {
+        "found": "찾음",
+        "missing": "찾을 수 없음",
+        "not_pz": "PZ 폴더 아님"
+      },
+      "hintData": "프로필, 설치한 모드, 백업, SteamCMD",
+      "hintZomboid": "모드, 세이브, 서버 설정, 로그",
+      "overriddenBy": "<span class=\"mono\">{env}</span>에 의해 재정의됨",
+      "detected": "자동 감지됨",
+      "browse": "찾아보기…",
+      "detect": "감지",
+      "detectTip": "여기 지정한 폴더를 지우고 다시 찾아요",
+      "open": "열기",
+      "moveLabel": "PZMM 데이터 이동",
+      "moveConfirm": "PZMM 데이터를 <span class=\"mono\">{from}</span>에서 <span class=\"mono\">{to}</span> 위치로 옮길까요? 옮기지 않으면 PZMM은 그곳에서 빈 상태로 시작해요.",
+      "moveData": "데이터 옮기기",
+      "switchWithoutMoving": "옮기지 않고 전환",
+      "reading": "폴더 읽는 중…"
+    },
+    "downloads": {
+      "title": "다운로드 및 업데이트",
+      "check": "모드 업데이트 확인",
+      "checkOff": "안 함 (업데이트 확인 버튼 사용)",
+      "checkStart": "PZMM 시작 시",
+      "check1h": "시작 시, 이후 1시간마다",
+      "check3h": "시작 시, 이후 3시간마다",
+      "whenFound": "업데이트를 찾으면",
+      "notify": "알려 주기",
+      "install": "설치하기",
+      "openIn": "창작마당 페이지 열기",
+      "inSteam": "Steam (실행 중일 때)",
+      "inBrowser": "브라우저",
+      "appUpdates": "PZMM 시작 시 새 버전 확인"
+    },
+    "token": {
+      "title": "GitHub 토큰",
+      "hint": "GitHub에서 설치한 모드용: 토큰을 쓰면 GitHub의 시간당 다운로드 60회 제한이 늘어나요. 토큰은 파일이 아닌 시스템 자격 증명 저장소에 보관돼요.",
+      "envSet": "GITHUB_TOKEN이 설정되어 있어서 그 값을 사용해요.",
+      "savedPlaceholder": "저장된 토큰이 있어요",
+      "save": "토큰 저장",
+      "forget": "삭제"
+    },
+    "repair": {
+      "title": "복구",
+      "redownload": "PZMM이 설치한 모드 다시 받기",
+      "redownloadTip": "손상된 파일을 복구해요. 각 모드의 현재 버전은 백업으로 보관돼요"
+    },
+    "removing": {
+      "title": "제거 및 백업",
+      "removed": "제거한 모드",
+      "recycle": "휴지통으로 이동",
+      "deleted": "삭제",
+      "removeRequirements": "다른 모드가 쓰지 않는 필수 모드도 제거",
+      "ask": "묻기",
+      "always": "항상",
+      "never": "안 함",
+      "backupCap": "백업 최대 용량",
+      "mb": "MB",
+      "backupCapHint": "0 = 제한 없음, 오래된 것부터 삭제",
+      "backupsHint": "업데이트할 때 모드의 이전 버전을 백업으로 보관해요(상세 정보의 이전 버전 복원).",
+      "backupsUse": "백업 사용량 <strong>{size}</strong>",
+      "clearBackups": "백업 지우기"
+    },
+    "appearance": {
+      "title": "모양",
+      "theme": "테마",
+      "themeSystem": "시스템 설정 따르기",
+      "dark": "어둡게",
+      "light": "밝게",
+      "accent": "강조 색상",
+      "build": "게임 빌드",
+      "buildDetect": "default.txt에서 감지",
+      "build42": "Build 42",
+      "build41": "Build 41",
+      "workshopView": "창작마당 시작 화면",
+      "browse": "둘러보기",
+      "home": "홈",
+      "perPage": "창작마당 페이지당 결과 수",
+      "compact": "행 간격 좁게",
+      "showIds": "이름 옆에 모드 ID 표시",
+      "windowHint": "창 크기와 위치는 자동으로 기억돼요."
+    },
+    "launch": {
+      "title": "실행",
+      "args": "추가 게임 인수",
+      "argsHint": "게임 실행 시 Steam을 통해 전달되며, Steam이 처음 한 번 허용 여부를 물어요.",
+      "autosort": "새 프로필을 처음 사용할 때 모드를 카테고리별로 그룹화"
+    },
+    "about": {
+      "title": "정보",
+      "version": "PZMM {version}",
+      "checkUpdates": "업데이트 확인",
+      "openLogs": "로그 폴더 열기",
+      "diagnostics": "진단 정보 복사",
+      "diagnosticsTip": "버전, 폴더, 프로필, 모드 수, 설정 점검 결과 (사용자 이름은 가려짐)",
+      "keys": "키보드: <kbd>/</kbd> 검색 · <kbd>↑</kbd><kbd>↓</kbd> 행 이동 · <kbd>Enter</kbd> 상세 정보 · <kbd>Space</kbd> 활성화/비활성화 · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> 순서 변경 · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> 실행 취소/다시 실행 · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+클릭 여러 개 선택 · <kbd>Esc</kbd> 선택 해제"
+    }
+  },
+  "servers": {
+    "label": "서버 및 세이브",
+    "sameMods": "현재 프로필과 같은 모드",
+    "notInProfile": {
+      "other": "{count}개가 내 프로필에 없음"
+    },
+    "notInTheirs": {
+      "other": "내 모드 {count}개가 여기에 없음"
+    },
+    "started": "{name} 서버를 시작했어요({how}). 콘솔 창에서 진행 상황을 볼 수 있어요.",
+    "title": "전용 서버",
+    "lede": "“{profile}” 프로필을 서버 설정에 보내서 서버가 같은 모드를 같은 순서로 로드하게 해요. 설정하는 항목: <span class=\"mono\">Mods=</span>, <span class=\"mono\">WorkshopItems=</span>, 그리고 모드가 맵을 추가하면 <span class=\"mono\">Map=</span>. 다른 설정은 모두 그대로 유지돼요.",
+    "config": "서버 설정",
+    "newConfig": "새 설정…",
+    "newNameLabel": "새 서버 설정 이름",
+    "writeTo": "{name}.ini에 쓰기",
+    "mapOrder": "맵 순서",
+    "mapOrderHint": "서버는 맵을 위에서 아래로 로드해요. 모드 맵은 <span class=\"mono\">Muldraugh, KY</span>보다 위에 둬야 해요. 드래그하거나 Alt+↑/↓로 정렬하고, 쓰기를 누르면 저장돼요.",
+    "join": "서버 구성 가져오기",
+    "joinHint": "서버 설정으로 프로필을 만들어요. 없는 창작마당 모드는 설치되고 모드 순서도 복사돼요.",
+    "startTip": "이 전용 서버 시작",
+    "start": "서버 시작",
+    "useAsProfile": "프로필로 사용",
+    "noConfigs": "<span class=\"mono\">{dir}</span>에 서버 설정이 아직 없어요.",
+    "saves": {
+      "title": "저장된 게임",
+      "lede": "각 세이브는 플레이할 때 쓴 모드를 기억해요. 세이브를 이어 하기 전에 그 세이브의 모드를 불러오면 빠지는 모드가 없어요.",
+      "none": "모드 목록이 있는 세이브가 아직 없어요.",
+      "info": {
+        "other": "{mode} · 모드 {count}개 · {when} 플레이 · {diff}"
+      },
+      "useMods": "이 세이브의 모드 사용"
+    }
+  },
+  "zb": {
+    "title": "ZombieBuddy",
+    "lede": "어떤 모드는 Lua 모드로는 할 수 없는 방식으로 게임을 바꾸는 Java 코드를 포함해요. ZombieBuddy는 그런 모드에 필요한 로더예요. 설정하려면 모드 폴더 밖에서 두 가지를 바꿔야 하는데, PZMM이 둘 다 대신 해 줘요.",
+    "caution": "<strong>Java 모드는 컴퓨터에서 무엇이든 할 수 있어요.</strong> ZombieBuddy는 새로운 Java 모드나 변경된 Java 모드를 로드하기 전에 매번 물어봐요. 신뢰할 수 있는 제작자의 모드만 승인하세요.",
+    "checks": {
+      "mod": "ZombieBuddy 모드 다운로드됨",
+      "modHint": "Steam에서 구독했거나 PZMM이 설치함",
+      "agent": "게임 폴더의 Java 에이전트 파일",
+      "gameNotFound": "게임 폴더를 찾을 수 없음",
+      "flag": "ProjectZomboid64.json의 실행 플래그",
+      "flagHint": "Steam에서 게임을 시작할 때 ZombieBuddy를 로드해요",
+      "enabled": "“{profile}” 프로필에서 활성화됨",
+      "enabledHint": "이게 필요한 모드가 로드될 수 있도록"
+    },
+    "done": "완료",
+    "notDone": "미완료",
+    "neededBy": {
+      "other": "활성화된 모드 {count}개에 필요: <span class=\"mono\">{ids}</span>"
+    },
+    "changesLabel": "적용할 변경 사항",
+    "confirmRemove": "게임 폴더에서 ZombieBuddy를 제거할까요?",
+    "willDo": "PZMM이 할 작업:",
+    "nothing": "바꿀 게 없어요.",
+    "apply": "변경 사항 적용",
+    "repair": "ZombieBuddy 복구",
+    "setUp": "ZombieBuddy 설정",
+    "removeFromGame": "게임 폴더에서 제거",
+    "about": "ZombieBuddy 정보",
+    "fine": "게임 업데이트나 Steam의 “게임 파일 무결성 확인”을 하면 실행 플래그가 지워져요. 그러면 이 페이지에 <em>복구</em>가 표시돼요. PZMM은 일반 런처만 변경해요.",
+    "useInstallerBefore": "대체 런처나 Steam 실행 옵션을 쓴다면 대신",
+    "installer": "공식 설치 프로그램",
+    "useInstallerAfter": "사용을 권장해요."
+  },
+  "profile": {
+    "tip": "프로필: 지금 플레이하는 모드 목록",
+    "menuLabel": "프로필",
+    "newProfile": "새 프로필…",
+    "setUpViewpoint": "Project Viewpoint 설정…"
+  },
+  "activity": {
+    "title": "활동",
+    "empty": "설치, 업데이트, 오류가 여기에 표시돼요."
+  },
+  "links": {
+    "label": "PZMM 링크",
+    "github": "GitHub의 PZMM: 소스, 이슈, 릴리스",
+    "discord": "PZMM Discord 참여하기",
+    "kofi": "Ko-fi에서 PZMM 후원하기",
+    "comingSoon": "{label} (곧 제공)"
+  },
+  "window": {
+    "minimise": "최소화",
+    "maximise": "최대화",
+    "restore": "이전 크기로 복원"
+  },
+  "workshop": {
+    "sorts": {
+      "popular": "인기순",
+      "subscribed": "최다 구독",
+      "topRated": "최고 평점",
+      "newest": "최신순",
+      "updated": "최근 업데이트순",
+      "libraries": "최다 필수 (라이브러리)",
+      "collections": "최다 컬렉션 포함"
+    },
+    "days": {
+      "today": "오늘",
+      "week": "이번 주",
+      "month": "이번 달",
+      "months3": "3개월",
+      "months6": "6개월",
+      "year": "올해"
+    },
+    "within": {
+      "any": "전체 기간",
+      "day": "최근 24시간",
+      "week": "최근 1주",
+      "month": "최근 1개월",
+      "months3": "최근 3개월",
+      "months6": "최근 6개월",
+      "year": "최근 1년"
+    },
+    "tagNames": {
+      "Animals": "동물",
+      "Audio": "오디오",
+      "Balance": "밸런스",
+      "Building": "건축",
+      "ClothingArmor": "의류",
+      "Farming": "농사",
+      "Food": "음식",
+      "Framework": "프레임워크",
+      "Hardmode": "하드 모드",
+      "Interface": "인터페이스",
+      "Items": "아이템",
+      "LanguageTranslation": "번역",
+      "Literature": "문학",
+      "Map": "맵",
+      "Military": "군사",
+      "Misc": "기타",
+      "Models": "모델",
+      "Multiplayer": "멀티플레이어",
+      "PopCulture": "대중문화",
+      "QoL": "편의성",
+      "Realistic": "현실적",
+      "SillyFun": "재미",
+      "Skills": "기술",
+      "Textures": "텍스처",
+      "Traits": "특성",
+      "Vehicles": "차량",
+      "Weapons": "무기",
+      "WIP": "개발 중"
+    },
+    "home": {
+      "popularWeek": "이번 주 인기",
+      "subscribed": "최다 구독",
+      "newest": "최신",
+      "updated": "최근 업데이트",
+      "required": "최다 필수"
+    },
+    "errors": {
+      "rateLimited": "Steam이 지금 요청을 제한하고 있어요. 잠시 후 다시 시도하세요.",
+      "unreachable": "Steam 창작마당에 연결하지 못했어요: {error}"
+    },
+    "starsTip": {
+      "other": "별 5개 중 {stars}개 ({votes}명 평가)"
+    },
+    "detailsLabel": "{title} 상세 정보",
+    "collectionBadge": "컬렉션 · {count}",
+    "moreByAuthorTip": "이 제작자의 다른 항목",
+    "byAuthor": "제작자: {author}",
+    "subscribersTip": "현재 구독자",
+    "subs": {
+      "other": "구독 {n}"
+    },
+    "favouritesTip": "즐겨찾기",
+    "commentsTip": "댓글",
+    "postedTip": "{date} 게시",
+    "updatedOn": "{date} 업데이트",
+    "needs": {
+      "other": "다른 모드 {count}개 필요, 함께 설치돼요"
+    },
+    "details": "상세 정보",
+    "label": "Steam 창작마당",
+    "optionsLabel": "둘러보기 옵션",
+    "viewLabel": "창작마당 보기",
+    "browse": "둘러보기",
+    "homeTab": "홈",
+    "searchPlaceholder": "창작마당 검색",
+    "searchTip": "Steam 검색: \"정확한 문구\", AND, OR, NOT, +필수, -제외",
+    "searchInLabel": "검색 위치",
+    "searchInTip": "단어가 나타나야 하는 곳",
+    "anywhere": "전체",
+    "titles": "제목",
+    "descriptions": "설명",
+    "search": "검색",
+    "clearTerm": "“{term}” 지우기",
+    "gameBuild": "게임 빌드",
+    "buildN": "Build {n}",
+    "anyBuild": "모든 빌드",
+    "show": "표시",
+    "mods": "모드",
+    "collections": "컬렉션",
+    "sortBy": "정렬 기준",
+    "popularOver": "인기 기간",
+    "perPage": "페이지당",
+    "tagsHeading": "태그",
+    "tagsHeadingCount": "태그 ({count})",
+    "tagsHint": "클릭하면 포함, 다시 클릭하면 제외, 한 번 더 클릭하면 해제돼요.",
+    "tagOnlyTip": "{tag}만",
+    "tagNoTip": "{tag} 제외",
+    "posted": "게시",
+    "updated": "업데이트",
+    "onlyIncompatible": "호환되지 않음으로 표시된 모드만",
+    "clearFilters": "필터 지우기",
+    "viewpointAddons": "Viewpoint 애드온",
+    "viewpointDiscordTip": "Project Viewpoint 커뮤니티 Discord: 도움말, 버그 신고, 소식",
+    "viewpointDiscord": "Viewpoint Discord",
+    "modsBy": "<strong>{author}</strong>의 모드",
+    "modsByCount": "<strong>{author}</strong>의 모드 ({count})",
+    "thisAuthor": "이 제작자",
+    "collectionsWith": "<strong>{title}</strong> 포함 컬렉션",
+    "modsThatNeed": "<strong>{title}</strong>에 의존하는 모드",
+    "backToBrowsing": "둘러보기로 돌아가기",
+    "tryAgain": "다시 시도",
+    "viewAll": "모두 보기",
+    "loading": "불러오는 중…",
+    "loadingWorkshop": "창작마당 불러오는 중…",
+    "nothingMatches": "일치하는 항목이 없어요. 단어나 태그를 줄이거나 다른 빌드를 선택해 보세요.",
+    "clearSearch": "검색 지우기",
+    "countMods": {
+      "other": "모드 {n}개"
+    },
+    "countCollections": {
+      "other": "컬렉션 {n}개"
+    },
+    "countModsFor": {
+      "other": "“{search}” 검색 결과: 모드 {n}개"
+    },
+    "countCollectionsFor": {
+      "other": "“{search}” 검색 결과: 컬렉션 {n}개"
+    },
+    "loadingSuffix": " · 불러오는 중…",
+    "pagesLabel": "페이지",
+    "previous": "이전",
+    "pageOf": "{page} / {pages} 페이지",
+    "next": "다음"
+  },
+  "panel": {
+    "moreByAuthorTip": "이 제작자의 다른 모드",
+    "byAuthor": "제작자: {author}",
+    "closeTip": "닫기 (Esc)",
+    "screenshotLabel": "스크린샷 {n}",
+    "youtubeTip": "YouTube에서 보기",
+    "youtubeLabel": "YouTube에서 동영상 보기",
+    "installAll": {
+      "other": "모드 {count}개 모두 설치"
+    },
+    "workshopPage": "창작마당 페이지",
+    "rating": "평점",
+    "subscribers": "구독자",
+    "visitors": "방문자",
+    "favourites": "즐겨찾기",
+    "comments": "댓글",
+    "size": "크기",
+    "posted": "게시일",
+    "updated": "업데이트",
+    "modsThatNeed": "이 모드에 의존하는 모드",
+    "collectionsWith": "이 항목이 포함된 컬렉션",
+    "moreBy": "{author}의 다른 항목",
+    "thisAuthor": "이 제작자",
+    "needs": {
+      "other": "다른 모드 {count}개 필요 (함께 설치됨)"
+    },
+    "items": {
+      "other": "이 컬렉션의 항목 {count}개"
+    },
+    "description": "설명",
+    "changeNotes": "변경 사항",
+    "commentsTab": "댓글 ({n})",
+    "loading": "불러오는 중…",
+    "noOlderChanges": "이전 변경 사항이 없어요.",
+    "noChanges": "변경 사항이 없어요.",
+    "newer": "최신",
+    "older": "이전",
+    "noComments": "아직 댓글이 없어요.",
+    "commentsRange": "{total}개 중 {from}–{to}",
+    "postHint": "댓글을 남기려면 창작마당 페이지를 이용하세요."
+  },
+  "installButton": {
+    "installAll": "모두 설치"
+  }
+}

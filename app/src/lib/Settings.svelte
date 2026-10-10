@@ -1,6 +1,7 @@
 <script lang="ts">
   import { api, type Folder, type SettingsView, type View } from "./api";
   import { fmtSize } from "./format";
+  import { LANGS, systemLang, t, th, type Vars } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
   import Links from "./Links.svelte";
   import { prefs } from "./prefs.svelte";
@@ -10,15 +11,14 @@
     view: View | null;
     busy: boolean;
     appVersion: string;
-    say: (text: string, error?: boolean) => void;
+    say: (key: string, vars?: Vars, error?: boolean) => void;
     onBuild: (build: 41 | 42 | null) => void;
     onRedownload: () => void;
     onCheckUpdate: () => void;
     onFoldersChanged: () => void;
   } = $props();
 
-  const STATUS = { found: "Found", missing: "Not found", not_pz: "Not a PZ folder" };
-  const hint = (f: Folder) => (f.key === "data" ? "profiles, installed mods, backups, SteamCMD" : f.key === "zomboid" ? "mods, saves, server configs, logs" : "");
+  const hint = (f: Folder) => (f.key === "data" ? t("settings.folders.hintData") : f.key === "zomboid" ? t("settings.folders.hintZomboid") : "");
 
   /** A PZMM data change waiting for "move the data or not". `path` "" is the default folder. */
   let moving = $state<{ path: string; to: string } | null>(null);
@@ -35,7 +35,7 @@
       cfg = await api.folderSet(f.key, path, move);
       onFoldersChanged();
     } catch (e) {
-      say(String(e), true);
+      say(String(e), {}, true);
     } finally {
       working = false;
     }
@@ -46,7 +46,7 @@
     if (picked) setFolder(f, picked);
   }
 
-  const save = () => cfg && api.settingsSet($state.snapshot(cfg.settings)).catch((e) => say(`Couldn't save the settings: ${e}`, true));
+  const save = () => cfg && api.settingsSet($state.snapshot(cfg.settings)).catch((e) => say("settings.saveFailed", { error: String(e) }, true));
 
   let token = $state("");
   async function saveToken(value: string) {
@@ -54,196 +54,200 @@
       await api.githubTokenSet(value);
       token = "";
       if (cfg) cfg.token_saved = !!value.trim();
-      say(value.trim() ? "Saved the GitHub token in the system's credential store." : "Forgot the GitHub token.");
+      say(value.trim() ? "settings.tokenSaved" : "settings.tokenForgot");
     } catch (e) {
-      say(String(e), true);
+      say(String(e), {}, true);
     }
   }
 
   async function clearBackups() {
-    if (!cfg || !confirm(`Delete all backups (${fmtSize(cfg.backups_size)})? Mods can't be restored to their previous version afterwards.`)) return;
+    if (!cfg || !confirm(t("settings.confirmClearBackups", { size: fmtSize(cfg.backups_size) }))) return;
     try {
       cfg.backups_size = await api.backupsClear();
     } catch (e) {
-      say(String(e), true);
+      say(String(e), {}, true);
     }
   }
 
   async function copyDiagnostics() {
     try {
       await navigator.clipboard.writeText(await api.diagnostics());
-      say("Copied the diagnostics (your user name is masked). Paste them into a bug report.");
+      say("settings.diagnosticsCopied");
     } catch (e) {
-      say(`Couldn't copy the diagnostics: ${e}`, true);
+      say("settings.diagnosticsFailed", { error: String(e) }, true);
     }
   }
 </script>
 
-<section class="settings blueprint" aria-label="Settings">
+<section class="settings blueprint" aria-label={t("settings.label")}>
   <div class="inner">
   <div class="card">
-    <h2>Folders</h2>
-    <p class="lede">PZMM finds these by itself. Set one only if it's somewhere else. An environment variable wins over what's set here.</p>
+    <h2>{t("settings.folders.title")}</h2>
+    <p class="lede">{t("settings.folders.lede")}</p>
     {#if cfg}
       <ul class="folders">
         {#each cfg.folders as f (f.key)}
           <li>
             <div class="head">
               <strong>{f.label}</strong>
-              <span class="status {f.status}">{STATUS[f.status]}</span>
-              {#if f.overridden}<span class="hint">overridden by <span class="mono">{f.env}</span></span>{:else if !f.custom && f.path}<span class="hint">detected</span>{/if}
+              <span class="status {f.status}">{t(`settings.folders.status.${f.status}`)}</span>
+              {#if f.overridden}<span class="hint">{@html th("settings.folders.overriddenBy", { env: f.env ?? "" })}</span>{:else if !f.custom && f.path}<span class="hint">{t("settings.folders.detected")}</span>{/if}
             </div>
             {#if hint(f)}<span class="hint">{hint(f)}</span>{/if}
             <div class="row">
-              <input type="text" class="mono path" value={f.path ?? ""} placeholder="Not found" spellcheck="false" aria-label={f.label}
+              <input type="text" class="mono path" value={f.path ?? ""} placeholder={t("settings.folders.status.missing")} spellcheck="false" aria-label={f.label}
                 disabled={working} onchange={(e) => setFolder(f, e.currentTarget.value)} />
-              <button disabled={working} onclick={() => browse(f)}><Icon name="folder" size={14} />Browse…</button>
-              <button disabled={working} onclick={() => setFolder(f, "")} title="Forget the folder set here and find it again"><Icon name="search" size={14} />Detect</button>
-              <button disabled={f.status === "missing" || !f.path} onclick={() => f.path && api.openPath(f.path)}><Icon name="external" size={14} />Open</button>
+              <button disabled={working} onclick={() => browse(f)}><Icon name="folder" size={14} />{t("settings.folders.browse")}</button>
+              <button disabled={working} onclick={() => setFolder(f, "")} title={t("settings.folders.detectTip")}><Icon name="search" size={14} />{t("settings.folders.detect")}</button>
+              <button disabled={f.status === "missing" || !f.path} onclick={() => f.path && api.openPath(f.path)}><Icon name="external" size={14} />{t("settings.folders.open")}</button>
             </div>
             {#each f.warnings as w}<p class="warn"><Icon name="alert" size={13} />{w}</p>{/each}
             {#if f.key === "data" && moving}
-              <div class="confirm" role="group" aria-label="Move PZMM data">
-                <p>Move your PZMM data from <span class="mono">{f.path}</span> to <span class="mono">{moving.to}</span>? Without moving, PZMM starts empty there.</p>
-                <button class="primary" disabled={busy} onclick={() => moving && setFolder(f, moving.path, true)}><Icon name="swap" size={14} />Move data</button>
-                <button disabled={busy} onclick={() => moving && setFolder(f, moving.path, false)}>Switch without moving</button>
-                <button class="quiet" onclick={() => (moving = null)}><Icon name="x" size={14} />Cancel</button>
+              <div class="confirm" role="group" aria-label={t("settings.folders.moveLabel")}>
+                <p>{@html th("settings.folders.moveConfirm", { from: f.path ?? "", to: moving.to })}</p>
+                <button class="primary" disabled={busy} onclick={() => moving && setFolder(f, moving.path, true)}><Icon name="swap" size={14} />{t("settings.folders.moveData")}</button>
+                <button disabled={busy} onclick={() => moving && setFolder(f, moving.path, false)}>{t("settings.folders.switchWithoutMoving")}</button>
+                <button class="quiet" onclick={() => (moving = null)}><Icon name="x" size={14} />{t("common.cancel")}</button>
               </div>
             {/if}
           </li>
         {/each}
       </ul>
     {:else}
-      <p class="hint">Reading the folders…</p>
+      <p class="hint">{t("settings.folders.reading")}</p>
     {/if}
   </div>
 
   {#if cfg}
   <div class="card">
-    <h2>Downloads and updates</h2>
+    <h2>{t("settings.downloads.title")}</h2>
     <div class="grid">
-      <label for="upd">Check mods for updates</label>
+      <label for="upd">{t("settings.downloads.check")}</label>
       <select id="upd" bind:value={cfg.settings.update_check} onchange={save}>
-        <option value="off">Never (use Check for updates)</option>
-        <option value="start">When PZMM starts</option>
-        <option value="1h">On start, then every hour</option>
-        <option value="3h">On start, then every 3 hours</option>
+        <option value="off">{t("settings.downloads.checkOff")}</option>
+        <option value="start">{t("settings.downloads.checkStart")}</option>
+        <option value="1h">{t("settings.downloads.check1h")}</option>
+        <option value="3h">{t("settings.downloads.check3h")}</option>
       </select>
-      <label for="act">When updates are found</label>
+      <label for="act">{t("settings.downloads.whenFound")}</label>
       <select id="act" bind:value={cfg.settings.update_action} onchange={save} disabled={cfg.settings.update_check === "off"}>
-        <option value="notify">Tell me</option>
-        <option value="install">Install them</option>
+        <option value="notify">{t("settings.downloads.notify")}</option>
+        <option value="install">{t("settings.downloads.install")}</option>
       </select>
-      <label for="links">Open Workshop pages in</label>
+      <label for="links">{t("settings.downloads.openIn")}</label>
       <select id="links" bind:value={cfg.settings.workshop_links} onchange={save}>
-        <option value="steam">Steam (when it's running)</option>
-        <option value="browser">The browser</option>
+        <option value="steam">{t("settings.downloads.inSteam")}</option>
+        <option value="browser">{t("settings.downloads.inBrowser")}</option>
       </select>
       <span></span>
-      <label class="check"><input type="checkbox" bind:checked={cfg.settings.app_updates} onchange={save} />Check for new versions of PZMM when it starts</label>
+      <label class="check"><input type="checkbox" bind:checked={cfg.settings.app_updates} onchange={save} />{t("settings.downloads.appUpdates")}</label>
     </div>
-    <h3>GitHub token</h3>
-    <p class="hint">For mods installed from GitHub: a token raises GitHub's limit of 60 downloads an hour. It's kept in the system's credential store, never in a file.
-      {#if cfg.token_env}<strong>GITHUB_TOKEN is set, so that one is used.</strong>{/if}</p>
+    <h3>{t("settings.token.title")}</h3>
+    <p class="hint">{t("settings.token.hint")}
+      {#if cfg.token_env}<strong>{t("settings.token.envSet")}</strong>{/if}</p>
     <form class="row" onsubmit={(e) => { e.preventDefault(); saveToken(token); }}>
-      <input type="password" bind:value={token} autocomplete="off" spellcheck="false" aria-label="GitHub token" placeholder={cfg.token_saved ? "A token is saved" : "ghp_…"} />
-      <button type="submit" disabled={!token.trim()}><Icon name="check" size={14} />Save token</button>
-      {#if cfg.token_saved}<button type="button" onclick={() => saveToken("")}><Icon name="x" size={14} />Forget</button>{/if}
+      <input type="password" bind:value={token} autocomplete="off" spellcheck="false" aria-label={t("settings.token.title")} placeholder={cfg.token_saved ? t("settings.token.savedPlaceholder") : "ghp_…"} />
+      <button type="submit" disabled={!token.trim()}><Icon name="check" size={14} />{t("settings.token.save")}</button>
+      {#if cfg.token_saved}<button type="button" onclick={() => saveToken("")}><Icon name="x" size={14} />{t("settings.token.forget")}</button>{/if}
     </form>
-    <h3>Repair</h3>
-    <button onclick={onRedownload} disabled={busy} title="Repairs damaged copies; each keeps its current version as a backup"><Icon name="download" size={14} />Re-download mods PZMM installed</button>
+    <h3>{t("settings.repair.title")}</h3>
+    <button onclick={onRedownload} disabled={busy} title={t("settings.repair.redownloadTip")}><Icon name="download" size={14} />{t("settings.repair.redownload")}</button>
   </div>
 
   <div class="card">
-    <h2>Removing and backups</h2>
+    <h2>{t("settings.removing.title")}</h2>
     <div class="grid">
-      <label for="rm">Removed mods</label>
+      <label for="rm">{t("settings.removing.removed")}</label>
       <select id="rm" bind:value={cfg.settings.recycle} onchange={save}>
-        <option value={true}>Go to the Recycle Bin</option>
-        <option value={false}>Are deleted</option>
+        <option value={true}>{t("settings.removing.recycle")}</option>
+        <option value={false}>{t("settings.removing.deleted")}</option>
       </select>
-      <label for="req">Also remove required mods nothing else uses</label>
+      <label for="req">{t("settings.removing.removeRequirements")}</label>
       <select id="req" bind:value={cfg.settings.remove_requirements} onchange={save}>
-        <option value="ask">Ask</option>
-        <option value="always">Always</option>
-        <option value="never">Never</option>
+        <option value="ask">{t("settings.removing.ask")}</option>
+        <option value="always">{t("settings.removing.always")}</option>
+        <option value="never">{t("settings.removing.never")}</option>
       </select>
-      <label for="cap">Backups may use up to</label>
-      <span class="row"><input id="cap" type="number" min="0" step="100" bind:value={cfg.settings.backup_cap_mb} onchange={save} /> MB <span class="hint">0 = no limit; the oldest go first</span></span>
+      <label for="cap">{t("settings.removing.backupCap")}</label>
+      <span class="row"><input id="cap" type="number" min="0" step="100" bind:value={cfg.settings.backup_cap_mb} onchange={save} /> {t("settings.removing.mb")} <span class="hint">{t("settings.removing.backupCapHint")}</span></span>
     </div>
-    <p class="hint">An update keeps the mod's previous version as a backup (Restore previous version in its details).</p>
+    <p class="hint">{t("settings.removing.backupsHint")}</p>
     <div class="row">
-      <span>Backups use <strong>{fmtSize(cfg.backups_size)}</strong></span>
-      <button class="danger" disabled={busy || !cfg.backups_size} onclick={clearBackups}><Icon name="trash" size={14} />Clear backups</button>
+      <span>{@html th("settings.removing.backupsUse", { size: fmtSize(cfg.backups_size) })}</span>
+      <button class="danger" disabled={busy || !cfg.backups_size} onclick={clearBackups}><Icon name="trash" size={14} />{t("settings.removing.clearBackups")}</button>
     </div>
   </div>
   {/if}
 
   <div class="card">
-    <h2>Appearance</h2>
+    <h2>{t("settings.appearance.title")}</h2>
     <div class="grid">
-      <label for="theme">Theme</label>
-      <select id="theme" bind:value={prefs.theme}>
-        <option value="system">Match system</option>
-        <option value="dark">Dark</option>
-        <option value="light">Light</option>
+      <label for="lang">{t("settings.language")}</label>
+      <select id="lang" bind:value={prefs.lang}>
+        <option value="">{t("settings.languageSystem", { name: LANGS[systemLang()] })}</option>
+        {#each Object.entries(LANGS) as [code, name]}<option value={code}>{name}</option>{/each}
       </select>
-      <label for="accent">Accent</label>
+      <label for="theme">{t("settings.appearance.theme")}</label>
+      <select id="theme" bind:value={prefs.theme}>
+        <option value="system">{t("settings.appearance.themeSystem")}</option>
+        <option value="dark">{t("settings.appearance.dark")}</option>
+        <option value="light">{t("settings.appearance.light")}</option>
+      </select>
+      <label for="accent">{t("settings.appearance.accent")}</label>
       <input id="accent" type="color" bind:value={prefs.accent} />
-      <label for="build">Game build</label>
+      <label for="build">{t("settings.appearance.build")}</label>
       <select id="build" value={String(view?.build ?? "")} disabled={busy}
         onchange={(e) => { const v = e.currentTarget.value; onBuild(v ? (Number(v) as 41 | 42) : null); }}>
-        <option value="">Detect from default.txt</option>
-        <option value="42">Build 42</option>
-        <option value="41">Build 41</option>
+        <option value="">{t("settings.appearance.buildDetect")}</option>
+        <option value="42">{t("settings.appearance.build42")}</option>
+        <option value="41">{t("settings.appearance.build41")}</option>
       </select>
-      <label for="wsview">Workshop opens on</label>
+      <label for="wsview">{t("settings.appearance.workshopView")}</label>
       <select id="wsview" bind:value={prefs.workshopView}>
-        <option value="browse">Browse</option>
-        <option value="home">Home</option>
+        <option value="browse">{t("settings.appearance.browse")}</option>
+        <option value="home">{t("settings.appearance.home")}</option>
       </select>
-      <label for="perpage">Workshop results per page</label>
+      <label for="perpage">{t("settings.appearance.perPage")}</label>
       <select id="perpage" bind:value={prefs.perPage}>
         <option value={30}>30</option>
         <option value={50}>50</option>
       </select>
       <span></span>
-      <label class="check"><input type="checkbox" bind:checked={prefs.compact} />Compact rows</label>
+      <label class="check"><input type="checkbox" bind:checked={prefs.compact} />{t("settings.appearance.compact")}</label>
       <span></span>
-      <label class="check"><input type="checkbox" bind:checked={prefs.showIds} />Show mod IDs beside names</label>
+      <label class="check"><input type="checkbox" bind:checked={prefs.showIds} />{t("settings.appearance.showIds")}</label>
     </div>
-    <p class="hint">The window remembers its size and position.</p>
+    <p class="hint">{t("settings.appearance.windowHint")}</p>
   </div>
 
   {#if cfg}
   <div class="card">
-    <h2>Launch</h2>
+    <h2>{t("settings.launch.title")}</h2>
     <div class="grid">
-      <label for="args">Extra game arguments</label>
+      <label for="args">{t("settings.launch.args")}</label>
+      <!-- i18n-ignore: game command-line flags -->
       <input id="args" type="text" class="mono" bind:value={cfg.settings.launch_args} onchange={save} spellcheck="false" placeholder="-debug -nosteam" />
       <span></span>
-      <span class="hint">Launch game passes these through Steam, which asks once to allow them.</span>
+      <span class="hint">{t("settings.launch.argsHint")}</span>
       <span></span>
-      <label class="check"><input type="checkbox" bind:checked={cfg.settings.autosort_new} onchange={save} />Group a new profile's mods by category the first time it's used</label>
+      <label class="check"><input type="checkbox" bind:checked={cfg.settings.autosort_new} onchange={save} />{t("settings.launch.autosort")}</label>
     </div>
   </div>
   {/if}
 
   <div class="card">
-    <h2>About</h2>
+    <h2>{t("settings.about.title")}</h2>
     <div class="row">
-      <span>PZMM {appVersion}</span>
-      <button onclick={onCheckUpdate}><Icon name="update" size={14} />Check for updates</button>
+      <span>{t("settings.about.version", { version: appVersion })}</span>
+      <button onclick={onCheckUpdate}><Icon name="update" size={14} />{t("settings.about.checkUpdates")}</button>
       <Links />
     </div>
     <div class="row">
-      <button disabled={!view} onclick={() => view && api.openPath(`${view.zomboid}/Logs`)}><Icon name="folder" size={14} />Open log folder</button>
-      <button onclick={copyDiagnostics} title="Version, folders, profile, mod count and Check setup results, with your user name masked"><Icon name="copy" size={14} />Copy diagnostics</button>
+      <button disabled={!view} onclick={() => view && api.openPath(`${view.zomboid}/Logs`)}><Icon name="folder" size={14} />{t("settings.about.openLogs")}</button>
+      <button onclick={copyDiagnostics} title={t("settings.about.diagnosticsTip")}><Icon name="copy" size={14} />{t("settings.about.diagnostics")}</button>
     </div>
     <p class="keys">
-      Keyboard: <kbd>/</kbd> search · <kbd>↑</kbd><kbd>↓</kbd> move between rows · <kbd>Enter</kbd> details ·
-      <kbd>Space</kbd> enable/disable · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> reorder · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> undo/redo ·
-      <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+click select several · <kbd>Esc</kbd> clear selection
+      {@html th("settings.about.keys")}
     </p>
   </div>
   </div>
@@ -394,7 +398,7 @@
     color: var(--muted);
     font-size: 12px;
   }
-  kbd {
+  .keys :global(kbd) {
     font-family: var(--font-mono);
     font-size: 11px;
     border: 1px solid var(--line);

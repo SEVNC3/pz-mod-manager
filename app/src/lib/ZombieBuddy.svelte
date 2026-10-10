@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api, zbReady, type ZbStatus } from "./api";
+  import { t, th } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
 
   let { status, profile, busy, onSetup, onRemove }: {
@@ -33,26 +34,24 @@
   const checks = $derived(
     status
       ? [
-          [status.have_mod, "ZombieBuddy mod downloaded", "Subscribed in Steam or installed by PZMM"],
-          [status.files_current, "Java agent files in the game folder", status.game_dir ?? "Game folder not found"],
-          [status.launcher_patched, "Launch flag in ProjectZomboid64.json", "Loads ZombieBuddy when you start the game from Steam"],
-          [status.enabled, `Enabled in the "${profile}" profile`, "So mods that need it can load"],
+          [status.have_mod, t("zb.checks.mod"), t("zb.checks.modHint")],
+          [status.files_current, t("zb.checks.agent"), status.game_dir ?? t("zb.checks.gameNotFound")],
+          [status.launcher_patched, t("zb.checks.flag"), t("zb.checks.flagHint")],
+          [status.enabled, t("zb.checks.enabled", { profile }), t("zb.checks.enabledHint")],
         ] as [boolean, string, string][]
       : [],
   );
 </script>
 
-<section class="zb blueprint" aria-label="ZombieBuddy">
+<section class="zb blueprint" aria-label={t("zb.title")}>
   <div class="inner">
-    <h2>ZombieBuddy</h2>
+    <h2>{t("zb.title")}</h2>
     <p class="lede">
-      Some mods include Java code that changes the game in ways Lua mods can't. ZombieBuddy is the loader those mods need.
-      Setting it up takes two changes outside your mods folder, and PZMM makes both for you.
+      {t("zb.lede")}
     </p>
 
     <p class="caution">
-      <strong>Java mods can do anything on your computer.</strong> ZombieBuddy asks you before it loads each new or changed
-      Java mod. Only approve mods from authors you trust.
+      {@html th("zb.caution")}
     </p>
 
     {#if status}
@@ -61,52 +60,50 @@
           <li class:ok>
             <span class="mark" aria-hidden="true">{#if ok}<Icon name="check" size={12} />{/if}</span>
             <span><strong>{label}</strong><span class="hint">{hint}</span></span>
-            <span class="visually-hidden">{ok ? "done" : "not done"}</span>
+            <span class="visually-hidden">{ok ? t("zb.done") : t("zb.notDone")}</span>
           </li>
         {/each}
       </ul>
 
       {#if status.required_by.length}
         <p class="needed">
-          Needed by {status.required_by.length} enabled {status.required_by.length === 1 ? "mod" : "mods"}:
-          <span class="mono">{status.required_by.join(", ")}</span>
+          {@html th("zb.neededBy", { count: status.required_by.length, ids: status.required_by.join(", ") })}
         </p>
       {/if}
 
       {#if plan}
-        <div class="plan" role="region" aria-label="Changes to apply">
-          <p><strong>{plan.remove ? "Remove ZombieBuddy from the game folder?" : "PZMM will:"}</strong></p>
+        <div class="plan" role="region" aria-label={t("zb.changesLabel")}>
+          <p><strong>{plan.remove ? t("zb.confirmRemove") : t("zb.willDo")}</strong></p>
           {#if plan.lines.length}
             <ul class="mono">{#each plan.lines as l}<li>{l}</li>{/each}</ul>
           {:else}
-            <p>Nothing to change.</p>
+            <p>{t("zb.nothing")}</p>
           {/if}
           <div class="row">
             <button class="primary" onclick={apply} disabled={busy || !plan.lines.length}>
-              <Icon name={plan.remove ? "trash" : "check"} size={14} />{plan.remove ? "Remove" : "Apply changes"}
+              <Icon name={plan.remove ? "trash" : "check"} size={14} />{plan.remove ? t("common.remove") : t("zb.apply")}
             </button>
-            <button class="quiet" onclick={() => (plan = null)}><Icon name="x" size={14} />Cancel</button>
+            <button class="quiet" onclick={() => (plan = null)}><Icon name="x" size={14} />{t("common.cancel")}</button>
           </div>
         </div>
       {:else}
         <div class="row">
           {#if !ready}
             <button class="primary" onclick={() => preview(false)} disabled={busy || !status.game_dir}>
-              <Icon name="settings" size={14} />{installedAny ? "Repair ZombieBuddy" : "Set up ZombieBuddy"}
+              <Icon name="settings" size={14} />{installedAny ? t("zb.repair") : t("zb.setUp")}
             </button>
           {/if}
           {#if installedAny}
-            <button class="danger" onclick={() => preview(true)} disabled={busy}><Icon name="trash" size={14} />Remove from game folder</button>
+            <button class="danger" onclick={() => preview(true)} disabled={busy}><Icon name="trash" size={14} />{t("zb.removeFromGame")}</button>
           {/if}
-          <button class="quiet" onclick={() => api.openUrl("https://github.com/zed-0xff/ZombieBuddy")}><Icon name="external" size={14} />About ZombieBuddy</button>
+          <button class="quiet" onclick={() => api.openUrl("https://github.com/zed-0xff/ZombieBuddy")}><Icon name="external" size={14} />{t("zb.about")}</button>
         </div>
       {/if}
       {#if error}<p class="error">{error}</p>{/if}
 
       <p class="fine">
-        Game updates and Steam's "Verify integrity of game files" remove the launch flag. If that happens, this page shows
-        <em>Repair</em>. PZMM changes only the normal launcher. If you use the alternate launcher or Steam launch options,
-        use the <button class="quiet link" onclick={() => api.openUrl("https://github.com/zed-0xff/ZombieBuddy/releases/tag/windows_installer")}>official installer</button> instead.
+        {@html th("zb.fine")}
+        {t("zb.useInstallerBefore")} <button class="quiet link" onclick={() => api.openUrl("https://github.com/zed-0xff/ZombieBuddy/releases/tag/windows_installer")}>{t("zb.installer")}</button> {t("zb.useInstallerAfter")}
       </p>
     {/if}
   </div>

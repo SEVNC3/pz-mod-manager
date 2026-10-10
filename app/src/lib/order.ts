@@ -5,7 +5,8 @@
 // mods with the enabled ones first, in load order (see `loadList`).
 import type { ModRow, Row } from "./api";
 
-export type Problem = { text: string; fixable: boolean };
+/** `key`: its text in the locale files, about mod `id`. */
+export type Problem = { key: string; id: string; fixable: boolean };
 
 const isMod = (r: Row): r is ModRow => r.kind === "mod";
 
@@ -64,13 +65,13 @@ export function findProblems(rows: Row[]): Map<string, Problem> {
   const check = (r: ModRow, i: number): Problem | null => {
     for (const req of r.requires ?? []) {
       const dep = mods.get(req);
-      if (!dep || dep.missing) return { text: `Needs ${req} (not installed)`, fixable: false };
-      if (!dep.on) return { text: `Needs ${req} (disabled)`, fixable: true };
-      if (pos.get(req)! > i) return { text: `${req} must load first`, fixable: true };
+      if (!dep || dep.missing) return { key: "problems.needsMissing", id: req, fixable: false };
+      if (!dep.on) return { key: "problems.needsDisabled", id: req, fixable: true };
+      if (pos.get(req)! > i) return { key: "problems.loadFirst", id: req, fixable: true };
     }
-    for (const x of r.incompatible ?? []) if (enabled(x)) return { text: `Incompatible with ${x}`, fixable: false };
-    for (const a of r.load_after ?? []) if (enabled(a) && pos.get(a)! > i) return { text: `Should load after ${a}`, fixable: true };
-    for (const b of r.load_before ?? []) if (enabled(b) && pos.get(b)! < i) return { text: `Should load before ${b}`, fixable: true };
+    for (const x of r.incompatible ?? []) if (enabled(x)) return { key: "problems.incompatible", id: x, fixable: false };
+    for (const a of r.load_after ?? []) if (enabled(a) && pos.get(a)! > i) return { key: "problems.loadAfter", id: a, fixable: true };
+    for (const b of r.load_before ?? []) if (enabled(b) && pos.get(b)! < i) return { key: "problems.loadBefore", id: b, fixable: true };
     return null;
   };
   const out = new Map<string, Problem>();

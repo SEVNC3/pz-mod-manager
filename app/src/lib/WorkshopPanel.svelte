@@ -6,6 +6,7 @@
   import Icon from "./Icon.svelte";
   import InstallButton from "./InstallButton.svelte";
   import Stars from "./Stars.svelte";
+  import { t } from "./i18n.svelte";
 
   // The item panel: everything Steam's item page shows, plus Install.
   let { item, busy, installing, onInstall, onClose, onDependents, onInCollections, onAuthor, onOpen }: {
@@ -125,10 +126,10 @@
     <div class="titles">
       <h2>{it.title}</h2>
       {#if it.author}
-        <button class="quiet link" onclick={() => onAuthor(it)} title="More mods by this author">by {it.author}</button>
+        <button class="quiet link" onclick={() => onAuthor(it)} title={t("panel.moreByAuthorTip")}>{t("panel.byAuthor", { author: it.author })}</button>
       {/if}
     </div>
-    <button class="quiet icon" onclick={onClose} aria-label="Close" title="Close (Esc)"><Icon name="x" size={16} /></button>
+    <button class="quiet icon" onclick={onClose} aria-label={t("common.close")} title={t("panel.closeTip")}><Icon name="x" size={16} /></button>
   </header>
 
   <div class="scroll">
@@ -138,10 +139,10 @@
         {#if images.length > 1 || info?.videos.length}
           <div class="thumbs">
             {#each images as src, i}
-              <button class:on={i === shot} onclick={() => (shot = i)} aria-label={`Screenshot ${i + 1}`}><img {src} alt="" loading="lazy" /></button>
+              <button class:on={i === shot} onclick={() => (shot = i)} aria-label={t("panel.screenshotLabel", { n: i + 1 })}><img {src} alt="" loading="lazy" /></button>
             {/each}
             {#each info?.videos ?? [] as v}
-              <button class="video" onclick={() => api.openUrl(`https://www.youtube.com/watch?v=${v}`)} title="Watch on YouTube" aria-label="Watch the video on YouTube">
+              <button class="video" onclick={() => api.openUrl(`https://www.youtube.com/watch?v=${v}`)} title={t("panel.youtubeTip")} aria-label={t("panel.youtubeLabel")}>
                 <img src={`https://img.youtube.com/vi/${v}/mqdefault.jpg`} alt="" loading="lazy" /><span><Icon name="play" size={18} fill /></span>
               </button>
             {/each}
@@ -151,21 +152,21 @@
     {/if}
 
     <div class="actions">
-      <InstallButton item={it} {busy} {installing} {onInstall} all={`Install all ${info?.members.length || it.num_children || ""} mods`} />
-      <button onclick={() => api.openUrl(workshopUrl(it.id))}><Icon name="steam" size={14} />Workshop page</button>
+      <InstallButton item={it} {busy} {installing} {onInstall} all={(info?.members.length || it.num_children) ? t("panel.installAll", { count: info?.members.length || it.num_children }) : undefined} />
+      <button onclick={() => api.openUrl(workshopUrl(it.id))}><Icon name="steam" size={14} />{t("panel.workshopPage")}</button>
     </div>
 
     <dl class="stats">
       {#if it.votes > 0}
-        <div><dt>Rating</dt><dd class="stars"><Stars stars={it.stars} /> <span class="muted">{compact.format(it.votes)}</span></dd></div>
+        <div><dt>{t("panel.rating")}</dt><dd class="stars"><Stars stars={it.stars} /> <span class="muted">{compact.format(it.votes)}</span></dd></div>
       {/if}
-      <div><dt>Subscribers</dt><dd>{compact.format(it.subscriptions)}</dd></div>
-      <div><dt>Visitors</dt><dd>{compact.format(it.views)}</dd></div>
-      <div><dt>Favourites</dt><dd>{compact.format(it.favorited)}</dd></div>
-      <div><dt>Comments</dt><dd>{compact.format(it.comments)}</dd></div>
-      {#if !it.collection}<div><dt>Size</dt><dd>{fmtSize(it.file_size)}</dd></div>{/if}
-      <div><dt>Posted</dt><dd>{date(it.time_created)}</dd></div>
-      <div><dt>Updated</dt><dd>{date(it.time_updated)}</dd></div>
+      <div><dt>{t("panel.subscribers")}</dt><dd>{compact.format(it.subscriptions)}</dd></div>
+      <div><dt>{t("panel.visitors")}</dt><dd>{compact.format(it.views)}</dd></div>
+      <div><dt>{t("panel.favourites")}</dt><dd>{compact.format(it.favorited)}</dd></div>
+      <div><dt>{t("panel.comments")}</dt><dd>{compact.format(it.comments)}</dd></div>
+      {#if !it.collection}<div><dt>{t("panel.size")}</dt><dd>{fmtSize(it.file_size)}</dd></div>{/if}
+      <div><dt>{t("panel.posted")}</dt><dd>{date(it.time_created)}</dd></div>
+      <div><dt>{t("panel.updated")}</dt><dd>{date(it.time_updated)}</dd></div>
     </dl>
     {#if it.tags.length}
       <p class="tags">{#each it.tags as t}<span>{t}</span>{/each}</p>
@@ -173,79 +174,79 @@
 
     <div class="links">
       {#if !it.collection}
-        <button class="quiet" onclick={() => onDependents(it)}><Icon name="layers" size={14} />Mods that need this</button>
-        <button class="quiet" onclick={() => onInCollections(it)}><Icon name="folder" size={14} />Collections with this</button>
+        <button class="quiet" onclick={() => onDependents(it)}><Icon name="layers" size={14} />{t("panel.modsThatNeed")}</button>
+        <button class="quiet" onclick={() => onInCollections(it)}><Icon name="folder" size={14} />{t("panel.collectionsWith")}</button>
       {/if}
       {#if it.creator}
-        <button class="quiet" onclick={() => onAuthor(it)}><Icon name="search" size={14} />More by {it.author || "this author"}</button>
+        <button class="quiet" onclick={() => onAuthor(it)}><Icon name="search" size={14} />{t("panel.moreBy", { author: it.author || t("panel.thisAuthor") })}</button>
       {/if}
     </div>
 
     {#if info?.required.length}
-      <h3>Needs {info.required.length} other {info.required.length === 1 ? "mod" : "mods"} (installed with it)</h3>
+      <h3>{t("panel.needs", { count: info.required.length })}</h3>
       <ul class="mini">
         {#each info.required as r (r.id)}
           <li>
             <button class="quiet link" onclick={() => onOpen(r)}>{r.title}</button>
-            {#if r.have}<span class="have small"><Icon name="check" size={12} /> Installed</span>{/if}
+            {#if r.have}<span class="have small"><Icon name="check" size={12} /> {t("common.installed")}</span>{/if}
           </li>
         {/each}
       </ul>
     {/if}
 
     {#if info?.members.length}
-      <h3>{info.members.length} items in this collection</h3>
+      <h3>{t("panel.items", { count: info.members.length })}</h3>
       <ul class="mini">
         {#each info.members as m (m.id)}
           <li>
             {#if m.preview_url}<img src={m.preview_url} alt="" loading="lazy" />{/if}
             <button class="quiet link" onclick={() => onOpen(m)}>{m.title}</button>
-            {#if m.have}<span class="have small"><Icon name="check" size={12} /> Installed</span>{/if}
+            {#if m.have}<span class="have small"><Icon name="check" size={12} /> {t("common.installed")}</span>{/if}
           </li>
         {/each}
       </ul>
     {/if}
 
     <div class="tabs" role="tablist">
-      <button role="tab" aria-selected={tab === "about"} class:on={tab === "about"} onclick={() => pick("about")}>Description</button>
-      <button role="tab" aria-selected={tab === "changes"} class:on={tab === "changes"} onclick={() => pick("changes")}>Change notes</button>
-      <button role="tab" aria-selected={tab === "comments"} class:on={tab === "comments"} onclick={() => pick("comments")}>Comments ({compact.format(it.comments)})</button>
+      <button role="tab" aria-selected={tab === "about"} class:on={tab === "about"} onclick={() => pick("about")}>{t("panel.description")}</button>
+      <button role="tab" aria-selected={tab === "changes"} class:on={tab === "changes"} onclick={() => pick("changes")}>{t("panel.changeNotes")}</button>
+      <button role="tab" aria-selected={tab === "comments"} class:on={tab === "comments"} onclick={() => pick("comments")}>{t("panel.commentsTab", { n: compact.format(it.comments) })}</button>
     </div>
 
     {#if errors[tab]}<p class="error">{errors[tab]}</p>{/if}
     {#if tab === "about"}
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
       <div class="desc" onclick={linkClick}>
-        {#if info?.item}{@html bbcode(info.item.description)}{:else if !errors.about}<p class="muted">Loading…</p>{/if}
+        {#if info?.item}{@html bbcode(info.item.description)}{:else if !errors.about}<p class="muted">{t("panel.loading")}</p>{/if}
       </div>
     {:else if tab === "changes"}
       {#if errors.changes}<!-- shown above -->
-      {:else if !changes}<p class="muted">Loading…</p>
-      {:else if !changes.length}<p class="muted">{changesPage > 1 ? "No older change notes." : "No change notes."}</p>
+      {:else if !changes}<p class="muted">{t("panel.loading")}</p>
+      {:else if !changes.length}<p class="muted">{changesPage > 1 ? t("panel.noOlderChanges") : t("panel.noChanges")}</p>
       {:else}
         <ol class="notes">
           {#each changes as c}<li><strong>{date(c.time)}</strong><p>{c.text}</p></li>{/each}
         </ol>
       {/if}
       <nav class="pager">
-        <button disabled={changesPage <= 1} onclick={() => loadChanges(changesPage - 1)}><Icon name="chevron-left" size={14} />Newer</button>
-        <button disabled={!changes || changes.length < 10} onclick={() => loadChanges(changesPage + 1)}>Older<Icon name="chevron-right" size={14} /></button>
+        <button disabled={changesPage <= 1} onclick={() => loadChanges(changesPage - 1)}><Icon name="chevron-left" size={14} />{t("panel.newer")}</button>
+        <button disabled={!changes || changes.length < 10} onclick={() => loadChanges(changesPage + 1)}>{t("panel.older")}<Icon name="chevron-right" size={14} /></button>
       </nav>
     {:else}
       {#if errors.comments}<!-- shown above -->
-      {:else if !comments}<p class="muted">Loading…</p>
-      {:else if !comments.comments.length}<p class="muted">No comments yet.</p>
+      {:else if !comments}<p class="muted">{t("panel.loading")}</p>
+      {:else if !comments.comments.length}<p class="muted">{t("panel.noComments")}</p>
       {:else}
         <ol class="notes">
           {#each comments.comments as c}<li><strong>{c.author}</strong> <span class="muted">{date(c.time)}</span><p>{c.text}</p></li>{/each}
         </ol>
         <nav class="pager">
-          <button disabled={commentsStart <= 0} onclick={() => loadComments(Math.max(0, commentsStart - 20))}><Icon name="chevron-left" size={14} />Newer</button>
-          <span class="muted">{commentsStart + 1}–{Math.min(commentsStart + 20, comments.total)} of {comments.total}</span>
-          <button disabled={commentsStart + 20 >= comments.total} onclick={() => loadComments(commentsStart + 20)}>Older<Icon name="chevron-right" size={14} /></button>
+          <button disabled={commentsStart <= 0} onclick={() => loadComments(Math.max(0, commentsStart - 20))}><Icon name="chevron-left" size={14} />{t("panel.newer")}</button>
+          <span class="muted">{t("panel.commentsRange", { from: commentsStart + 1, to: Math.min(commentsStart + 20, comments.total), total: comments.total })}</span>
+          <button disabled={commentsStart + 20 >= comments.total} onclick={() => loadComments(commentsStart + 20)}>{t("panel.older")}<Icon name="chevron-right" size={14} /></button>
         </nav>
       {/if}
-      <p class="muted small-note">To post a comment, use the Workshop page.</p>
+      <p class="muted small-note">{t("panel.postHint")}</p>
     {/if}
   </div>
 </div>

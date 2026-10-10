@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { workshopUrl } from "./format";
+import { t } from "./i18n.svelte";
 
 export type Mode = "zomboid" | "viewpoint";
 export type ModRow = {
@@ -128,10 +129,10 @@ export function encodeShare(s: Shared): string {
 
 /** Accepts a share code or the raw JSON. */
 export function decodeShare(text: string): Shared {
-  const t = text.trim();
-  const json = t.startsWith("PZMM1:") ? new TextDecoder().decode(Uint8Array.from(atob(t.slice(6)), (c) => c.charCodeAt(0))) : t;
+  const code = text.trim();
+  const json = code.startsWith("PZMM1:") ? new TextDecoder().decode(Uint8Array.from(atob(code.slice(6)), (c) => c.charCodeAt(0))) : code;
   const s = JSON.parse(json);
-  if (typeof s?.name !== "string" || typeof s?.list !== "string") throw new Error("That isn't a PZMM profile code.");
+  if (typeof s?.name !== "string" || typeof s?.list !== "string") throw new Error(t("api.badShareCode"));
   return { name: s.name, kind: s.kind ?? "", list: s.list, order: Array.isArray(s.order) ? s.order : [], workshop: s.workshop ?? {} };
 }
 
@@ -274,14 +275,14 @@ export function describeSource(source: string): { label: string; url: string | n
   const [kind, rest = ""] = source.split(/:(.*)/s);
   switch (kind) {
     case "workshop":
-      return { label: "Workshop", url: workshopUrl(rest) };
+      return { label: t("source.workshop"), url: workshopUrl(rest) };
     case "steam":
-      return { label: "Subscribed", url: workshopUrl(rest) };
+      return { label: t("source.steam"), url: workshopUrl(rest) };
     case "github":
       return { label: "GitHub", url: `https://github.com/${rest.split("@")[0]}` };
     case "local":
-      return { label: "Local file", url: null };
+      return { label: t("source.local"), url: null };
     default:
-      return { label: "Manual", url: null };
+      return { label: t("source.manual"), url: null };
   }
 }

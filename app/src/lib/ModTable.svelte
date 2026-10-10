@@ -1,6 +1,7 @@
 <script lang="ts">
   import { describeSource, type ModRow, type Overlap, type Row, type Stats } from "./api";
   import { fmtDate, fmtSize } from "./format";
+  import { t } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
   import LayerIcon, { overlapLabel } from "./LayerIcon.svelte";
   import { sectionDrop, type Problem } from "./order";
@@ -64,10 +65,10 @@
   let dropAt = $state<number | null>(null);
 
   const SOURCE_HINTS: Record<string, string> = {
-    steam: "Subscribed in Steam; Steam keeps it updated",
-    workshop: "Downloaded from the Workshop by PZMM",
-    github: "Installed from GitHub by PZMM",
-    local: "Installed from a file by PZMM",
+    steam: "modTable.sourceHint.steam",
+    workshop: "modTable.sourceHint.workshop",
+    github: "modTable.sourceHint.github",
+    local: "modTable.sourceHint.local",
   };
 
   const place = $derived(new Map(order.map((id, i) => [id, i + 1])));
@@ -109,7 +110,7 @@
 
 <table>
   <thead class="visually-hidden">
-    <tr><th>Move</th><th>Enabled</th><th>Load order</th><th>Mod</th><th>Size</th><th>Last changed</th><th>Shared files</th><th>Source</th></tr>
+    <tr><th>{t("modTable.col.move")}</th><th>{t("common.enabled")}</th><th>{t("modTable.col.loadOrder")}</th><th>{t("modTable.col.mod")}</th><th>{t("modTable.col.size")}</th><th>{t("modTable.col.lastChanged")}</th><th>{t("modTable.col.sharedFiles")}</th><th>{t("modTable.col.source")}</th></tr>
   </thead>
   <tbody>
     {#each visible as { r, i }, k (r.kind === "mod" ? `m:${r.id}` : `s:${i}:${r.name}`)}
@@ -127,19 +128,19 @@
           <td colspan="7">
             {#if editingSep === i}
               <!-- svelte-ignore a11y_autofocus -->
-              <input class="tape-edit" type="text" value={r.name} autofocus aria-label="Separator name (empty removes it)"
+              <input class="tape-edit" type="text" value={r.name} autofocus aria-label={t("modTable.sepNameLabel")}
                 onblur={(e) => onRename(i, e.currentTarget.value)}
-                onkeydown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") editingSep = null; }} />
+                onkeydown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") editingSep = null; /* i18n-ignore: key names */ }} />
             {:else}
-              <button class="quiet fold" aria-expanded={!collapsed.has(r.name)} aria-label={`${collapsed.has(r.name) ? "Expand" : "Collapse"} ${r.name}`}
+              <button class="quiet fold" aria-expanded={!collapsed.has(r.name)} aria-label={t(collapsed.has(r.name) ? "modTable.expandLabel" : "modTable.collapseLabel", { name: r.name })}
                 onclick={(e) => { e.stopPropagation(); onToggleSection(r.name); }}><Icon name={collapsed.has(r.name) ? "chevron-right" : "chevron-down"} size={14} /></button>
-              <span class="tape" title="Double-click to rename">{r.name}</span>
+              <span class="tape" title={t("modTable.renameTip")}>{r.name}</span>
               {#if sectionCounts.get(r.name)}
                 {@const c = sectionCounts.get(r.name)!}
-                <span class="sec-count">{c.on} of {c.total} enabled</span>
+                <span class="sec-count">{t("modTable.sectionCount", { on: c.on, total: c.total })}</span>
               {/if}
-              <button class="quiet icon sep-remove" disabled={busy || filtering} title="Remove this separator (Delete). Its mods stay where they are."
-                aria-label={`Remove separator ${r.name}`} onclick={(e) => { e.stopPropagation(); onRemoveSep(i); }}><Icon name="trash" size={14} /></button>
+              <button class="quiet icon sep-remove" disabled={busy || filtering} title={t("modTable.removeSepTip")}
+                aria-label={t("modTable.removeSepLabel", { name: r.name })} onclick={(e) => { e.stopPropagation(); onRemoveSep(i); }}><Icon name="trash" size={14} /></button>
             {/if}
           </td>
         </tr>
@@ -154,7 +155,7 @@
           ondrop={(e) => { e.preventDefault(); drop(i); }}>
           <td class="grip" aria-hidden="true">{#if !filtering}<Icon name="grip" size={14} fill />{/if}</td>
           <td class="check">
-            <input type="checkbox" checked={r.on} disabled={busy} aria-label={`Enable ${r.name || r.id}`}
+            <input type="checkbox" checked={r.on} disabled={busy} aria-label={t("modTable.enableLabel", { name: r.name || r.id })}
               onclick={(e) => e.stopPropagation()} onchange={() => onToggle(r.id)} />
           </td>
           <td class="num mono">{place.get(r.id) ?? ""}</td>
@@ -162,9 +163,9 @@
             <span class="title" title={r.name || r.id}>{r.name || r.id}</span>
             {#if prefs.showIds && r.name && r.name !== r.id}<span class="id mono">{r.id}</span>{/if}
             {#if r.only41 && (build ?? 42) !== 41}
-              <span class="build-badge" title="Built for Build 41 only (no 42/ or common/ folder): on Build 42 it may error or do nothing">B41 only</span>
+              <span class="build-badge" title={t("modTable.b41OnlyTip")}>{t("modTable.b41Only")}</span>
             {:else if r.only42 && build === 41}
-              <span class="build-badge" title="Built for Build 42 only">B42 only</span>
+              <span class="build-badge" title={t("modTable.b42OnlyTip")}>{t("modTable.b42Only")}</span>
             {/if}
           </td>
           <td class="meta mono">{stats[r.id] ? fmtSize(stats[r.id].size) : ""}</td>
@@ -177,13 +178,14 @@
           </td>
           <td class="src">
             {#if r.missing}
-              <span class="missing">Not installed</span>
+              <span class="missing">{t("modTable.notInstalled")}</span>
             {:else if problems.has(r.id)}
-              <span class="missing" title={problems.get(r.id)?.text}><Icon name="alert" size={12} />{problems.get(r.id)?.text}</span>
+              {@const p = problems.get(r.id)!}
+              <span class="missing" title={t(p.key, { id: p.id })}><Icon name="alert" size={12} />{t(p.key, { id: p.id })}</span>
             {:else if updates.has(r.id)}
-              <span class="update"><Icon name="update" size={12} />Update available</span>
+              <span class="update"><Icon name="update" size={12} />{t("modTable.updateAvailable")}</span>
             {:else}
-              <span class="badge" data-kind={r.source.split(":")[0]} title={SOURCE_HINTS[r.source.split(":")[0]] ?? "Added to the mods folder outside PZMM"}>{src.label}</span>
+              <span class="badge" data-kind={r.source.split(":")[0]} title={t(SOURCE_HINTS[r.source.split(":")[0]] ?? "modTable.sourceHint.manual")}>{src.label}</span>
             {/if}
           </td>
         </tr>
