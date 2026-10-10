@@ -55,7 +55,7 @@ pub fn conflicts(mine: &Path, my_pos: usize, others: &[(String, PathBuf, usize)]
             (!shared.is_empty()).then(|| Conflict { other: id.clone(), files: shared.len(), wins: my_pos > *pos, examples: shared.into_iter().take(5).collect() })
         })
         .collect();
-    out.sort_by(|a, b| b.files.cmp(&a.files));
+    out.sort_by_key(|c| std::cmp::Reverse(c.files));
     out
 }
 
