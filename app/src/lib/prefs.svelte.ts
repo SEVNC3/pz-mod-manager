@@ -16,8 +16,8 @@ export const prefs = $state({
   showIds: read("pzmm.showIds", "1") === "1",
   workshopView: (read("pzmm.workshopView", "browse") === "home" ? "home" : "browse") as "home" | "browse",
   perPage: (read("pzmm.perPage", "30") === "50" ? 50 : 30) as 30 | 50,
-  /** The Maps tab lists every Map-tagged Workshop item, not only installed maps. */
-  mapsWorkshop: read("pzmm.mapsWorkshop", "0") === "1",
+  /** The Maps tab lists every Map-tagged Workshop item (the built-in index, then Steam), not only installed maps. */
+  mapsWorkshop: read("pzmm.mapsWorkshop", "1") === "1",
 });
 
 /** Text colour on an accent fill: dark on light accents, white on dark ones. */

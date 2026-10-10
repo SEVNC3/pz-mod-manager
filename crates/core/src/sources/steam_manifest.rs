@@ -24,6 +24,7 @@ pub struct Session {
     key: DepotKey,
     cdn: CdnClient,
     pool: CdnServerPool,
+    calls: std::sync::Mutex<()>,
     // last: the client's tasks run on it
     rt: tokio::runtime::Runtime,
 }
@@ -41,14 +42,19 @@ impl Session {
         if servers.is_empty() {
             bail!("Steam listed no content servers");
         }
-        Ok(Session { client, key, cdn: CdnClient::new()?, pool: CdnServerPool::new(servers), rt })
+        Ok(Session { client, key, cdn: CdnClient::new()?, pool: CdnServerPool::new(servers), calls: std::sync::Mutex::new(()), rt })
     }
 
     /// The files in a manifest (an item's `hcontent_file`), without folders.
     pub fn files(&self, manifest: u64) -> Result<Vec<File>> {
         let (app, depot, id) = (AppId(APP), DepotId(APP), ManifestId(manifest));
+        let code = {
+            // one call at a time: each caller reads the connection and drops other callers' answers
+            let _one = self.calls.lock().unwrap_or_else(|e| e.into_inner());
+            self.rt.block_on(self.client.get_manifest_request_code(app, depot, id, None, None))?.unwrap_or(0)
+        };
+        // the content servers (plain HTTP) take several readers at once
         let mut m = self.rt.block_on(async {
-            let code = self.client.get_manifest_request_code(app, depot, id, None, None).await?.unwrap_or(0);
             let data = self.cdn.download_manifest_pooled(&self.pool, depot, id, code, None).await?;
             anyhow::Ok(steamroom_client::manifest::parse_cdn_manifest(&data)?)
         })?;

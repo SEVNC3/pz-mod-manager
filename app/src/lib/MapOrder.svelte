@@ -42,6 +42,7 @@
       ondragover={(e) => { e.preventDefault(); mapAt = i; }}
       ondrop={(e) => { e.preventDefault(); dropMap(i); }}>
       <span class="num mono">{i + 1}</span>{m}
+      {#if i > 0 && m !== "Muldraugh, KY"}<button class="quiet top" onclick={() => moveMap(i, 0)} title="Load it first" aria-label="Move {m} to the top">Top</button>{/if}
     </li>
   {/each}
   <li class="tail" class:drop={mapAt === maps.length} aria-hidden="true"
@@ -61,5 +62,10 @@
   }
   .maps li:hover .num {
     color: var(--on-selected);
+  }
+  .top {
+    margin-left: auto;
+    padding: 0 6px;
+    font-size: 12px;
   }
 </style>

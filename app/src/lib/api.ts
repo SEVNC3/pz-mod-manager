@@ -174,7 +174,8 @@ export type Cell = [number, number];
 export type MapFolder = { folder: string; title: string; lots: string[]; cells: Cell[] };
 export type MapMod = { id: string; name: string; source: string; requires: string[]; maps: MapFolder[] };
 /** A Workshop item PZMM read maps from (the Workshop scan or a check). */
-export type MapItem = { title: string; author: string; subscriptions: number; size: number; manual: boolean };
+/** `mods`: how many mods the item holds on this build (a mod pack holds several); times are Unix seconds. */
+export type MapItem = { title: string; author: string; subscriptions: number; size: number; manual: boolean; updated: number; created: number; tags: string[]; mods: number };
 export type MapsView = {
   build: 41 | 42;
   vanilla_folders: string[];
@@ -185,6 +186,8 @@ export type MapsView = {
   /** Workshop maps read without installing (one per mod id). */
   checked: MapMod[];
   items: Record<string, MapItem>;
+  /** Mod ids several Workshop items provide, with those items. */
+  providers: Record<string, string[]>;
 };
 export type GridCell = { x: number; y: number; kind: "vanilla" | "water" | "map" | "over" | "conflict"; maps: string[] };
 export type MapScan = { phase: "listing" | "reading" | "done"; done: number; total: number; failed: number };
@@ -233,13 +236,14 @@ export const api = {
   saveUse: (mode: string, name: string) => invoke<View>("save_use", { mode, name }),
   mapsView: () => invoke<MapsView>("maps_view"),
   mapGrid: (vanilla: Cell[], water: Cell[], shown: MapMod[]) => invoke<GridCell[]>("map_grid", { vanilla, water, shown }),
-  mapQuickSelect: (all: MapMod[], fixed: string[], ranks: Record<string, number>) => invoke<string[]>("map_quick_select", { all, fixed, ranks }),
-  /** The Map= list for `folders`; an empty `order` starts from the profile's saved one. */
+  /** `fixed`: the enabled maps, which stay (listed or not). */
+  mapQuickSelect: (all: MapMod[], fixed: MapMod[], ranks: Record<string, number>) => invoke<string[]>("map_quick_select", { all, fixed, ranks }),
+  /** The Map= list for `folders`: `order`'s arrangement, the profile's saved one for maps it lacks. */
   mapLine: (order: string[], folders: string[]) => invoke<string[]>("map_line", { order, folders }),
   mapOrderSave: (maps: string[]) => invoke<void>("map_order_save", { maps }),
   mapsExport: (shown: MapMod[], mapLine: string[]) => invoke<string>("maps_export", { shown, mapLine }),
   mapCheck: (id: string, download: boolean) => invoke<MapMod[]>("map_check", { id, download }),
-  /** Read every Map-tagged Workshop item for the build ("maps-scan" events report progress). */
+  /** Read every Map-tagged Workshop item, both builds ("maps-scan" events report progress). */
   mapScan: () => invoke<MapScan>("map_scan"),
   mapScanStop: () => invoke<void>("map_scan_stop"),
   mapPresets: () => invoke<Record<string, string[]>>("map_presets"),

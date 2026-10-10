@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use super::{Paths, files, server};
+use super::{Paths, server};
 use crate::store::Row;
 
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize)]
@@ -164,7 +164,7 @@ fn check_servers(paths: &Paths, mods: &BTreeMap<String, Row>, build: u8) -> Vec<
         }
         let map_line = text.lines().find_map(|l| l.strip_prefix("Map=")).unwrap_or("");
         let maps: Vec<&str> = map_line.split(';').map(str::trim).filter(|m| !m.is_empty()).collect();
-        let mod_maps: Vec<String> = cfg.mods.iter().filter_map(|id| mods.get(id)).flat_map(|m| files::maps(&m.dir)).collect();
+        let mod_maps = server::mod_maps(&cfg.mods, mods, build);
         for mm in &mod_maps {
             if !maps.contains(&mm.as_str()) {
                 out.push(warn(&subject, format!("a mod adds the map {mm}, but Map= doesn't list it")));

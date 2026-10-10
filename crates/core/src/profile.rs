@@ -257,13 +257,32 @@ pub fn map_order(paths: &Paths, name: &str) -> Vec<String> {
     fs::read_to_string(file).map(|t| t.lines().map(str::trim).filter(|l| !l.is_empty()).map(String::from).collect()).unwrap_or_default()
 }
 
-pub fn set_map_order(paths: &Paths, name: &str, maps: &[String]) -> Result<()> {
+/// Save `maps` as the arranged order; maps it lacks keep their place (see `server::merge_order`).
+/// Returns whether the saved order changed.
+pub fn set_map_order(paths: &Paths, name: &str, maps: &[String]) -> Result<bool> {
     valid_name(name)?;
+    let old = map_order(paths, name);
+    let new = pz::server::merge_order(&old, maps);
+    if new == old {
+        return Ok(false);
+    }
     let d = dir(paths).join(on_disk(paths, name));
     fs::create_dir_all(&d)?;
-    crate::write_atomic(&d.join("maporder.txt"), maps.iter().map(|m| format!("{m}
-")).collect::<String>())?;
-    Ok(())
+    crate::write_atomic(&d.join("maporder.txt"), new.iter().map(|m| format!("{m}\n")).collect::<String>())?;
+    Ok(true)
+}
+
+/// default.txt's `maps` block for `profile`: its arranged order, kept to the enabled mods' maps
+/// on `build`, without Muldraugh (the game loads it last on its own). None keeps the block as
+/// it is: the profile's maps were never arranged.
+fn game_maps(paths: &Paths, profile: &Profile, build: u8) -> Option<Vec<String>> {
+    let order = map_order(paths, &profile.name);
+    if order.is_empty() {
+        return None;
+    }
+    let mods = crate::store::scan(paths).ok()?;
+    let line = pz::server::map_order(&order, &pz::server::mod_maps(&profile.enabled(), &mods, build));
+    Some(line.into_iter().filter(|m| m != pz::server::BASE_MAP).collect())
 }
 
 pub fn delete(paths: &Paths, name: &str) -> Result<()> {
@@ -345,7 +364,9 @@ pub fn apply(paths: &Paths, profile: &Profile) -> Result<()> {
     if let Some(d) = pz::try_read_default(&paths.default_txt()).filter(|d| !d.mods.is_empty()) {
         s.seen_b41 = Some(d.b41);
     }
-    pz::write_default(&paths.default_txt(), &profile.enabled(), s.b41.or(s.seen_b41))?;
+    let b41 = s.b41.or(s.seen_b41);
+    let maps = game_maps(paths, profile, if b41.unwrap_or(false) { 41 } else { 42 });
+    pz::write_default(&paths.default_txt(), &profile.enabled(), b41, maps.as_deref())?;
     let kind = s.kinds.get(&profile.name).cloned().unwrap_or_else(|| DEFAULT_KIND.into());
     s.last.insert(kind, profile.name.clone());
     save_state(paths, &State { active: profile.name.clone(), ..s })
@@ -472,6 +493,24 @@ mod tests {
     }
 
     #[test]
+    fn applying_writes_the_map_order_to_the_game() {
+        let (_t, paths) = temp_paths();
+        for (id, map) in [("A", "Town A"), ("B", "Town B"), ("C", "Off")] {
+            let d = paths.mods().join(id).join("42");
+            fs::create_dir_all(d.join("media/maps").join(map)).unwrap();
+            fs::write(d.join("mod.info"), format!("id={id}\n")).unwrap();
+        }
+        apply(&paths, &Profile::parse("Default", "+A\n+B\n")).unwrap();
+        assert_eq!(pz::read_default(&paths.default_txt()).maps, "\n", "never arranged: the block is left alone");
+        set_map_order(&paths, "Default", &ids(&["Town B", "Off", "Town A", "Muldraugh, KY"])).unwrap();
+        apply(&paths, &Profile::parse("Default", "+A\n+B\n")).unwrap();
+        assert_eq!(pz::read_default(&paths.default_txt()).maps, "\n    map = Town B,\n    map = Town A,\n", "enabled maps only, Muldraugh left to the game");
+        // a map that leaves the arrangement keeps its place in the saved order
+        set_map_order(&paths, "Default", &ids(&["Town A", "Town B", "Muldraugh, KY"])).unwrap();
+        assert_eq!(map_order(&paths, "Default"), ids(&["Town A", "Town B", "Off", "Muldraugh, KY"]));
+    }
+
+    #[test]
     fn text_round_trip() {
         let text = "# --- Maps\n+A\n-B\n+C\n";
         assert_eq!(Profile::parse("x", text).to_text(), text);
@@ -516,7 +555,7 @@ mod tests {
     fn sync_adopts_the_game_order() {
         let (_t, paths) = temp_paths();
         apply(&paths, &Profile::parse("Default", "# --- Mine\n+A\n+B\n-C\n")).unwrap();
-        pz::write_default(&paths.default_txt(), &ids(&["C", "B", "A"]), None).unwrap();
+        pz::write_default(&paths.default_txt(), &ids(&["C", "B", "A"]), None, None).unwrap();
         let (p, adopted) = sync(&paths).unwrap();
         assert!(adopted);
         assert_eq!(p.enabled(), ids(&["C", "B", "A"]));
@@ -579,7 +618,7 @@ mod tests {
     #[test]
     fn b41_format_survives_an_empty_list() {
         let (_t, paths) = temp_paths();
-        pz::write_default(&paths.default_txt(), &ids(&["A"]), Some(true)).unwrap();
+        pz::write_default(&paths.default_txt(), &ids(&["A"]), Some(true), None).unwrap();
         apply(&paths, &Profile::from_ids("Default", ids(&[]))).unwrap();
         assert_eq!(effective_build(&paths), 41);
         apply(&paths, &Profile::from_ids("Default", ids(&["A"]))).unwrap();
@@ -589,7 +628,7 @@ mod tests {
     #[test]
     fn sync_and_apply() {
         let (_t, paths) = temp_paths();
-        pz::write_default(&paths.default_txt(), &ids(&["A", "B"]), None).unwrap();
+        pz::write_default(&paths.default_txt(), &ids(&["A", "B"]), None, None).unwrap();
         let (mut p, _) = sync(&paths).unwrap();
         assert_eq!((p.name.as_str(), p.enabled()), ("Default", ids(&["A", "B"])));
 

@@ -3,22 +3,23 @@
   import type { MapScan } from "./api";
 
   // the Workshop scan outlives the tab (it runs in the backend), so its state lives here
-  const scan = $state({ running: false, p: null as MapScan | null, error: "", ticks: 0, started: false });
+  // `build`: the build it last ran for (switching builds scans again); `stopping`: Stop was clicked
+  const scan = $state({ running: false, p: null as MapScan | null, error: "", ticks: 0, started: false, build: 0, stopping: false });
   let listening = false;
   function follow() {
     if (listening) return;
     listening = true;
     listen<MapScan>("maps-scan", (e) => {
-      scan.p = e.payload;
       // show what's read so far every 50 items
-      if (e.payload.phase === "reading" && e.payload.done % 50 === 0) scan.ticks++;
+      if (e.payload.phase === "reading" && e.payload.done !== scan.p?.done && e.payload.done % 50 === 0) scan.ticks++;
+      scan.p = e.payload;
     }).catch(() => (listening = false));
   }
 </script>
 
 <script lang="ts">
   import { onMount, untrack } from "svelte";
-  import { api, type Cell, type GridCell, type MapCompare, type MapMod, type MapsView, type ModRow } from "./api";
+  import { api, type Cell, type GridCell, type MapCompare, type MapMod, type MapsView, type ModRow, type WorkshopItem } from "./api";
   import Icon from "./Icon.svelte";
   import MapOrder from "./MapOrder.svelte";
   import { compact, fmtSize, workshopUrl } from "./format";
@@ -47,9 +48,11 @@
   let pickedCells = $state<Cell[]>([]);
 
   const load = () => api.mapsView().then((v) => (data = v)).catch((e) => say(String(e), true));
-  // after installs, removals and toggles (busy flips back), like Details; and as the scan reads
+  // after installs, removals and toggles (busy flips back), like Details; as the scan reads, and
+  // when it ends (even if the tab was closed and opened again meanwhile)
   $effect(() => {
     void scan.ticks;
+    void scan.running;
     if (!busy) load();
   });
 
@@ -61,6 +64,9 @@
   const names = $derived(new Map(all.map((m) => [m.id, nameOf(m)])));
   const isOn = (id: string) => !!mods.get(id)?.on;
   const shown = $derived(all.filter((m) => isOn(m.id) || preview.has(m.id)));
+  /** Shown maps left off the grid (to see what's under them); they still count as shown elsewhere. */
+  let hidden = $state<Set<string>>(new Set());
+  const drawn = $derived(shown.filter((m) => !hidden.has(m.id)));
   const cellCount = (m: MapMod) => m.maps.reduce((n, f) => n + f.cells.length, 0);
   const key = ([x, y]: Cell) => `${x},${y}`;
 
@@ -68,7 +74,7 @@
   let gridFor = 0;
   $effect(() => {
     const ask = ++gridFor;
-    api.mapGrid(data?.vanilla ?? [], data?.water ?? [], shown).then((g) => ask === gridFor && (grid = g)).catch((e) => say(String(e), true));
+    api.mapGrid(data?.vanilla ?? [], data?.water ?? [], drawn).then((g) => ask === gridFor && (grid = g)).catch((e) => say(String(e), true));
   });
   const byCell = $derived(new Map(grid.map((c) => [`${c.x},${c.y}`, c])));
   const vanillaSet = $derived(new Set((data?.vanilla ?? []).map(key)));
@@ -89,17 +95,50 @@
   const conflictCells = $derived(grid.filter((c) => c.kind === "conflict").length);
   const overCells = $derived(grid.filter((c) => c.kind === "over").length);
 
+  // --- undo: preview changes are kept here, enabling and disabling in the app's history ---
+  /** The preview before a change, and whether the change also enabled or disabled mods. */
+  type Step = { preview: Set<string>; app: boolean };
+  let history = $state.raw<Step[]>([]);
+  /** Change the preview (`app`: right after an enable/disable, undone with it). */
+  function setPreview(next: Set<string>, app = false) {
+    history = [...history.slice(-49), { preview, app }];
+    preview = next;
+  }
+  async function setMods(ids: string[], on: boolean) {
+    const ok = await onSetMods(ids, on);
+    if (ok) setPreview(preview, true);
+    return ok;
+  }
+  function undo() {
+    const last = history.at(-1);
+    if (!last) return onUndo(); // edits made in My mods
+    history = history.slice(0, -1);
+    if (last.app) onUndo();
+    preview = last.preview;
+  }
+  function undoKey(e: KeyboardEvent) {
+    const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
+    if (typing || busy || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== "z") return;
+    e.preventDefault();
+    undo();
+  }
+
   function togglePreview(id: string) {
     const next = new Set(preview);
     next.has(id) ? next.delete(id) : next.add(id);
-    preview = next;
+    setPreview(next);
+  }
+  function toggleHidden(id: string) {
+    const next = new Set(hidden);
+    next.has(id) ? next.delete(id) : next.add(id);
+    hidden = next;
   }
 
   // --- the list: search, filter, sort ---
   let search = $state("");
   type Filter = "all" | "on" | "installed" | "missing" | "conflict" | "over";
   let filter = $state<Filter>("all");
-  type Sort = "name" | "cells" | "conflicts" | "state" | "subs";
+  type Sort = "name" | "cells" | "conflicts" | "state" | "subs" | "updated" | "newest";
   let sortBy = $state<Sort>("name");
   const FILTERS: [Filter, string][] = [["all", "All maps"], ["on", "Enabled"], ["installed", "Installed"], ["missing", "Not installed"], ["conflict", "Conflicting"], ["over", "Over vanilla"]];
   const stateRank = (m: MapMod) => (isOn(m.id) ? 0 : mods.has(m.id) ? 1 : 2);
@@ -112,7 +151,7 @@
       if (pickedCells.length && !pickedCells.some(([x, y]) => m.maps.some((f) => f.cells.some((c) => c[0] === x && c[1] === y)))) return false;
       if (!words.length) return true;
       const meta = metaOf(m);
-      const hay = [nameOf(m), m.id, itemOf(m.source) ?? "", meta?.author ?? "", meta?.title ?? "", ...m.maps.map((f) => f.folder)].join("\n").toLowerCase();
+      const hay = [nameOf(m), m.id, itemOf(m.source) ?? "", meta?.author ?? "", meta?.title ?? "", ...(meta?.tags ?? []), ...m.maps.map((f) => f.folder)].join("\n").toLowerCase();
       return words.every((w) => hay.includes(w));
     });
     const by: Record<Sort, (a: MapMod, b: MapMod) => number> = {
@@ -121,6 +160,8 @@
       conflicts: (a, b) => (clashes.get(b.id)?.with.size ?? 0) - (clashes.get(a.id)?.with.size ?? 0),
       state: (a, b) => stateRank(a) - stateRank(b),
       subs: (a, b) => (metaOf(b)?.subscriptions ?? -1) - (metaOf(a)?.subscriptions ?? -1),
+      updated: (a, b) => (metaOf(b)?.updated ?? -1) - (metaOf(a)?.updated ?? -1),
+      newest: (a, b) => (metaOf(b)?.created ?? -1) - (metaOf(a)?.created ?? -1),
     };
     return out.sort((a, b) => by[sortBy](a, b) || nameOf(a).localeCompare(nameOf(b)));
   });
@@ -136,23 +177,28 @@
   const listedOn = $derived(listed.filter((m) => isOn(m.id)).map((m) => m.id));
   async function enablePreviewed() {
     const ids = previewOff;
-    if (await onSetMods(ids, true)) preview = new Set([...preview].filter((id) => !ids.includes(id)));
+    if (await onSetMods(ids, true)) setPreview(new Set([...preview].filter((id) => !ids.includes(id))), true);
   }
-  const previewListed = () => (preview = new Set([...preview, ...listed.filter((m) => !isOn(m.id)).map((m) => m.id)]));
+  const previewListed = () => setPreview(new Set([...preview, ...listed.filter((m) => !isOn(m.id)).map((m) => m.id)]));
   const clearListed = () => {
     const ids = new Set(listed.map((m) => m.id));
-    preview = new Set([...preview].filter((id) => !ids.has(id)));
+    setPreview(new Set([...preview].filter((id) => !ids.has(id))));
   };
 
   /** Preview the most maps (of those listed) that fit around the enabled ones: installed and popular ones win ties. */
+  let picking = $state(false);
   async function quickSelect() {
+    picking = true;
     try {
       const ranks = Object.fromEntries(listed.map((m) => [m.id, (mods.has(m.id) ? 2 ** 40 : 0) + (metaOf(m)?.subscriptions ?? 0)]));
-      const pick = await api.mapQuickSelect(listed, all.filter((m) => isOn(m.id)).map((m) => m.id), ranks);
-      preview = new Set(pick);
+      // every enabled map, listed or not, keeps its cells
+      const pick = await api.mapQuickSelect(listed, all.filter((m) => isOn(m.id)), ranks);
+      setPreview(new Set(pick));
       say(pick.length ? `Previewing ${pick.length} ${pick.length === 1 ? "map" : "maps"}: the most of the listed maps that fit together around the enabled ones.` : "Every listed map shares cells with an enabled one.");
     } catch (e) {
       say(String(e), true);
+    } finally {
+      picking = false;
     }
   }
 
@@ -163,35 +209,55 @@
     if (off.length && !(await onSetMods(off, false))) return;
     const next = new Set([...preview].filter((id) => !rivals.includes(id)));
     if (!isOn(m.id)) next.add(m.id);
-    preview = next;
+    setPreview(next, off.length > 0); // one undo step
   }
+
+  // --- mod packs and duplicates ---
+  const installedPerItem = $derived.by(() => {
+    const n = new Map<string, number>();
+    for (const r of mods.values()) n.set(r.source, (n.get(r.source) ?? 0) + 1);
+    return n;
+  });
+  /** How many mods `m`'s Workshop item holds (more than one: a mod pack). */
+  const packSize = (m: MapMod) => metaOf(m)?.mods || installedPerItem.get(m.source) || 1;
+  /** Map folder -> the maps that add it (more than one: only one loads). */
+  const folderOwners = $derived.by(() => {
+    const out = new Map<string, string[]>();
+    for (const m of all) for (const f of m.maps) out.set(f.folder, [...(out.get(f.folder) ?? []), m.id]);
+    return out;
+  });
+  /** Other Workshop items that provide `m`'s mod id. */
+  const otherItems = (m: MapMod) => (data?.providers[m.id] ?? []).filter((it) => it !== itemOf(m.source));
   const cellList = (cells: Cell[]) => cells.slice(0, 3).map(([x, y]) => `${x},${y}`).join(" · ") + (cells.length > 3 ? ` +${cells.length - 3}` : "");
 
   // --- the Workshop source: every Map-tagged item, read from Steam's file lists ---
   async function startScan() {
     follow();
-    scan.running = true;
-    scan.error = "";
-    scan.started = true;
+    Object.assign(scan, { running: true, error: "", started: true, stopping: false, build: data?.build ?? 0 });
     try {
       const p = await api.mapScan();
       scan.p = p;
-      if (p.failed) say(`${p.failed} Workshop ${p.failed === 1 ? "item's" : "items'"} file lists couldn't be read; the next scan tries again.`, true);
+      if (p.failed) say(`${p.failed} Workshop ${p.failed === 1 ? "item's file list" : "items' file lists"} couldn't be read (the activity log says why).`, true);
     } catch (e) {
       scan.error = String(e);
     } finally {
-      scan.running = false;
-      load();
+      scan.running = false; // the load effect picks up the last batch
     }
   }
+  function stopScan() {
+    scan.stopping = true;
+    api.mapScanStop().catch(() => {});
+  }
   $effect(() => {
-    // once per session: later scans only read new and updated items
-    if (prefs.mapsWorkshop && !untrack(() => scan.started)) startScan();
+    // once per session and build: later scans only read new and updated items
+    const build = data?.build;
+    if (prefs.mapsWorkshop && build && untrack(() => !scan.running && (!scan.started || scan.build !== build))) startScan();
   });
   const workshopCount = $derived(data ? Object.keys(data.items).length : 0);
   const scanText = $derived.by(() => {
     const p = scan.p;
     if (scan.error) return /429|limiting/i.test(scan.error) ? "Steam is limiting requests right now. Wait a minute and refresh." : scan.error.replace(/^Error:\s*/, "");
+    if (scan.running && scan.stopping) return "Stopping…";
     if (!scan.running || !p) return `${data?.checked.length ?? 0} not installed, from ${workshopCount} Workshop items read.`;
     if (p.phase === "listing") return `Listing Map-tagged Workshop items… ${p.done} of ${p.total || "?"}`;
     return `Reading file lists… ${p.done} of ${p.total}${p.failed ? ` (${p.failed} failed)` : ""}`;
@@ -201,6 +267,23 @@
   type Group = "enabled" | "preview" | "missing";
   type Need = { key: string; id: string; folder: string; by: string[]; group: Group };
   const GROUPS: [Group, string][] = [["enabled", "Needed by enabled maps"], ["preview", "Needed by previewed maps"], ["missing", "Needed by maps you haven't installed"]];
+  const mapById = $derived(new Map(all.map((m) => [m.id, m])));
+  /** What a mod requires: the installed one's mod.info, else a Workshop map's. */
+  const requiresOf = (id: string) => mods.get(id)?.requires ?? mapById.get(id)?.requires ?? [];
+  /** Everything `m` needs, directly or through what it needs. */
+  function allRequires(m: MapMod) {
+    const seen = new Set<string>([m.id]);
+    const walk = (ids: string[]): void => {
+      for (const r of ids)
+        if (!seen.has(r)) {
+          seen.add(r);
+          walk(requiresOf(r));
+        }
+    };
+    walk(m.requires);
+    seen.delete(m.id);
+    return [...seen];
+  }
   const needs = $derived.by(() => {
     const out = new Map<string, Need>();
     const order: Group[] = ["enabled", "preview", "missing"];
@@ -212,7 +295,7 @@
       out.set(key, n);
     };
     for (const m of shown) {
-      for (const r of m.requires) add(r, r, "", m);
+      for (const r of allRequires(m)) add(r, r, "", m);
       for (const lot of m.maps.flatMap((f) => f.lots)) {
         if (data?.vanilla_folders.includes(lot) || m.maps.some((f) => f.folder === lot)) continue;
         const p = all.find((o) => o.maps.some((f) => f.folder === lot));
@@ -221,6 +304,8 @@
     }
     return [...out.values()].sort((a, b) => (a.id || a.folder).localeCompare(b.id || b.folder));
   });
+  /** The Requirements card: each requirement and the maps that need it, or each map's tree. */
+  let reqView = $state<"list" | "tree">("list");
   /** A requirement's Workshop item: from the installed mod, else a Workshop map that is it. */
   const needItem = (n: Need) => (n.id ? itemOf(mods.get(n.id)?.source ?? "") ?? itemOf(all.find((m) => m.id === n.id)?.source ?? "") : undefined);
   /** Workshop lookups for missing requirements, by mod id. */
@@ -250,8 +335,12 @@
     const f = folders;
     api.mapLine(untrack(() => $state.snapshot(mapLine)), f).then((l) => (mapLine = l)).catch(() => {});
   });
+  // saved (and given to the game) once the arranging stops for a moment
   $effect(() => {
-    if (mapLine.length) api.mapOrderSave($state.snapshot(mapLine)).catch(() => {});
+    const line = $state.snapshot(mapLine);
+    if (!line.length) return;
+    const t = setTimeout(() => api.mapOrderSave(line).catch((e) => say(String(e), true)), 600);
+    return () => clearTimeout(t);
   });
 
   async function exportMaps() {
@@ -287,7 +376,7 @@
   function loadPreset() {
     const ids = presets[presetPick] ?? [];
     const known = new Set(all.map((m) => m.id));
-    preview = new Set(ids.filter((id) => known.has(id) && !isOn(id)));
+    setPreview(new Set(ids.filter((id) => known.has(id) && !isOn(id))));
     const gone = ids.filter((id) => !known.has(id));
     say(`Previewing "${presetPick}"${gone.length ? `; not found: ${gone.join(", ")} (install them, or turn on Workshop maps)` : ""}.`, gone.length > 0);
   }
@@ -325,8 +414,9 @@
     if (!id) return say("Paste a Workshop link or item ID.", true);
     checking = true;
     try {
-      const { item } = await api.workshopInfo(id);
+      const { item, members } = await api.workshopInfo(id);
       if (!item) throw new Error(`There's no Workshop item ${id}.`);
+      if (item.collection) return await checkCollection(item.title, members);
       if (item.have) return say(`${item.title} is already installed: if it adds maps, they're in the list.`);
       let found;
       try {
@@ -336,7 +426,7 @@
         found = await api.mapCheck(id, true);
       }
       checkText = "";
-      preview = new Set([...preview, ...found.map((m) => m.id)]);
+      setPreview(new Set([...preview, ...found.map((m) => m.id)]));
       say(found.length ? `Read ${item.title}: it's previewed on the grid and in the list as not installed.` : `${item.title} adds no maps for Build ${data?.build}.`);
       await load();
     } catch (err) {
@@ -344,6 +434,34 @@
     } finally {
       checking = false;
     }
+  }
+
+  /** Preview every map in a collection: maps PZMM knows at once, Map-tagged members it doesn't read from Steam (one at a time). */
+  async function checkCollection(title: string, members: WorkshopItem[]) {
+    const ids: string[] = [];
+    const failed: string[] = [];
+    let unread = 0;
+    for (const [i, it] of members.entries()) {
+      const known = all.filter((m) => itemOf(m.source) === it.id);
+      if (known.length) ids.push(...known.map((m) => m.id));
+      else if (!it.have && it.tags.includes("Map")) {
+        say(`Reading ${it.title} (${i + 1} of ${members.length})…`);
+        try {
+          ids.push(...(await api.mapCheck(it.id, false)).map((m) => m.id));
+        } catch {
+          failed.push(it.title);
+        }
+      } else if (!it.have) unread++;
+    }
+    checkText = "";
+    await load();
+    setPreview(new Set([...preview, ...ids.filter((id) => !isOn(id))]));
+    say(
+      `${title}: previewing ${ids.length} ${ids.length === 1 ? "map" : "maps"} from ${members.length} items.` +
+        (failed.length ? ` Couldn't read ${failed.join(", ")}: check them one by one.` : "") +
+        (unread ? ` ${unread} other ${unread === 1 ? "item isn't tagged Map, so it wasn't" : "items aren't tagged Map, so they weren't"} read.` : ""),
+      failed.length > 0,
+    );
   }
 
   // --- the grid: a canvas (thousands of cells), coloured from the theme's tokens ---
@@ -493,6 +611,8 @@
   const KIND = { vanilla: "Vanilla area", water: "Vanilla river", map: "", over: "Over a vanilla area", conflict: "Conflict: these maps share this cell" };
 </script>
 
+<svelte:window onkeydown={undoKey} />
+
 <section class="maps blueprint" aria-label="Maps">
   <div class="inner">
     <div class="card world">
@@ -511,8 +631,9 @@
           <p>Enabled maps are always shown. Tick a map, or click its row, to <em>preview</em> it: it's drawn and checked for conflicts, but nothing
             changes in your mod list until you enable it. Click cells to list the maps there; Shift+click adds more cells.</p>
           <h3>Workshop maps</h3>
-          <p>With Workshop maps on, PZMM lists every Map-tagged Workshop item for this build, including ones you haven't installed. It reads each
-            item's file list from Steam (no download, nothing installed) and keeps the cells, reading an item again only when it's updated.
+          <p>With Workshop maps on, PZMM lists every Map-tagged Workshop item for this build, including ones you haven't installed: at once from
+            its built-in index, then it reads the file lists of items updated since from Steam (no download, nothing installed), reading an item
+            again only when it's updated. Paste a collection in "Check a Workshop map" to preview all its maps.
             Preview them like installed maps, then Install the ones you want.</p>
           <button class="quiet" onclick={() => (help = false)}><Icon name="x" size={14} />Close</button>
         </div>
@@ -520,8 +641,8 @@
       <p class="lede">The grid shows enabled maps and the ones you preview. Scroll to zoom, drag to move, click a cell to list the maps there.</p>
       <div class="legend">
         {#if colours}
-          {#each shown.slice(0, 12) as m (m.id)}<span><i style:background={swatch(m.id)}></i>{nameOf(m)}</span>{/each}
-          {#if shown.length > 12}<span>+{shown.length - 12} more</span>{/if}
+          {#each drawn.slice(0, 12) as m (m.id)}<span><i style:background={swatch(m.id)}></i>{nameOf(m)}</span>{/each}
+          {#if drawn.length > 12}<span>+{drawn.length - 12} more</span>{/if}
         {:else}
           <span><i style="background: var(--map-cell)"></i>A map</span>
           <span><i style="background: var(--map-over)"></i>Over vanilla ({overCells})</span>
@@ -567,22 +688,23 @@
     <div class="card list">
       <div class="head">
         <h2>Map mods</h2>
-        <button class="quiet icon" onclick={onUndo} disabled={busy || !canUndo} title="Undo the last enable or disable (Ctrl+Z)" aria-label="Undo"><Icon name="undo" size={16} /></button>
+        <button class="quiet icon" onclick={undo} disabled={busy || !(history.length || canUndo)} title="Undo the last preview change, quick select, preset or enable/disable (Ctrl+Z)" aria-label="Undo"><Icon name="undo" size={16} /></button>
       </div>
       <div class="source">
         <label class="check"><input type="checkbox" bind:checked={prefs.mapsWorkshop} />Workshop maps you haven't installed</label>
+        <span class="hint note">Lists every Map-tagged Workshop item from PZMM's built-in index, then reads only items updated since from Steam (file lists; nothing is downloaded).</span>
         {#if prefs.mapsWorkshop}
           <span class="hint" class:bad={!!scan.error} role="status">{scanText}</span>
           {#if scan.running}
             {#if scan.p?.total}<progress max={scan.p.total} value={scan.p.done}></progress>{/if}
-            <button class="quiet" onclick={() => api.mapScanStop()}><Icon name="x" size={14} />Stop</button>
+            <button class="quiet" onclick={stopScan} disabled={scan.stopping}><Icon name="x" size={14} />{scan.stopping ? "Stopping…" : "Stop"}</button>
           {:else}
             <button class="quiet" onclick={startScan} title="List the Map-tagged items again and read new and updated ones"><Icon name="refresh" size={14} />Refresh</button>
           {/if}
         {/if}
       </div>
       <div class="row">
-        <input type="search" bind:value={search} placeholder="Search name, mod ID, Workshop ID, folder, author" aria-label="Search maps" />
+        <input type="search" bind:value={search} placeholder="Search name, mod ID, Workshop ID, folder, author, tag" aria-label="Search maps" />
         <select bind:value={filter} aria-label="Show maps" title="Show maps">
           {#each FILTERS as [v, label]}<option value={v}>{label}</option>{/each}
         </select>
@@ -592,6 +714,8 @@
           <option value="conflicts">Most conflicts</option>
           <option value="state">Enabled first</option>
           <option value="subs">Most subscribers</option>
+          <option value="updated">Recently updated</option>
+          <option value="newest">Newest</option>
         </select>
       </div>
       {#if pickedCells.length}
@@ -602,14 +726,15 @@
         </p>
       {/if}
       <div class="row bulk">
-        <button onclick={quickSelect} disabled={!listed.length} title="Preview the most listed maps that share no cell with each other or the enabled ones (installed and popular maps win ties)"><Icon name="wand" size={14} />Most maps that fit</button>
+        <button onclick={quickSelect} disabled={!listed.length || picking} aria-busy={picking} title="Preview the most listed maps that share no cell with each other or the enabled ones (installed and popular maps win ties)"><Icon name="wand" size={14} />{picking ? "Finding the most that fit…" : "Most maps that fit"}</button>
         <button onclick={previewListed} disabled={!listed.length}>Preview listed</button>
         {#if preview.size}
           <button onclick={clearListed}>Unpreview listed</button>
-          <button onclick={() => (preview = new Set())} title="Clear the preview: the grid shows enabled maps only">Enabled only</button>
+          <button onclick={() => setPreview(new Set())} title="Clear the preview: the grid shows enabled maps only">Enabled only</button>
         {/if}
         {#if previewOff.length}<button onclick={enablePreviewed} disabled={busy}><Icon name="check" size={14} />Enable {previewOff.length} previewed</button>{/if}
-        {#if listedOn.length}<button onclick={() => onSetMods(listedOn, false)} disabled={busy}><Icon name="x" size={14} />Disable {listedOn.length} listed</button>{/if}
+        {#if listedOn.length}<button onclick={() => setMods(listedOn, false)} disabled={busy}><Icon name="x" size={14} />Disable {listedOn.length} listed</button>{/if}
+        {#if hidden.size}<button onclick={() => (hidden = new Set())} title="Draw every shown map on the grid again">Unhide {hidden.size}</button>{/if}
       </div>
       {#if data && !all.length}
         <p class="hint">No installed mod adds maps for Build {data.build}. Turn on Workshop maps above, or check one below before installing it.</p>
@@ -623,11 +748,11 @@
           {@const clash = clashes.get(m.id)}
           {@const isShown = on || preview.has(m.id)}
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-          <li class:shown={isShown} onclick={(e) => !on && !(e.target as HTMLElement).closest("button, input, a") && togglePreview(m.id)}>
+          <li class:shown={isShown} class:hidden={hidden.has(m.id)} onclick={(e) => !on && !(e.target as HTMLElement).closest("button, input, a") && togglePreview(m.id)}>
             <input type="checkbox" checked={isShown} disabled={on} onchange={() => togglePreview(m.id)}
               aria-label="Preview {nameOf(m)} on the grid" title={on ? "Enabled maps are always shown" : "Show on the grid without enabling"} />
             <span class="name">
-              <span><strong>{nameOf(m)}</strong>{#if on}<span class="on">Enabled</span>{:else if !installed}<span class="off">Not installed</span>{/if}</span>
+              <span><strong>{nameOf(m)}</strong>{#if on}<span class="on">Enabled</span>{:else if !installed}<span class="off">Not installed</span>{/if}{#if isShown}<button class="link hide" onclick={() => toggleHidden(m.id)} title={hidden.has(m.id) ? "Draw it on the grid again" : "Leave it off the grid to see what's under it (it stays in the export and requirements)"}>{hidden.has(m.id) ? "Show on grid" : "Hide on grid"}</button>{/if}</span>
               <span class="hint">{cellCount(m)} {cellCount(m) === 1 ? "cell" : "cells"} · {m.maps.map((f) => f.folder).join("; ")}{meta?.author ? ` · by ${meta.author}` : ""}{meta?.subscriptions ? ` · ${compact.format(meta.subscriptions)} subscribers` : ""}{!installed && meta?.size ? ` · ${fmtSize(meta.size)}` : ""}</span>
               {#each [...(clash?.with ?? [])].slice(0, 3) as [rival, cells] (rival)}
                 <span class="bad">Conflicts with {names.get(rival) ?? rival} on {cells.length === 1 ? "cell" : "cells"} <span class="mono">{cellList(cells)}</span>
@@ -635,11 +760,19 @@
               {/each}
               {#if (clash?.with.size ?? 0) > 3}<span class="bad">…and {clash!.with.size - 3} more</span>{/if}
               {#if clash?.over}<span class="over">{clash.over} {clash.over === 1 ? "cell" : "cells"} over vanilla</span>{/if}
+              {#if packSize(m) > 1}<span class="hint">1 of {packSize(m)} mods in this Workshop item</span>{/if}
+              {#each otherItems(m).slice(0, 1) as it (it)}
+                <span class="dupe">Mod ID {m.id} is also in {data?.items[it]?.title ?? `Workshop item ${it}`}{otherItems(m).length > 1 ? ` and ${otherItems(m).length - 1} more` : ""}: only one copy loads</span>
+              {/each}
+              {#each m.maps.filter((f) => (folderOwners.get(f.folder)?.length ?? 0) > 1) as f (f.folder)}
+                {@const others = folderOwners.get(f.folder)!.filter((id) => id !== m.id)}
+                <span class="dupe">Map folder {f.folder} is also added by {others.slice(0, 2).map((id) => names.get(id) ?? id).join(", ")}{others.length > 2 ? ` and ${others.length - 2} more` : ""}</span>
+              {/each}
             </span>
             <span class="btns">
               {#if item}<button class="quiet" onclick={() => api.openUrl(workshopUrl(item))} title="Open its Workshop page"><Icon name="steam" size={14} />Workshop</button>{/if}
               {#if installed}
-                <button disabled={busy} onclick={() => onSetMods([m.id], !on)} title={on ? "" : "Also turns on the mods it needs"}>{on ? "Disable" : "Enable"}</button>
+                <button disabled={busy} onclick={() => setMods([m.id], !on)} title={on ? "" : "Also turns on the mods it needs"}>{on ? "Disable" : "Enable"}</button>
               {:else if item}
                 <button disabled={busy} onclick={() => onInstallWorkshop(item)} title="Install it with the items it requires"><Icon name="download" size={14} />Install</button>
               {/if}
@@ -653,42 +786,82 @@
     </div>
 
     <div class="card">
-      <h2>Requirements</h2>
-      <p class="lede">What the shown maps need: required mods (<span class="mono">require=</span>) and other maps they build on (<span class="mono">lots=</span>).</p>
+      <div class="head">
+        <h2>Requirements</h2>
+        {#if needs.length}
+          <div class="seg" role="radiogroup" aria-label="Requirements view">
+            <button type="button" role="radio" aria-checked={reqView === "list"} class:active={reqView === "list"} onclick={() => (reqView = "list")} title="Each requirement and the shown maps that need it">Needed by</button>
+            <button type="button" role="radio" aria-checked={reqView === "tree"} class:active={reqView === "tree"} onclick={() => (reqView = "tree")} title="Each shown map and what it needs, all the way down">Tree</button>
+          </div>
+        {/if}
+      </div>
+      <p class="lede">What the shown maps need, directly or through what they need: required mods (<span class="mono">require=</span>) and other maps they build on (<span class="mono">lots=</span>).</p>
       {#if !needs.length}
         <p class="hint">{shown.length ? "The shown maps need nothing else." : "Show or enable a map to see what it needs."}</p>
       {/if}
-      {#each GROUPS as [g, title] (g)}
-        {@const group = needs.filter((n) => n.group === g)}
-        {#if group.length}
-          <h3>{title}</h3>
-          <ul class="needs">
-            {#each group as n (n.key)}
-              {@const m = n.id ? mods.get(n.id) : undefined}
-              {@const item = needItem(n)}
-              <li>
-                <span class="name">
-                  <span class="mono">{n.id || n.folder}</span>
-                  <span class="state {m ? (m.on ? 'is-on' : 'is-off') : 'is-missing'}">{m ? (m.on ? "On" : "Off") : "Not installed"}</span>
-                  <span class="hint">{n.folder && n.id ? `map ${n.folder} · ` : n.folder ? "map folder · " : ""}needed by {n.by.map((id) => names.get(id) ?? id).join(", ")}</span>
-                  {#if finding[n.id]}<span class="hint">{finding[n.id]}</span>{/if}
-                </span>
-                <span class="btns">
-                  {#if item}<button class="quiet" onclick={() => api.openUrl(workshopUrl(item))} title="Open its Workshop page"><Icon name="steam" size={14} />Workshop</button>{/if}
-                  {#if m && !m.on}
-                    <button disabled={busy} onclick={() => onSetMods([n.id], true)}>Enable</button>
-                  {:else if !m && n.id}
-                    <button disabled={busy} onclick={() => installNeed(n)} title="Find it on the Steam Workshop and install it"><Icon name="download" size={14} />Install</button>
-                    {#if finding[n.id]?.startsWith("No result") && n.by.some((b) => mods.has(b))}
-                      <button class="quiet" onclick={() => onShowMod(n.by.find((b) => mods.has(b))!)}>Pick in details</button>
-                    {/if}
-                  {/if}
-                </span>
-              </li>
+      {#snippet needState(n: Need)}
+        {@const m = n.id ? mods.get(n.id) : undefined}
+        <span class="state {m ? (m.on ? 'is-on' : 'is-off') : 'is-missing'}">{m ? (m.on ? "On" : "Off") : "Not installed"}</span>
+      {/snippet}
+      {#snippet needButtons(n: Need)}
+        {@const m = n.id ? mods.get(n.id) : undefined}
+        {@const item = needItem(n)}
+        <span class="btns">
+          {#if item}<button class="quiet" onclick={() => api.openUrl(workshopUrl(item))} title="Open its Workshop page"><Icon name="steam" size={14} />Workshop</button>{/if}
+          {#if m && !m.on}
+            <button disabled={busy} onclick={() => setMods([n.id], true)}>Enable</button>
+          {:else if !m && n.id}
+            <button disabled={busy} onclick={() => installNeed(n)} title="Find it on the Steam Workshop and install it"><Icon name="download" size={14} />Install</button>
+            {#if finding[n.id]?.startsWith("No result") && n.by.some((b) => mods.has(b))}
+              <button class="quiet" onclick={() => onShowMod(n.by.find((b) => mods.has(b))!)}>Pick in details</button>
+            {/if}
+          {/if}
+        </span>
+      {/snippet}
+      {#if reqView === "list"}
+        {#each GROUPS as [g, title] (g)}
+          {@const group = needs.filter((n) => n.group === g)}
+          {#if group.length}
+            <h3>{title}</h3>
+            <ul class="needs">
+              {#each group as n (n.key)}
+                <li>
+                  <span class="name">
+                    <span class="mono">{n.id || n.folder}</span>
+                    {@render needState(n)}
+                    <span class="hint">{n.folder && n.id ? `map ${n.folder} · ` : n.folder ? "map folder · " : ""}needed by {n.by.map((id) => names.get(id) ?? id).join(", ")}</span>
+                    {#if finding[n.id]}<span class="hint">{finding[n.id]}</span>{/if}
+                  </span>
+                  {@render needButtons(n)}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        {/each}
+      {:else}
+        {#snippet branch(root: MapMod, id: string, depth: number, path: string[])}
+          {@const n = needs.find((x) => x.key === id) ?? { key: id, id, folder: "", by: [root.id], group: "missing" as Group }}
+          <li style:padding-left="{8 + depth * 18}px">
+            <span class="name">
+              <span><span class="mono">{id}</span> {@render needState(n)}{#if path.includes(id)}<span class="hint"> (needs itself: a loop)</span>{/if}</span>
+              {#if finding[id]}<span class="hint">{finding[id]}</span>{/if}
+            </span>
+            {@render needButtons(n)}
+          </li>
+          {#if !path.includes(id)}
+            {#each requiresOf(id) as r (r)}{@render branch(root, r, depth + 1, [...path, id])}{/each}
+          {/if}
+        {/snippet}
+        {#each shown.filter((m) => m.requires.length || m.maps.some((f) => f.lots.some((l) => !data?.vanilla_folders.includes(l)))) as m (m.id)}
+          <h3>{nameOf(m)}</h3>
+          <ul class="needs tree">
+            {#each m.requires as r (r)}{@render branch(m, r, 0, [m.id])}{/each}
+            {#each needs.filter((n) => n.folder && n.by.includes(m.id)) as n (n.key)}
+              <li><span class="name"><span><span class="mono">{n.id || n.folder}</span> {@render needState(n)} <span class="hint">map {n.folder}</span></span></span>{@render needButtons(n)}</li>
             {/each}
           </ul>
-        {/if}
-      {/each}
+        {/each}
+      {/if}
     </div>
 
     <div class="card">
@@ -699,7 +872,7 @@
       </p>
       {#if mapLine.length}
         <h3>Map order</h3>
-        <p class="hint">The game loads maps top to bottom: mod maps go before <span class="mono">Muldraugh, KY</span>. Drag or Alt+↑/↓ to arrange; it's kept with your profile and used by the export and the server card.</p>
+        <p class="hint">The game loads maps top to bottom: mod maps go before <span class="mono">Muldraugh, KY</span>. Drag or Alt+↑/↓ to arrange; it's kept with your profile, used by the export and the server card, and written to the game's mod list for the enabled maps.</p>
         <MapOrder bind:maps={mapLine} />
       {/if}
       <div class="row">
@@ -752,7 +925,7 @@
                 <span class="btns">
                   {#if s.id && !row?.on && byId(s.id)}<button class="quiet" onclick={() => s.id && !preview.has(s.id) && togglePreview(s.id)}>Preview</button>{/if}
                   {#if row && !row.on}
-                    <button disabled={busy} onclick={() => onSetMods([s.id!], true)}>Enable</button>
+                    <button disabled={busy} onclick={() => setMods([s.id!], true)}>Enable</button>
                   {:else if !row && s.item}
                     <button disabled={busy} onclick={() => onInstallWorkshop(s.item!)}><Icon name="download" size={14} />Install</button>
                   {/if}
@@ -770,9 +943,9 @@
 
     <div class="card wide">
       <h2>Check a Workshop map before installing</h2>
-      <p class="lede">See where one map sits and what it conflicts with first. PZMM reads the item's file list from Steam (nothing is downloaded or installed) and keeps only its cells.</p>
+      <p class="lede">See where a map (or every map in a collection) sits and what it conflicts with first. PZMM reads the item's file list from Steam (nothing is downloaded or installed) and keeps only its cells.</p>
       <form class="row" onsubmit={check}>
-        <input type="text" bind:value={checkText} placeholder="Workshop link or ID" spellcheck="false" aria-label="Workshop link or ID" />
+        <input type="text" bind:value={checkText} placeholder="Workshop or collection link, or ID" spellcheck="false" aria-label="Workshop or collection link, or ID" />
         <button type="submit" disabled={checking || !checkText.trim()}><Icon name="search" size={14} />{checking ? "Checking…" : "Check"}</button>
       </form>
     </div>
@@ -1041,8 +1214,24 @@
     font-size: 12px;
     color: var(--text);
   }
-  .over {
+  .over,
+  .dupe {
     color: var(--map-over);
     font-size: 12px;
+  }
+  .mods li.hidden strong {
+    opacity: 0.6;
+  }
+  .link.hide {
+    margin-left: 10px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .source .note {
+    flex-basis: 100%;
+    order: 1;
+  }
+  .tree li {
+    border-bottom-style: dashed;
   }
 </style>

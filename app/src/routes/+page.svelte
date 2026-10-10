@@ -562,6 +562,7 @@
     if (typing || !(e.ctrlKey || e.metaKey) || (tab !== "mods" && tab !== "maps")) return;
     const k = e.key.toLowerCase();
     if (k === "z" && !e.shiftKey) {
+      if (tab === "maps") return; // the Maps tab undoes its preview changes too, then calls undo
       e.preventDefault();
       undo();
     } else if (k === "y" || (k === "z" && e.shiftKey)) {

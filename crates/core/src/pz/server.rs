@@ -83,9 +83,26 @@ pub fn map_order(order: &[String], mod_maps: &[String]) -> Vec<String> {
     out
 }
 
-/// The maps the enabled mods add, in load order.
-pub fn mod_maps(enabled: &[String], mods: &std::collections::BTreeMap<String, crate::store::Row>) -> Vec<String> {
-    enabled.iter().filter_map(|id| mods.get(id)).flat_map(|m| super::files::maps(&m.dir)).collect()
+/// `arranged`, with the entries of `saved` it lacks put back after the entry they followed:
+/// maps that left the list keep their place for when they come back.
+pub fn merge_order(saved: &[String], arranged: &[String]) -> Vec<String> {
+    let mut out = arranged.to_vec();
+    let mut at = 0;
+    for s in saved {
+        match out.iter().position(|o| o == s) {
+            Some(p) => at = p + 1,
+            None => {
+                out.insert(at, s.clone());
+                at += 1;
+            }
+        }
+    }
+    out
+}
+
+/// The maps the enabled mods add on `build` (the folders the game reads, see `maps::folder_names`), in load order.
+pub fn mod_maps(enabled: &[String], mods: &std::collections::BTreeMap<String, crate::store::Row>, build: u8) -> Vec<String> {
+    enabled.iter().filter_map(|id| mods.get(id)).flat_map(|m| super::maps::folder_names(&m.dir, build)).collect()
 }
 
 /// Set `Mods=`, `WorkshopItems=` and, when `maps` isn't empty, `Map=`. Every other line is
@@ -142,11 +159,11 @@ pub fn export(paths: &Paths, name: &str, enabled: &[String], mods: &std::collect
             _ => notes.push(format!("{id} isn't from the Workshop: copy its folder into the server's mods folder yourself")),
         }
     }
-    let b41 = crate::profile::effective_build(paths) == 41;
+    let build = crate::profile::effective_build(paths);
     let file = path(paths, name)?;
     let current = read(&file).map(|c| c.maps).unwrap_or_default();
-    let maps = map_order(arranged.unwrap_or(&current), &mod_maps(&ids, mods));
-    write(&file, &ids, &workshop, &maps, b41)?;
+    let maps = map_order(arranged.unwrap_or(&current), &mod_maps(&ids, mods, build));
+    write(&file, &ids, &workshop, &maps, build == 41)?;
     notes.insert(0, format!("Wrote {} mods and {} Workshop items to {}", ids.len(), workshop.len(), file.display()));
     Ok(notes)
 }
@@ -220,6 +237,44 @@ mod tests {
         // B stays first, the gone map drops, the new C goes before Muldraugh
         assert_eq!(map_order(&ids(&["B", "Gone", "A", BASE_MAP]), &ids(&["A", "B", "C", "A"])), ids(&["B", "A", "C", BASE_MAP]));
         assert_eq!(map_order(&[], &ids(&["A"])), ids(&["A", BASE_MAP]));
+    }
+
+    #[test]
+    fn merge_keeps_maps_that_left() {
+        let ids = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        // X was hidden, then A and B swapped: X stays after A, Y stays first
+        assert_eq!(merge_order(&ids(&["Y", "A", "X", "B", BASE_MAP]), &ids(&["B", "A", BASE_MAP])), ids(&["Y", "B", "A", "X", BASE_MAP]));
+        // so when X comes back it's where it was, not just before Muldraugh
+        let saved = merge_order(&ids(&["A", "X", "B", BASE_MAP]), &ids(&["A", "B", BASE_MAP]));
+        assert_eq!(map_order(&saved, &ids(&["A", "B", "X"])), ids(&["A", "X", "B", BASE_MAP]));
+        assert_eq!(merge_order(&[], &ids(&["A"])), ids(&["A"]));
+    }
+
+    #[test]
+    fn server_maps_follow_the_build() {
+        // a B41 map at the mod root; B42 maps in common/ and the newest version folder (42.9 is older)
+        let t = tempfile::tempdir().unwrap();
+        let m = t.path().join("Town");
+        for d in ["media/maps/Old Town", "common/media/maps/Town", "42.13/media/maps/Town Extra", "42.9/media/maps/Gone"] {
+            fs::create_dir_all(m.join(d)).unwrap();
+        }
+        let row = crate::store::Row {
+            id: "Town".into(),
+            name: String::new(),
+            source: "manual".into(),
+            dir: m,
+            info: PathBuf::new(),
+            requires: vec![],
+            incompatible: vec![],
+            load_after: vec![],
+            load_before: vec![],
+            supports_41: true,
+            supports_42: true,
+        };
+        let mods = [("Town".to_string(), row)].into();
+        let ids = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(mod_maps(&ids(&["Town"]), &mods, 41), ids(&["Old Town"]));
+        assert_eq!(mod_maps(&ids(&["Town"]), &mods, 42), ids(&["Town", "Town Extra"]));
     }
 
     #[test]

@@ -49,7 +49,21 @@ pub fn workshop_dir() -> Option<PathBuf> {
 }
 
 pub fn read_info(path: &Path) -> HashMap<String, String> {
-    parse_info(&fs::read(path).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default())
+    parse_info(&fs::read(path).map(|b| decode_text(&b)).unwrap_or_default())
+}
+
+/// A text file the game reads (mod.info, map.info, title files): UTF-8, else Windows-1252,
+/// which older mods were saved in by Windows editors.
+pub fn decode_text(b: &[u8]) -> String {
+    if let Ok(s) = std::str::from_utf8(b) {
+        return s.to_string();
+    }
+    // 0x80..0x9F are the only bytes where Windows-1252 differs from Latin-1 (the gaps decode as themselves)
+    const HIGH: [u16; 32] = [
+        0x20AC, 0x81, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x8D, 0x017D, 0x8F, //
+        0x90, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x9D, 0x017E, 0x0178,
+    ];
+    b.iter().map(|&c| if (0x80..0xA0).contains(&c) { char::from_u32(HIGH[c as usize - 0x80] as u32).unwrap_or('?') } else { char::from(c) }).collect()
 }
 
 /// mod.info's `key=value` lines.
@@ -265,8 +279,10 @@ pub fn try_read_default(path: &Path) -> Option<DefaultTxt> {
 }
 
 /// Rewrite default.txt with `ids` in order. `b41: None` keeps the file's current format
-/// (B42 when unknown). The file as it was before PZMM's first write is kept as `default.txt.bak`.
-pub fn write_default(path: &Path, ids: &[String], b41: Option<bool>) -> Result<()> {
+/// (B42 when unknown). `maps` (map folders, load order) replaces the `maps { }` block; None
+/// keeps it. Both builds write `map = <folder>,` lines; Muldraugh stays last if the file had it (the game.s
+/// `checkMissingMaps` drops it). The file as it was before PZMM's first write is kept as `default.txt.bak`.
+pub fn write_default(path: &Path, ids: &[String], b41: Option<bool>, maps: Option<&[String]>) -> Result<()> {
     // an existing file we can't read keeps its maps block and format unknown: don't overwrite it blind
     let old = if path.exists() {
         try_read_default(path).with_context(|| format!("can't read {} (is the game running?)", path.display()))?
@@ -284,7 +300,16 @@ pub fn write_default(path: &Path, ids: &[String], b41: Option<bool>) -> Result<(
         .filter(|i| !i.is_empty() && seen.insert(*i))
         .map(|i| format!("    mod = {prefix}{i},\n"))
         .collect();
-    crate::write_atomic(path, format!("VERSION = 1,\n\nmods\n{{\n{body}}}\n\nmaps\n{{{}}}\n", old.maps))?;
+    let maps = match maps {
+        Some(m) => {
+            // the vanilla map stays last when the game wrote it there (B41 is unverified: keep what it had)
+            let vanilla = old.maps.lines().any(|l| l.trim() == "map = Muldraugh, KY,");
+            let m = m.iter().filter(|f| f.as_str() != "Muldraugh, KY").map(String::as_str).chain(vanilla.then_some("Muldraugh, KY"));
+            format!("\n{}", m.map(|f| format!("    map = {f},\n")).collect::<String>())
+        }
+        None => old.maps,
+    };
+    crate::write_atomic(path, format!("VERSION = 1,\n\nmods\n{{\n{body}}}\n\nmaps\n{{{maps}}}\n"))?;
     Ok(())
 }
 
@@ -339,7 +364,7 @@ mod tests {
         let p = t.path().join("default.txt");
         write(&p, "VERSION = 1,\n\nmods\n{\n}\n\nmaps\n{\n    map = Muldraugh, KY,\n}\n");
         let ids = ["ModA".to_string(), "ModB".into(), "ModA".into()];
-        write_default(&p, &ids, None).unwrap();
+        write_default(&p, &ids, None, None).unwrap();
         let text = fs::read_to_string(&p).unwrap();
         assert!(text.contains("mod = \\ModA,") && text.contains("map = Muldraugh, KY,"));
         let d = read_default(&p);
@@ -353,10 +378,43 @@ mod tests {
         let p = t.path().join("default.txt");
         write(&p, "VERSION = 1,\nmods\n{\n    mod = Old,\n}\nmaps\n{\n}\n");
         assert!(read_default(&p).b41);
-        write_default(&p, &["Old".into(), "New".into()], None).unwrap();
+        write_default(&p, &["Old".into(), "New".into()], None, None).unwrap();
         assert!(fs::read_to_string(&p).unwrap().contains("mod = New,"));
-        write_default(&p, &["Old".into()], Some(false)).unwrap();
+        write_default(&p, &["Old".into()], Some(false), None).unwrap();
         assert!(fs::read_to_string(&p).unwrap().contains("mod = \\Old,"));
+    }
+
+    #[test]
+    fn maps_block_for_both_builds() {
+        // as the game's ActiveModsFile writes it: `map = <folder>,` per line, the same in B41 and B42
+        let t = tempfile::tempdir().unwrap();
+        let maps = ["Riverside Plus".to_string(), "Fort, KY".into()];
+        for (b41, prefix) in [(true, ""), (false, "\\")] {
+            let p = t.path().join(format!("{b41}/default.txt"));
+            write(&p, "VERSION = 1,\nmods\n{\n}\nmaps\n{\n    map = Old,\n}\n");
+            write_default(&p, &["Town".into()], Some(b41), Some(&maps)).unwrap();
+            assert_eq!(
+                fs::read_to_string(&p).unwrap(),
+                format!("VERSION = 1,\n\nmods\n{{\n    mod = {prefix}Town,\n}}\n\nmaps\n{{\n    map = Riverside Plus,\n    map = Fort, KY,\n}}\n")
+            );
+            assert_eq!(read_default(&p).maps, "\n    map = Riverside Plus,\n    map = Fort, KY,\n");
+            // None keeps the block; an empty list empties it
+            write_default(&p, &["Town".into()], None, None).unwrap();
+            assert!(fs::read_to_string(&p).unwrap().contains("map = Fort, KY,"));
+            write_default(&p, &["Town".into()], None, Some(&[])).unwrap();
+            assert!(fs::read_to_string(&p).unwrap().ends_with("maps\n{\n}\n"));
+        }
+        // Muldraugh stays last when the game had it
+        let p = t.path().join("vanilla/default.txt");
+        write(&p, "VERSION = 1,\nmods\n{\n}\nmaps\n{\n    map = Muldraugh, KY,\n}\n");
+        write_default(&p, &[], None, Some(&maps)).unwrap();
+        assert!(fs::read_to_string(&p).unwrap().ends_with("    map = Fort, KY,\n    map = Muldraugh, KY,\n}\n"));
+    }
+
+    #[test]
+    fn ansi_text_is_windows_1252() {
+        assert_eq!(decode_text("Café – ok".as_bytes()), "Café – ok");
+        assert_eq!(decode_text(b"Caf\xe9 \x96 \x93Riverside\x94 \x80"), "Café – \u{201c}Riverside\u{201d} €");
     }
 
     #[test]
