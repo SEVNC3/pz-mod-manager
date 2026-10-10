@@ -102,6 +102,21 @@ This merges their findings. Each item names its source. Work top to bottom; P0 a
 50. [ ] **Map order**: a second list for the server `Map=` line, with the same drag and autosort (maps before `Muldraugh, KY`).
 51. [ ] **Conflicts and override icons follow the load order**, since that decides which file wins.
 
+## P5: a real Settings tab
+
+52. [ ] **Settings becomes its own tab** (a blueprint page with cards, like Servers & saves) instead of the strip in the header. Sections: Folders, Downloads and updates, Appearance, Launch, About.
+53. [ ] **Folders**, each with a path field, **Browse…**, **Detect** and **Open**, a status (found / not found / not a PZ folder), and a note when an environment variable is overriding it:
+    - Project Zomboid install (`PZ_GAME_DIR`), detected from the Steam libraries.
+    - Zomboid user folder (`PZ_HOME`): mods, saves, server configs, logs.
+    - Dedicated server install (`PZ_SERVER_DIR`).
+    - Steam Workshop content folder (`workshop/content/108600`), found from the Steam libraries.
+    - PZMM data (`PZMM_DATA`): profiles, installed mods, backups, SteamCMD. Changing it offers to move the existing data.
+54. [ ] **Saved in the config folder**, not the data folder (`%APPDATA%\pzmm\settings.json`), read by the core so the app and CLI agree. Order of precedence: environment variable, then the setting, then autodetect. Bad or missing paths show in Check setup.
+55. [ ] **Downloads and updates**: check mod updates on start, check app updates on start, open Workshop links in the Steam client or browser, backups kept per mod, Redownload all, and a GitHub token for rate limits (stored in the OS credential store, never in the file).
+56. [ ] **Appearance**: theme, accent and default game build (moved from the header strip), plus the Workshop's default view and results per page.
+57. [ ] **Launch**: extra game arguments (`-debug`, `-nosteam`) and autosort on first run of a new profile.
+58. [ ] **About**: version, check for updates, the GitHub, Discord and Ko-fi links, and Open log folder.
+
 ## Lower-priority core fixes (1.1.x)
 
 - Updates continue for mods shadowed by a later Steam subscription (core 10).
