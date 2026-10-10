@@ -11,6 +11,7 @@ A free, open-source mod manager for **Project Zomboid** (Build 41 and 42), for W
 - **Conflicts:** each mod's details show which other mods replace the same files, and which copy wins.
 - **Updates:** PZMM checks the Workshop for newer versions of the mods it installed, without downloading them. Every update keeps the previous version, and **Restore previous version** brings it back if an update breaks your save.
 - **Servers and saves:** write a profile into a dedicated server's config (`Mods=`, `WorkshopItems=`, `Map=`), turn a server config into a profile, or load the mods a save was played with.
+- **Project Viewpoint:** switch between plain Project Zomboid and [Project Viewpoint](https://steamcommunity.com/sharedfiles/filedetails/?id=3809306528) (3D first/third person) from the header. The first switch downloads Viewpoint and ZombieBuddy, sets up ZombieBuddy and makes a Viewpoint profile; each side remembers its own mod list.
 - **ZombieBuddy:** one-click setup for [ZombieBuddy](https://github.com/zed-0xff/ZombieBuddy), the loader that Java mods need. PZMM shows each change before applying it and can undo it.
 - **Updates itself:** PZMM checks for new versions when it starts. **Update and restart** downloads the new version, checks its signature and installs it.
 - **Ownership:** PZMM only deletes mods it installed. It never touches your Workshop subscriptions or mods you installed by hand.
@@ -55,6 +56,7 @@ pzmm find tsarslib --install # find the Workshop item that provides a mod id
 pzmm server export servertest   # active profile -> Zomboid/Server/servertest.ini
 pzmm server import servertest   # server config -> profile (installs missing mods)
 pzmm zombiebuddy install     # also: status, uninstall
+pzmm mode viewpoint          # or: zomboid; --dry-run lists the changes
 ```
 
 The command line and the app share the same profiles and data.

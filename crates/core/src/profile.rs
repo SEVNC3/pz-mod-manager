@@ -118,6 +118,51 @@ struct State {
     /// Force the B41 default.txt format; otherwise the file's format is kept.
     #[serde(default)]
     b41: Option<bool>,
+    /// Profile name -> kind (e.g. "viewpoint"). Untagged profiles are the default kind.
+    #[serde(default)]
+    kinds: std::collections::BTreeMap<String, String>,
+    /// Kind -> the profile of that kind used last, so switching kinds returns to it.
+    #[serde(default)]
+    last: std::collections::BTreeMap<String, String>,
+}
+
+/// The default profile kind: plain Project Zomboid.
+pub const DEFAULT_KIND: &str = "zomboid";
+
+/// A profile's kind ("zomboid" unless tagged otherwise).
+pub fn kind_of(paths: &Paths, name: &str) -> String {
+    state(paths).kinds.get(name).cloned().unwrap_or_else(|| DEFAULT_KIND.into())
+}
+
+pub fn set_kind(paths: &Paths, name: &str, kind: &str) -> Result<()> {
+    let mut s = state(paths);
+    if kind == DEFAULT_KIND {
+        s.kinds.remove(name);
+    } else {
+        s.kinds.insert(name.into(), kind.into());
+    }
+    save_state(paths, &s)
+}
+
+/// Record the active profile as the last one of its kind (done before switching kinds,
+/// so switching back returns to it even if it was last applied before kinds existed).
+pub fn remember_active(paths: &Paths) -> Result<()> {
+    let mut s = state(paths);
+    let name = active_name(paths);
+    let kind = s.kinds.get(&name).cloned().unwrap_or_else(|| DEFAULT_KIND.into());
+    s.last.insert(kind, name);
+    save_state(paths, &s)
+}
+
+/// The profile of `kind` used most recently, if it still exists.
+pub fn last_of_kind(paths: &Paths, kind: &str) -> Option<String> {
+    let s = state(paths);
+    let existing = list(paths);
+    s.last
+        .get(kind)
+        .filter(|n| existing.contains(n))
+        .cloned()
+        .or_else(|| existing.into_iter().find(|n| s.kinds.get(n).map_or(DEFAULT_KIND, String::as_str) == kind))
 }
 
 fn dir(paths: &Paths) -> PathBuf {
@@ -171,7 +216,10 @@ pub fn delete(paths: &Paths, name: &str) -> Result<()> {
         bail!("{name:?} is the active profile; switch to another first");
     }
     fs::remove_dir_all(dir(paths).join(name))?;
-    Ok(())
+    let mut s = state(paths);
+    s.kinds.remove(name);
+    s.last.retain(|_, n| n != name);
+    save_state(paths, &s)
 }
 
 fn state(paths: &Paths) -> State {
@@ -219,8 +267,10 @@ pub fn sync(paths: &Paths) -> Result<(Profile, bool)> {
 /// Save `profile`, make it active and write it to the game's mod list.
 pub fn apply(paths: &Paths, profile: &Profile) -> Result<()> {
     save(paths, profile)?;
-    let s = state(paths);
+    let mut s = state(paths);
     pz::write_default(&paths.default_txt(), &profile.enabled(), s.b41)?;
+    let kind = s.kinds.get(&profile.name).cloned().unwrap_or_else(|| DEFAULT_KIND.into());
+    s.last.insert(kind, profile.name.clone());
     save_state(paths, &State { active: profile.name.clone(), ..s })
 }
 
@@ -268,6 +318,21 @@ mod tests {
         let mut p = Profile::parse("x", "+A\n");
         p.adopt(&ids(&["A", "", "A"]));
         assert_eq!(p.to_text(), "+A\n");
+    }
+
+    #[test]
+    fn kinds_remember_their_last_profile() {
+        let (_t, paths) = temp_paths();
+        apply(&paths, &Profile::from_ids("Default", ids(&["A"]))).unwrap();
+        set_kind(&paths, "3D", "viewpoint").unwrap();
+        apply(&paths, &Profile::from_ids("3D", ids(&["Viewpoint"]))).unwrap();
+        assert_eq!(kind_of(&paths, "3D"), "viewpoint");
+        assert_eq!(kind_of(&paths, "Default"), DEFAULT_KIND);
+        assert_eq!(last_of_kind(&paths, DEFAULT_KIND).as_deref(), Some("Default"));
+        assert_eq!(last_of_kind(&paths, "viewpoint").as_deref(), Some("3D"));
+        apply(&paths, &Profile::from_ids("Default", ids(&["A"]))).unwrap();
+        delete(&paths, "3D").unwrap();
+        assert_eq!(last_of_kind(&paths, "viewpoint"), None);
     }
 
     #[test]

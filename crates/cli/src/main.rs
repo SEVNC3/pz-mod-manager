@@ -74,6 +74,14 @@ enum Cmd {
         action: String,
         name: String,
     },
+    /// Show or switch the game: zomboid (plain) or viewpoint (Project Viewpoint, 3D)
+    Mode {
+        /// zomboid or viewpoint; omit to show the current mode
+        to: Option<String>,
+        /// Only list what switching would change
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Set up the ZombieBuddy Java agent (Java mods): status, install or uninstall
     Zombiebuddy {
         #[arg(default_value = "status")]
@@ -177,6 +185,27 @@ fn run(cli: Cli) -> Result<()> {
             ids.iter().for_each(|i| println!("{i}: update available (pzmm update)"));
         }
         Cmd::Server { action, name } => server(&paths, &p, &action, &name)?,
+        Cmd::Mode { to, dry_run } => {
+            use pzmm_core::pz::viewpoint as vp;
+            let Some(to) = to else {
+                println!("{} (profile {:?})", profile::kind_of(&paths, &p.name), p.name);
+                return Ok(());
+            };
+            if to != vp::KIND && to != profile::DEFAULT_KIND {
+                bail!("expected zomboid or viewpoint");
+            }
+            for line in vp::preview(&paths, &to, &store::scan(&paths)?)? {
+                println!("{} {line}", if dry_run { "would" } else { "-" });
+            }
+            if !dry_run {
+                if to == vp::KIND {
+                    sources::install(&paths, &vp::needed(&paths, &store::scan(&paths)?)?, false);
+                    vp::enter(&paths, &store::scan(&paths)?)?;
+                } else {
+                    vp::leave(&paths)?;
+                }
+            }
+        }
         Cmd::Zombiebuddy { action } => zombiebuddy(&paths, &mut p, &action)?,
         Cmd::Profile(ProfileCmd::List) => {
             for name in profile::list(&paths) {
@@ -227,7 +256,7 @@ fn list(paths: &Paths, p: &Profile) -> Result<()> {
 fn zombiebuddy(paths: &Paths, p: &mut Profile, action: &str) -> Result<()> {
     use pzmm_core::pz::zombiebuddy as zb;
     let launcher = zb::game_dir().and_then(|g| zb::launcher_dir(&g));
-    let libs = || store::scan(paths).ok().and_then(|mut m| m.remove(zb::MOD_ID)).filter(|m| zb::official_source(&m.source)).and_then(|m| zb::libs_dir(&m.dir));
+    let libs = || store::scan(paths).ok().and_then(|m| zb::locate(&m).1);
     match action {
         "status" => {
             let l = launcher.as_deref();

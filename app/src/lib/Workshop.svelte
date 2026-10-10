@@ -2,10 +2,12 @@
   import { onMount } from "svelte";
   import { api, type Browse } from "./api";
 
-  let { busy, defaultBuild, onInstall }: {
+  let { busy, defaultBuild, onInstall, viewpoint = false }: {
     busy: boolean;
     defaultBuild: number | null;
     onInstall: (id: string) => Promise<boolean>;
+    /** Project Viewpoint mode: offer a shortcut to its add-ons. */
+    viewpoint?: boolean;
   } = $props();
 
   const SORTS = [
@@ -84,6 +86,9 @@
           {#each SORTS as [v, label]}<option value={v}>{label}</option>{/each}
         </select>
       </label>
+    {/if}
+    {#if viewpoint && search !== "Project Viewpoint"}
+      <button type="button" onclick={() => { query = search = "Project Viewpoint"; page = 1; load(); }}>Viewpoint add-ons</button>
     {/if}
     <label>Game
       <select bind:value={build} onchange={() => go(1)}>

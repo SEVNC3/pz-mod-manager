@@ -44,6 +44,14 @@ pub fn official_source(source: &str) -> bool {
     source.strip_prefix("steam:").or_else(|| source.strip_prefix("workshop:")) == Some(WORKSHOP_ID)
 }
 
+/// Where the agent goes (the game's launcher folder) and comes from (the official
+/// ZombieBuddy Workshop item's libs folder), given a mod scan.
+pub fn locate(mods: &std::collections::BTreeMap<String, crate::store::Row>) -> (Option<PathBuf>, Option<PathBuf>) {
+    let launcher = game_dir().and_then(|g| launcher_dir(&g));
+    let libs = mods.get(MOD_ID).filter(|m| official_source(&m.source)).and_then(|m| libs_dir(&m.dir));
+    (launcher, libs)
+}
+
 /// The folder inside a ZombieBuddy mod that holds `ZombieBuddy.jar` (normally `libs/`).
 pub fn libs_dir(mod_dir: &Path) -> Option<PathBuf> {
     let mut stack = vec![(mod_dir.to_path_buf(), 0)];

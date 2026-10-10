@@ -96,6 +96,9 @@ pub struct Fetched {
     pub source: String,
     root: PathBuf,
     _temp: Option<tempfile::TempDir>,
+    /// Already subscribed in Steam: use Steam's copy (Steam keeps it updated) instead of
+    /// copying it into Zomboid/mods, where a copy would shadow newer Steam updates.
+    subscribed: bool,
 }
 
 /// Download (network and SteamCMD only; nothing in Zomboid/mods changes). Workshop items
@@ -111,6 +114,16 @@ pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
     if resolve && !workshop.is_empty() {
         workshop = expand_workshop(paths, workshop);
     }
+    if let Some(ws) = steam_workshop::content_dir(pz::STEAM_APP) {
+        workshop.retain(|id| {
+            let root = ws.join(id);
+            if !steam_workshop::valid_id(id) || !root.is_dir() {
+                return true;
+            }
+            report(Ok(Fetched { source: format!("steam:{id}"), root, _temp: None, subscribed: true }));
+            false
+        });
+    }
     if !workshop.is_empty() {
         let refs: Vec<&str> = workshop.iter().map(String::as_str).collect();
         match steam_workshop::download(paths, pz::STEAM_APP, &refs) {
@@ -118,7 +131,7 @@ pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
                 for (id, dir) in got {
                     report(
                         dir.with_context(|| format!("workshop:{id}: download failed"))
-                            .map(|root| Fetched { source: format!("workshop:{id}"), root, _temp: None }),
+                            .map(|root| Fetched { source: format!("workshop:{id}"), root, _temp: None, subscribed: false }),
                     );
                 }
             }
@@ -132,6 +145,7 @@ pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
                 source: format!("github:{spec}"),
                 root: t.path().to_path_buf(),
                 _temp: Some(t),
+                subscribed: false,
             })),
             Source::Local(p) => report(fetch_local(p)),
         }
@@ -143,6 +157,12 @@ pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
 pub fn install_fetched(paths: &Paths, fetched: &[Fetched]) -> Vec<String> {
     let mut ids = vec![];
     for f in fetched {
+        if f.subscribed {
+            let found: Vec<String> = pz::find_mods(&f.root, 8).into_iter().map(|m| m.id).collect();
+            crate::log!("{}: you're subscribed in Steam, which keeps it updated; using that copy ({})", f.source, found.join(", "));
+            ids.extend(found);
+            continue;
+        }
         match store::install(paths, &f.root, &f.source) {
             Ok(v) => ids.extend(v),
             Err(e) => crate::log!("error: {e:#}"),
@@ -298,12 +318,12 @@ fn fetch_local(p: &Path) -> Result<Fetched> {
     let abs = std::path::absolute(p)?;
     let source = format!("local:{}", abs.display());
     if abs.is_dir() {
-        return Ok(Fetched { source, root: abs, _temp: None });
+        return Ok(Fetched { source, root: abs, _temp: None, subscribed: false });
     }
     if abs.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
         let t = tempfile::tempdir()?;
         unzip(&std::fs::read(&abs)?, t.path())?;
-        return Ok(Fetched { source, root: t.path().to_path_buf(), _temp: Some(t) });
+        return Ok(Fetched { source, root: t.path().to_path_buf(), _temp: Some(t), subscribed: false });
     }
     bail!("{}: not a folder or .zip", abs.display())
 }

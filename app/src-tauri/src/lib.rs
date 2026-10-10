@@ -89,6 +89,10 @@ struct View {
     zomboid: String,
     workshop: Option<String>,
     build: Option<u8>,
+    /// Kind of the active profile: "zomboid" or "viewpoint".
+    mode: String,
+    /// Profile name -> kind, so the profile picker can show one mode's profiles.
+    kinds: BTreeMap<String, String>,
 }
 
 fn view(paths: &Paths) -> anyhow::Result<View> {
@@ -108,6 +112,7 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
     let mut rest: Vec<store::Row> = mods.into_values().collect();
     rest.sort_by_key(|m| (if m.name.is_empty() { &m.id } else { &m.name }).to_lowercase());
     rows.extend(rest.into_iter().map(|m| Row::Mod { id: m.id, name: m.name, source: m.source, on: false, missing: false, requires: m.requires }));
+    let mode = profile::kind_of(paths, &p.name);
     Ok(View {
         profile: p.name,
         profiles: profile::list(paths),
@@ -116,6 +121,8 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
         zomboid: paths.zomboid.display().to_string(),
         workshop: sources::steam_workshop::content_dir(pz::STEAM_APP).map(|d| d.display().to_string()),
         build: profile::build(paths),
+        mode,
+        kinds: profile::list(paths).into_iter().map(|n| { let kind = profile::kind_of(paths, &n); (n, kind) }).collect(),
     })
 }
 
@@ -210,8 +217,10 @@ fn profile_new(name: String) -> Res<View> {
         if profile::exists(paths, &name) {
             anyhow::bail!("a profile named {name:?} already exists");
         }
-        let lines = active(paths)?.lines;
-        profile::apply(paths, &Profile { name, lines })?;
+        let current = active(paths)?;
+        // a copy of a Viewpoint profile is a Viewpoint profile too
+        profile::set_kind(paths, &name, &profile::kind_of(paths, &current.name))?;
+        profile::apply(paths, &Profile { name, lines: current.lines })?;
         view(paths)
     })
 }
@@ -334,8 +343,7 @@ type ZbPaths = (Option<std::path::PathBuf>, Option<std::path::PathBuf>, BTreeMap
 
 fn zb_paths(paths: &Paths) -> anyhow::Result<ZbPaths> {
     let mods = scan(paths)?;
-    let launcher = zb::game_dir().and_then(|g| zb::launcher_dir(&g));
-    let libs = mods.get(zb::MOD_ID).filter(|m| zb::official_source(&m.source)).and_then(|m| zb::libs_dir(&m.dir));
+    let (launcher, libs) = zb::locate(&mods);
     Ok((launcher, libs, mods))
 }
 
@@ -603,6 +611,37 @@ fn save_use(mode: String, name: String) -> Res<View> {
     })
 }
 
+// --- Project Zomboid / Project Viewpoint ---
+
+use pzmm_core::pz::viewpoint as vp;
+
+/// What switching to `mode` would do, for the confirmation panel.
+#[tauri::command]
+fn mode_preview(mode: String) -> Res<Vec<String>> {
+    reading(|paths| vp::preview(paths, &mode, &scan(paths)?))
+}
+
+/// Switch between plain Project Zomboid and Project Viewpoint profiles, setting up
+/// Viewpoint (downloads, ZombieBuddy agent, profile) the first time.
+#[tauri::command]
+async fn mode_switch(mode: String) -> Res<View> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if mode != vp::KIND {
+            return locked(|paths| {
+                vp::leave(paths)?;
+                view(paths)
+            });
+        }
+        let missing = reading(|paths| vp::needed(paths, &scan(paths)?))?;
+        fetch_then(&missing, false, |paths, _| {
+            vp::enter(paths, &scan(paths)?)?;
+            view(paths)
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 fn open_path(app: AppHandle, path: String) -> Res<()> {
     app.opener().open_path(path, None::<&str>).map_err(|e| e.to_string())
@@ -638,7 +677,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
             details, poster, open_path, open_url, workshop_browse, zb_status, zb_preview, zb_install, zb_uninstall,
-            find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, servers_and_saves, server_export, server_import, save_use
+            find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, servers_and_saves, server_export, server_import, save_use,
+            mode_preview, mode_switch
         ])
         .run(tauri::generate_context!())
         .expect("error while running PZMM");

@@ -10,6 +10,7 @@ use anyhow::Result;
 pub mod files;
 pub mod saves;
 pub mod server;
+pub mod viewpoint;
 pub mod zombiebuddy;
 
 pub const STEAM_APP: &str = "108600";

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
+export type Mode = "zomboid" | "viewpoint";
 export type ModRow = { kind: "mod"; id: string; name: string; source: string; on: boolean; missing: boolean; requires: string[] };
 export type SepRow = { kind: "sep"; name: string };
 export type Row = ModRow | SepRow;
@@ -7,6 +8,10 @@ export type Row = ModRow | SepRow;
 export type View = {
   profile: string;
   profiles: string[];
+  /** Kind of the active profile. */
+  mode: Mode;
+  /** Profile name -> kind. */
+  kinds: Record<string, Mode>;
   rows: Row[];
   adopted: boolean;
   zomboid: string;
@@ -84,6 +89,8 @@ export const api = {
   serverExport: (name: string) => invoke<string[]>("server_export", { name }),
   serverImport: (name: string) => invoke<View>("server_import", { name }),
   saveUse: (mode: string, name: string) => invoke<View>("save_use", { mode, name }),
+  modePreview: (mode: Mode) => invoke<string[]>("mode_preview", { mode }),
+  modeSwitch: (mode: Mode) => invoke<View>("mode_switch", { mode }),
   openPath: (path: string) => invoke<void>("open_path", { path }),
   openUrl: (url: string) => invoke<void>("open_url", { url }),
 };

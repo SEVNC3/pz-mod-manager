@@ -4,7 +4,7 @@
   import { getVersion } from "@tauri-apps/api/app";
   import { check, type Update } from "@tauri-apps/plugin-updater";
   import { relaunch } from "@tauri-apps/plugin-process";
-  import { api, describeSource, zbReady, type ModRow, type Row, type View, type ZbStatus } from "$lib/api";
+  import { api, describeSource, zbReady, type Mode, type ModRow, type Row, type View, type ZbStatus } from "$lib/api";
   import Details from "$lib/Details.svelte";
   import Workshop from "$lib/Workshop.svelte";
   import ZombieBuddy from "$lib/ZombieBuddy.svelte";
@@ -15,6 +15,7 @@
 
   let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
   let updates = $state<Set<string>>(new Set());
+
   // shared files between enabled mods: who overrides whom (refreshed after every change)
   let overlaps = $state<Record<string, Overlap>>({});
   const refreshOverlaps = () => api.conflictSummary().then((o) => (overlaps = o)).catch(() => {});
@@ -65,6 +66,32 @@
 
   let view = $state<View | null>(null);
   let rows = $state<Row[]>([]);
+
+  // --- Project Zomboid / Project Viewpoint ---
+  const MODES: [Mode, string][] = [["zomboid", "Project Zomboid"], ["viewpoint", "Project Viewpoint"]];
+  let modePlan = $state<{ target: Mode; lines: string[]; error: string } | null>(null);
+  const modeProfiles = $derived(
+    (view?.profiles ?? []).filter((p) => p === view?.profile || (view?.kinds[p] ?? "zomboid") === (view?.mode ?? "zomboid")),
+  );
+
+  async function planMode(target: Mode) {
+    if (!view || target === view.mode) return;
+    modePlan = { target, lines: [], error: "" };
+    try {
+      modePlan.lines = await api.modePreview(target);
+    } catch (e) {
+      modePlan.error = String(e);
+    }
+  }
+
+  async function switchMode() {
+    if (!modePlan) return;
+    const target = modePlan.target;
+    modePlan = null;
+    logOpen = true;
+    const label = target === "viewpoint" ? "Setting up Project Viewpoint" : "Switching to Project Zomboid";
+    if (await run(label, () => api.modeSwitch(target))) await settleOrder();
+  }
   let selected = $state<string | null>(null);
   let busy = $state(false);
   let busyLabel = $state("");
@@ -351,6 +378,13 @@
   <header class="top">
     <div class="brand" aria-label="PZMM">PZMM</div>
 
+    <div class="modes" role="radiogroup" aria-label="Game">
+      {#each MODES as [m, label]}
+        <button role="radio" aria-checked={view?.mode === m} class:active={(view?.mode ?? "zomboid") === m}
+          disabled={busy} onclick={() => planMode(m)}>{label}</button>
+      {/each}
+    </div>
+
     <div class="profile">
       <label for="profile">Profile</label>
       {#if newProfile !== null}
@@ -363,12 +397,12 @@
       {:else}
         <select id="profile" value={view?.profile} disabled={busy}
           onchange={(e) => run("Switching profile", () => api.profileUse(e.currentTarget.value))}>
-          {#each view?.profiles ?? [] as p}
+          {#each modeProfiles as p}
             <option value={p}>{p}</option>
           {/each}
         </select>
         <button class="quiet" onclick={() => (newProfile = "")} disabled={busy} title="New profile from the current one">New</button>
-        {#if (view?.profiles.length ?? 0) > 1}
+        {#if modeProfiles.length > 1}
           <button class="quiet" onclick={deleteProfile} disabled={busy}>Delete</button>
         {/if}
       {/if}
@@ -392,6 +426,31 @@
       <button class="quiet" aria-expanded={settingsOpen} onclick={() => (settingsOpen = !settingsOpen)}>Settings</button>
     </div>
   </header>
+
+  {#if modePlan}
+    <div class="mode-plan" role="region" aria-label="Switch game">
+      {#if modePlan.error}
+        <p class="error">{modePlan.error}</p>
+        <button class="quiet" onclick={() => (modePlan = null)}>Close</button>
+      {:else}
+        <p>
+          <strong>{modePlan.target === "viewpoint" ? "Switch to Project Viewpoint (3D)?" : "Switch back to Project Zomboid?"}</strong>
+          {#if modePlan.target === "viewpoint"}
+            Viewpoint is early in development. It loads through ZombieBuddy, which asks you once, when the game starts, to approve its Java code.
+          {/if}
+        </p>
+        {#if modePlan.lines.length}
+          <ul class="mono">{#each modePlan.lines as l}<li>{l}</li>{/each}</ul>
+          <div class="row">
+            <button class="primary" onclick={switchMode} disabled={busy}>Switch</button>
+            <button class="quiet" onclick={() => (modePlan = null)}>Cancel</button>
+          </div>
+        {:else}
+          <p class="hint-line">Checking what's needed…</p>
+        {/if}
+      {/if}
+    </div>
+  {/if}
 
   {#if appUpdate}
     <div class="app-update" role="status">
@@ -445,7 +504,7 @@
   </div>
 
   {#if tab === "workshop"}
-    <Workshop {busy} defaultBuild={view?.build ?? null} onInstall={installWorkshop} />
+    <Workshop {busy} defaultBuild={view?.build ?? null} onInstall={installWorkshop} viewpoint={view?.mode === "viewpoint"} />
   {:else if tab === "servers"}
     <ServersSaves {busy} profile={view?.profile ?? ""} enabledIds={[...mods.values()].filter((m) => m.on).map((m) => m.id)}
       onImport={(name) => { logOpen = true; return run(`Importing ${name}.ini`, () => api.serverImport(name)); }}
@@ -645,6 +704,47 @@
     margin-left: 6px;
     vertical-align: 2px;
   }
+  .modes {
+    display: flex;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .modes button {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 5px 10px;
+    color: var(--muted);
+  }
+  .modes button.active {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-weight: 700;
+  }
+  .mode-plan {
+    padding: 10px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  .mode-plan p {
+    margin: 0 0 6px;
+  }
+  .mode-plan ul {
+    margin: 0 0 8px;
+    padding-left: 18px;
+    overflow-wrap: anywhere;
+  }
+  .mode-plan .row {
+    display: flex;
+    gap: 8px;
+  }
+  .mode-plan .error {
+    color: var(--danger);
+  }
+  .hint-line {
+    color: var(--muted);
+  }
   .app-update {
     display: flex;
     align-items: center;
@@ -708,7 +808,7 @@
   .install {
     display: flex;
     gap: 6px;
-    flex: 1 1 340px;
+    flex: 1 1 200px;
   }
   .install input {
     flex: 1;
