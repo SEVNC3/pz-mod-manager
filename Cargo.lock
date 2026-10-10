@@ -3099,7 +3099,7 @@ dependencies = [
 
 [[package]]
 name = "pzmm"
-version = "1.0.2"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -3109,7 +3109,7 @@ dependencies = [
 
 [[package]]
 name = "pzmm-app"
-version = "1.0.2"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "pzmm-core",
@@ -3125,7 +3125,7 @@ dependencies = [
 
 [[package]]
 name = "pzmm-core"
-version = "1.0.2"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "dirs",

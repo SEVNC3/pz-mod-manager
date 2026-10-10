@@ -1,6 +1,6 @@
 # PZMM 1.1: review findings and scope
 
-2026-10-10. Merged from three read-only reviews (UX/product, code robustness, community research) plus the Project Viewpoint scope. Effort: S = hours, M = a day or two, L = more.
+2026-10-10. **Status: queue worked through for 1.1.0 (unreleased); see "What shipped" at the end.** Merged from three read-only reviews (UX/product, code robustness, community research) plus the Project Viewpoint scope. Effort: S = hours, M = a day or two, L = more.
 
 ## P0: data safety (fix before the next release)
 
@@ -76,3 +76,39 @@ All verified in the code. None have been reported as hitting a user yet.
 - **ZombieBuddy policy.** Some 3D mods' guides tell users to set `policy=allow-all`. PZMM keeps ZombieBuddy's default "prompt" policy and never sets allow-all on its own.
 
 **Effort:** M (about 1–2 days): the core mode table and profile field, the header switch, the first-run setup dialog reusing the ZombieBuddy and install code, the subscription preference, and server-export filtering once client-only is confirmed.
+
+## What shipped (1.1.0, unreleased)
+
+**Done:**
+- Every P0 item.
+- **P1:** downloads outside the lock, SteamCMD limits, the cross-process lock, Steam throttling and caching, the scan cache, `file_type()`, the BOM and `Mod.info` fixes, maps in any version folder, and the tests.
+- **Viewpoint mode:**
+  - the header switch with a confirmation step
+  - `pzmm mode`
+  - each mode remembering its own profile
+  - Steam subscriptions preferred over PZMM copies
+- **P2:**
+  1. Undo and redo.
+  2. `incompatible` and `loadModAfter`/`loadModBefore`, with the stable sort.
+  3. Doctor and `pzmm doctor`.
+  4. The save-mismatch banner and the confirmation before updating a save's mods.
+  5. Bulk select.
+  6. Profile share and import (code, plus `pzmm profile export`/`import`).
+  7. `console.txt` error attribution, `pzmm errors` and the bisect helper.
+  8. Collapsible separators, separator at the selection, and Move to.
+  9. Size and last-changed columns, with sorting.
+  10. Start server, and `pzmm watch` with `--on-update`.
+  11. B41/B42-only badges.
+  12. Keyboard: Enter, `/`, arrow keys on tabs and filters, and a shortcut list.
+- **Quick wins:** the loading state, the server-name default, and the status column width. The empty-state "flash" turned out not to exist: before the first load the list is empty, not the "nothing yet" message.
+
+**Deliberately skipped (each with a reason):**
+- **Copying the save folder before updates.** Saves can be gigabytes. Mod rollback plus the save warning cover the risk.
+- **A "not updated since the last game patch" badge.** There's no reliable patch date, and it would flag many stable mods.
+- **RCON restart warnings.** `pzmm watch --on-update` runs the admin's own command, which can use their RCON tool.
+- **The `versionMin`/`versionMax` check.** It needs the installed game version, which PZMM can't read reliably yet. `versionMin` is shown in the details pane.
+
+**Still open from the plan:**
+- Excluding Viewpoint from server `Mods=`, if it's confirmed client-only.
+- GitHub update checks.
+- The `default.txt` `maps {}` block.

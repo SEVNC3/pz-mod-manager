@@ -14,6 +14,16 @@ A free, open-source mod manager for **Project Zomboid** (Build 41 and 42), for W
 - **Project Viewpoint:** switch between plain Project Zomboid and [Project Viewpoint](https://steamcommunity.com/sharedfiles/filedetails/?id=3809306528) (3D first/third person) from the header. The first switch downloads Viewpoint and ZombieBuddy, sets up ZombieBuddy and makes a Viewpoint profile; each side remembers its own mod list.
 - **ZombieBuddy:** one-click setup for [ZombieBuddy](https://github.com/zed-0xff/ZombieBuddy), the loader that Java mods need. PZMM shows each change before applying it and can undo it.
 - **Updates itself:** PZMM checks for new versions when it starts. **Update and restart** downloads the new version, checks its signature and installs it.
+- **Find what's wrong:** **Check setup** reports:
+  - mods built for the wrong game build
+  - missing, disabled or late-loading requirements
+  - incompatible mods
+  - server configs out of sync
+
+  It also counts the Lua errors in your last session's `console.txt` per mod. **Find the broken mod** narrows down a crash by halving your mods each time you test the game.
+- **Big lists:** select several mods at once (Ctrl/Shift+click), fold separators, sort by name, size or last change, and undo with Ctrl+Z.
+- **Share a profile:** **Share** copies a code. A friend pastes it into **Import**, and PZMM installs the Workshop mods they're missing.
+- **Saves:** PZMM warns when your latest save was played with a different mod list, and offers to load the save's list.
 - **Ownership:** PZMM only deletes mods it installed. It never touches your Workshop subscriptions or mods you installed by hand.
 
 ## Download
@@ -57,6 +67,11 @@ pzmm server export servertest   # active profile -> Zomboid/Server/servertest.in
 pzmm server import servertest   # server config -> profile (installs missing mods)
 pzmm zombiebuddy install     # also: status, uninstall
 pzmm mode viewpoint          # or: zomboid; --dry-run lists the changes
+pzmm doctor                  # check the profile and server configs (exit code 1 on errors)
+pzmm errors                  # Lua errors per mod in the last game session
+pzmm profile export friends.json   # share a profile; import with: pzmm profile import friends.json
+pzmm server start servertest # start the dedicated server
+pzmm watch servertest --on-update "restart-server.bat"   # react to Workshop updates
 ```
 
 The command line and the app share the same profiles and data.
@@ -68,6 +83,7 @@ On Linux, SteamCMD needs 32-bit libraries (`lib32gcc-s1` on Debian/Ubuntu).
 | `PZ_HOME` | `~/Zomboid` | Your Zomboid user folder |
 | `PZMM_DATA` | `%LOCALAPPDATA%\pzmm` or `~/.local/share/pzmm` | Profiles, backups, SteamCMD |
 | `PZ_GAME_DIR` | found in your Steam libraries | The game's install folder (used for ZombieBuddy) |
+| `PZ_SERVER_DIR` | found in your Steam libraries | The Dedicated Server tool's folder |
 | `GITHUB_TOKEN` | none | Private repos or a higher GitHub API rate limit |
 
 ## Build from source

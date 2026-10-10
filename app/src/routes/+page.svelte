@@ -793,8 +793,8 @@
         <button role="radio" aria-checked={filter === v} class:active={filter === v} onclick={() => (filter = v as typeof filter)}>{label}</button>
       {/each}
     </div>
-    <label class="sort">Sort
-      <select bind:value={sortBy} aria-label="Sort the list">
+    <label class="sort">
+      <select bind:value={sortBy} aria-label="Sort the list" title="Sort the list">
         <option value="order">Load order</option>
         <option value="name">Name</option>
         <option value="size">Size</option>
@@ -834,9 +834,9 @@
       <span class="spacer"></span>
     {/if}
     <button class="quiet" onclick={checkSetup} disabled={busy} title="Check the profile and server configs for problems">Check setup</button>
-    <button class="quiet" onclick={undo} disabled={busy || !undoStack.length} title="Undo the last list change (Ctrl+Z)">Undo</button>
-    <button class="quiet" onclick={redo} disabled={busy || !redoStack.length} title="Redo (Ctrl+Y)">Redo</button>
-    <button class="quiet" onclick={addSeparator} disabled={busy || filtering}>Add separator</button>
+    <button class="quiet icon" onclick={undo} disabled={busy || !undoStack.length} title="Undo the last list change (Ctrl+Z)" aria-label="Undo">↶</button>
+    <button class="quiet icon" onclick={redo} disabled={busy || !redoStack.length} title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
+    <button class="quiet" onclick={addSeparator} disabled={busy || filtering} title="Add a separator above the selected mod">+ Separator</button>
   </div>
 
   {#if bisect}
@@ -1251,13 +1251,13 @@
   .filters {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     padding: 8px 16px;
     border-bottom: 1px solid var(--line);
     flex-wrap: wrap;
   }
   .filters input[type="search"] {
-    width: 220px;
+    width: 180px;
   }
   .seg {
     display: flex;
@@ -1383,6 +1383,11 @@
   .name .id {
     margin-left: 10px;
     color: var(--muted);
+  }
+  .icon {
+    padding: 4px 8px;
+    font-size: 16px;
+    line-height: 1;
   }
   .loading {
     padding: 24px 16px;
