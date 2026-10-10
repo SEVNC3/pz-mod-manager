@@ -192,6 +192,18 @@ fn save(rows: Vec<Row>) -> Res<View> {
     })
 }
 
+/// Enable `ids` in order, leaving off any that declares (or is declared) incompatible with
+/// a mod already on: Workshop items often ship alternative versions of one mod.
+fn enable_compatible(p: &mut Profile, mods: &BTreeMap<String, store::Row>, ids: &[String]) {
+    let clashes = |a: &str, b: &str| mods.get(a).is_some_and(|m| m.incompatible.iter().any(|x| x == b));
+    for id in ids {
+        match p.enabled().into_iter().find(|o| o != id && (clashes(id, o) || clashes(o, id))) {
+            Some(o) => pzmm_core::log!("{id} left off: it's incompatible with {o}. Enable it instead of {o} if you prefer it."),
+            None => p.set(id, true),
+        }
+    }
+}
+
 #[tauri::command]
 async fn install(sources: Vec<String>, enable: bool) -> Res<View> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -199,7 +211,7 @@ async fn install(sources: Vec<String>, enable: bool) -> Res<View> {
         fetch_then(&parsed, true, |paths, ids| {
             if enable && !ids.is_empty() {
                 let mut p = active(paths)?;
-                ids.iter().for_each(|i| p.set(i, true));
+                enable_compatible(&mut p, &scan(paths)?, &ids);
                 profile::apply(paths, &p)?;
             }
             view(paths)
@@ -504,6 +516,7 @@ async fn install_missing() -> Res<(View, Vec<String>)> {
         })?;
         // look up and download without holding the lock
         let (mut items, mut unresolved) = (vec![], vec![]);
+        let needed: Vec<String> = wanted.iter().map(|(id, _)| id.clone()).collect();
         for (id, hint) in wanted {
             match sources::find_mod(&id, hint.as_deref(), build) {
                 Ok(c) if c.first().is_some_and(|c| c.sure()) => {
@@ -517,9 +530,22 @@ async fn install_missing() -> Res<(View, Vec<String>)> {
                 }
             }
         }
-        fetch_then(&items, true, |paths, ids| {
+        fetch_then(&items, true, |paths, _| {
+            // only what was missing and what that needs: an item's other mods are often optional add-ons
+            let mods = scan(paths)?;
             let mut p = active(paths)?;
-            ids.iter().for_each(|id| p.set(id, true));
+            let (mut todo, mut seen) = (needed, std::collections::HashSet::new());
+            let mut enable = vec![];
+            while let Some(id) = todo.pop() {
+                if let Some(m) = mods.get(&id)
+                    && seen.insert(id.clone())
+                {
+                    todo.extend(m.requires.iter().cloned());
+                    enable.push(id);
+                }
+            }
+            enable.reverse();
+            enable_compatible(&mut p, &mods, &enable);
             profile::apply(paths, &p)?;
             for id in &unresolved {
                 pzmm_core::log!("{id}: no Workshop item clearly provides it. Use Download in the mod's details to pick one.");
