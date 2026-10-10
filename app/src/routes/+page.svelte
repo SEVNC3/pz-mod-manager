@@ -12,7 +12,7 @@
   import LayerIcon from "$lib/LayerIcon.svelte";
   import Links from "$lib/Links.svelte";
   import { findProblems, sortLoadOrder } from "$lib/order";
-  import type { Finding, Overlap } from "$lib/api";
+  import type { Finding, Overlap, Save } from "$lib/api";
 
   let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
   let updates = $state<Set<string>>(new Set());
@@ -209,6 +209,15 @@
   }
 
   async function updateMods(ids: string[]) {
+    const inSave = latestSave ? ids.filter((i) => latestSave!.mods.includes(i)) : [];
+    if (
+      inSave.length &&
+      !confirm(
+        `${inSave.join(", ")} ${inSave.length === 1 ? "is" : "are"} used by your latest save (${latestSave!.name}). ` +
+          "Updates can break a save in progress. Each updated mod keeps its previous version (Restore previous version). Update now?",
+      )
+    )
+      return;
     logOpen = true;
     if (await run(`Updating ${ids.length === 1 ? ids[0] : `${ids.length} mods`}`, () => api.updateMods(ids))) {
       updates = new Set([...updates].filter((u) => !ids.includes(u)));
@@ -241,6 +250,20 @@
       if (unresolved.length) say(`Still missing: ${unresolved.join(", ")}. Select a mod that needs one and use Find to pick a match.`, true);
     }
   }
+
+  // --- save safety: the latest save vs the active profile ---
+  let latestSave = $state<Save | null>(null);
+  let saveNoticeDismissed = $state(false);
+  const refreshSave = () =>
+    api.serversAndSaves().then((d) => (latestSave = d.saves[0] ?? null)).catch(() => {});
+  const saveDiff = $derived.by(() => {
+    if (!latestSave) return null;
+    const on = new Set([...mods.values()].filter((m) => m.on).map((m) => m.id));
+    const theirs = new Set(latestSave.mods);
+    const missing = latestSave.mods.filter((m) => !on.has(m));
+    const extra = [...on].filter((m) => !theirs.has(m));
+    return missing.length || extra.length ? { missing, extra } : null;
+  });
 
   // --- health check ---
   let findings = $state<Finding[] | null>(null);
@@ -376,6 +399,7 @@
   onMount(() => {
     const unlisten = listen<string>("log", (e) => say(e.payload, e.payload.startsWith("error:")));
     run("Loading", api.load).then(checkUpdates);
+    refreshSave();
     getVersion().then((v) => (appVersion = v));
     checkAppUpdate();
     return () => {
@@ -527,6 +551,17 @@
       onRemove={async () => { logOpen = true; await run("Removing ZombieBuddy", api.zbUninstall); }} />
   {:else}
   <section class="mods">
+  {#if saveDiff && latestSave && !saveNoticeDismissed}
+    <div class="banner save" role="status">
+      <span>
+        Your latest save, <strong>{latestSave.name}</strong>, was played with a different mod list:
+        {[saveDiff.missing.length && `${saveDiff.missing.length} of its mods aren't enabled`, saveDiff.extra.length && `${saveDiff.extra.length} enabled mods weren't in it`].filter(Boolean).join(", ")}.
+        Continuing it with this list can break it.
+      </span>
+      <button onclick={() => latestSave && run(`Loading the mods of ${latestSave.name}`, () => api.saveUse(latestSave!.mode, latestSave!.name))}>Use the save's mods</button>
+      <button class="quiet" onclick={() => (saveNoticeDismissed = true)}>Dismiss</button>
+    </div>
+  {/if}
   {#if zbNeeded}
     <div class="banner" role="status">
       <span>{zb?.required_by.length} enabled {zb?.required_by.length === 1 ? "mod needs" : "mods need"} ZombieBuddy, which isn't set up{zb?.files_current || zb?.launcher_patched ? " completely (a game update may have reset it)" : ""}.</span>
@@ -824,6 +859,9 @@
     padding: 8px 16px;
     background: color-mix(in oklab, var(--danger) 12%, var(--panel));
     border-bottom: 1px solid var(--line);
+  }
+  .banner.save {
+    background: color-mix(in oklab, var(--accent) 12%, var(--panel));
   }
   .banner span {
     flex: 1;
