@@ -24,9 +24,10 @@
     stroke-width: 1.3;
     stroke-linejoin: round;
   }
+  /* blood red; the slightly lighter edge keeps its shape readable on charcoal */
   .wins .top {
-    fill: var(--accent-text);
-    stroke: var(--accent-text);
+    fill: var(--accent);
+    stroke: color-mix(in oklab, var(--accent) 70%, white);
   }
   /* being overridden is normal: neutral, so red stays for real problems */
   .loses .bottom {
