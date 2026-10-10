@@ -607,7 +607,7 @@
     if (sectionDrag) {
       const next = moveSection(rows, dragFrom, to);
       if (next) commit(next);
-    } else move(dragFrom, to);
+    } else move(dragFrom, rows[to]?.kind === "sep" && rows[dragFrom]?.kind === "mod" ? to + 1 : to); // a mod dropped on a section's tape goes to the top of that section
     dragFrom = dropAt = null;
   }
 
@@ -615,7 +615,15 @@
     if (from === to || to < 0 || to > rows.length) return;
     const next = [...rows];
     const [item] = next.splice(from, 1);
-    next.splice(to > from ? to - 1 : to, 0, item);
+    const at = to > from ? to - 1 : to;
+    next.splice(at, 0, item);
+    // a mod landing in a collapsed section would vanish: open that section
+    if (item.kind === "mod") {
+      let s = at;
+      while (s >= 0 && next[s].kind !== "sep") s--;
+      const name = s >= 0 && next[s].kind === "sep" ? (next[s] as { name: string }).name : "";
+      if (name && collapsed.has(name)) toggleSection(name);
+    }
     commit(next);
   }
 
