@@ -200,15 +200,10 @@
   }
   .hint {
     display: block;
-    color: var(--muted);
-    font-size: 12px;
   }
   .notes {
     margin: 10px 0 0;
     padding-left: 18px;
     color: var(--muted);
-  }
-  .error {
-    color: var(--danger);
   }
 </style>

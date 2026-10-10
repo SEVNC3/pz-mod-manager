@@ -78,19 +78,19 @@ This merges their findings. Each item names its source. Work top to bottom; P0 a
 
 ## P3: refactor (after P0-P2, behaviour unchanged)
 
-38. [ ] **Shared helpers** (app B2, B3).
+38. [x] **Shared helpers** (app B2, B3).
     - `lib/format.ts`: size, date, compact numbers, workshopUrl, plain.
     - `Stars.svelte` and `InstallButton.svelte`.
-39. [ ] **Shared CSS in app.css** (app B4): segmented control, `button.link`, `.hint`, `.lede`, `.error`, `.pager`. Merge the split rules in +page.
-40. [ ] **One install path and one `run(label, job, opts)`** (app B1, B5).
-41. [ ] **Split +page.svelte** (app B6-B10). ActivityLog, SettingsPanel and Findings, then ModTable; later an app state module.
-42. [ ] **Rust tidy** (app B11).
+39. [x] **Shared CSS in app.css** (app B4): segmented control, `button.link`, `.hint`, `.lede`, `.error`, `.pager`. Merge the split rules in +page.
+40. [x] **One install path and one `run(label, job, opts)`** (app B1, B5).
+41. [x] **Split +page.svelte** (app B6-B10). ActivityLog, SettingsPanel and Findings, then ModTable; later an app state module.
+42. [x] **Rust tidy** (app B11).
     - One `blocking` helper.
     - `reading` for read-only probes.
     - A cached media-file walk.
     - `update_all` under the lock.
-43. [ ] **Names and slim saves** (app B12). Rename the `ModDetails` type; save sends `{kind,id,on}` only.
-44. [ ] **Dead code** (app C): the `enable` parameter, the `copy` icon, `SepRow`, and the redundant lines in Details.
+43. [x] **Names and slim saves** (app B12). Rename the `ModDetails` type; save sends `{kind,id,on}` only.
+44. [x] **Dead code** (app C): the `enable` parameter, the `copy` icon, `SepRow`, and the redundant lines in Details.
 
 ## P4: library and load order split (like Mod Organizer 2)
 
@@ -142,7 +142,7 @@ This merges their findings. Each item names its source. Work top to bottom; P0 a
   - A Credits section (Feather, the fonts, logo.dev logos, game trademarks, not affiliated).
   - CLI help lists PZ_GAME_DIR and PZ_SERVER_DIR.
 - [ ] ROADMAP-1.1 "What shipped" brought up to date. FOUNDATION.md stale files (`reconcile.rs`, `local.rs`, 7z) and the 1.1 row fixed. Add WorkshopPanel to WORKSHOP-PARITY. Mark UI-QUEUE as superseded where later commits changed things.
-- [ ] Remove the unused `serde_json` (app crate) and `@tauri-apps/plugin-opener` (npm).
+- [x] Remove the unused `@tauri-apps/plugin-opener` (npm). `serde_json` stays: `generate_context!` needs it.
 - [ ] Release notes from the hygiene draft (`--notes-file`).
 - [ ] Decide before pushing:
   - Squash the GIF add and remove commits (840 KB in history).

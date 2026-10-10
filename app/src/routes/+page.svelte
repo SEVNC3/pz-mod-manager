@@ -5,19 +5,22 @@
   import { check, type Update } from "@tauri-apps/plugin-updater";
   import { relaunch } from "@tauri-apps/plugin-process";
   import { decodeShare, encodeShare } from "$lib/api";
-  import { api, describeSource, zbReady, type Mode, type ModRow, type Row, type View, type ZbStatus } from "$lib/api";
+  import { api, zbReady, type Mode, type ModRow, type Row, type View, type ZbStatus } from "$lib/api";
   import Details from "$lib/Details.svelte";
   import Workshop from "$lib/Workshop.svelte";
   import ZombieBuddy from "$lib/ZombieBuddy.svelte";
   import ServersSaves from "$lib/ServersSaves.svelte";
-  import LayerIcon from "$lib/LayerIcon.svelte";
   import Links from "$lib/Links.svelte";
-  import Icon, { type IconName } from "$lib/Icon.svelte";
-  import { autosort, bisectRound, findProblems, moveSection, placeInSections, sectionDrop, sortLoadOrder } from "$lib/order";
+  import Icon from "$lib/Icon.svelte";
+  import ActivityLog from "$lib/ActivityLog.svelte";
+  import Findings from "$lib/Findings.svelte";
+  import SettingsPanel from "$lib/SettingsPanel.svelte";
+  import ModTable from "$lib/ModTable.svelte";
+  import { autosort, bisectRound, findProblems, moveSection, placeInSections, sortLoadOrder } from "$lib/order";
   import LoadOrder from "$lib/LoadOrder.svelte";
   import WindowControls from "$lib/WindowControls.svelte";
   import ProfilePicker from "$lib/ProfilePicker.svelte";
-  import type { Finding, ModErrors, Overlap, Save, Stats } from "$lib/api";
+  import type { Categories, Finding, ModErrors, Overlap, Save, Stats } from "$lib/api";
 
   let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
   let updates = $state<Set<string>>(new Set());
@@ -25,13 +28,6 @@
   // shared files between enabled mods: who overrides whom (refreshed after every change)
   let overlaps = $state<Record<string, Overlap>>({});
   const refreshOverlaps = () => api.conflictSummary().then((o) => (overlaps = o)).catch(() => {});
-  const overlapLabel = (o: Overlap) =>
-    [
-      o.wins_over.length && `Overrides files from ${o.wins_over.join(", ")}`,
-      o.loses_to.length && `Some files are overridden by ${o.loses_to.join(", ")}`,
-    ]
-      .filter(Boolean)
-      .join(". ");
 
   // --- PZMM's own updates (signed releases on GitHub) ---
   let appVersion = $state("");
@@ -101,9 +97,8 @@
     if (!modePlan) return;
     const { target, profile } = modePlan;
     modePlan = null;
-    logOpen = true;
     const label = target === "viewpoint" ? "Setting up Project Viewpoint" : "Switching to Project Zomboid";
-    if (!(await run(label, () => api.modeSwitch(target)))) return;
+    if (!(await run(label, () => api.modeSwitch(target), { showLog: true }))) return;
     // the switch lands on that game's last profile; go on to the one that was picked
     if (profile && view && profile !== view.profile && view.profiles.includes(profile)) await run(`Switching to "${profile}"`, () => api.profileUse(profile));
     await settleOrder();
@@ -122,53 +117,10 @@
   let newProfile = $state<string | null>(null);
   let editingSep = $state<number | null>(null);
   let dragFrom = $state<number | null>(null);
-  let dropAt = $state<number | null>(null);
-
-  // --- per-viewer preferences (theme, accent) ---
-  const pref = (k: string, d: string) => {
-    try {
-      return localStorage.getItem(k) ?? d;
-    } catch {
-      return d;
-    }
-  };
-  let theme = $state(pref("pzmm.theme", "system"));
-  const DEFAULT_ACCENT = "#6e080c"; // the blood on the separator tape (static/blood.svg)
-  // people still on an earlier default (amber, then pink) move to the current one
-  let accent = $state([pref("pzmm.accent", DEFAULT_ACCENT)].map((a) => (["#d39b3a", "#fc2684"].includes(a) ? DEFAULT_ACCENT : a))[0]);
-  /** Text colour on an accent fill: dark on light accents, white on dark ones. */
-  const onAccent = (hex: string) => {
-    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? "#1b1a17" : "#ffffff";
-  };
-  $effect(() => {
-    const root = document.documentElement;
-    if (theme === "system") delete root.dataset.theme;
-    else root.dataset.theme = theme;
-    root.style.setProperty("--accent", accent);
-    root.style.setProperty("--on-accent", onAccent(accent));
-    try {
-      localStorage.setItem("pzmm.theme", theme);
-      localStorage.setItem("pzmm.accent", accent);
-    } catch {}
-  });
-
-  const SOURCE_HINTS: Record<string, string> = {
-    steam: "Subscribed in Steam; Steam keeps it updated",
-    workshop: "Downloaded from the Workshop by PZMM",
-    github: "Installed from GitHub by PZMM",
-    local: "Installed from a file by PZMM",
-  };
 
   // --- derived ---
   const mods = $derived(new Map(rows.filter((r): r is ModRow => r.kind === "mod").map((r) => [r.id, r])));
   const enabledCount = $derived([...mods.values()].filter((m) => m.on).length);
-  const order = $derived.by(() => {
-    const o = new Map<number, number>();
-    let n = 0;
-    rows.forEach((r, i) => r.kind === "mod" && r.on && o.set(i, ++n));
-    return o;
-  });
   const problems = $derived(findProblems(rows));
   const fixable = $derived([...problems.values()].filter((p) => p.fixable).length);
   const missingReqs = $derived.by(() => {
@@ -181,9 +133,6 @@
   let stats = $state<Record<string, Stats>>({});
   const refreshStats = () => api.modStats().then((s) => (stats = s)).catch(() => {});
   let sortBy = $state<"order" | "name" | "size" | "updated" | "status">("order");
-  const fmtSize = (b: number) =>
-    b >= 1 << 30 ? `${(b / (1 << 30)).toFixed(1)} GB` : b >= 1 << 20 ? `${(b / (1 << 20)).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
-  const fmtDate = (s: number) => (s ? new Date(s * 1000).toLocaleDateString(undefined, { year: "2-digit", month: "short", day: "numeric" }) : "");
 
   const filtering = $derived(search.trim() !== "" || filter !== "all" || sortBy !== "order");
   // --- sections: separators can be collapsed (remembered per profile on this computer) ---
@@ -208,18 +157,6 @@
   const sectionOf = $derived.by(() => {
     let current = "";
     return rows.map((r) => (r.kind === "sep" ? (current = r.name) : current));
-  });
-  /** Mods / enabled mods under each separator. */
-  const sectionCounts = $derived.by(() => {
-    const out = new Map<string, { total: number; on: number }>();
-    rows.forEach((r, i) => {
-      if (r.kind !== "mod") return;
-      const c = out.get(sectionOf[i]) ?? { total: 0, on: 0 };
-      c.total++;
-      if (r.on) c.on++;
-      out.set(sectionOf[i], c);
-    });
-    return out;
   });
 
   const visible = $derived.by(() => {
@@ -246,23 +183,6 @@
       });
   });
 
-  /** The icon for an activity line, from what it says. */
-  function logIcon(text: string, error: boolean): IconName {
-    const t = text.toLowerCase();
-    if (error || t.startsWith("error")) return "error";
-    if (t.startsWith("installed") || t.includes("downloaded") || t.startsWith("downloading")) return "download";
-    if (t.includes("restored")) return "rollback";
-    if (t.includes("update")) return "refresh";
-    if (t.startsWith("delete") || t.startsWith("remove") || t.includes("removed")) return "trash";
-    if (t.startsWith("switched")) return "swap";
-    if (t.includes("requires") || t.includes("found on the workshop") || t.startsWith("collection")) return "layers";
-    if (t.includes("copied a share code")) return "share";
-    if (t.startsWith("started")) return "server";
-    if (t.includes("up to date") || t.includes("set up") || t.startsWith("copied") || t.startsWith("imported") || t.startsWith("picked up")) return "check";
-    if (t.includes("couldn't") || t.includes("isn't") || t.includes("not ")) return "alert";
-    return "info";
-  }
-
   /** Back from the game: reload, so changes made in its mod menu show before anything is saved over them. */
   let lastFocusLoad = 0;
   async function refreshOnFocus() {
@@ -286,8 +206,12 @@
     if (error) logOpen = true;
   }
 
-  /** Run a backend job that returns the new view. Errors go to the activity log; returns success. */
-  async function run(label: string, job: () => Promise<View>, keepHistory = false): Promise<boolean> {
+  /**
+   * Run a backend job that returns the new view. Errors go to the activity log; returns success.
+   * `keepHistory` for list edits (undoable, no new files); `showLog` opens the log for long jobs.
+   */
+  async function run(label: string, job: () => Promise<View>, { keepHistory = false, showLog = false } = {}): Promise<boolean> {
+    if (showLog) logOpen = true;
     // undo covers list edits only: anything else (installs, profile switches) resets it
     if (!keepHistory) undoStack = redoStack = [];
     const before = new Set(rows.flatMap((r) => (r.kind === "mod" ? [r.id] : [])));
@@ -324,7 +248,7 @@
 
   /** Autosort: needed mods on, grouped by category, every load rule satisfied. `record` keeps it undoable. */
   async function autosortList(record = true) {
-    let c: Awaited<ReturnType<typeof api.categories>>;
+    let c: Categories;
     pending++;
     busyLabel = "Reading Workshop tags";
     try {
@@ -393,8 +317,7 @@
       )
     )
       return;
-    logOpen = true;
-    if (await run(`Updating ${ids.length === 1 ? ids[0] : `${ids.length} mods`}`, () => api.updateMods(ids))) {
+    if (await run(`Updating ${ids.length === 1 ? ids[0] : `${ids.length} mods`}`, () => api.updateMods(ids), { showLog: true })) {
       updates = new Set([...updates].filter((u) => !ids.includes(u)));
     }
   }
@@ -405,25 +328,23 @@
     if (fixable) fixLoadOrder();
   }
 
-  async function installWorkshop(id: string) {
-    logOpen = true;
-    const ok = await run(`Installing Workshop mod ${id}`, () => api.install([id]));
+  /** Every install: run it with the log open, then settle the order of what came in. */
+  async function installAndSettle(label: string, job: () => Promise<View>) {
+    const ok = await run(label, job, { showLog: true });
     if (ok) await settleOrder();
     return ok;
   }
 
+  const installWorkshop = (id: string) => installAndSettle(`Installing Workshop mod ${id}`, () => api.install([id]));
+
   async function installMissing() {
-    logOpen = true;
     let unresolved: string[] = [];
-    const ok = await run(`Finding ${missingReqs.size} missing ${missingReqs.size === 1 ? "mod" : "mods"} on the Workshop`, async () => {
+    const ok = await installAndSettle(`Finding ${missingReqs.size} missing ${missingReqs.size === 1 ? "mod" : "mods"} on the Workshop`, async () => {
       const [v, left] = await api.installMissing();
       unresolved = left;
       return v;
     });
-    if (ok) {
-      await settleOrder();
-      if (unresolved.length) say(`Still missing: ${unresolved.join(", ")}. Select a mod that needs one and use Find to pick a match.`, true);
-    }
+    if (ok && unresolved.length) say(`Still missing: ${unresolved.join(", ")}. Select a mod that needs one and use Find to pick a match.`, true);
   }
 
   // --- save safety: the latest save vs the active profile ---
@@ -459,8 +380,7 @@
     importText = null;
     try {
       const shared = decodeShare(text);
-      logOpen = true;
-      await run(`Importing "${shared.name}"`, () => api.profileImport(shared));
+      await run(`Importing "${shared.name}"`, () => api.profileImport(shared), { showLog: true });
     } catch (err) {
       say(String(err), true);
     }
@@ -529,7 +449,7 @@
       redoStack = [];
     }
     rows = next;
-    return run("Saving", () => api.save(next), true);
+    return run("Saving", () => api.save(next), { keepHistory: true });
   };
 
   function undo() {
@@ -589,26 +509,13 @@
     commit(rows.map((r) => (r.kind === "mod" && r.id === id ? { ...r, on: !r.on } : r)));
   }
 
-  // dragging a separator carries its whole section, and drops land on section boundaries
-  const sectionDrag = $derived(dragFrom !== null && rows[dragFrom]?.kind === "sep");
-  const dragEnd = $derived.by(() => {
-    if (!sectionDrag || dragFrom === null) return -1;
-    let e = dragFrom + 1;
-    while (e < rows.length && rows[e].kind !== "sep") e++;
-    return e;
-  });
-  const dropShown = $derived(sectionDrag && dragFrom !== null && dropAt !== null ? sectionDrop(rows, dragFrom, dropAt) : dropAt);
-
-  function dropOn(to: number) {
-    if (dragFrom === null || busy) {
-      dragFrom = dropAt = null;
-      return;
-    }
-    if (sectionDrag) {
-      const next = moveSection(rows, dragFrom, to);
+  /** A drop from the list: a separator carries its whole section. */
+  function dropOn(from: number, to: number) {
+    if (busy) return;
+    if (rows[from]?.kind === "sep") {
+      const next = moveSection(rows, from, to);
       if (next) commit(next);
-    } else move(dragFrom, rows[to]?.kind === "sep" && rows[dragFrom]?.kind === "mod" ? to + 1 : to); // a mod dropped on a section's tape goes to the top of that section
-    dragFrom = dropAt = null;
+    } else move(from, rows[to]?.kind === "sep" && rows[from]?.kind === "mod" ? to + 1 : to); // a mod dropped on a section's tape goes to the top of that section
   }
 
   function move(from: number, to: number) {
@@ -632,8 +539,7 @@
     const sources = installText.split(/\s+/).filter(Boolean);
     if (!sources.length) return;
     installText = "";
-    logOpen = true;
-    await run(`Installing ${sources.length === 1 ? sources[0] : `${sources.length} mods`}`, () => api.install(sources));
+    await installAndSettle(`Installing ${sources.length === 1 ? sources[0] : `${sources.length} mods`}`, () => api.install(sources));
   }
 
   /** A new separator above the selected mod (or at the top), ready to rename. */
@@ -723,12 +629,6 @@
     }
   }
 
-  /** Once the list has sections, mods outside them are loose: each is a card of its own, in place. */
-  const hasSections = $derived(!filtering && rows.some((r) => r.kind === "sep" && r.name));
-  const loose = (k: number) => {
-    const v = visible[k];
-    return hasSections && !!v && v.r.kind === "mod" && !sectionOf[v.i];
-  };
   const separators = $derived(rows.flatMap((r) => (r.kind === "sep" && r.name ? [r.name] : [])));
 
   function remove(id: string) {
@@ -891,38 +791,8 @@
     </div>
   {/if}
 
-  {#if settingsOpen}
-    <div class="settings" role="region" aria-label="Settings">
-      <label>Theme
-        <select bind:value={theme}>
-          <option value="system">Match system</option>
-          <option value="dark">Dark</option>
-          <option value="light">Light</option>
-        </select>
-      </label>
-      <label>Accent <input type="color" bind:value={accent} /></label>
-      <label>Game build
-        <select value={String(view?.build ?? "")} disabled={busy}
-          onchange={(e) => { const v = e.currentTarget.value; run("Saving", () => api.setBuild(v ? (Number(v) as 41 | 42) : null)); }}>
-          <option value="">Detect from default.txt</option>
-          <option value="42">Build 42</option>
-          <option value="41">Build 41</option>
-        </select>
-      </label>
-      <button onclick={redownloadAll} disabled={busy} title="Repairs damaged copies; each keeps its current version as a backup"><Icon name="download" size={14} />Re-download mods PZMM installed</button>
-      <span class="keys">
-        Keyboard: <kbd>/</kbd> search · <kbd>↑</kbd><kbd>↓</kbd> move between rows · <kbd>Enter</kbd> details ·
-        <kbd>Space</kbd> enable/disable · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> reorder · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> undo/redo ·
-        <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+click select several · <kbd>Esc</kbd> clear selection
-      </span>
-      <span class="version">PZMM {appVersion}
-        <button class="quiet" onclick={() => checkAppUpdate(true)}>Check for updates</button></span>
-      <div class="paths">
-        <span>Zomboid folder <button class="quiet link mono" onclick={() => view && api.openPath(view.zomboid)}>{view?.zomboid}</button></span>
-        <span>Steam Workshop folder <span class="mono">{view?.workshop ?? "not found"}</span></span>
-      </div>
-    </div>
-  {/if}
+  <SettingsPanel open={settingsOpen} {view} {busy} {appVersion} onBuild={(b) => run("Saving", () => api.setBuild(b))}
+    onRedownload={redownloadAll} onCheckUpdate={() => checkAppUpdate(true)} />
 
   <div class="tabbar">
   <div class="tabs" role="tablist" aria-label="Sections" tabindex="-1" onkeydown={(e) => arrowPick(e, TAB_IDS, tab, (v) => (tab = v as typeof tab))}>
@@ -943,12 +813,12 @@
     <!-- kept mounted above -->
   {:else if tab === "servers"}
     <ServersSaves {busy} profile={view?.profile ?? ""} enabledIds={[...mods.values()].filter((m) => m.on).map((m) => m.id)}
-      onImport={(name) => { logOpen = true; return run(`Importing ${name}.ini`, () => api.serverImport(name)); }}
+      onImport={(name) => run(`Importing ${name}.ini`, () => api.serverImport(name), { showLog: true })}
       onUseSave={(mode, name) => run(`Loading the mods of ${name}`, () => api.saveUse(mode, name))} />
   {:else if tab === "zb"}
     <ZombieBuddy status={zb} profile={view?.profile ?? ""} {busy}
-      onSetup={async () => { logOpen = true; await run("Setting up ZombieBuddy", api.zbInstall); }}
-      onRemove={async () => { logOpen = true; await run("Removing ZombieBuddy", api.zbUninstall); }} />
+      onSetup={async () => { await run("Setting up ZombieBuddy", api.zbInstall, { showLog: true }); }}
+      onRemove={async () => { await run("Removing ZombieBuddy", api.zbUninstall, { showLog: true }); }} />
   {:else}
   <section class="mods">
   {#if saveDiff && latestSave && !saveNoticeDismissed}
@@ -1025,54 +895,8 @@
     </span>
   </div>
 
-  {#if bisect}
-    <div class="findings" role="region" aria-label="Find the broken mod">
-      <p>
-        <strong>Finding the broken mod, round {bisect.round}:</strong>
-        {bisect.suspects.length} suspects left, {bisect.testing.length} enabled for this test (plus what they need).
-        Start the game, check whether the problem happens, then come back here.
-      </p>
-      <div class="row">
-        <button onclick={() => bisectAnswer(true)} disabled={busy}><Icon name="alert" size={14} />The problem still happens</button>
-        <button onclick={() => bisectAnswer(false)} disabled={busy}><Icon name="check" size={14} />The problem is gone</button>
-        <button class="quiet" onclick={bisectStop} disabled={busy}><Icon name="rollback" size={14} />Stop and restore my list</button>
-      </div>
-    </div>
-  {/if}
-
-  {#if findings}
-    <div class="findings" role="region" aria-label="Setup check">
-      <div class="findings-head">
-        <strong>
-          {findings.length === 0 ? "No problems found." : `${findings.filter((f) => f.level === "error").length} errors, ${findings.filter((f) => f.level === "warning").length} warnings`}
-        </strong>
-        <button class="quiet" onclick={() => (findings = null)}><Icon name="x" size={14} />Close</button>
-      </div>
-      {#if findings.length}
-        <ul>
-          {#each findings as f}
-            <li class={f.level}><span class="mono">{f.subject}</span> {f.text}</li>
-          {/each}
-        </ul>
-      {/if}
-      {#if gameErrors.length}
-        <p class="findings-sub"><strong>Lua errors in your last game session</strong> (from console.txt):</p>
-        <ul>
-          {#each gameErrors as e}
-            <li class="warning">
-              <button class="quiet link" disabled={!e.id} onclick={() => e.id && (selected = e.id)}>{e.name}</button>:
-              {e.count} {e.count === 1 ? "error" : "errors"}, first at <span class="mono">{e.example}</span>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-      <p class="findings-sub">
-        Something breaks but nothing above explains it?
-        <button class="quiet link" onclick={bisectStart} disabled={busy}>Find the broken mod</button>:
-        PZMM halves your enabled mods each time you test the game.
-      </p>
-    </div>
-  {/if}
+  <Findings {findings} {gameErrors} {bisect} {busy} onClose={() => (findings = null)} onSelect={(id) => (selected = id)}
+    onBisectStart={bisectStart} onBisectAnswer={bisectAnswer} onBisectStop={bisectStop} />
   <main class:with-details={selected} class:with-panel={!selected && rows.length}>
     <div class="list blueprint">
       {#if !view}
@@ -1083,97 +907,9 @@
           <p>Paste a Steam Workshop link above to install a mod, or subscribe to mods in Steam: subscriptions show up here automatically.</p>
         </div>
       {:else}
-        <table>
-          <thead class="visually-hidden">
-            <tr><th>Move</th><th>Enabled</th><th>Load order</th><th>Mod</th><th>Size</th><th>Last changed</th><th>Shared files</th><th>Source</th></tr>
-          </thead>
-          <tbody>
-            {#each visible as { r, i }, k (r.kind === "mod" ? `m:${r.id}` : `s:${i}:${r.name}`)}
-              <!-- each section is a card: a separator starts one, the row before the next separator ends it -->
-              {@const start = k === 0 || r.kind === "sep" || loose(k) || loose(k - 1)}
-              {@const end = k === visible.length - 1 || visible[k + 1].r.kind === "sep" || loose(k) || loose(k + 1)}
-              {#if start && k > 0}<tr class="gap" aria-hidden="true"><td colspan="8"></td></tr>{/if}
-              {#if r.kind === "sep"}
-                <tr class="sep" class:start class:end class:drop={dropShown === i} class:dragging={dragFrom === i} data-index={i} tabindex="0" draggable={!filtering && editingSep !== i}
-                  ondragstart={() => (dragFrom = i)} ondragend={() => { dragFrom = dropAt = null; }}
-                  ondragover={(e) => { e.preventDefault(); dropAt = i; }}
-                  ondrop={(e) => { e.preventDefault(); dropOn(i); }}
-                  ondblclick={() => !busy && (editingSep = i)} onkeydown={(e) => editingSep !== i && rowKey(e, i, r)}>
-                  <td class="grip" aria-hidden="true"><Icon name="grip" size={14} fill /></td>
-                  <td colspan="7">
-                    {#if editingSep === i}
-                      <!-- svelte-ignore a11y_autofocus -->
-                      <input class="tape-edit" type="text" value={r.name} autofocus aria-label="Separator name (empty removes it)"
-                        onblur={(e) => renameSep(i, e.currentTarget.value)}
-                        onkeydown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") editingSep = null; }} />
-                    {:else}
-                      <button class="quiet fold" aria-expanded={!collapsed.has(r.name)} aria-label={`${collapsed.has(r.name) ? "Expand" : "Collapse"} ${r.name}`}
-                        onclick={(e) => { e.stopPropagation(); toggleSection(r.name); }}><Icon name={collapsed.has(r.name) ? "chevron-right" : "chevron-down"} size={14} /></button>
-                      <span class="tape" title="Double-click to rename">{r.name}</span>
-                      {#if sectionCounts.get(r.name)}
-                        {@const c = sectionCounts.get(r.name)!}
-                        <span class="sec-count">{c.on} of {c.total} enabled</span>
-                      {/if}
-                      <button class="quiet icon sep-remove" disabled={busy || filtering} title="Remove this separator (Delete). Its mods stay where they are."
-                        aria-label={`Remove separator ${r.name}`} onclick={(e) => { e.stopPropagation(); removeSep(i); }}><Icon name="trash" size={14} /></button>
-                    {/if}
-                  </td>
-                </tr>
-              {:else}
-                {@const src = describeSource(r.source)}
-                <tr class="mod" class:start class:end class:off={!r.on} class:selected={selected === r.id} class:picked={picked.size >= 2 && picked.has(r.id)} class:drop={dropShown === i} class:dragging={dragFrom === i || (sectionDrag && dragFrom !== null && i > dragFrom && i < dragEnd)}
-                  data-index={i} tabindex="0" draggable={!filtering}
-                  aria-selected={selected === r.id}
-                  onclick={(e) => rowClick(e, r.id)} onkeydown={(e) => rowKey(e, i, r)}
-                  ondragstart={() => (dragFrom = i)} ondragend={() => { dragFrom = dropAt = null; }}
-                  ondragover={(e) => { e.preventDefault(); dropAt = i; }}
-                  ondrop={(e) => { e.preventDefault(); dropOn(i); }}>
-                  <td class="grip" aria-hidden="true">{#if !filtering}<Icon name="grip" size={14} fill />{/if}</td>
-                  <td class="check">
-                    <input type="checkbox" checked={r.on} disabled={busy} aria-label={`Enable ${r.name || r.id}`}
-                      onclick={(e) => e.stopPropagation()} onchange={() => toggle(r.id)} />
-                  </td>
-                  <td class="num mono">{order.get(i) ?? ""}</td>
-                  <td class="name">
-                    <span class="title" title={r.name || r.id}>{r.name || r.id}</span>
-                    {#if r.name && r.name !== r.id}<span class="id mono">{r.id}</span>{/if}
-                    {#if r.only41 && (view?.build ?? 42) !== 41}
-                      <span class="build-badge" title="Built for Build 41 only (no 42/ or common/ folder): on Build 42 it may error or do nothing">B41 only</span>
-                    {:else if r.only42 && view?.build === 41}
-                      <span class="build-badge" title="Built for Build 42 only">B42 only</span>
-                    {/if}
-                  </td>
-                  <td class="meta mono">{stats[r.id] ? fmtSize(stats[r.id].size) : ""}</td>
-                  <td class="meta mono">{stats[r.id] ? fmtDate(stats[r.id].modified) : ""}</td>
-                  <td class="overlap">
-                    {#if r.on && overlaps[r.id]}
-                      {@const o = overlaps[r.id]}
-                      <LayerIcon wins={o.wins_over.length > 0} loses={o.loses_to.length > 0} label={overlapLabel(o)} />
-                    {/if}
-                  </td>
-                  <td class="src">
-                    {#if r.missing}
-                      <span class="missing">Not installed</span>
-                    {:else if problems.has(r.id)}
-                      <span class="missing" title={problems.get(r.id)?.text}><Icon name="alert" size={12} />{problems.get(r.id)?.text}</span>
-                    {:else if updates.has(r.id)}
-                      <span class="update"><Icon name="update" size={12} />Update available</span>
-                    {:else}
-                      <span class="badge" data-kind={r.source.split(":")[0]} title={SOURCE_HINTS[r.source.split(":")[0]] ?? "Added to the mods folder outside PZMM"}>{src.label}</span>
-                    {/if}
-                  </td>
-                </tr>
-              {/if}
-            {/each}
-            {#if !filtering}
-              <tr class="tail" class:drop={dropShown === rows.length} aria-hidden="true"
-                ondragover={(e) => { e.preventDefault(); dropAt = rows.length; }}
-                ondrop={(e) => { e.preventDefault(); dropOn(rows.length); }}>
-                <td colspan="8"></td>
-              </tr>
-            {/if}
-          </tbody>
-        </table>
+        <ModTable {rows} {visible} {sectionOf} {filtering} {busy} build={view?.build ?? null} {stats} {overlaps} {problems} {updates}
+          {collapsed} {picked} {selected} bind:dragFrom bind:editingSep onRowClick={rowClick} onRowKey={rowKey} onToggle={toggle}
+          onToggleSection={toggleSection} onDrop={dropOn} onRename={renameSep} onRemoveSep={removeSep} />
       {/if}
     </div>
 
@@ -1182,29 +918,13 @@
         onToggle={toggle} onSelect={(id) => (selected = id)}
         onRemove={remove} onRollback={(id) => run(`Restoring ${id}`, () => api.rollback(id))} onClose={() => (selected = null)} />
     {:else if rows.length}
-      <LoadOrder {rows} {problems} {overlaps} {busy} onAutosort={() => autosortList()} onFix={fixLoadOrder} />
+      <LoadOrder {rows} {problems} {fixable} {overlaps} {busy} onAutosort={() => autosortList()} onFix={fixLoadOrder} />
     {/if}
   </main>
   </section>
   {/if}
 
-  <footer class="activity" class:open={logOpen}>
-    <button class="quiet bar" aria-expanded={logOpen} onclick={() => (logOpen = !logOpen)}>
-      <span class="dot" class:busy aria-hidden="true"></span>
-      <span class="label">{busy ? busyLabel + "…" : "Activity"}</span>
-      {#if log.length}<Icon name={logIcon(log.at(-1)!.text, log.at(-1)!.error)} size={12} />{/if}
-      <span class="last">{log.at(-1)?.text ?? ""}</span>
-    </button>
-    {#if logOpen}
-      <ol class="log mono" aria-live="polite">
-        {#each log as l}
-          <li class:error={l.error}><Icon name={logIcon(l.text, l.error)} size={12} /><span>{l.text}</span></li>
-        {:else}
-          <li class="quiet-line">Installs, updates and errors show up here.</li>
-        {/each}
-      </ol>
-    {/if}
-  </footer>
+  <ActivityLog {log} {busy} {busyLabel} bind:open={logOpen} />
 </div>
 
 <style>
@@ -1274,9 +994,6 @@
     display: flex;
     gap: 8px;
   }
-  .mode-plan .error {
-    color: var(--danger);
-  }
   .hint-line {
     color: var(--muted);
   }
@@ -1294,40 +1011,6 @@
   .app-update progress {
     accent-color: var(--accent-text);
     width: 220px;
-  }
-  .version {
-    color: var(--muted);
-  }
-  .findings {
-    padding: 8px 16px 10px;
-    border-bottom: 1px solid var(--line);
-    background: var(--panel);
-    max-height: 30vh;
-    overflow-y: auto;
-  }
-  .findings-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .findings-sub {
-    margin: 8px 0 0;
-    color: var(--muted);
-  }
-  .findings .row {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .findings ul {
-    margin: 6px 0 0;
-    padding-left: 18px;
-  }
-  .findings li.error {
-    color: var(--danger);
-  }
-  .findings li.warning {
-    color: var(--text);
   }
   .banner {
     display: flex;
@@ -1362,11 +1045,16 @@
     margin: -6px 0;
   }
   .profile,
-  .inline,
+  .inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
   .right {
     display: flex;
     align-items: center;
     gap: 6px;
+    margin-left: auto;
   }
   .install {
     display: flex;
@@ -1375,45 +1063,6 @@
   }
   .install input {
     flex: 1;
-  }
-  .right {
-    margin-left: auto;
-  }
-
-  .settings {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 18px;
-    padding: 10px 16px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--line);
-  }
-  .settings label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--muted);
-  }
-  .settings input[type="color"] {
-    width: 34px;
-    height: 26px;
-    padding: 0;
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    background: none;
-  }
-  .paths {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    color: var(--muted);
-    margin-left: auto;
-  }
-  .link {
-    padding: 0 4px;
-    text-decoration: underline;
-    text-underline-offset: 2px;
   }
 
   /* --- filters --- */
@@ -1428,26 +1077,8 @@
   .filters input[type="search"] {
     width: 180px;
   }
-  .seg {
-    display: flex;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    overflow: hidden;
-  }
   .seg button {
-    border: 0;
-    border-radius: 0;
-    background: transparent;
     padding: 5px 12px;
-    color: var(--muted);
-  }
-  .seg button:hover:not(:disabled) {
-    color: var(--text);
-  }
-  .seg button.active {
-    background: var(--accent-soft);
-    color: var(--on-selected);
-    font-weight: 700;
   }
   .count {
     color: var(--muted);
@@ -1459,12 +1090,17 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: right;
-    color: var(--muted);
-    font-size: 12px;
     margin-left: auto;
   }
   .spacer {
     margin-left: auto;
+  }
+  .bulk {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    flex-wrap: wrap;
   }
 
   /* --- list + details --- */
@@ -1482,163 +1118,6 @@
     min-height: 0;
     padding: 14px 16px 0;
   }
-  /* sections are cards lifted off the blueprint: rows paint the card, gap rows space them, and the
-     table's drop shadow follows each card's shape (box-shadow can't wrap a group of rows) */
-  table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    filter: var(--card-drop);
-  }
-  tr.mod td,
-  tr.sep td {
-    background: var(--panel);
-  }
-  tr.start td:first-child {
-    border-top-left-radius: 8px;
-  }
-  tr.start td:last-child {
-    border-top-right-radius: 8px;
-  }
-  tr.end td {
-    border-bottom: 0;
-  }
-  tr.end td:first-child {
-    border-bottom-left-radius: 8px;
-  }
-  tr.end td:last-child {
-    border-bottom-right-radius: 8px;
-  }
-  tr.gap td {
-    height: 14px;
-    padding: 0;
-    border: 0;
-  }
-  td {
-    padding: 0 8px;
-    height: 40px;
-    border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
-  }
-  tr.mod {
-    cursor: default;
-  }
-  /* hovered, picked and selected rows look like a selected tab: blood red under white text,
-     with a white bar on the left */
-  tr.mod:hover td {
-    background: color-mix(in oklab, var(--accent) 24%, var(--panel));
-  }
-  tr.mod:hover td,
-  tr.mod.picked td,
-  tr.mod.selected td {
-    color: var(--on-selected);
-  }
-  tr.mod:hover .num,
-  tr.mod.picked .num,
-  tr.mod.selected .num {
-    color: var(--on-selected);
-  }
-  tr.mod:hover .id,
-  tr.mod:hover .meta,
-  tr.mod.picked .id,
-  tr.mod.picked .meta,
-  tr.mod.selected .id,
-  tr.mod.selected .meta {
-    color: rgb(255 255 255 / 0.72);
-  }
-  /* the hover/selection marker: a solid white chevron sitting on the card's left edge, half over it */
-  tr.mod td:first-child {
-    position: relative;
-  }
-  tr.mod:hover td:first-child::before,
-  tr.mod.picked td:first-child::before,
-  tr.mod.selected td:first-child::before {
-    content: "";
-    position: absolute;
-    left: -5px;
-    top: 50%;
-    width: 10px;
-    height: 14px;
-    margin-top: -7px;
-    z-index: 1;
-    background: var(--on-selected);
-    clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%);
-  }
-  .fold {
-    padding: 0 6px;
-    margin-right: 4px;
-    color: var(--muted);
-  }
-  .sec-count {
-    margin-left: 12px;
-    color: var(--muted);
-    font-size: 12px;
-  }
-  tr.mod.picked td {
-    background: color-mix(in oklab, var(--accent) 22%, var(--panel));
-  }
-  .bulk {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: auto;
-    flex-wrap: wrap;
-  }
-  tr.mod.selected td {
-    background: color-mix(in oklab, var(--accent) 32%, var(--panel));
-  }
-  tr.off .title,
-  tr.off .num {
-    color: var(--muted);
-  }
-  tr.mod:hover .title,
-  tr.mod.picked .title,
-  tr.mod.selected .title {
-    color: var(--on-selected);
-  }
-  tr.dragging {
-    opacity: 0.4;
-  }
-  /* where a drag will land: blood red feathering down from the row's top edge */
-  tr.drop td {
-    background-image: linear-gradient(to bottom, color-mix(in oklab, var(--accent) 85%, white) 0, color-mix(in oklab, var(--accent) 55%, transparent) 3px, transparent 20px);
-  }
-  tr:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: -2px;
-  }
-  .grip {
-    width: 22px;
-    color: var(--muted);
-    cursor: grab;
-    text-align: center;
-    padding-right: 0;
-  }
-  .check {
-    width: 28px;
-  }
-  .check input {
-    width: 16px;
-    height: 16px;
-  }
-  .num {
-    width: 40px;
-    text-align: right;
-    color: var(--accent-text);
-  }
-  /* max-width: 0 lets an auto-layout cell shrink, so long names ellipsize instead of wrapping */
-  .name {
-    max-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .name .title {
-    font-weight: 700;
-  }
-  .name .id {
-    margin-left: 10px;
-    color: var(--muted);
-  }
   .tools {
     display: flex;
     align-items: center;
@@ -1654,133 +1133,12 @@
     padding: 24px 16px;
     color: var(--muted);
   }
-  .keys {
-    grid-column: 1 / -1;
-    color: var(--muted);
-    font-size: 12px;
-  }
-  kbd {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    border: 1px solid var(--line);
-    border-bottom-width: 2px;
-    border-radius: 3px;
-    padding: 0 4px;
-    background: var(--raised);
-  }
-  .build-badge {
-    margin-left: 8px;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--danger);
-    border: 1px solid color-mix(in oklab, var(--danger) 50%, transparent);
-    border-radius: 4px;
-    padding: 0 5px;
-  }
-  .meta {
-    width: 78px;
-    text-align: right;
-    color: var(--muted);
-    white-space: nowrap;
-  }
   .sort {
     display: flex;
     align-items: center;
     gap: 6px;
     color: var(--muted);
   }
-  /* its own column so the icons line up whatever the badge beside them says */
-  .overlap {
-    width: 28px;
-    padding-left: 8px;
-    padding-right: 0;
-    text-align: center;
-  }
-  .src {
-    width: 1%;
-    white-space: nowrap;
-    text-align: right;
-  }
-  .badge {
-    font-size: 12px;
-    color: var(--muted);
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    padding: 1px 8px;
-  }
-  .badge[data-kind="github"],
-  .badge[data-kind="workshop"],
-  .badge[data-kind="local"] {
-    color: var(--text);
-  }
-  .update {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    color: var(--accent-text);
-    font-weight: 700;
-    font-size: 12px;
-  }
-  .missing {
-    display: inline-block;
-    max-width: 320px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    vertical-align: middle;
-    color: var(--danger);
-    font-weight: 700;
-    font-size: 12px;
-  }
-  .missing :global(.icon) {
-    margin-right: 4px;
-  }
-  tr.tail td {
-    height: 48px;
-    border: 0;
-  }
-
-  /* signature: separators are masking-tape labels, like crates in a safehouse */
-  tr.sep td {
-    height: 46px;
-  }
-  .tape,
-  .tape-edit {
-    display: inline-block;
-    font-family: var(--font-marker);
-    font-size: 16px;
-    letter-spacing: 0.02em;
-    color: var(--tape-ink);
-    background: var(--tape);
-    padding: 2px 16px 0;
-    transform: rotate(-0.8deg);
-    clip-path: polygon(0 8%, 3% 0, 6% 10%, 9% 1%, 100% 0, 98% 30%, 100% 55%, 97% 80%, 100% 100%, 4% 100%, 1% 88%, 3% 60%, 0 40%);
-    box-shadow: 0 1px 0 rgb(0 0 0 / 0.15);
-  }
-  .tape {
-    padding-right: 72px;
-    background: url(/blood.svg) right -10px center / auto 140% no-repeat, var(--tape);
-  }
-  .sep-remove {
-    float: right;
-    margin-top: 6px;
-    color: var(--muted);
-    opacity: 0;
-  }
-  tr.sep:hover .sep-remove,
-  tr.sep:focus-within .sep-remove {
-    opacity: 1;
-  }
-  .sep-remove:hover:not(:disabled) {
-    color: var(--danger);
-  }
-  .tape-edit {
-    border: 0;
-    border-radius: 0;
-    outline-offset: 3px;
-    min-width: 220px;
-  }
-
   .empty {
     max-width: 460px;
     margin: 12vh auto 0;
@@ -1795,93 +1153,14 @@
     margin-bottom: 4px;
   }
 
-  /* --- activity --- */
-  .activity {
-    border-top: 1px solid var(--line);
-    background: var(--panel);
-  }
-  .bar {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 10px;
-    width: 100%;
-    padding: 7px 16px;
-    border-radius: 0;
-    text-align: left;
-  }
-  .label {
-    font-weight: 700;
-  }
-  .last {
-    color: var(--muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-  }
-  .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--muted);
-    opacity: 0.6;
-  }
-  .dot.busy {
-    opacity: 1;
-    background: var(--accent-text);
-    animation: pulse 1s ease-in-out infinite alternate;
-  }
-  @keyframes pulse {
-    to {
-      opacity: 0.3;
-    }
-  }
-  .log {
-    list-style: none;
-    margin: 0;
-    padding: 4px 16px 10px;
-    max-height: 180px;
-    overflow-y: auto;
-  }
-  .log li {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 2px 0;
-    overflow-wrap: anywhere;
-  }
-  .log li :global(.icon) {
-    margin-top: 3px;
-    color: var(--muted);
-  }
-  .log li.error :global(.icon) {
-    color: var(--danger);
-  }
-  .log .error {
-    color: var(--danger);
-  }
-  .quiet-line {
-    color: var(--muted);
-  }
-
-  /* strips above the list (banners, plans, findings, settings, app update) are cards like everything else */
+  /* strips above the list (banners, plans, app update; findings and settings too) are cards like everything else */
   .banner,
   .mode-plan,
-  .findings,
-  .settings,
   .app-update {
     margin: 10px 16px 0;
     border-bottom: 0;
     border-radius: 8px;
     box-shadow: var(--card-shadow);
-  }
-  .settings {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    align-items: center;
-    gap: 12px 18px;
-    padding: 14px 18px;
   }
   .banner > :global(.icon) {
     flex: none;

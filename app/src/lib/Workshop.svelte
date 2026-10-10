@@ -1,7 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { api, newQuery, type Browse, type Query, type WorkshopItem } from "./api";
+  import { compact, fmtDate, plain } from "./format";
   import Icon from "./Icon.svelte";
+  import InstallButton from "./InstallButton.svelte";
+  import Stars from "./Stars.svelte";
   import WorkshopPanel from "./WorkshopPanel.svelte";
 
   let { busy, defaultBuild, onInstall, viewpoint = false, hidden = false }: {
@@ -212,11 +215,6 @@
   const perPage = $derived(view === "author" ? 30 : q.per_page);
   const pages = $derived(data ? Math.max(1, Math.min(1000, Math.ceil(data.total / perPage))) : 1);
   const page = $derived(view === "author" ? authorPage : q.page);
-  const compact = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
-  const date = (t: number) => new Date(t * 1000).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-  /** A card's blurb: no BBCode, images or bare links. */
-  const plain = (s: string) =>
-    s.replace(/\[img\][\s\S]*?\[\/img\]/gi, "").replace(/https?:\/\/\S+/g, "").replace(/\[\/?[a-z0-9*]+(=[^\]]*)?\]/gi, "").replace(/\s+/g, " ").trim();
   const builds = (tags: string[]) => tags.filter((t) => /^Build \d+$/.test(t)).map((t) => t.replace("Build ", "B"));
   const sorts = $derived(q.collections ? COLLECTION_SORTS : ITEM_SORTS);
 
@@ -226,19 +224,9 @@
 {#snippet stars(it: WorkshopItem)}
   {#if it.votes > 0}
     <span class="stars" title={`${it.stars} of 5 stars from ${it.votes.toLocaleString()} votes`}>
-      {#each [1, 2, 3, 4, 5] as n}<span class:lit={n <= it.stars}><Icon name="star" size={12} fill /></span>{/each}
+      <Stars stars={it.stars} />
       <span class="votes">{compact.format(it.votes)}</span>
     </span>
-  {/if}
-{/snippet}
-
-{#snippet installButton(it: WorkshopItem)}
-  {#if it.have}
-    <span class="have"><Icon name="check" size={14} /> Installed</span>
-  {:else}
-    <button class="primary" disabled={busy || installing !== null} onclick={() => install(it.id)}>
-      <Icon name="download" size={14} />{installing === it.id ? "Installing…" : it.collection ? "Install all" : "Install"}
-    </button>
   {/if}
 {/snippet}
 
@@ -259,7 +247,7 @@
         {#if !small}
           <span title="Favourites"><Icon name="star" size={11} /> {compact.format(it.favorited)}</span>
           <span title="Comments"><Icon name="message" size={11} /> {compact.format(it.comments)}</span>
-          <span title={`Posted ${date(it.time_created)}`}>Updated {date(it.time_updated)}</span>
+          <span title={`Posted ${fmtDate(it.time_created, "long")}`}>Updated {fmtDate(it.time_updated, "long")}</span>
           {#each builds(it.tags) as b}<span class="tag">{b}</span>{/each}
         {/if}
       </p>
@@ -269,7 +257,7 @@
       {/if}
     </div>
     <div class="actions">
-      {@render installButton(it)}
+      <InstallButton item={it} {busy} {installing} onInstall={install} />
       <button class="quiet" onclick={() => (open = it)}>Details</button>
     </div>
   </li>
@@ -277,7 +265,7 @@
 
 <section class="workshop" aria-label="Steam Workshop" {hidden}>
   <aside class="side" aria-label="Browse options">
-    <div class="views" role="tablist" aria-label="Workshop view">
+    <div class="seg" role="tablist" aria-label="Workshop view">
       <button type="button" role="tab" aria-selected={view !== "home"} class:active={view !== "home"} onclick={() => show("browse")}>
         <Icon name="search" size={14} /> Browse
       </button>
@@ -465,30 +453,8 @@
     min-height: 0;
     min-width: 0;
   }
-  .views,
-  .seg {
-    display: flex;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    overflow: hidden;
-  }
-  .views button,
   .seg button {
     flex: 1;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    color: var(--muted);
-  }
-  .views button:hover:not(:disabled),
-  .seg button:hover:not(:disabled) {
-    color: var(--text);
-  }
-  .views button.active,
-  .seg button.active {
-    background: var(--accent-soft);
-    color: var(--on-selected);
-    font-weight: 700;
   }
   .search {
     display: flex;
@@ -533,8 +499,6 @@
   }
   .hint {
     margin: 0;
-    font-size: 12px;
-    color: var(--muted);
   }
   .chips {
     display: grid;
@@ -734,7 +698,7 @@
     font-size: 12px;
     color: var(--muted);
   }
-  .meta span {
+  .meta :global(span) {
     display: inline-flex;
     align-items: center;
     gap: 3px;
@@ -742,9 +706,6 @@
   .stars {
     gap: 1px !important;
     color: var(--line);
-  }
-  .stars .lit {
-    color: var(--accent-text);
   }
   .votes {
     margin-left: 4px;
@@ -781,17 +742,7 @@
   .card.small .title {
     font-size: 14px;
   }
-  .have {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--accent-text);
-    font-weight: 700;
-  }
   .pager {
-    display: flex;
-    justify-content: center;
-    align-items: center;
     gap: 14px;
     width: fit-content;
     margin: 18px auto 6px;

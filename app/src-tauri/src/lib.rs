@@ -50,6 +50,11 @@ fn scan(paths: &Paths) -> anyhow::Result<BTreeMap<String, store::Row>> {
     Ok(mods)
 }
 
+/// Run blocking work (downloads, Workshop requests, file walks) off the UI thread.
+async fn blocking<T: Send + 'static, E: std::fmt::Display>(f: impl FnOnce() -> Result<T, E> + Send + 'static) -> Res<T> {
+    tauri::async_runtime::spawn_blocking(move || f().map_err(|e| format!("{e:#}"))).await.map_err(|e| e.to_string())?
+}
+
 /// Download outside the lock (it can take minutes), then install under it.
 fn fetch_then<T>(sources: &[Source], resolve: bool, then: impl FnOnce(&Paths, Vec<String>) -> anyhow::Result<T>) -> Res<T> {
     let fetched = sources::fetch(&Paths::detect(), sources, resolve);
@@ -215,11 +220,11 @@ fn enable_compatible(p: &mut Profile, mods: &BTreeMap<String, store::Row>, ids: 
 }
 
 #[tauri::command]
-async fn install(sources: Vec<String>, enable: bool) -> Res<View> {
-    tauri::async_runtime::spawn_blocking(move || {
+async fn install(sources: Vec<String>) -> Res<View> {
+    blocking(move || {
         let parsed: Vec<Source> = sources.iter().map(|s| Source::parse(s)).collect();
         fetch_then(&parsed, true, |paths, ids| {
-            if enable && !ids.is_empty() {
+            if !ids.is_empty() {
                 let mut p = active(paths)?;
                 enable_compatible(&mut p, &scan(paths)?, &ids);
                 profile::apply(paths, &p)?;
@@ -228,15 +233,13 @@ async fn install(sources: Vec<String>, enable: bool) -> Res<View> {
         })
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 async fn update_all() -> Res<View> {
-    tauri::async_runtime::spawn_blocking(|| {
+    blocking(|| {
         let mut seen = std::collections::HashSet::new();
-        let all: Vec<Source> = store::load(&Paths::detect())
-            .map_err(|e| format!("{e:#}"))?
+        let all: Vec<Source> = reading(store::load)?
             .into_values()
             .filter(|e| seen.insert(e.source.clone()))
             .filter_map(|e| Source::from_index(&e.source))
@@ -247,7 +250,6 @@ async fn update_all() -> Res<View> {
         fetch_then(&all, false, |paths, _| view(paths))
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command(async)]
@@ -374,11 +376,6 @@ fn with_have(items: Vec<sources::steam_workshop::Item>) -> Vec<BrowseItem> {
     items.into_iter().map(|item| BrowseItem { have: have.contains(&item.id), item }).collect()
 }
 
-/// Run a blocking Workshop request off the UI thread.
-async fn web<T: Send + 'static>(f: impl FnOnce() -> anyhow::Result<T> + Send + 'static) -> Res<T> {
-    tauri::async_runtime::spawn_blocking(move || f().map_err(|e| format!("{e:#}"))).await.map_err(|e| e.to_string())?
-}
-
 /// Details of many items, in their order (the API takes 100 at a time).
 fn details_of(ids: &[String]) -> anyhow::Result<Vec<sources::steam_workshop::Item>> {
     let mut out = vec![];
@@ -393,7 +390,7 @@ fn details_of(ids: &[String]) -> anyhow::Result<Vec<sources::steam_workshop::Ite
 
 #[tauri::command]
 async fn workshop_browse(query: sources::steam_workshop::Query) -> Res<Browse> {
-    web(move || {
+    blocking(move || -> anyhow::Result<_> {
         let res = sources::steam_workshop::browse(pz::STEAM_APP, &query)?;
         Ok(Browse { total: res.total, items: with_have(res.items) })
     })
@@ -414,7 +411,7 @@ struct WorkshopItemFull {
 /// and, for a collection, its members.
 #[tauri::command]
 async fn workshop_info(id: String) -> Res<WorkshopItemFull> {
-    web(move || {
+    blocking(move || -> anyhow::Result<_> {
         let item = sources::steam_workshop::details(&[id.as_str()])?.into_iter().next();
         let page = sources::steam_workshop::item_page(&id)?;
         let members = if item.as_ref().is_some_and(|i| i.collection) {
@@ -435,18 +432,18 @@ async fn workshop_info(id: String) -> Res<WorkshopItemFull> {
 
 #[tauri::command]
 async fn workshop_changes(id: String, page: u32) -> Res<Vec<sources::steam_workshop::ChangeNote>> {
-    web(move || sources::steam_workshop::change_notes(&id, page)).await
+    blocking(move || sources::steam_workshop::change_notes(&id, page)).await
 }
 
 #[tauri::command]
 async fn workshop_comments(creator: String, id: String, start: u32) -> Res<sources::steam_workshop::Comments> {
-    web(move || sources::steam_workshop::comments(&creator, &id, start)).await
+    blocking(move || sources::steam_workshop::comments(&creator, &id, start)).await
 }
 
 /// One page of an author's Project Zomboid items.
 #[tauri::command]
 async fn workshop_author(creator: String, page: u32) -> Res<Browse> {
-    web(move || {
+    blocking(move || -> anyhow::Result<_> {
         let (total, ids) = sources::steam_workshop::author_items(pz::STEAM_APP, &creator, page)?;
         Ok(Browse { total, items: with_have(details_of(&ids)?) })
     })
@@ -523,8 +520,8 @@ fn zb_preview(remove: bool) -> Res<Vec<String>> {
 
 #[tauri::command]
 async fn zb_install() -> Res<View> {
-    tauri::async_runtime::spawn_blocking(|| {
-        let need_mod = locked(|paths| Ok(zb_paths(paths)?.1.is_none()))?;
+    blocking(|| {
+        let need_mod = reading(|paths| Ok(zb_paths(paths)?.1.is_none()))?;
         let fetch: Vec<Source> = if need_mod { vec![Source::Workshop(zb::WORKSHOP_ID.into())] } else { vec![] };
         fetch_then(&fetch, false, |paths, _| {
             let (launcher, libs, _) = zb_paths(paths)?;
@@ -541,7 +538,6 @@ async fn zb_install() -> Res<View> {
         })
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command(async)]
@@ -565,22 +561,21 @@ fn workshop_item(row: &store::Row) -> Option<&str> {
 /// Workshop items that may provide `mod_id`, which the installed mod `needed_by` requires.
 #[tauri::command]
 async fn find_requirement(mod_id: String, needed_by: String) -> Res<Vec<sources::Candidate>> {
-    tauri::async_runtime::spawn_blocking(move || {
+    blocking(move || {
         let hint = scan(&Paths::detect()).ok().and_then(|m| m.get(&needed_by).and_then(workshop_item).map(String::from));
         let build = profile::effective_build(&Paths::detect());
-        sources::find_mod(&mod_id, hint.as_deref(), build).map_err(|e| format!("{e:#}"))
+        sources::find_mod(&mod_id, hint.as_deref(), build)
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 /// Install every requirement of enabled mods that isn't installed, when the Workshop
 /// has a confirmed match (its description declares the mod id). Returns ids still missing.
 #[tauri::command]
 async fn install_missing() -> Res<(View, Vec<String>)> {
-    tauri::async_runtime::spawn_blocking(|| {
+    blocking(|| {
         // (missing id, Workshop item of a mod that needs it), read under the lock
-        let (wanted, build) = locked(|paths| {
+        let (wanted, build) = reading(|paths| {
             let mods = scan(paths)?;
             let mut wanted: Vec<(String, Option<String>)> = vec![];
             for id in active(paths)?.enabled() {
@@ -633,22 +628,19 @@ async fn install_missing() -> Res<(View, Vec<String>)> {
         })
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 // --- updates, conflicts, servers, saves ---
 
 #[tauri::command]
 async fn check_updates() -> Res<Vec<String>> {
-    tauri::async_runtime::spawn_blocking(|| sources::check_updates(&Paths::detect()).map_err(|e| format!("{e:#}")))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(|| sources::check_updates(&Paths::detect())).await
 }
 
 /// Re-download specific mods PZMM installed.
 #[tauri::command]
 async fn update_mods(ids: Vec<String>) -> Res<View> {
-    tauri::async_runtime::spawn_blocking(move || {
+    blocking(move || {
         let index = locked(store::load)?;
         let mut seen = std::collections::HashSet::new();
         let todo: Vec<Source> = ids
@@ -660,7 +652,6 @@ async fn update_mods(ids: Vec<String>) -> Res<View> {
         fetch_then(&todo, false, |paths, _| view(paths))
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command(async)]
@@ -686,12 +677,11 @@ fn conflicts(id: String) -> Res<Vec<pz::files::Conflict>> {
 /// fetched separately from the list).
 #[tauri::command]
 async fn mod_stats() -> Res<BTreeMap<String, pz::files::Stats>> {
-    tauri::async_runtime::spawn_blocking(|| {
+    blocking(|| -> Res<_> {
         let mods = reading(scan)?;
         Ok(mods.into_iter().map(|(id, m)| (id, pz::files::stats(&m.dir))).collect())
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 #[derive(Serialize)]
@@ -705,18 +695,17 @@ struct Categories {
 /// Every mod's category (asks Steam for Workshop tags, so outside the lock).
 #[tauri::command]
 async fn categories() -> Res<Categories> {
-    tauri::async_runtime::spawn_blocking(|| {
+    blocking(|| -> Res<_> {
         let mods = reading(scan)?;
         Ok(Categories { order: pz::category::ORDER, of: pz::category::categorize(&mods) })
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 /// For every enabled mod: which enabled mods it overrides, and is overridden by.
 #[tauri::command]
 async fn conflict_summary() -> Res<std::collections::HashMap<String, pz::files::Overlap>> {
-    tauri::async_runtime::spawn_blocking(|| {
+    blocking(|| -> Res<_> {
         let order: Vec<(String, std::path::PathBuf)> = reading(|paths| {
             let mods = scan(paths)?;
             Ok(active(paths)?.enabled().into_iter().filter_map(|id| mods.get(&id).map(|m| (id, m.dir.clone()))).collect())
@@ -724,7 +713,6 @@ async fn conflict_summary() -> Res<std::collections::HashMap<String, pz::files::
         Ok(pz::files::overlaps(&order))
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 #[derive(Serialize)]
@@ -758,7 +746,7 @@ fn server_export(name: String) -> Res<Vec<String>> {
 /// Make a profile from a server config (installing missing Workshop items) and use it.
 #[tauri::command]
 async fn server_import(name: String) -> Res<View> {
-    tauri::async_runtime::spawn_blocking(move || {
+    blocking(move || {
         let (cfg, missing) = locked(|paths| {
             let cfg = pz::server::read(&pz::server::path(paths, &name)?)?;
             let have = sources::workshop_available(paths);
@@ -774,7 +762,6 @@ async fn server_import(name: String) -> Res<View> {
         })
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 /// Start the dedicated server with config `name`.
@@ -811,7 +798,7 @@ fn profile_export() -> Res<profile::Shared> {
 /// Install what a shared profile needs from the Workshop, then save and use it.
 #[tauri::command]
 async fn profile_import(shared: profile::Shared) -> Res<View> {
-    tauri::async_runtime::spawn_blocking(move || {
+    blocking(move || {
         let needs = reading(|paths| Ok(profile::import_needs(&shared, &scan(paths)?)))?;
         if !needs.is_empty() {
             pzmm_core::log!("installing {} Workshop item(s) the shared profile uses", needs.len());
@@ -823,7 +810,6 @@ async fn profile_import(shared: profile::Shared) -> Res<View> {
         })
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 #[derive(Serialize)]
@@ -865,7 +851,7 @@ fn mode_preview(mode: String) -> Res<Vec<String>> {
 /// Viewpoint (downloads, ZombieBuddy agent, profile) the first time.
 #[tauri::command]
 async fn mode_switch(mode: String) -> Res<View> {
-    tauri::async_runtime::spawn_blocking(move || {
+    blocking(move || {
         if mode != vp::KIND {
             return locked(|paths| {
                 vp::leave(paths)?;
@@ -879,7 +865,6 @@ async fn mode_switch(mode: String) -> Res<View> {
         })
     })
     .await
-    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command(async)]
@@ -938,4 +923,17 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running PZMM");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Row;
+
+    /// The UI saves slim rows: everything but kind, id/name and on is optional.
+    #[test]
+    fn slim_rows_deserialize() {
+        let rows: Vec<Row> = serde_json::from_str(r#"[{"kind":"sep","name":"Maps"},{"kind":"mod","id":"A","on":true}]"#).unwrap();
+        assert!(matches!(&rows[0], Row::Sep { name } if name == "Maps"));
+        assert!(matches!(&rows[1], Row::Mod { id, on: true, missing: false, .. } if id == "A"));
+    }
 }

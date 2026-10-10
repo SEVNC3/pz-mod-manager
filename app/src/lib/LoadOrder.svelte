@@ -3,9 +3,11 @@
   import type { Overlap, Row } from "./api";
   import type { Problem } from "./order";
 
-  let { rows, problems, overlaps, busy, onAutosort, onFix }: {
+  let { rows, problems, fixable, overlaps, busy, onAutosort, onFix }: {
     rows: Row[];
     problems: Map<string, Problem>;
+    /** How many problems Fix load order can fix. */
+    fixable: number;
     overlaps: Record<string, Overlap>;
     busy: boolean;
     onAutosort: () => void;
@@ -13,7 +15,6 @@
   } = $props();
 
   const enabled = $derived(rows.filter((r) => r.kind === "mod" && r.on).length);
-  const fixable = $derived([...problems.values()].filter((p) => p.fixable).length);
   const overridden = $derived(Object.values(overlaps).filter((o) => o.loses_to.length).length);
   const sections = $derived.by(() => {
     const out: { name: string; on: number; total: number }[] = [];
@@ -82,7 +83,6 @@
     color: var(--muted);
   }
   .lede {
-    margin: 0 0 14px;
     color: var(--muted);
   }
   .facts {

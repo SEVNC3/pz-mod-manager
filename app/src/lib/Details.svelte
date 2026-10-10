@@ -1,7 +1,8 @@
 <script lang="ts">
   import LayerIcon from "./LayerIcon.svelte";
   import Icon from "./Icon.svelte";
-  import { api, describeSource, type Candidate, type Conflict, type Details, type ModRow } from "./api";
+  import { workshopUrl } from "./format";
+  import { api, describeSource, type Candidate, type Conflict, type ModDetails, type ModRow } from "./api";
 
   let {
     id,
@@ -29,7 +30,7 @@
     onClose: () => void;
   } = $props();
 
-  let d = $state<Details | null>(null);
+  let d = $state<ModDetails | null>(null);
   let conflicts = $state<Conflict[]>([]);
   // Workshop matches for missing requirements, by mod id
   let found = $state<Record<string, Candidate[] | "loading" | string>>({});
@@ -39,7 +40,6 @@
     try {
       const list = await api.findRequirement(req, id);
       if (list[0]?.confirmed && list[0]?.fits_build) {
-        found[req] = [];
         delete found[req];
         await onInstallWorkshop(list[0].id);
       } else {
@@ -56,7 +56,6 @@
   // so rollback/remove are reflected.
   $effect(() => {
     const target = id;
-    void busy;
     if (busy) return;
     api.details(target).then((r) => {
       if (target === id) d = r;
@@ -166,7 +165,7 @@
                   {#each list.slice(0, 5) as c (c.id)}
                     <li class:best={c.confirmed && c.fits_build}>
                       <span>
-                        <button class="quiet link" onclick={() => api.openUrl(`https://steamcommunity.com/sharedfiles/filedetails/?id=${c.id}`)}>{c.title}</button>
+                        <button class="quiet link" onclick={() => api.openUrl(workshopUrl(c.id))}>{c.title}</button>
                         <span class="hint">
                           {c.subscriptions.toLocaleString()} subscribers{c.confirmed ? " · Mod ID matches" : ""}{c.required_by_author ? " · listed by the author" : ""}{c.fits_build ? "" : " · not tagged for your game build"}
                         </span>
@@ -324,8 +323,6 @@
   .hint {
     display: block;
     margin: 2px 0;
-    color: var(--muted);
-    font-size: 12px;
   }
   .cands {
     list-style: none;
@@ -344,11 +341,6 @@
     border-left: 2px solid var(--accent-text);
     margin-left: -12px;
     padding-left: 10px;
-  }
-  .link {
-    padding: 0;
-    text-decoration: underline;
-    text-underline-offset: 2px;
   }
   .ok {
     color: var(--muted);

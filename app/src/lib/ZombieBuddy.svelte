@@ -129,9 +129,6 @@
     margin: 0 0 6px;
     font-size: 22px;
   }
-  .lede {
-    margin: 0 0 14px;
-  }
   .caution {
     padding: 10px 14px;
     border-left: 3px solid var(--danger);
@@ -169,8 +166,6 @@
   }
   .hint {
     display: block;
-    color: var(--muted);
-    font-size: 12px;
     overflow-wrap: anywhere;
   }
   .needed {
@@ -200,12 +195,8 @@
     margin-top: 24px;
   }
   .link {
-    padding: 0;
-    text-decoration: underline;
+    text-underline-offset: auto;
     color: inherit;
     font-size: inherit;
-  }
-  .error {
-    color: var(--danger);
   }
 </style>

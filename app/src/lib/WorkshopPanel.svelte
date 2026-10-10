@@ -2,7 +2,10 @@
   import { onMount } from "svelte";
   import { api, type ChangeNote, type Comments, type WorkshopInfo, type WorkshopItem } from "./api";
   import { bbcode } from "./bbcode";
+  import { compact, fmtDate, fmtSize, workshopUrl } from "./format";
   import Icon from "./Icon.svelte";
+  import InstallButton from "./InstallButton.svelte";
+  import Stars from "./Stars.svelte";
 
   // The item panel: everything Steam's item page shows, plus Install.
   let { item, busy, installing, onInstall, onClose, onDependents, onInCollections, onAuthor, onOpen }: {
@@ -113,10 +116,7 @@
     api.openUrl(a.getAttribute("data-href")!);
   }
 
-  const compact = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
-  const date = (t: number) => (t ? new Date(t * 1000).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—");
-  const size = (b: number) => (b >= 1 << 20 ? `${(b / (1 << 20)).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
-  const page = (id: string) => api.openUrl(`https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`);
+  const date = (t: number) => fmtDate(t, "long") || "—";
 </script>
 
 <div class="backdrop" onclick={onClose} aria-hidden="true"></div>
@@ -151,25 +151,19 @@
     {/if}
 
     <div class="actions">
-      {#if it.have}
-        <span class="have"><Icon name="check" size={14} /> Installed</span>
-      {:else}
-        <button class="primary" disabled={busy || installing !== null} onclick={() => onInstall(it.id)}>
-          <Icon name="download" size={14} />{installing === it.id ? "Installing…" : it.collection ? `Install all ${info?.members.length || it.num_children || ""} mods` : "Install"}
-        </button>
-      {/if}
-      <button onclick={() => page(it.id)}><Icon name="steam" size={14} />Workshop page</button>
+      <InstallButton item={it} {busy} {installing} {onInstall} all={`Install all ${info?.members.length || it.num_children || ""} mods`} />
+      <button onclick={() => api.openUrl(workshopUrl(it.id))}><Icon name="steam" size={14} />Workshop page</button>
     </div>
 
     <dl class="stats">
       {#if it.votes > 0}
-        <div><dt>Rating</dt><dd class="stars">{#each [1, 2, 3, 4, 5] as n}<span class:lit={n <= it.stars}><Icon name="star" size={12} fill /></span>{/each} <span class="muted">{compact.format(it.votes)}</span></dd></div>
+        <div><dt>Rating</dt><dd class="stars"><Stars stars={it.stars} /> <span class="muted">{compact.format(it.votes)}</span></dd></div>
       {/if}
       <div><dt>Subscribers</dt><dd>{compact.format(it.subscriptions)}</dd></div>
       <div><dt>Visitors</dt><dd>{compact.format(it.views)}</dd></div>
       <div><dt>Favourites</dt><dd>{compact.format(it.favorited)}</dd></div>
       <div><dt>Comments</dt><dd>{compact.format(it.comments)}</dd></div>
-      {#if !it.collection}<div><dt>Size</dt><dd>{size(it.file_size)}</dd></div>{/if}
+      {#if !it.collection}<div><dt>Size</dt><dd>{fmtSize(it.file_size)}</dd></div>{/if}
       <div><dt>Posted</dt><dd>{date(it.time_created)}</dd></div>
       <div><dt>Updated</dt><dd>{date(it.time_updated)}</dd></div>
     </dl>
@@ -299,9 +293,6 @@
     padding: 4px;
   }
   .link {
-    padding: 0;
-    text-decoration: underline;
-    text-underline-offset: 2px;
     color: var(--muted);
     white-space: normal;
     text-align: left;
@@ -393,9 +384,6 @@
     align-items: center;
     gap: 1px;
     color: var(--line);
-  }
-  .stars .lit {
-    color: var(--accent-text);
   }
   .tags {
     display: flex;
@@ -523,9 +511,6 @@
     overflow-wrap: anywhere;
   }
   .pager {
-    display: flex;
-    align-items: center;
-    justify-content: center;
     gap: 12px;
     margin-top: 10px;
   }
@@ -534,8 +519,5 @@
   }
   .small-note {
     font-size: 12px;
-  }
-  .error {
-    color: var(--danger);
   }
 </style>

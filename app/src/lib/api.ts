@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { workshopUrl } from "./format";
 
 export type Mode = "zomboid" | "viewpoint";
 export type ModRow = {
@@ -15,7 +16,7 @@ export type ModRow = {
   only41: boolean;
   only42: boolean;
 };
-export type SepRow = { kind: "sep"; name: string };
+type SepRow = { kind: "sep"; name: string };
 export type Row = ModRow | SepRow;
 
 export type View = {
@@ -34,7 +35,7 @@ export type View = {
   build: 41 | 42 | null;
 };
 
-export type Details = {
+export type ModDetails = {
   id: string;
   name: string;
   source: string;
@@ -98,6 +99,8 @@ export type WorkshopInfo = { item: WorkshopItem | null; screenshots: string[]; v
 export type ChangeNote = { time: number; text: string };
 export type Comments = { total: number; comments: { author: string; time: number; text: string }[] };
 export type Browse = { total: number; items: WorkshopItem[] };
+/** Autosort's sections in list order, and each mod's section. */
+export type Categories = { order: string[]; of: Record<string, string> };
 export type Candidate = Omit<WorkshopItem, "have"> & { confirmed: boolean; required_by_author: boolean; fits_build: boolean };
 
 export type ZbStatus = {
@@ -139,8 +142,9 @@ export type ServersAndSaves = { servers: string[]; server_dir: string; saves: Sa
 
 export const api = {
   load: () => invoke<View>("load"),
-  save: (rows: Row[]) => invoke<View>("save", { rows }),
-  install: (sources: string[], enable = true) => invoke<View>("install", { sources, enable }),
+  // the backend only stores order, on/off and separators
+  save: (rows: Row[]) => invoke<View>("save", { rows: rows.map((r) => (r.kind === "mod" ? { kind: r.kind, id: r.id, on: r.on } : { kind: r.kind, name: r.name })) }),
+  install: (sources: string[]) => invoke<View>("install", { sources }),
   updateAll: () => invoke<View>("update_all"),
   remove: (ids: string[]) => invoke<View>("remove", { ids }),
   rollback: (id: string) => invoke<View>("rollback", { id }),
@@ -148,7 +152,7 @@ export const api = {
   profileUse: (name: string) => invoke<View>("profile_use", { name }),
   profileDelete: (name: string) => invoke<View>("profile_delete", { name }),
   setBuild: (build: 41 | 42 | null) => invoke<View>("set_build", { build }),
-  details: (id: string) => invoke<Details | null>("details", { id }),
+  details: (id: string) => invoke<ModDetails | null>("details", { id }),
   poster: (id: string) => invoke<ArrayBuffer>("poster", { id }),
   browse: (query: Query) => invoke<Browse>("workshop_browse", { query }),
   workshopInfo: (id: string) => invoke<WorkshopInfo>("workshop_info", { id }),
@@ -165,7 +169,7 @@ export const api = {
   checkUpdates: () => invoke<string[]>("check_updates"),
   updateMods: (ids: string[]) => invoke<View>("update_mods", { ids }),
   modStats: () => invoke<Record<string, Stats>>("mod_stats"),
-  categories: () => invoke<{ order: string[]; of: Record<string, string> }>("categories"),
+  categories: () => invoke<Categories>("categories"),
   conflictSummary: () => invoke<Record<string, Overlap>>("conflict_summary"),
   conflicts: (id: string) => invoke<Conflict[]>("conflicts", { id }),
   serversAndSaves: () => invoke<ServersAndSaves>("servers_and_saves"),
@@ -187,12 +191,11 @@ export const api = {
 /** Human label + page URL for a source string from the backend. */
 export function describeSource(source: string): { label: string; url: string | null } {
   const [kind, rest = ""] = source.split(/:(.*)/s);
-  const workshop = (id: string) => `https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`;
   switch (kind) {
     case "workshop":
-      return { label: "Workshop", url: workshop(rest) };
+      return { label: "Workshop", url: workshopUrl(rest) };
     case "steam":
-      return { label: "Subscribed", url: workshop(rest) };
+      return { label: "Subscribed", url: workshopUrl(rest) };
     case "github":
       return { label: "GitHub", url: `https://github.com/${rest.split("@")[0]}` };
     case "local":
