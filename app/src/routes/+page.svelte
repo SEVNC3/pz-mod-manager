@@ -357,6 +357,52 @@
     if (name) await run(`Creating profile "${name}"`, () => api.profileNew(name));
   }
 
+  // --- bulk selection: Ctrl/Cmd+click toggles, Shift+click selects a range ---
+  let picked = $state<Set<string>>(new Set());
+  let anchor = $state<string | null>(null);
+  const isOurs = (m: ModRow) => /^(workshop|github|local):/.test(m.source);
+
+  function rowClick(e: MouseEvent, id: string) {
+    if (e.shiftKey && anchor) {
+      const ids = visible.filter(({ r }) => r.kind === "mod").map(({ r }) => (r as ModRow).id);
+      const [a, b] = [ids.indexOf(anchor), ids.indexOf(id)].sort((x, y) => x - y);
+      if (a >= 0) picked = new Set(ids.slice(a, b + 1));
+    } else if (e.ctrlKey || e.metaKey) {
+      const next = new Set(picked);
+      next.has(id) ? next.delete(id) : next.add(id);
+      picked = next;
+      anchor = id;
+    } else {
+      picked = new Set([id]);
+      anchor = id;
+    }
+    selected = id;
+  }
+
+  function bulkSet(on: boolean) {
+    commit(rows.map((r) => (r.kind === "mod" && picked.has(r.id) ? { ...r, on } : r)));
+  }
+
+  /** Move the picked mods (in their current order) to just under separator `to` ("top" / "bottom"). */
+  function bulkMove(to: string) {
+    const moving = rows.filter((r) => r.kind === "mod" && picked.has(r.id));
+    const rest = rows.filter((r) => !(r.kind === "mod" && picked.has(r.id)));
+    let at = to === "top" ? 0 : to === "bottom" ? rest.length : rest.findIndex((r) => r.kind === "sep" && r.name === to) + 1;
+    if (to !== "top" && to !== "bottom" && at === 0) return;
+    commit([...rest.slice(0, at), ...moving, ...rest.slice(at)]);
+  }
+
+  function bulkRemove() {
+    const ids = [...picked].filter((id) => mods.get(id) && isOurs(mods.get(id)!));
+    if (!ids.length) return say("None of the selected mods were installed by PZMM; unsubscribe Steam mods in Steam.", true);
+    const skipped = picked.size - ids.length;
+    if (confirm(`Delete ${ids.length} mod${ids.length === 1 ? "" : "s"} from your Zomboid mods folder?${skipped ? ` (${skipped} not installed by PZMM will be left alone.)` : ""}`)) {
+      run(`Removing ${ids.length} mods`, () => api.remove(ids)).then(() => (picked = new Set()));
+    }
+  }
+
+  const separators = $derived(rows.filter((r) => r.kind === "sep").map((r) => (r as { name: string }).name));
+
   function remove(id: string) {
     if (confirm(`Delete ${id} from your Zomboid mods folder?`)) run(`Removing ${id}`, () => api.remove([id]));
   }
@@ -584,9 +630,24 @@
       <button class="primary" onclick={fixLoadOrder} disabled={busy}
         title="Enable required mods and order mods by their require / loadModAfter / loadModBefore rules">Fix load order</button>
     {/if}
-    {#if !missingReqs.size && !fixable}
+    {#if picked.size > 1}
+      <span class="bulk" role="group" aria-label="Selected mods">
+        <strong>{picked.size} selected</strong>
+        <button onclick={() => bulkSet(true)} disabled={busy}>Enable</button>
+        <button onclick={() => bulkSet(false)} disabled={busy}>Disable</button>
+        <select aria-label="Move selected mods" disabled={busy || filtering}
+          onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ""; if (v) bulkMove(v); }}>
+          <option value="">Move to…</option>
+          <option value="top">Top of the list</option>
+          {#each separators as s}<option value={s}>Under "{s}"</option>{/each}
+          <option value="bottom">Bottom of the list</option>
+        </select>
+        <button class="danger" onclick={bulkRemove} disabled={busy}>Remove</button>
+        <button class="quiet" onclick={() => (picked = new Set())}>Clear</button>
+      </span>
+    {:else if !missingReqs.size && !fixable}
       <span class="hint">
-        {filtering ? "Clear the search and filter to change load order." : "Drag to reorder · Alt+↑/↓ · Space toggles"}
+        {filtering ? "Clear the search and filter to change load order." : "Drag to reorder · Alt+↑/↓ · Space toggles · Ctrl/Shift+click selects several"}
       </span>
     {:else}
       <span class="spacer"></span>
@@ -648,10 +709,10 @@
                 </tr>
               {:else}
                 {@const src = describeSource(r.source)}
-                <tr class="mod" class:off={!r.on} class:selected={selected === r.id} class:drop={dropAt === i} class:dragging={dragFrom === i}
+                <tr class="mod" class:off={!r.on} class:selected={selected === r.id} class:picked={picked.size > 1 && picked.has(r.id)} class:drop={dropAt === i} class:dragging={dragFrom === i}
                   data-index={i} tabindex="0" draggable={!filtering}
                   aria-selected={selected === r.id}
-                  onclick={() => (selected = r.id)} onkeydown={(e) => rowKey(e, i, r)}
+                  onclick={(e) => rowClick(e, r.id)} onkeydown={(e) => rowKey(e, i, r)}
                   ondragstart={() => (dragFrom = i)} ondragend={() => { dragFrom = dropAt = null; }}
                   ondragover={(e) => { e.preventDefault(); dropAt = i; }}
                   ondrop={(e) => { e.preventDefault(); if (dragFrom !== null) move(dragFrom, i); dragFrom = dropAt = null; }}>
@@ -1013,6 +1074,16 @@
   }
   tr.mod:hover {
     background: color-mix(in oklab, var(--raised) 70%, transparent);
+  }
+  tr.mod.picked {
+    background: color-mix(in oklab, var(--accent) 10%, transparent);
+  }
+  .bulk {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    flex-wrap: wrap;
   }
   tr.mod.selected {
     background: var(--accent-soft);
