@@ -7,7 +7,6 @@
   ],
   "permissions": [
     "core:default",
-    "opener:default",
     "updater:default",
     "process:allow-restart",
     "core:window:allow-minimize",

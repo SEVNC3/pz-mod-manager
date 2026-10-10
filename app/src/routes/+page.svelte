@@ -103,7 +103,9 @@
     await settleOrder();
   }
   let selected = $state<string | null>(null);
-  let busy = $state(false);
+  /** Runs in flight: busy until every one has finished. */
+  let pending = $state(0);
+  const busy = $derived(pending > 0);
   let busyLabel = $state("");
   let log = $state<{ text: string; error: boolean }[]>([]);
   let logOpen = $state(false);
@@ -255,6 +257,23 @@
     return "info";
   }
 
+  /** Back from the game: reload, so changes made in its mod menu show before anything is saved over them. */
+  let lastFocusLoad = 0;
+  async function refreshOnFocus() {
+    if (busy || dragFrom !== null || editingSep !== null || Date.now() - lastFocusLoad < 3000) return;
+    lastFocusLoad = Date.now();
+    try {
+      const v = await api.load();
+      if (busy) return;
+      view = v;
+      rows = v.rows;
+      if (v.adopted) {
+        undoStack = redoStack = [];
+        say(`Picked up changes made in the game's mod menu (profile "${v.profile}").`);
+      }
+    } catch {}
+  }
+
   // --- actions ---
   function say(text: string, error = false) {
     log.push({ text, error });
@@ -267,7 +286,7 @@
     if (!keepHistory) undoStack = redoStack = [];
     const before = new Set(rows.flatMap((r) => (r.kind === "mod" ? [r.id] : [])));
     const knownProfiles = view?.profiles;
-    busy = true;
+    pending++;
     busyLabel = label;
     try {
       const v = await job();
@@ -289,8 +308,8 @@
       } catch {}
       return false;
     } finally {
-      busy = false;
-      busyLabel = "";
+      pending--;
+      if (!pending) busyLabel = "";
       refreshZb();
       refreshOverlaps();
       if (!keepHistory) refreshStats(); // files may have changed (installs, updates, removals)
@@ -300,8 +319,7 @@
   /** Autosort: needed mods on, grouped by category, every load rule satisfied. `record` keeps it undoable. */
   async function autosortList(record = true) {
     let c: Awaited<ReturnType<typeof api.categories>>;
-    const wasBusy = busy;
-    busy = true;
+    pending++;
     busyLabel = "Reading Workshop tags";
     try {
       c = await api.categories();
@@ -309,7 +327,7 @@
       say(String(e), true);
       return;
     } finally {
-      busy = wasBusy;
+      pending--;
     }
     const next = autosort(rows, c.of, c.order);
     const sections = next.filter((r) => r.kind === "sep").length;
@@ -554,7 +572,10 @@
   const dropShown = $derived(sectionDrag && dragFrom !== null && dropAt !== null ? sectionDrop(rows, dragFrom, dropAt) : dropAt);
 
   function dropOn(to: number) {
-    if (dragFrom === null) return;
+    if (dragFrom === null || busy) {
+      dragFrom = dropAt = null;
+      return;
+    }
     if (sectionDrag) {
       const next = moveSection(rows, dragFrom, to);
       if (next) commit(next);
@@ -689,6 +710,8 @@
   // --- keyboard: arrows move focus, Alt+arrows reorder, Space toggles ---
   async function rowKey(e: KeyboardEvent, i: number, r: Row) {
     const tr = e.currentTarget as HTMLElement;
+    const edits = e.key === " " || e.key === "Delete" || (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown"));
+    if (busy && edits) return;
     if (e.key === " " && r.kind === "mod") {
       e.preventDefault();
       toggle(r.id);
@@ -730,7 +753,7 @@
   });
 </script>
 
-<svelte:window onkeydown={globalKey} />
+<svelte:window onkeydown={globalKey} onfocus={refreshOnFocus} />
 
 <div class="app">
   <header class="top" data-tauri-drag-region>
@@ -1028,7 +1051,7 @@
                   ondragstart={() => (dragFrom = i)} ondragend={() => { dragFrom = dropAt = null; }}
                   ondragover={(e) => { e.preventDefault(); dropAt = i; }}
                   ondrop={(e) => { e.preventDefault(); dropOn(i); }}
-                  ondblclick={() => (editingSep = i)} onkeydown={(e) => editingSep !== i && rowKey(e, i, r)}>
+                  ondblclick={() => !busy && (editingSep = i)} onkeydown={(e) => editingSep !== i && rowKey(e, i, r)}>
                   <td class="grip" aria-hidden="true">⠿</td>
                   <td colspan="7">
                     {#if editingSep === i}

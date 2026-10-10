@@ -176,16 +176,20 @@ fn active(paths: &Paths) -> anyhow::Result<Profile> {
     Ok(profile::sync(paths)?.0)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn load() -> Res<View> {
     locked(view)
 }
 
 /// Save the whole list (order, on/off, separators) to the active profile and the game.
-#[tauri::command]
+#[tauri::command(async)]
 fn save(rows: Vec<Row>) -> Res<View> {
     locked(|paths| {
-        let mut p = active(paths)?;
+        let (mut p, adopted) = profile::sync(paths)?;
+        if adopted {
+            // the rows were drawn before the game's mod menu changed the list; saving them would undo that
+            anyhow::bail!("The mod list was changed in the game's mod menu, so PZMM reloaded it. Make your change again.");
+        }
         p.lines = rows
             .into_iter()
             .map(|r| match r {
@@ -246,7 +250,7 @@ async fn update_all() -> Res<View> {
     .map_err(|e| e.to_string())?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn remove(ids: Vec<String>) -> Res<View> {
     locked(|paths| {
         let refused = store::remove(paths, &ids)?;
@@ -260,7 +264,7 @@ fn remove(ids: Vec<String>) -> Res<View> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn rollback(id: String) -> Res<View> {
     locked(|paths| {
         store::rollback(paths, &id)?;
@@ -269,7 +273,7 @@ fn rollback(id: String) -> Res<View> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn profile_new(name: String) -> Res<View> {
     locked(|paths| {
         if profile::exists(paths, &name) {
@@ -283,7 +287,7 @@ fn profile_new(name: String) -> Res<View> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn profile_use(name: String) -> Res<View> {
     locked(|paths| {
         profile::apply(paths, &profile::load(paths, &name)?)?;
@@ -291,7 +295,7 @@ fn profile_use(name: String) -> Res<View> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn profile_delete(name: String) -> Res<View> {
     locked(|paths| {
         profile::delete(paths, &name)?;
@@ -299,7 +303,7 @@ fn profile_delete(name: String) -> Res<View> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn set_build(build: Option<u8>) -> Res<View> {
     locked(|paths| {
         profile::set_b41(paths, build.map(|b| b == 41))?;
@@ -320,7 +324,7 @@ struct Details {
     has_backup: bool,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn details(id: String) -> Res<Option<Details>> {
     reading(|paths| {
         let Some(m) = scan(paths)?.remove(&id) else { return Ok(None) };
@@ -338,7 +342,7 @@ fn details(id: String) -> Res<Option<Details>> {
 }
 
 /// The mod's poster image as raw bytes (empty if none).
-#[tauri::command]
+#[tauri::command(async)]
 fn poster(id: String) -> Res<tauri::ipc::Response> {
     reading(|paths| {
         let Some(m) = scan(paths)?.remove(&id) else { return Ok(vec![]) };
@@ -474,7 +478,7 @@ fn zb_paths(paths: &Paths) -> anyhow::Result<ZbPaths> {
     Ok((launcher, libs, mods))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn zb_status() -> Res<ZbStatus> {
     reading(|paths| {
         let (launcher, libs, mods) = zb_paths(paths)?;
@@ -496,7 +500,7 @@ fn zb_status() -> Res<ZbStatus> {
 }
 
 /// What setting up (or removing) ZombieBuddy would change, for the confirmation dialog.
-#[tauri::command]
+#[tauri::command(async)]
 fn zb_preview(remove: bool) -> Res<Vec<String>> {
     reading(|paths| {
         let (launcher, libs, _) = zb_paths(paths)?;
@@ -540,7 +544,7 @@ async fn zb_install() -> Res<View> {
     .map_err(|e| e.to_string())?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn zb_uninstall() -> Res<View> {
     locked(|paths| {
         let Some(l) = zb_paths(paths)?.0 else { anyhow::bail!("Project Zomboid's game folder wasn't found in your Steam libraries") };
@@ -659,12 +663,13 @@ async fn update_mods(ids: Vec<String>) -> Res<View> {
     .map_err(|e| e.to_string())?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn conflicts(id: String) -> Res<Vec<pz::files::Conflict>> {
-    reading(|paths| {
+    // collect paths under the lock, walk their files after it (other commands wait on the lock)
+    let found = reading(|paths| {
         let mods = scan(paths)?;
         let enabled = active(paths)?.enabled();
-        let Some(mine) = mods.get(&id) else { return Ok(vec![]) };
+        let Some(mine) = mods.get(&id) else { return Ok(None) };
         let my_pos = enabled.iter().position(|e| *e == id).unwrap_or(usize::MAX);
         let others: Vec<(String, std::path::PathBuf, usize)> = enabled
             .iter()
@@ -672,8 +677,9 @@ fn conflicts(id: String) -> Res<Vec<pz::files::Conflict>> {
             .filter(|(_, e)| **e != id)
             .filter_map(|(pos, e)| mods.get(e).map(|m| (e.clone(), m.dir.clone(), pos)))
             .collect();
-        Ok(pz::files::conflicts(&mine.dir, my_pos, &others))
-    })
+        Ok(Some((mine.dir.clone(), my_pos, others)))
+    })?;
+    Ok(found.map(|(dir, pos, others)| pz::files::conflicts(&dir, pos, &others)).unwrap_or_default())
 }
 
 /// Folder size and newest file time of every mod (walks all their files, so it's
@@ -711,12 +717,11 @@ async fn categories() -> Res<Categories> {
 #[tauri::command]
 async fn conflict_summary() -> Res<std::collections::HashMap<String, pz::files::Overlap>> {
     tauri::async_runtime::spawn_blocking(|| {
-        reading(|paths| {
+        let order: Vec<(String, std::path::PathBuf)> = reading(|paths| {
             let mods = scan(paths)?;
-            let order: Vec<(String, std::path::PathBuf)> =
-                active(paths)?.enabled().into_iter().filter_map(|id| mods.get(&id).map(|m| (id, m.dir.clone()))).collect();
-            Ok(pz::files::overlaps(&order))
-        })
+            Ok(active(paths)?.enabled().into_iter().filter_map(|id| mods.get(&id).map(|m| (id, m.dir.clone()))).collect())
+        })?;
+        Ok(pz::files::overlaps(&order))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -729,7 +734,7 @@ struct ServersAndSaves {
     saves: Vec<pz::saves::Save>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn servers_and_saves() -> Res<ServersAndSaves> {
     reading(|paths| {
         Ok(ServersAndSaves {
@@ -741,7 +746,7 @@ fn servers_and_saves() -> Res<ServersAndSaves> {
 }
 
 /// Write the active profile into `Server/<name>.ini`. Returns notes for the user.
-#[tauri::command]
+#[tauri::command(async)]
 fn server_export(name: String) -> Res<Vec<String>> {
     reading(|paths| {
         let notes = pz::server::export(paths, &name, &active(paths)?.enabled(), &scan(paths)?)?;
@@ -773,7 +778,7 @@ async fn server_import(name: String) -> Res<View> {
 }
 
 /// Start the dedicated server with config `name`.
-#[tauri::command]
+#[tauri::command(async)]
 fn server_start(name: String) -> Res<String> {
     reading(|paths| {
         let script = pz::server::start(paths, &name)?;
@@ -783,7 +788,7 @@ fn server_start(name: String) -> Res<String> {
 }
 
 /// Make a profile from a save's mod list and use it.
-#[tauri::command]
+#[tauri::command(async)]
 fn save_use(mode: String, name: String) -> Res<View> {
     locked(|paths| {
         let save = pz::saves::list(paths).into_iter().find(|s| s.mode == mode && s.name == name);
@@ -798,7 +803,7 @@ fn save_use(mode: String, name: String) -> Res<View> {
 use pzmm_core::pz::viewpoint as vp;
 
 /// The active profile packaged for sharing.
-#[tauri::command]
+#[tauri::command(async)]
 fn profile_export() -> Res<profile::Shared> {
     reading(|paths| profile::export(paths, &scan(paths)?))
 }
@@ -830,7 +835,7 @@ struct ErrorsByMod {
 }
 
 /// Lua errors in the last game session's console.txt, per mod.
-#[tauri::command]
+#[tauri::command(async)]
 fn console_errors() -> Res<Vec<ErrorsByMod>> {
     reading(|paths| {
         let mods = scan(paths)?;
@@ -845,13 +850,13 @@ fn console_errors() -> Res<Vec<ErrorsByMod>> {
 }
 
 /// Health check of the active profile and server configs.
-#[tauri::command]
+#[tauri::command(async)]
 fn doctor() -> Res<Vec<pz::doctor::Finding>> {
     reading(|paths| Ok(pz::doctor::check(paths, &active(paths)?.enabled(), &scan(paths)?, profile::effective_build(paths))))
 }
 
 /// What switching to `mode` would do, for the confirmation panel.
-#[tauri::command]
+#[tauri::command(async)]
 fn mode_preview(mode: String) -> Res<Vec<String>> {
     reading(|paths| vp::preview(paths, &mode, &scan(paths)?))
 }
@@ -877,12 +882,16 @@ async fn mode_switch(mode: String) -> Res<View> {
     .map_err(|e| e.to_string())?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn open_path(app: AppHandle, path: String) -> Res<()> {
+    // folders only: a file path here could launch a program
+    if !std::path::Path::new(&path).is_dir() {
+        return Err(format!("not a folder: {path}"));
+    }
     app.opener().open_path(path, None::<&str>).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn open_url(app: AppHandle, url: String) -> Res<()> {
     if !(url.starts_with("https://") || url == format!("steam://rungameid/{}", pz::STEAM_APP)) {
         return Err(format!("refusing to open {url}"));
