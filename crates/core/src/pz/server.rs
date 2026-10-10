@@ -147,6 +147,46 @@ pub fn write(path: &Path, mods: &[String], workshop: &[String], maps: &[String],
 /// `arranged`, else as the config has them: see [`map_order`]). Returns notes for the user
 /// (the summary first, then anything the server won't get automatically).
 pub fn export(paths: &Paths, name: &str, enabled: &[String], mods: &std::collections::BTreeMap<String, crate::store::Row>, arranged: Option<&[String]>) -> Result<Vec<String>> {
+    let (file, w) = plan(paths, name, enabled, mods, arranged)?;
+    write(&file, &w.ids, &w.workshop, &w.maps, crate::profile::effective_build(paths) == 41)?;
+    let mut notes = w.notes;
+    notes.insert(0, format!("Wrote {} mods and {} Workshop items to {}", w.ids.len(), w.workshop.len(), file.display()));
+    Ok(notes)
+}
+
+/// What `export` would change in `Server/<name>.ini`, for a confirmation first.
+#[derive(Debug, Default, PartialEq, serde::Serialize)]
+pub struct Preview {
+    /// The file doesn't exist yet.
+    pub new: bool,
+    pub added: Vec<String>,
+    pub removed: Vec<String>,
+    /// `Map=` now and after (the same when it stays as it is).
+    pub maps_from: Vec<String>,
+    pub maps_to: Vec<String>,
+}
+
+pub fn preview(paths: &Paths, name: &str, enabled: &[String], mods: &std::collections::BTreeMap<String, crate::store::Row>, arranged: Option<&[String]>) -> Result<Preview> {
+    let (file, w) = plan(paths, name, enabled, mods, arranged)?;
+    let now = if file.exists() { read(&file).with_context(|| format!("reading {}", file.display()))? } else { ServerMods::default() };
+    Ok(Preview {
+        new: !file.exists(),
+        added: w.ids.iter().filter(|i| !now.mods.contains(i)).cloned().collect(),
+        removed: now.mods.iter().filter(|i| !w.ids.contains(i)).cloned().collect(),
+        maps_to: if w.maps.is_empty() { now.maps.clone() } else { w.maps },
+        maps_from: now.maps,
+    })
+}
+
+/// The lines `export` writes, and notes about mods the server won't get.
+struct Written {
+    ids: Vec<String>,
+    workshop: Vec<String>,
+    maps: Vec<String>,
+    notes: Vec<String>,
+}
+
+fn plan(paths: &Paths, name: &str, enabled: &[String], mods: &std::collections::BTreeMap<String, crate::store::Row>, arranged: Option<&[String]>) -> Result<(PathBuf, Written)> {
     let (mut ids, mut workshop, mut notes) = (vec![], vec![], vec![]);
     for id in enabled {
         let Some(m) = mods.get(id) else {
@@ -167,9 +207,7 @@ pub fn export(paths: &Paths, name: &str, enabled: &[String], mods: &std::collect
     let file = path(paths, name)?;
     let current = read(&file).map(|c| c.maps).unwrap_or_default();
     let maps = map_order(arranged.unwrap_or(&current), &mod_maps(&ids, mods, build));
-    write(&file, &ids, &workshop, &maps, build == 41)?;
-    notes.insert(0, format!("Wrote {} mods and {} Workshop items to {}", ids.len(), workshop.len(), file.display()));
-    Ok(notes)
+    Ok((file, Written { ids, workshop, maps, notes }))
 }
 
 /// The script that starts a dedicated server: the Dedicated Server tool (`PZ_SERVER_DIR`, the
@@ -283,6 +321,31 @@ mod tests {
         let ids = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
         assert_eq!(mod_maps(&ids(&["Town"]), &mods, 41), ids(&["Old Town"]));
         assert_eq!(mod_maps(&ids(&["Town"]), &mods, 42), ids(&["Town", "Town Extra"]));
+    }
+
+    #[test]
+    fn preview_lists_what_writing_changes() {
+        let (_t, paths) = crate::store::tests::temp_paths();
+        let row = |source: &str| crate::store::Row {
+            id: String::new(),
+            name: String::new(),
+            source: source.into(),
+            dir: PathBuf::new(),
+            info: PathBuf::new(),
+            requires: vec![],
+            incompatible: vec![],
+            load_after: vec![],
+            load_before: vec![],
+            supports_41: true,
+            supports_42: true,
+        };
+        let mods = [("A".to_string(), row("steam:1")), ("B".to_string(), row("steam:2"))].into();
+        let ids = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(preview(&paths, "srv", &ids(&["A"]), &mods, None).unwrap(), Preview { new: true, added: ids(&["A"]), ..Default::default() });
+        assert!(!path(&paths, "srv").unwrap().exists(), "a preview writes nothing");
+        export(&paths, "srv", &ids(&["A"]), &mods, None).unwrap();
+        let p = preview(&paths, "srv", &ids(&["B"]), &mods, None).unwrap();
+        assert_eq!((p.new, p.added, p.removed), (false, ids(&["B"]), ids(&["A"])));
     }
 
     #[test]

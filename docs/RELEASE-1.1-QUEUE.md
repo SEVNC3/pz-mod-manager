@@ -163,18 +163,18 @@ Rebuilt from scratch: the Workshop mod (3360392628) forbids redistributing its c
 
 ## P7: the ideas list, built for 1.1
 
-67. [ ] "What changed" for updates: the change notes since your installed version, before and after updating.
-68. [ ] List snapshots before updates and autosort, with Restore.
-69. [ ] Rename and duplicate profiles; paste a share code from the clipboard.
-70. [ ] A right-click row menu in My mods (and the load order list).
-71. [ ] A Browse… button for zips and folders.
-72. [ ] "Hide installed" in the Workshop.
-73. [ ] Cancel and n-of-m progress for installs.
-74. [ ] Back in the item panel, including after "Mods that need this".
-75. [ ] Install for missing mods and "Disable X" on incompatibilities, right in the findings.
-76. [ ] Previews before writing a server .ini or switching to a save's mods.
-77. [ ] A copyable activity log with times.
-78. [ ] Launch game warns about problems first.
+67. [x] "What changed" for updates: the change notes since your installed version, before and after updating.
+68. [x] List snapshots before updates and autosort, with Restore.
+69. [x] Rename and duplicate profiles; paste a share code from the clipboard.
+70. [x] A right-click row menu in My mods (and the load order list).
+71. [x] A Browse… button for zips and folders.
+72. [x] "Hide installed" in the Workshop.
+73. [x] Cancel and n-of-m progress for installs.
+74. [x] Back in the item panel, including after "Mods that need this".
+75. [x] Install for missing mods and "Disable X" on incompatibilities, right in the findings.
+76. [x] Previews before writing a server .ini or switching to a save's mods.
+77. [x] A copyable activity log with times.
+78. [x] Launch game warns about problems first.
 
 ## Ideas for after 1.1 (ux 25)
 

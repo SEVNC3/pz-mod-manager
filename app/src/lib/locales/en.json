@@ -59,7 +59,15 @@
       "one": "{count} enabled mod needs ZombieBuddy, which isn't set up completely (a game update may have reset it).",
       "other": "{count} enabled mods need ZombieBuddy, which isn't set up completely (a game update may have reset it)."
     },
-    "zbSetup": "Set up ZombieBuddy"
+    "zbSetup": "Set up ZombieBuddy",
+    "profileNamePlaceholder": "Profile name",
+    "rename": "Rename",
+    "duplicate": "Duplicate",
+    "copyName": "{name} copy",
+    "browse": "Browse…",
+    "browseTip": "Install a mod from a .zip file or a folder on this computer",
+    "browseZip": ".zip files…",
+    "browseFolder": "A mod folder…"
   },
   "mods": {
     "searchPlaceholder": "Search mods  ( / )",
@@ -145,7 +153,11 @@
     },
     "restoring": "Restoring {id}",
     "zbSetup": "Setting up ZombieBuddy",
-    "zbRemove": "Removing ZombieBuddy"
+    "zbRemove": "Removing ZombieBuddy",
+    "copyingProfile": "Copying the profile as \"{name}\"",
+    "renamingProfile": "Renaming the profile to \"{name}\"",
+    "restoringSnapshot": "Restoring a snapshot",
+    "lookingUp": "Looking up {id} on the Workshop"
   },
   "log": {
     "appLatest": "PZMM {version} is the latest version.",
@@ -178,7 +190,14 @@
     "bisectFound": "Found it: {id} causes the problem. Your mod list is restored.",
     "bisectNone": "The problem didn't follow any single mod. Your mod list is restored.",
     "sectionExists": "There's already a section called \"{name}\". Pick another name.",
-    "noneOurs": "None of the selected mods were installed by PZMM; unsubscribe Steam mods in Steam."
+    "noneOurs": "None of the selected mods were installed by PZMM; unsubscribe Steam mods in Steam.",
+    "logCopied": "Copied the activity log (your user name is hidden in paths).",
+    "logCopyFailed": "Couldn't copy the activity log: {error}",
+    "snapshotFailed": "Couldn't keep a snapshot of the profile, so nothing was changed: {error}",
+    "updated": "Updated {name}.",
+    "snapshotRestored": "Restored the snapshot. The list it replaced is a snapshot too.",
+    "pickRequirement": "No Workshop item clearly provides {id}: pick one under Requires in the details.",
+    "idCopied": "Copied {id}."
   },
   "confirm": {
     "group": "Group by category replaces your own sections ({sections}) with category sections. Ctrl+Z undoes it. Group now?",
@@ -636,7 +655,10 @@
     "description": "Description",
     "restore": "Restore previous version",
     "steamNote": "This mod comes from your Steam subscriptions. Unsubscribe in Steam to remove it.",
-    "unsubscribe": "Unsubscribe on the Workshop page"
+    "unsubscribe": "Unsubscribe on the Workshop page",
+    "whatChanged": "What changed since your version",
+    "loadingChanges": "Reading the change notes…",
+    "noChangeNotes": "The author didn't write change notes for this update."
   },
   "loadOrder": {
     "title": "Load order",
@@ -688,7 +710,8 @@
       "other": "{count} errors, first at <span class=\"mono\">{example}</span>"
     },
     "unexplained": "Something breaks but nothing above explains it?",
-    "halves": "PZMM halves your enabled mods each time you test the game."
+    "halves": "PZMM halves your enabled mods each time you test the game.",
+    "disable": "Disable {id}"
   },
   "settings": {
     "label": "Settings",
@@ -876,11 +899,19 @@
     "tip": "Profile: the mod list you're playing",
     "menuLabel": "Profiles",
     "newProfile": "New profile…",
-    "setUpViewpoint": "Set up Project Viewpoint…"
+    "setUpViewpoint": "Set up Project Viewpoint…",
+    "rename": "Rename…",
+    "duplicate": "Duplicate…",
+    "snapshots": "Snapshots…"
   },
   "activity": {
     "title": "Activity",
-    "empty": "Installs, updates and errors show up here."
+    "empty": "Installs, updates and errors show up here.",
+    "progress": "{done} of {total}",
+    "cancelTip": "Stop the download. Mods that finished downloading still install.",
+    "copy": "Copy log",
+    "copyTip": "Copy the log with times (your user name is hidden in paths)",
+    "whatChanged": "What changed"
   },
   "links": {
     "label": "PZMM links",
@@ -1051,7 +1082,11 @@
     "pagesLabel": "Pages",
     "previous": "Previous",
     "pageOf": "Page {page} of {pages}",
-    "next": "Next"
+    "next": "Next",
+    "hideInstalled": "Hide installed",
+    "hideInstalledTip": "Leave out mods you already have (installed or subscribed)",
+    "back": "Back",
+    "backTip": "Back (Alt+Left)"
   },
   "panel": {
     "moreByAuthorTip": "More mods by this author",
@@ -1099,5 +1134,58 @@
   },
   "installButton": {
     "installAll": "Install all"
+  },
+  "snapshots": {
+    "title": "Snapshots of \"{profile}\"",
+    "intro": "PZMM keeps the last 10 lists from before updates, Autosort, grouping, removing mods and imports.",
+    "counts": {
+      "one": "{enabled} of {count} mod enabled",
+      "other": "{enabled} of {count} mods enabled"
+    },
+    "restore": "Restore",
+    "none": "No snapshots yet.",
+    "why": {
+      "update": "Before updating mods",
+      "autosort": "Before Autosort",
+      "group": "Before Group by category",
+      "remove": "Before removing mods",
+      "import": "Before an import",
+      "restore": "Before a restore"
+    }
+  },
+  "preview": {
+    "updatesProfile": "Updates the profile \"{name}\": its list is replaced; its sections and disabled mods stay.",
+    "createsProfile": "Creates the profile \"{name}\" and switches to it.",
+    "saveTitle": "Use the mods of {save}?",
+    "useMods": "Use these mods",
+    "sameMods": "The enabled mods stay the same.",
+    "added": {
+      "one": "Adds {count} mod: {ids}",
+      "other": "Adds {count} mods: {ids}"
+    },
+    "removed": {
+      "one": "Removes {count} mod: {ids}",
+      "other": "Removes {count} mods: {ids}"
+    },
+    "newFile": "Creates {file}.",
+    "map": "Map= changes from {from} to {to}",
+    "serverTitle": "Write this profile to {file}?",
+    "write": "Write"
+  },
+  "launch": {
+    "title": {
+      "one": "{count} problem in your mod list. The game may skip mods or fail to load.",
+      "other": "{count} problems in your mod list. The game may skip mods or fail to load."
+    },
+    "notInstalled": "{id}: enabled but not installed",
+    "fix": "Fix",
+    "anyway": "Launch anyway"
+  },
+  "menu": {
+    "label": "{name}: actions",
+    "toTop": "Move to the top of the load order",
+    "toBottom": "Move to the bottom of the load order",
+    "copyId": "Copy mod ID",
+    "showInMaps": "Show in Maps"
   }
 }

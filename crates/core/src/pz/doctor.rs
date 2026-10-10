@@ -21,14 +21,24 @@ pub struct Finding {
     /// The mod or file it's about.
     pub subject: String,
     pub text: String,
+    /// What would fix it, for a button beside it.
+    pub action: Option<Action>,
+}
+
+/// A fix the UI can offer: install a missing mod, or disable a clashing one.
+#[derive(Debug, PartialEq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Action {
+    Install(String),
+    Disable(String),
 }
 
 fn err(subject: &str, text: String) -> Finding {
-    Finding { level: Level::Error, subject: subject.into(), text }
+    Finding { level: Level::Error, subject: subject.into(), text, action: None }
 }
 
 fn warn(subject: &str, text: String) -> Finding {
-    Finding { level: Level::Warning, subject: subject.into(), text }
+    Finding { level: Level::Warning, subject: subject.into(), text, action: None }
 }
 
 /// Check the enabled mods (in load order) for `build` (41/42), against everything
@@ -48,14 +58,14 @@ pub fn check(paths: &Paths, enabled: &[String], mods: &BTreeMap<String, Row>, bu
         for r in &m.requires {
             match pos.get(r.as_str()) {
                 None if mods.contains_key(r) => out.push(err(id, format!("needs {r}, which is disabled"))),
-                None => out.push(err(id, format!("needs {r}, which isn't installed"))),
+                None => out.push(Finding { action: Some(Action::Install(r.clone())), ..err(id, format!("needs {r}, which isn't installed")) }),
                 Some(&j) if j > i => out.push(err(id, format!("needs {r}, which loads after it"))),
                 Some(_) => {}
             }
         }
         for x in &m.incompatible {
             if pos.contains_key(x.as_str()) {
-                out.push(err(id, format!("is incompatible with {x}, which is also enabled")));
+                out.push(Finding { action: Some(Action::Disable(x.clone())), ..err(id, format!("is incompatible with {x}, which is also enabled")) });
             }
         }
         for a in &m.load_after {
@@ -232,6 +242,11 @@ mod tests {
         assert!(texts.iter().any(|t| t.starts_with("New: needs Lib, which is disabled")), "{texts:?}");
         assert!(texts.iter().any(|t| t.starts_with("Old: is built for Build 41")), "{texts:?}");
         assert!(texts.iter().any(|t| t.starts_with("Gone: enabled but not installed")), "{texts:?}");
+        // fixes the UI can offer: install what's missing, disable the other of an incompatible pair
+        let mut clash = mods.clone();
+        clash.insert("Old".into(), Row { requires: vec!["Lib2".into()], incompatible: vec!["New".into()], ..mods["Old"].clone() });
+        let actions: Vec<_> = check(&paths, &["New".into(), "Lib".into(), "Old".into()], &clash, 41).into_iter().filter_map(|f| f.action).collect();
+        assert_eq!(actions, [Action::Install("Lib2".into()), Action::Disable("New".into())]);
 
         fs::create_dir_all(paths.zomboid.join("Server")).unwrap();
         fs::write(paths.zomboid.join("Server/srv.ini"), "Mods=New;Lib\nWorkshopItems=2\nMap=Muldraugh, KY\n").unwrap();

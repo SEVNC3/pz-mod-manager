@@ -4,13 +4,16 @@
   import { t, th } from "./i18n.svelte";
 
   // The setup check (findings, Lua errors from the last game) and the find-the-broken-mod rounds.
-  let { findings, gameErrors, bisect, busy, onClose, onSelect, onBisectStart, onBisectAnswer, onBisectStop }: {
+  let { findings, gameErrors, bisect, busy, onClose, onSelect, onInstall, onDisable, onBisectStart, onBisectAnswer, onBisectStop }: {
     findings: Finding[] | null;
     gameErrors: ModErrors[];
     bisect: { suspects: string[]; testing: string[]; round: number } | null;
     busy: boolean;
     onClose: () => void;
     onSelect: (id: string) => void;
+    /** A finding's fixes: install the missing mod `id` that `by` needs; disable mod `id`. */
+    onInstall: (id: string, by: string) => void;
+    onDisable: (id: string) => void;
     onBisectStart: () => void;
     onBisectAnswer: (stillBroken: boolean) => void;
     onBisectStop: () => void;
@@ -43,7 +46,15 @@
     {#if findings.length}
       <ul>
         {#each findings as f}
-          <li class={f.level}><span class="mono">{f.subject}</span> {f.text}</li>
+          <li class={f.level}><span class="mono">{f.subject}</span> {f.text}
+            {#if f.action?.install}
+              {@const id = f.action.install}
+              <button class="fix" onclick={() => onInstall(id, f.subject)} disabled={busy}><Icon name="download" size={12} />{t("common.install")}</button>
+            {:else if f.action?.disable}
+              {@const id = f.action.disable}
+              <button class="fix" onclick={() => onDisable(id)} disabled={busy}><Icon name="x" size={12} />{t("findings.disable", { id })}</button>
+            {/if}
+          </li>
         {/each}
       </ul>
     {/if}
@@ -100,5 +111,9 @@
   }
   .link {
     padding: 0 4px;
+  }
+  .fix {
+    padding: 1px 10px;
+    font-size: 12px;
   }
 </style>

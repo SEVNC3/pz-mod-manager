@@ -303,6 +303,47 @@ fn profile_use(name: String) -> Res<View> {
     })
 }
 
+/// Rename profile `from` to `to` (any profile, the active one included).
+#[tauri::command(async)]
+fn profile_rename(from: String, to: String) -> Res<View> {
+    locked(|paths| {
+        profile::rename(paths, &from, to.trim())?;
+        view(paths)
+    })
+}
+
+/// Copy profile `from` as `to`, staying on the active profile.
+#[tauri::command(async)]
+fn profile_duplicate(from: String, to: String) -> Res<View> {
+    locked(|paths| {
+        profile::duplicate(paths, &from, to.trim())?;
+        pzmm_core::log!("Copied the profile \"{from}\" as \"{}\".", to.trim());
+        view(paths)
+    })
+}
+
+/// Keep the active profile as it's saved now, before a change labelled `label`.
+#[tauri::command(async)]
+fn profile_snapshot(label: String) -> Res<()> {
+    reading(|paths| profile::snapshot(paths, &active(paths)?.name, &label))
+}
+
+/// The active profile's snapshots, newest first.
+#[tauri::command(async)]
+fn profile_snapshots() -> Res<Vec<profile::SnapshotInfo>> {
+    reading(|paths| Ok(profile::snapshots(paths, &profile::active_name(paths))))
+}
+
+/// Put the active profile back as snapshot `id` had it (its current state is snapshotted first).
+#[tauri::command(async)]
+fn snapshot_restore(id: String) -> Res<View> {
+    locked(|paths| {
+        let p = profile::restore(paths, &active(paths)?.name, &id)?;
+        profile::apply(paths, &p, profile::maps_scan(scan(paths)).as_ref())?;
+        view(paths)
+    })
+}
+
 #[tauri::command(async)]
 fn profile_delete(name: String) -> Res<View> {
     locked(|paths| {
@@ -330,6 +371,8 @@ struct Details {
     info: BTreeMap<String, String>,
     ours: bool,
     has_backup: bool,
+    /// It adds maps on the build being played.
+    maps: bool,
 }
 
 #[tauri::command(async)]
@@ -340,6 +383,7 @@ fn details(id: String) -> Res<Option<Details>> {
         Ok(Some(Details {
             info: pz::read_info(&m.info).into_iter().collect(),
             has_backup: store::has_backup(paths, &id),
+            maps: !pz::maps::folder_names(&m.dir, profile::effective_build(paths)).is_empty(),
             dir: m.dir.display().to_string(),
             id: m.id,
             name: m.name,
@@ -439,6 +483,22 @@ async fn workshop_info(id: String) -> Res<WorkshopItemFull> {
 #[tauri::command]
 async fn workshop_changes(id: String, page: u32) -> Res<Vec<sources::steam_workshop::ChangeNote>> {
     blocking(move || sources::steam_workshop::change_notes(&id, page)).await
+}
+
+/// The Workshop change notes since the installed version of mod `id` (PZMM's Workshop installs only).
+#[tauri::command]
+async fn mod_changes(id: String) -> Res<Vec<sources::steam_workshop::ChangeNote>> {
+    blocking(move || -> Res<_> {
+        let found = reading(|paths| {
+            let index = store::load(paths)?;
+            Ok(index.get(&id).and_then(|e| Some((e.source.strip_prefix("workshop:")?.to_string(), sources::installed_at(paths, &id, e)))))
+        })?;
+        match found {
+            Some((item, since)) => sources::steam_workshop::change_notes_since(&item, since).map_err(|e| format!("{e:#}")),
+            None => Ok(vec![]),
+        }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -763,6 +823,12 @@ fn server_export(name: String, maps: Vec<String>) -> Res<Vec<String>> {
         notes.iter().for_each(|n| pzmm_core::log!("{n}"));
         Ok(notes)
     })
+}
+
+/// What writing the active profile to `Server/<name>.ini` would change (see `server_export`).
+#[tauri::command(async)]
+fn server_preview(name: String, maps: Vec<String>) -> Res<pz::server::Preview> {
+    reading(|paths| pz::server::preview(paths, &name, &active(paths)?.enabled(), &scan(paths)?, Some(maps.as_slice()).filter(|m| !m.is_empty())))
 }
 
 /// Make a profile from a server config (installing missing Workshop items) and use it.
@@ -1233,6 +1299,30 @@ async fn pick_folder(app: AppHandle, start: String) -> Res<Option<String>> {
     .await
 }
 
+/// Zips (or a folder) to install, picked in the system dialog.
+#[tauri::command]
+async fn pick_install(app: AppHandle, folder: bool) -> Res<Vec<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    blocking(move || -> anyhow::Result<_> {
+        let dialog = app.dialog().file();
+        let picked = if folder { dialog.blocking_pick_folder().into_iter().collect() } else { dialog.add_filter("Zip", &["zip"]).blocking_pick_files().unwrap_or_default() };
+        Ok(picked.into_iter().filter_map(|p| p.into_path().ok()).map(|p| p.display().to_string()).collect())
+    })
+    .await
+}
+
+/// Cancel the SteamCMD download in progress: what it finished still installs.
+#[tauri::command]
+fn install_stop() {
+    sources::STOP.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// `text` with the Windows (or Linux) user name hidden in paths, like the diagnostics.
+#[tauri::command]
+fn mask_user(text: String) -> String {
+    pz::doctor::mask_home_user(&text)
+}
+
 /// Save the GitHub token in the OS credential store (empty: forget it).
 #[tauri::command(async)]
 fn github_token_set(token: String) -> Res<()> {
@@ -1298,16 +1388,20 @@ pub fn run() {
             pzmm_core::set_log_sink(move |line| {
                 let _ = handle.emit("log", line.to_string());
             });
+            let handle = app.handle().clone();
+            pzmm_core::set_progress_sink(move |done, total| {
+                let _ = handle.emit("progress", (done, total));
+            });
             pzmm_core::sweep_temp(&Paths::detect());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
-            details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, workshop_comments, workshop_author, zb_status, zb_preview, zb_install, zb_uninstall,
-            find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_export, server_import, server_start, save_use,
+            load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, profile_rename, profile_duplicate, profile_snapshot, profile_snapshots, snapshot_restore, set_build,
+            details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, mod_changes, workshop_comments, workshop_author, zb_status, zb_preview, zb_install, zb_uninstall,
+            find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_preview, server_export, server_import, server_start, save_use,
             maps_view, map_grid, map_quick_select, map_line, map_order_save, maps_export, map_check, map_check_stop, map_scan, map_scan_stop, map_presets, map_preset_set, map_server_compare,
             mode_preview, mode_switch, doctor, console_errors, profile_export, profile_import,
-            launch_game, settings_get, settings_set, folder_set, pick_folder, github_token_set, backups_clear, diagnostics
+            launch_game, settings_get, settings_set, folder_set, pick_folder, pick_install, install_stop, mask_user, github_token_set, backups_clear, diagnostics
         ])
         .run(tauri::generate_context!())
         .expect("error while running PZMM");

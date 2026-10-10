@@ -6,7 +6,7 @@
   import type { ModRow, Overlap, Row } from "./api";
   import type { Problem } from "./order";
 
-  let { rows, order, mods, problems, fixable, overlaps, busy, onAutosort, onFix, onMove, onSelect }: {
+  let { rows, order, mods, problems, fixable, overlaps, busy, onAutosort, onFix, onMove, onSelect, onMenu, onMenuKey }: {
     rows: Row[];
     /** The load order: enabled mod ids. */
     order: string[];
@@ -22,6 +22,9 @@
     onMove: (from: number, to: number) => void;
     /** Open a mod's details. */
     onSelect: (id: string) => void;
+    /** A row's right-click menu, at the pointer; `onMenuKey` opens it from the keyboard (true if it did). */
+    onMenu: (id: string, x: number, y: number) => void;
+    onMenuKey: (e: KeyboardEvent, id: string) => boolean;
   } = $props();
 
   const overridden = $derived(Object.values(overlaps).filter((o) => o.loses_to.length).length);
@@ -53,6 +56,7 @@
 
   async function key(e: KeyboardEvent, i: number, id: string) {
     const li = e.currentTarget as HTMLElement;
+    if (onMenuKey(e, id)) return;
     if ((e.key === "ArrowUp" || e.key === "ArrowDown") && e.altKey) {
       e.preventDefault();
       const to = e.key === "ArrowUp" ? i - 1 : i + 2;
@@ -101,6 +105,7 @@
         {@const p = problems.get(id)}
         <li role="option" aria-selected={current === id} class:selected={current === id} class:drop={dropAt === i} class:dragging={dragFrom === i} tabindex="0" draggable={!busy}
           onclick={() => (current = id)} ondblclick={() => onSelect(id)} onkeydown={(e) => key(e, i, id)}
+          oncontextmenu={(e) => { e.preventDefault(); current = id; onMenu(id, e.clientX, e.clientY); }}
           ondragstart={() => (dragFrom = i)} ondragend={() => { dragFrom = dropAt = null; }}
           ondragover={(e) => { e.preventDefault(); dropAt = i; }}
           ondrop={(e) => { e.preventDefault(); drop(i); }}>

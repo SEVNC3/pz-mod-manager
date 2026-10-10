@@ -32,6 +32,7 @@
     onDrop,
     onRename,
     onRemoveSep,
+    onMenu,
   }: {
     rows: Row[];
     /** The load order (enabled mod ids): the number column shows each mod's place in it. */
@@ -60,6 +61,8 @@
     onDrop: (from: number, to: number) => void;
     onRename: (i: number, name: string) => void;
     onRemoveSep: (i: number) => void;
+    /** A mod row's right-click menu, at the pointer. */
+    onMenu: (id: string, x: number, y: number) => void;
   } = $props();
 
   let dropAt = $state<number | null>(null);
@@ -150,6 +153,7 @@
           data-index={i} tabindex="0" draggable={!filtering}
           aria-selected={selected === r.id}
           onclick={(e) => onRowClick(e, r.id)} onkeydown={(e) => onRowKey(e, i, r)}
+          oncontextmenu={(e) => { e.preventDefault(); onMenu(r.id, e.clientX, e.clientY); }}
           ondragstart={() => (dragFrom = i)} ondragend={() => { dragFrom = dropAt = null; }}
           ondragover={(e) => { e.preventDefault(); dropAt = i; }}
           ondrop={(e) => { e.preventDefault(); drop(i); }}>

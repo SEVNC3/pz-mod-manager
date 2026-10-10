@@ -26,7 +26,7 @@
   import { t, th, type Vars } from "./i18n.svelte";
   import { prefs } from "./prefs.svelte";
 
-  let { busy, mods, loadOrder, say, onSetMods, onInstallWorkshop, onShowMod, canUndo, onUndo }: {
+  let { busy, mods, loadOrder, say, onSetMods, onInstallWorkshop, onShowMod, canUndo, onUndo, find = "" }: {
     busy: boolean;
     /** The library by mod id: what's installed and on. */
     mods: Map<string, ModRow>;
@@ -42,6 +42,8 @@
     /** The app's undo history (enabling and disabling are list edits). */
     canUndo: boolean;
     onUndo: () => void;
+    /** Start with this search (Show in Maps from a mod's menu). */
+    find?: string;
   } = $props();
 
   /** A backend error in the player's language: Maps failures come as `maps.err.<key>`, then English detail after ": ". */
@@ -150,7 +152,8 @@
   }
 
   // --- the list: search, filter, sort ---
-  let search = $state("");
+  // svelte-ignore state_referenced_locally
+  let search = $state(find);
   type Filter = "all" | "on" | "installed" | "missing" | "conflict" | "over";
   let filter = $state<Filter>("all");
   type Sort = "order" | "name" | "cells" | "conflicts" | "state" | "subs" | "updated" | "newest";

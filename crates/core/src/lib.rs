@@ -23,6 +23,20 @@ pub fn log_line(msg: &str) {
     }
 }
 
+type ProgressSink = Box<dyn Fn(usize, usize) + Send + Sync>;
+static PROGRESS: OnceLock<ProgressSink> = OnceLock::new();
+
+/// Hear download progress (`done` of `total` Workshop items); without a sink it's dropped.
+pub fn set_progress_sink(f: impl Fn(usize, usize) + Send + Sync + 'static) {
+    let _ = PROGRESS.set(Box::new(f));
+}
+
+pub fn progress(done: usize, total: usize) {
+    if let Some(f) = PROGRESS.get() {
+        f(done, total);
+    }
+}
+
 #[macro_export]
 macro_rules! log {
     ($($t:tt)*) => { $crate::log_line(&format!($($t)*)) };

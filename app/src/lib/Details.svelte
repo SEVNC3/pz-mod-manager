@@ -1,9 +1,9 @@
 <script lang="ts">
   import LayerIcon from "./LayerIcon.svelte";
   import Icon from "./Icon.svelte";
-  import { fmtNum, workshopUrl } from "./format";
+  import { fmtDate, fmtNum, workshopUrl } from "./format";
   import { t } from "./i18n.svelte";
-  import { api, describeSource, type Candidate, type Conflict, type ModDetails, type ModRow } from "./api";
+  import { api, describeSource, type Candidate, type ChangeNote, type Conflict, type ModDetails, type ModRow } from "./api";
 
   let {
     id,
@@ -52,6 +52,15 @@
   }
   let poster = $state<string | null>(null);
   let loadedFor = "";
+
+  /** What changed: the Workshop change notes since the installed version, for a mod with an update. */
+  let changes = $state<ChangeNote[] | string | null>(null);
+  $effect(() => {
+    const target = id;
+    changes = null;
+    if (!hasUpdate) return;
+    api.modChanges(target).then((c) => target === id && (changes = c)).catch((e) => target === id && (changes = String(e)));
+  });
 
   // Reload when the selection changes, and after any list change (busy flips back),
   // so rollback/remove are reflected.
@@ -134,6 +143,18 @@
         <span>{t("details.newerVersion")}</span>
         <button class="primary" onclick={() => onUpdate(id)} disabled={busy}><Icon name="refresh" size={14} />{t("details.updateNow")}</button>
       </div>
+      <h3>{t("details.whatChanged")}</h3>
+      {#if changes === null}
+        <p class="hint">{t("details.loadingChanges")}</p>
+      {:else if typeof changes === "string"}
+        <p class="bad">{changes}</p>
+      {:else if !changes.length}
+        <p class="hint">{t("details.noChangeNotes")}</p>
+      {:else}
+        <ol class="notes">
+          {#each changes as c}<li><strong>{fmtDate(c.time, "long")}</strong><p>{c.text}</p></li>{/each}
+        </ol>
+      {/if}
     {/if}
 
     {#if requires.length}
@@ -372,6 +393,22 @@
     padding: 8px 10px;
     border-radius: 6px;
     background: var(--accent-soft);
+  }
+  .notes {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  .notes li {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .notes p {
+    margin: 2px 0 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
   .conflicts {
     list-style: none;

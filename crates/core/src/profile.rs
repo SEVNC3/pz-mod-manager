@@ -231,11 +231,12 @@ pub fn load(paths: &Paths, name: &str) -> Result<Profile> {
 }
 
 /// Profile `name` with `ids` enabled in order. An existing one keeps its library (sections,
-/// disabled mods) and takes the new list instead of being replaced.
+/// disabled mods) and takes the new list instead of being replaced (snapshotted first).
 pub fn with_list(paths: &Paths, name: &str, ids: Vec<String>) -> Result<Profile> {
     if !exists(paths, name) {
         return Ok(Profile::from_ids(name, ids));
     }
+    snapshot(paths, name, "import")?;
     let mut p = load(paths, name)?;
     p.adopt(&ids);
     Ok(p)
@@ -314,6 +315,161 @@ pub fn delete(paths: &Paths, name: &str) -> Result<()> {
     s.kinds.remove(name);
     s.last.retain(|_, n| n != name);
     save_state(paths, &s)
+}
+
+/// Rename a profile (its folder, its kind, and the active / last-used records). A change of
+/// case only goes through a temporary name, since the folder is the same one on Windows.
+/// Folders are renamed, never copied and deleted, so a failure leaves the profile as it was.
+pub fn rename(paths: &Paths, from: &str, to: &str) -> Result<()> {
+    valid_name(from)?;
+    valid_name(to)?;
+    if !exists(paths, from) {
+        bail!("no profile named {from:?}");
+    }
+    let from = on_disk(paths, from);
+    if from == to {
+        return Ok(());
+    }
+    let case_only = from.eq_ignore_ascii_case(to);
+    if !case_only && exists(paths, to) {
+        bail!("a profile named {to:?} already exists");
+    }
+    let active = active_name(paths).eq_ignore_ascii_case(&from);
+    let (old, new) = (dir(paths).join(&from), dir(paths).join(to));
+    if case_only {
+        // valid and visible: if PZMM stops between the two steps, the profile still shows up
+        let tmp = dir(paths).join(format!("{from}.renaming"));
+        fs::rename(&old, &tmp).with_context(|| format!("renaming {from:?} (close anything using its folder)"))?;
+        fs::rename(&tmp, &new).with_context(|| format!("renaming {from:?}: it's in {}", tmp.display()))?;
+    } else {
+        fs::rename(&old, &new).with_context(|| format!("renaming {from:?} (close anything using its folder)"))?;
+    }
+    let mut s = state(paths);
+    if let Some(k) = s.kinds.remove(&from) {
+        s.kinds.insert(to.into(), k);
+    }
+    s.last.values_mut().filter(|n| **n == from).for_each(|n| *n = to.into());
+    if active {
+        s.active = to.into();
+    }
+    save_state(paths, &s)
+}
+
+/// A copy of profile `from` (library, load order, map order, kind) named `to`.
+pub fn duplicate(paths: &Paths, from: &str, to: &str) -> Result<()> {
+    valid_name(to)?;
+    if exists(paths, to) {
+        bail!("a profile named {to:?} already exists");
+    }
+    let p = load(paths, from)?;
+    let (maps, kind) = (read_map_order(paths, &p.name)?, kind_of(paths, &p.name));
+    save(paths, &Profile { name: to.into(), ..p })?;
+    if !maps.is_empty() {
+        crate::write_atomic(&dir(paths).join(to).join("maporder.txt"), maps.iter().map(|m| format!("{m}\n")).collect::<String>())?;
+    }
+    set_kind(paths, to, &kind)
+}
+
+/// maporder.txt for snapshots and copies: missing is empty, unreadable is an error (an empty
+/// copy would later overwrite the player's arrangement).
+fn read_map_order(paths: &Paths, name: &str) -> Result<Vec<String>> {
+    match fs::read_to_string(dir(paths).join(on_disk(paths, name)).join("maporder.txt")) {
+        Ok(t) => Ok(t.lines().map(str::trim).filter(|l| !l.is_empty()).map(String::from).collect()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(vec![]),
+        Err(e) => Err(e).with_context(|| format!("couldn't read the map order of {name:?}")),
+    }
+}
+
+/// How many snapshots each profile keeps.
+pub const SNAPSHOTS: usize = 10;
+
+/// A profile's lists as they were before a big change (`<profile>/snapshots/<ms>.json`).
+#[derive(Serialize, Deserialize)]
+struct Snapshot {
+    time: u64,
+    /// What came next: "update", "autosort", "group", "remove", "import", "restore".
+    label: String,
+    /// modlist.txt
+    list: String,
+    order: Vec<String>,
+    maps: Vec<String>,
+}
+
+/// One snapshot in the list (newest first).
+#[derive(Debug, Serialize)]
+pub struct SnapshotInfo {
+    pub id: String,
+    pub time: u64,
+    pub label: String,
+    pub enabled: usize,
+    pub mods: usize,
+}
+
+fn snapshot_dir(paths: &Paths, name: &str) -> PathBuf {
+    dir(paths).join(on_disk(paths, name)).join("snapshots")
+}
+
+/// The snapshot ids of `name`, newest first (ids are creation times in ms).
+fn snapshot_ids(paths: &Paths, name: &str) -> Vec<u64> {
+    let mut ids: Vec<u64> = fs::read_dir(snapshot_dir(paths, name))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| e.file_name().to_str()?.strip_suffix(".json")?.parse().ok())
+        .collect();
+    ids.sort_unstable_by(|a, b| b.cmp(a));
+    ids
+}
+
+/// Keep the saved state of profile `name` before a change labelled `label`; the oldest beyond
+/// [`SNAPSHOTS`] go. Refuses (and changes nothing) when the profile can't be read.
+pub fn snapshot(paths: &Paths, name: &str, label: &str) -> Result<()> {
+    let p = load(paths, name)?;
+    let snap = Snapshot { time: crate::store::now(), label: label.into(), list: p.to_text(), order: p.enabled(), maps: read_map_order(paths, name)? };
+    let d = snapshot_dir(paths, name);
+    fs::create_dir_all(&d)?;
+    let ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64);
+    let id = (ms..).find(|i| !d.join(format!("{i}.json")).exists()).unwrap_or(ms);
+    crate::write_atomic(&d.join(format!("{id}.json")), serde_json::to_string(&snap)?)?;
+    for old in snapshot_ids(paths, name).into_iter().skip(SNAPSHOTS) {
+        fs::remove_file(d.join(format!("{old}.json")))?;
+    }
+    Ok(())
+}
+
+/// Profile `name`'s snapshots, newest first (unreadable ones are left out).
+pub fn snapshots(paths: &Paths, name: &str) -> Vec<SnapshotInfo> {
+    let d = snapshot_dir(paths, name);
+    snapshot_ids(paths, name)
+        .into_iter()
+        .filter_map(|id| {
+            let s: Snapshot = serde_json::from_str(&fs::read_to_string(d.join(format!("{id}.json"))).ok()?).ok()?;
+            let p = Profile { order: s.order, ..Profile::parse(name, &s.list) };
+            let mods = p.lines.iter().filter(|l| matches!(l, Line::Mod { .. })).count();
+            Some(SnapshotInfo { id: id.to_string(), time: s.time, label: s.label, enabled: p.enabled().len(), mods })
+        })
+        .collect()
+}
+
+/// Put profile `name` back as snapshot `id` had it, after snapshotting its current state (so a
+/// restore can be undone the same way). Saves it; the caller applies it if it's active.
+pub fn restore(paths: &Paths, name: &str, id: &str) -> Result<Profile> {
+    let id: u64 = id.parse().with_context(|| format!("not a snapshot: {id:?}"))?;
+    let file = snapshot_dir(paths, name).join(format!("{id}.json"));
+    let s: Snapshot = serde_json::from_str(&fs::read_to_string(&file)?).with_context(|| format!("reading {}", file.display()))?;
+    snapshot(paths, name, "restore")?;
+    let name = on_disk(paths, name);
+    let p = Profile { order: s.order, ..Profile::parse(&name, &s.list) };
+    save(paths, &p)?;
+    let maps = dir(paths).join(&name).join("maporder.txt");
+    if s.maps.is_empty() {
+        if maps.exists() {
+            fs::remove_file(maps)?; // it was never arranged then
+        }
+    } else {
+        crate::write_atomic(&maps, s.maps.iter().map(|m| format!("{m}\n")).collect::<String>())?;
+    }
+    Ok(p)
 }
 
 fn state(paths: &Paths) -> State {
@@ -590,6 +746,68 @@ mod tests {
     }
 
     #[test]
+    fn snapshots_keep_the_last_ones_and_restore() {
+        let (_t, paths) = temp_paths();
+        apply(&paths, &Profile { order: ids(&["B", "A"]), ..Profile::parse("Default", "# --- S\n+A\n+B\n-C\n") }).unwrap();
+        set_map_order(&paths, "Default", &ids(&["Town", "Muldraugh, KY"])).unwrap();
+        snapshot(&paths, "default", "autosort").unwrap();
+        // the change it guards against
+        apply(&paths, &Profile::parse("Default", "+C\n")).unwrap();
+        set_map_order(&paths, "Default", &ids(&["Other", "Muldraugh, KY"])).unwrap();
+        let list = snapshots(&paths, "Default");
+        assert_eq!((list.len(), list[0].label.as_str(), list[0].enabled, list[0].mods), (1, "autosort", 2, 3));
+        let p = restore(&paths, "Default", &list[0].id).unwrap();
+        assert_eq!((p.to_text().as_str(), p.enabled()), ("# --- S\n+A\n+B\n-C\n", ids(&["B", "A"])));
+        assert_eq!(load(&paths, "Default").unwrap(), p, "saved");
+        assert_eq!(map_order(&paths, "Default"), ids(&["Town", "Muldraugh, KY"]));
+        // the restore kept what it replaced, so it can be undone the same way
+        let list = snapshots(&paths, "Default");
+        assert_eq!((list[0].label.as_str(), list[0].enabled), ("restore", 1));
+        restore(&paths, "Default", &list[0].id).unwrap();
+        assert_eq!(load(&paths, "Default").unwrap().enabled(), ids(&["C"]));
+        // only the newest are kept
+        for _ in 0..12 {
+            snapshot(&paths, "Default", "update").unwrap();
+        }
+        assert_eq!(snapshots(&paths, "Default").len(), SNAPSHOTS);
+        // an unreadable profile isn't snapshotted (or restored over)
+        let order = dir(&paths).join("Default/loadorder.txt");
+        fs::remove_file(&order).unwrap();
+        fs::create_dir(&order).unwrap();
+        assert!(snapshot(&paths, "Default", "update").is_err());
+        assert!(restore(&paths, "Default", &snapshots(&paths, "Default")[0].id).is_err());
+        assert!(restore(&paths, "Default", "../x").is_err());
+    }
+
+    #[test]
+    fn rename_and_duplicate_keep_everything() {
+        let (_t, paths) = temp_paths();
+        set_kind(&paths, "Solo", "viewpoint").unwrap();
+        apply(&paths, &Profile::parse("Solo", "# --- S\n+A\n")).unwrap();
+        set_map_order(&paths, "Solo", &ids(&["Town", "Muldraugh, KY"])).unwrap();
+        apply(&paths, &Profile::parse("Other", "+B\n")).unwrap();
+        // names clash whatever their case
+        assert!(rename(&paths, "Solo", "OTHER").is_err());
+        assert!(duplicate(&paths, "Solo", "other").is_err());
+        assert!(rename(&paths, "Solo", "../x").is_err() && rename(&paths, "Gone", "New").is_err());
+        assert_eq!(list(&paths), ids(&["Other", "Solo"]), "nothing changed");
+        // a change of case only
+        rename(&paths, "solo", "SOLO").unwrap();
+        assert_eq!(list(&paths), ids(&["Other", "SOLO"]));
+        assert_eq!((kind_of(&paths, "SOLO"), last_of_kind(&paths, "viewpoint")), ("viewpoint".to_string(), Some("SOLO".to_string())));
+        assert_eq!(load(&paths, "SOLO").unwrap().to_text(), "# --- S\n+A\n");
+        assert_eq!(map_order(&paths, "SOLO"), ids(&["Town", "Muldraugh, KY"]));
+        // the active profile stays active under its new name
+        rename(&paths, "Other", "Main").unwrap();
+        assert_eq!((active_name(&paths), sync(&paths).unwrap().0.enabled()), ("Main".to_string(), ids(&["B"])));
+        duplicate(&paths, "SOLO", "Copy").unwrap();
+        assert_eq!(list(&paths), ids(&["Copy", "Main", "SOLO"]));
+        assert_eq!((load(&paths, "Copy").unwrap().to_text(), kind_of(&paths, "Copy")), ("# --- S\n+A\n".to_string(), "viewpoint".to_string()));
+        assert_eq!(map_order(&paths, "Copy"), map_order(&paths, "SOLO"));
+        assert_eq!(active_name(&paths), "Main", "duplicating doesn't switch");
+    }
+
+    #[test]
     fn text_round_trip() {
         let text = "# --- Maps\n+A\n-B\n+C\n";
         assert_eq!(Profile::parse("x", text).to_text(), text);
@@ -692,6 +910,7 @@ mod tests {
 +C
 ", ids(&["C", "A"])));
         assert_eq!(with_list(&paths, "New", ids(&["A"])).unwrap(), Profile::from_ids("New", ids(&["A"])));
+        assert_eq!(snapshots(&paths, "Server x").iter().map(|s| (s.label.as_str(), s.enabled)).collect::<Vec<_>>(), [("import", 1)], "kept before the list was replaced");
     }
 
     #[test]

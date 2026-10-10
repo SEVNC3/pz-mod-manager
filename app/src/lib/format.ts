@@ -36,3 +36,16 @@ export const workshopUrl = (id: string) => `https://steamcommunity.com/sharedfil
 /** A card's blurb: no BBCode, images or bare links. */
 export const plain = (s: string) =>
   s.replace(/\[img\][\s\S]*?\[\/img\]/gi, "").replace(/https?:\/\/\S+/g, "").replace(/\[\/?[a-z0-9*]+(=[^\]]*)?\]/gi, "").replace(/\s+/g, " ").trim();
+
+/** A time of day with seconds (activity log lines), from ms. */
+export const fmtTime = (ms: number) => new Date(ms).toLocaleTimeString(numLocale(), { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+/** A preview's lines for mods a change adds and removes (long lists end in "…"), or that the mods stay. */
+export function modChanges(added: string[], removed: string[]): string[] {
+  const ids = (l: string[]) => l.slice(0, 12).join(", ") + (l.length > 12 ? ", …" : "");
+  if (!added.length && !removed.length) return [t("preview.sameMods")];
+  return [
+    ...(added.length ? [t("preview.added", { count: added.length, ids: ids(added) })] : []),
+    ...(removed.length ? [t("preview.removed", { count: removed.length, ids: ids(removed) })] : []),
+  ];
+}

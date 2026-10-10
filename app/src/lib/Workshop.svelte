@@ -71,6 +71,34 @@
   let open = $state<WorkshopItem | null>(null);
   let seq = 0;
 
+  // --- Back: the places the item panel's links left (another item, "Mods that need this", an author) ---
+  type Place = { open: WorkshopItem | null; view: typeof view; context: typeof context; q: Query; sortChoice: string; authorPage: number; data: Browse | null };
+  let history = $state<Place[]>([]);
+  /** Remember where we are before a panel link goes elsewhere. */
+  const leave = () => (history = [...history.slice(-29), $state.snapshot({ open, view, context, q, sortChoice, authorPage, data }) as Place]);
+  function back() {
+    const p = history.at(-1);
+    if (!p) return;
+    history = history.slice(0, -1);
+    ({ open, view, context, q, sortChoice, authorPage, data } = p);
+    seq++; // answers still on their way are for the place we left
+    loading = false;
+    error = "";
+  }
+  /** Closing the panel ends its trail, unless a list it led to (an author, what needs it) is still open. */
+  function closePanel() {
+    open = null;
+    if (!context) history = [];
+  }
+  function backKey(e: KeyboardEvent) {
+    if (!hidden && e.altKey && e.key === "ArrowLeft" && history.length) {
+      e.preventDefault();
+      back();
+    }
+  }
+  /** Leave out what's installed (prefs: "Hide installed"). */
+  const shown = (list: WorkshopItem[]) => (prefs.hideInstalled ? list.filter((i) => !i.have) : list);
+
   const WITHIN: [number, string][] = [[0, "workshop.within.any"], [1, "workshop.within.day"], [7, "workshop.within.week"], [30, "workshop.within.month"], [90, "workshop.within.months3"], [180, "workshop.within.months6"], [365, "workshop.within.year"]];
   const since = (days: number) => (days ? Math.floor(Date.now() / 1000) - days * 86400 : 0);
   /** The request as Steam wants it: build in the tags, libraries as a filter, dates as unix times. */
@@ -176,6 +204,7 @@
 
   // panel links
   function dependents(it: WorkshopItem) {
+    leave();
     open = null;
     view = "browse";
     context = { kind: "child", item: it };
@@ -184,6 +213,7 @@
     go(1);
   }
   function inCollections(it: WorkshopItem) {
+    leave();
     open = null;
     view = "browse";
     context = { kind: "child", item: it };
@@ -192,6 +222,7 @@
     go(1);
   }
   function byAuthor(it: WorkshopItem) {
+    leave();
     open = null;
     view = "author";
     context = { kind: "author", item: it };
@@ -266,6 +297,8 @@
     </div>
   </li>
 {/snippet}
+
+<svelte:window onkeydown={backKey} onmouseup={(e) => !hidden && e.button === 3 && history.length && (e.preventDefault(), back())} />
 
 <section class="workshop" aria-label={t("workshop.label")} {hidden}>
   <aside class="side" aria-label={t("workshop.optionsLabel")}>
@@ -356,6 +389,7 @@
       <label class="check"><input type="checkbox" bind:checked={q.incompatible} onchange={() => go(1)} /> {t("workshop.onlyIncompatible")}</label>
       {#if filterCount}<button type="button" class="quiet small" onclick={clearFilters}><Icon name="x" size={12} /> {t("workshop.clearFilters")}</button>{/if}
     {/if}
+    <label class="check" title={t("workshop.hideInstalledTip")}><input type="checkbox" bind:checked={prefs.hideInstalled} /> {t("workshop.hideInstalled")}</label>
 
     {#if viewpoint}
       <!-- i18n-ignore: the mod's name, also the search sent to Steam -->
@@ -380,6 +414,7 @@
       {:else}
         <span>{@html th("workshop.modsThatNeed", { title: context.item.title })}</span>
       {/if}
+      {#if history.length}<button class="quiet" onclick={back} title={t("workshop.backTip")}><Icon name="chevron-left" size={14} /> {t("workshop.back")}</button>{/if}
       <button class="quiet" onclick={clearContext}><Icon name="x" size={14} /> {t("workshop.backToBrowsing")}</button>
     </div>
   {/if}
@@ -398,7 +433,7 @@
             <button class="quiet" onclick={() => viewAll(over)}>{t("workshop.viewAll")}</button>
           </header>
           {#if rows[title]}
-            <ul class="strip">{#each rows[title]! as it (it.id)}{@render card(it, true)}{/each}</ul>
+            <ul class="strip">{#each shown(rows[title]!) as it (it.id)}{@render card(it, true)}{/each}</ul>
           {:else if rowErrors[title]}
             <div class="message inline"><p>{plainError(rowErrors[title])}</p>
               <button onclick={() => loadRow(seq, title, over)}><Icon name="refresh" size={14} />{t("workshop.tryAgain")}</button></div>
@@ -420,7 +455,7 @@
       {@const counted = view !== "author" && q.collections ? "workshop.countCollections" : "workshop.countMods"}
       <p class="count">{t(q.search ? `${counted}For` : counted, { count: data.total, n: compact.format(data.total), search: q.search })}{loading ? t("workshop.loadingSuffix") : ""}</p>
       <ul class="grid" class:dim={loading}>
-        {#each data.items as it (it.id)}{@render card(it)}{/each}
+        {#each shown(data.items) as it (it.id)}{@render card(it)}{/each}
       </ul>
       <nav class="pager" aria-label={t("workshop.pagesLabel")}>
         <button disabled={page <= 1 || loading} onclick={() => go(page - 1)}><Icon name="chevron-left" size={14} />{t("workshop.previous")}</button>
@@ -433,8 +468,8 @@
 </section>
 
 {#if open && !hidden}
-  <WorkshopPanel item={open} {busy} {installing} onInstall={install} onClose={() => (open = null)}
-    onDependents={dependents} onInCollections={inCollections} onAuthor={byAuthor} onOpen={(it) => (open = it)} />
+  <WorkshopPanel item={open} {busy} {installing} onInstall={install} onClose={closePanel}
+    onDependents={dependents} onInCollections={inCollections} onAuthor={byAuthor} onOpen={(it) => { leave(); open = it; }} onBack={history.length ? back : null} />
 {/if}
 
 <style>

@@ -9,7 +9,7 @@
   import { t } from "./i18n.svelte";
 
   // The item panel: everything Steam's item page shows, plus Install.
-  let { item, busy, installing, onInstall, onClose, onDependents, onInCollections, onAuthor, onOpen }: {
+  let { item, busy, installing, onInstall, onClose, onDependents, onInCollections, onAuthor, onOpen, onBack }: {
     /** The card it was opened from (has the rating and author, which the details API lacks). */
     item: WorkshopItem;
     busy: boolean;
@@ -20,6 +20,8 @@
     onInCollections: (it: WorkshopItem) => void;
     onAuthor: (it: WorkshopItem) => void;
     onOpen: (it: WorkshopItem) => void;
+    /** Back to where a link here came from (null: nowhere to go back to). */
+    onBack: (() => void) | null;
   } = $props();
 
   let info = $state<WorkshopInfo | null>(null);
@@ -123,6 +125,9 @@
 <div class="backdrop" onclick={onClose} aria-hidden="true"></div>
 <div class="panel" role="dialog" aria-modal="true" aria-label={it.title} tabindex="-1" bind:this={panel} onkeydown={dialogKey}>
   <header>
+    {#if onBack}
+      <button class="quiet icon" onclick={onBack} aria-label={t("workshop.back")} title={t("workshop.backTip")}><Icon name="chevron-left" size={16} /></button>
+    {/if}
     <div class="titles">
       <h2>{it.title}</h2>
       {#if it.author}

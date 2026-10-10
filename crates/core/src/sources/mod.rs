@@ -124,10 +124,14 @@ pub struct Fetched {
     subscribed: bool,
 }
 
+/// Set to cancel the SteamCMD download of the `fetch` in progress: items it finished still install.
+pub static STOP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// Download (network and SteamCMD only; nothing in Zomboid/mods changes). Workshop items
 /// go through one SteamCMD session; with `resolve`, collections are expanded and required
 /// items added. Errors are logged per source so one bad entry doesn't stop the rest.
 pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
+    STOP.store(false, std::sync::atomic::Ordering::SeqCst);
     let mut out = vec![];
     let mut report = |r: Result<Fetched>| match r {
         Ok(f) => out.push(f),
@@ -156,7 +160,7 @@ pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
     });
     if !workshop.is_empty() {
         let refs: Vec<&str> = workshop.iter().map(String::as_str).collect();
-        match steam_workshop::download(paths, pz::STEAM_APP, &refs, &std::sync::atomic::AtomicBool::new(false)) {
+        match steam_workshop::download(paths, pz::STEAM_APP, &refs, &STOP) {
             Ok(got) => {
                 for (id, dir) in got {
                     report(
@@ -268,26 +272,25 @@ fn expand_workshop(paths: &Paths, ids: Vec<String>) -> Vec<String> {
     out
 }
 
+/// When PZMM installed mod `id` (Unix seconds); v0.1 imports have no time, so their folder's age.
+pub fn installed_at(paths: &Paths, id: &str, e: &store::Entry) -> u64 {
+    if e.installed_at > 0 {
+        return e.installed_at;
+    }
+    std::fs::metadata(paths.mods().join(id))
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |d| d.as_secs())
+}
+
 /// Mods PZMM installed from the Workshop that have been updated there since.
 /// (Steam keeps subscriptions current itself; GitHub sources aren't checked yet.)
 pub fn check_updates(paths: &Paths) -> Result<Vec<String>> {
     let index = store::load(paths)?;
     let ours: Vec<(&String, &str, u64)> = index
         .iter()
-        .filter_map(|(id, e)| {
-            let item = e.source.strip_prefix("workshop:")?;
-            // v0.1 imports have no install time: fall back to the mod folder's age
-            let at = if e.installed_at > 0 {
-                e.installed_at
-            } else {
-                std::fs::metadata(paths.mods().join(id))
-                    .and_then(|m| m.modified())
-                    .ok()
-                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                    .map_or(0, |d| d.as_secs())
-            };
-            Some((id, item, at))
-        })
+        .filter_map(|(id, e)| Some((id, e.source.strip_prefix("workshop:")?, installed_at(paths, id, e))))
         .collect();
     let items: Vec<&str> = ours.iter().map(|o| o.1).collect::<HashSet<_>>().into_iter().collect();
     let updated: std::collections::HashMap<String, u64> =

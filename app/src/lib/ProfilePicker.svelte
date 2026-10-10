@@ -6,12 +6,16 @@
 
   // One picker for "which mod list am I playing": every profile, grouped under its game.
   // Picking a profile from the other game goes through the mode switch (onSwitchGame).
-  let { view, busy, onUse, onSwitchGame, onNew }: {
+  // Rename, Duplicate and Snapshots act on the active profile.
+  let { view, busy, onUse, onSwitchGame, onNew, onRename, onDuplicate, onSnapshots }: {
     view: View | null;
     busy: boolean;
     onUse: (name: string) => void;
     onSwitchGame: (target: Mode, profile?: string) => void;
     onNew: () => void;
+    onRename: () => void;
+    onDuplicate: () => void;
+    onSnapshots: () => void;
   } = $props();
 
   const GAMES: [Mode, string, string][] = [
@@ -88,6 +92,15 @@
       <div class="sep" role="separator"></div>
       <button role="menuitem" class="item" onclick={() => { close(false); onNew(); }}>
         <span class="tick"><Icon name="plus" size={14} /></span>{t("profile.newProfile")}
+      </button>
+      <button role="menuitem" class="item" onclick={() => { close(false); onRename(); }}>
+        <span class="tick"><Icon name="check" size={14} /></span>{t("profile.rename")}
+      </button>
+      <button role="menuitem" class="item" onclick={() => { close(false); onDuplicate(); }}>
+        <span class="tick"><Icon name="copy" size={14} /></span>{t("profile.duplicate")}
+      </button>
+      <button role="menuitem" class="item" onclick={() => { close(); onSnapshots(); }}>
+        <span class="tick"><Icon name="rollback" size={14} /></span>{t("profile.snapshots")}
       </button>
       {#if !hasViewpoint}
         <button role="menuitem" class="item" onclick={() => { close(); onSwitchGame("viewpoint"); }}>

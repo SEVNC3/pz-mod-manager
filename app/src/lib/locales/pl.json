@@ -69,7 +69,15 @@
       "many": "{count} włączonych modów wymaga ZombieBuddy, który nie jest w pełni skonfigurowany (mogła go zresetować aktualizacja gry).",
       "other": "{count} włączonych modów wymaga ZombieBuddy, który nie jest w pełni skonfigurowany (mogła go zresetować aktualizacja gry)."
     },
-    "zbSetup": "Skonfiguruj ZombieBuddy"
+    "zbSetup": "Skonfiguruj ZombieBuddy",
+    "profileNamePlaceholder": "Nazwa profilu",
+    "rename": "Zmień nazwę",
+    "duplicate": "Duplikuj",
+    "copyName": "{name} kopia",
+    "browse": "Przeglądaj…",
+    "browseTip": "Zainstaluj moda z pliku .zip lub folderu na tym komputerze",
+    "browseZip": "Pliki .zip…",
+    "browseFolder": "Folder moda…"
   },
   "mods": {
     "searchPlaceholder": "Szukaj modów  ( / )",
@@ -167,7 +175,11 @@
     },
     "restoring": "Przywracanie {id}",
     "zbSetup": "Konfigurowanie ZombieBuddy",
-    "zbRemove": "Usuwanie ZombieBuddy"
+    "zbRemove": "Usuwanie ZombieBuddy",
+    "copyingProfile": "Kopiowanie profilu jako „{name}”",
+    "renamingProfile": "Zmiana nazwy profilu na „{name}”",
+    "restoringSnapshot": "Przywracanie migawki",
+    "lookingUp": "Szukanie {id} w Warsztacie"
   },
   "log": {
     "appLatest": "PZMM {version} to najnowsza wersja.",
@@ -206,7 +218,14 @@
     "bisectFound": "Znaleziono: problem powoduje {id}. Twoja lista modów została przywrócona.",
     "bisectNone": "Problem nie był związany z żadnym pojedynczym modem. Twoja lista modów została przywrócona.",
     "sectionExists": "Sekcja o nazwie „{name}” już istnieje. Wybierz inną nazwę.",
-    "noneOurs": "Żaden z zaznaczonych modów nie został zainstalowany przez PZMM; subskrypcje modów ze Steam anuluj w Steam."
+    "noneOurs": "Żaden z zaznaczonych modów nie został zainstalowany przez PZMM; subskrypcje modów ze Steam anuluj w Steam.",
+    "logCopied": "Skopiowano dziennik aktywności (nazwa użytkownika jest ukryta w ścieżkach).",
+    "logCopyFailed": "Nie udało się skopiować dziennika aktywności: {error}",
+    "snapshotFailed": "Nie udało się zapisać migawki profilu, więc nic nie zmieniono: {error}",
+    "updated": "Zaktualizowano {name}.",
+    "snapshotRestored": "Przywrócono migawkę. Zastąpiona lista też jest migawką.",
+    "pickRequirement": "Żaden przedmiot z Warsztatu nie dostarcza jednoznacznie {id}: wybierz go w szczegółach, w sekcji Wymaga.",
+    "idCopied": "Skopiowano {id}."
   },
   "confirm": {
     "group": "Grupowanie według kategorii zastąpi twoje sekcje ({sections}) sekcjami kategorii. Ctrl+Z to cofa. Pogrupować teraz?",
@@ -728,7 +747,10 @@
     "description": "Opis",
     "restore": "Przywróć poprzednią wersję",
     "steamNote": "Ten mod pochodzi z twoich subskrypcji Steam. Aby go usunąć, anuluj subskrypcję w Steam.",
-    "unsubscribe": "Anuluj subskrypcję na stronie Warsztatu"
+    "unsubscribe": "Anuluj subskrypcję na stronie Warsztatu",
+    "whatChanged": "Co się zmieniło od twojej wersji",
+    "loadingChanges": "Odczytywanie listy zmian…",
+    "noChangeNotes": "Autor nie opisał zmian w tej aktualizacji."
   },
   "loadOrder": {
     "title": "Kolejność ładowania",
@@ -790,7 +812,8 @@
       "other": "{count} błędów, pierwszy w <span class=\"mono\">{example}</span>"
     },
     "unexplained": "Coś się psuje, ale nic powyżej tego nie wyjaśnia?",
-    "halves": "PZMM dzieli twoje włączone mody na pół przy każdym teście gry."
+    "halves": "PZMM dzieli twoje włączone mody na pół przy każdym teście gry.",
+    "disable": "Wyłącz {id}"
   },
   "settings": {
     "label": "Ustawienia",
@@ -986,11 +1009,19 @@
     "tip": "Profil: lista modów, z którą grasz",
     "menuLabel": "Profile",
     "newProfile": "Nowy profil…",
-    "setUpViewpoint": "Skonfiguruj Project Viewpoint…"
+    "setUpViewpoint": "Skonfiguruj Project Viewpoint…",
+    "rename": "Zmień nazwę…",
+    "duplicate": "Duplikuj…",
+    "snapshots": "Migawki…"
   },
   "activity": {
     "title": "Aktywność",
-    "empty": "Tutaj pojawią się instalacje, aktualizacje i błędy."
+    "empty": "Tutaj pojawią się instalacje, aktualizacje i błędy.",
+    "progress": "{done} z {total}",
+    "cancelTip": "Zatrzymaj pobieranie. Mody, które już się pobrały, i tak zostaną zainstalowane.",
+    "copy": "Kopiuj dziennik",
+    "copyTip": "Skopiuj dziennik z godzinami (nazwa użytkownika jest ukryta w ścieżkach)",
+    "whatChanged": "Co się zmieniło"
   },
   "links": {
     "label": "Linki PZMM",
@@ -1175,7 +1206,11 @@
     "pagesLabel": "Strony",
     "previous": "Poprzednia",
     "pageOf": "Strona {page} z {pages}",
-    "next": "Następna"
+    "next": "Następna",
+    "hideInstalled": "Ukryj zainstalowane",
+    "hideInstalledTip": "Pomiń mody, które już masz (zainstalowane lub subskrybowane)",
+    "back": "Wstecz",
+    "backTip": "Wstecz (Alt+Lewo)"
   },
   "panel": {
     "moreByAuthorTip": "Więcej modów od tego autora",
@@ -1229,5 +1264,66 @@
   },
   "installButton": {
     "installAll": "Zainstaluj wszystkie"
+  },
+  "snapshots": {
+    "title": "Migawki profilu „{profile}”",
+    "intro": "PZMM przechowuje 10 ostatnich list sprzed aktualizacji, automatycznego sortowania, grupowania, usuwania modów i importów.",
+    "counts": {
+      "one": "Włączone: {enabled} z {count} moda",
+      "few": "Włączone: {enabled} z {count} modów",
+      "many": "Włączone: {enabled} z {count} modów",
+      "other": "Włączone: {enabled} z {count} modów"
+    },
+    "restore": "Przywróć",
+    "none": "Nie ma jeszcze migawek.",
+    "why": {
+      "update": "Przed aktualizacją modów",
+      "autosort": "Przed automatycznym sortowaniem",
+      "group": "Przed grupowaniem według kategorii",
+      "remove": "Przed usunięciem modów",
+      "import": "Przed importem",
+      "restore": "Przed przywróceniem"
+    }
+  },
+  "preview": {
+    "updatesProfile": "Aktualizuje profil „{name}”: jego lista zostanie zastąpiona; sekcje i wyłączone mody zostają.",
+    "createsProfile": "Tworzy profil „{name}” i przełącza na niego.",
+    "saveTitle": "Użyć modów z {save}?",
+    "useMods": "Użyj tych modów",
+    "sameMods": "Włączone mody się nie zmieniają.",
+    "added": {
+      "one": "Dodaje {count} mod: {ids}",
+      "few": "Dodaje {count} mody: {ids}",
+      "many": "Dodaje {count} modów: {ids}",
+      "other": "Dodaje {count} modów: {ids}"
+    },
+    "removed": {
+      "one": "Usuwa {count} mod: {ids}",
+      "few": "Usuwa {count} mody: {ids}",
+      "many": "Usuwa {count} modów: {ids}",
+      "other": "Usuwa {count} modów: {ids}"
+    },
+    "newFile": "Tworzy {file}.",
+    "map": "Map= zmienia się z {from} na {to}",
+    "serverTitle": "Zapisać ten profil do {file}?",
+    "write": "Zapisz"
+  },
+  "launch": {
+    "title": {
+      "one": "{count} problem na liście modów. Gra może pominąć mody lub się nie wczytać.",
+      "few": "{count} problemy na liście modów. Gra może pominąć mody lub się nie wczytać.",
+      "many": "{count} problemów na liście modów. Gra może pominąć mody lub się nie wczytać.",
+      "other": "{count} problemów na liście modów. Gra może pominąć mody lub się nie wczytać."
+    },
+    "notInstalled": "{id}: włączony, ale niezainstalowany",
+    "fix": "Napraw",
+    "anyway": "Uruchom mimo to"
+  },
+  "menu": {
+    "label": "{name}: akcje",
+    "toTop": "Przenieś na początek kolejności ładowania",
+    "toBottom": "Przenieś na koniec kolejności ładowania",
+    "copyId": "Kopiuj ID moda",
+    "showInMaps": "Pokaż w Mapach"
   }
 }

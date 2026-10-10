@@ -54,7 +54,15 @@
     "zbNeededPartial": {
       "other": "활성화된 모드 {count}개에 ZombieBuddy가 필요하지만 설정이 완전하지 않아요(게임 업데이트로 초기화되었을 수 있어요)."
     },
-    "zbSetup": "ZombieBuddy 설정"
+    "zbSetup": "ZombieBuddy 설정",
+    "profileNamePlaceholder": "프로필 이름",
+    "rename": "이름 바꾸기",
+    "duplicate": "복제",
+    "copyName": "{name} 사본",
+    "browse": "찾아보기…",
+    "browseTip": "이 컴퓨터의 .zip 파일이나 폴더에서 모드 설치",
+    "browseZip": ".zip 파일…",
+    "browseFolder": "모드 폴더…"
   },
   "mods": {
     "searchPlaceholder": "모드 검색  ( / )",
@@ -134,7 +142,11 @@
     },
     "restoring": "{id} 복원 중",
     "zbSetup": "ZombieBuddy 설정 중",
-    "zbRemove": "ZombieBuddy 제거 중"
+    "zbRemove": "ZombieBuddy 제거 중",
+    "copyingProfile": "프로필을 \"{name}\"(으)로 복사하는 중",
+    "renamingProfile": "프로필 이름을 \"{name}\"(으)로 바꾸는 중",
+    "restoringSnapshot": "스냅샷 복원 중",
+    "lookingUp": "창작마당에서 {id} 찾는 중"
   },
   "log": {
     "appLatest": "최신 버전(PZMM {version})을 사용 중이에요.",
@@ -164,7 +176,14 @@
     "bisectFound": "찾았어요: {id} 때문에 문제가 생겨요. 모드 목록은 복원했어요.",
     "bisectNone": "특정 모드 하나 때문에 생긴 문제가 아니에요. 모드 목록은 복원했어요.",
     "sectionExists": "“{name}” 섹션이 이미 있어요. 다른 이름을 고르세요.",
-    "noneOurs": "선택한 모드 중 PZMM이 설치한 모드가 없어요. Steam 모드는 Steam에서 구독을 취소하세요."
+    "noneOurs": "선택한 모드 중 PZMM이 설치한 모드가 없어요. Steam 모드는 Steam에서 구독을 취소하세요.",
+    "logCopied": "활동 기록을 복사했어요(경로의 사용자 이름은 가려져요).",
+    "logCopyFailed": "활동 기록을 복사하지 못했어요: {error}",
+    "snapshotFailed": "프로필 스냅샷을 남기지 못해 아무것도 바꾸지 않았어요: {error}",
+    "updated": "{name} 업데이트 완료.",
+    "snapshotRestored": "스냅샷을 복원했어요. 대체된 목록도 스냅샷으로 남아 있어요.",
+    "pickRequirement": "{id}을(를) 확실히 제공하는 창작마당 항목이 없어요. 세부 정보의 필요 항목에서 하나를 고르세요.",
+    "idCopied": "{id} 복사됨."
   },
   "confirm": {
     "group": "카테고리별 그룹화를 하면 직접 만든 섹션({sections})이 카테고리 섹션으로 바뀌어요. Ctrl+Z로 되돌릴 수 있어요. 지금 그룹화할까요?",
@@ -590,7 +609,10 @@
     "description": "설명",
     "restore": "이전 버전 복원",
     "steamNote": "이 모드는 Steam 구독으로 설치됐어요. 제거하려면 Steam에서 구독을 취소하세요.",
-    "unsubscribe": "창작마당 페이지에서 구독 취소"
+    "unsubscribe": "창작마당 페이지에서 구독 취소",
+    "whatChanged": "내 버전 이후 바뀐 점",
+    "loadingChanges": "변경 사항을 읽는 중…",
+    "noChangeNotes": "제작자가 이 업데이트의 변경 사항을 쓰지 않았어요."
   },
   "loadOrder": {
     "title": "로드 순서",
@@ -637,7 +659,8 @@
       "other": "오류 {count}개, 첫 오류 위치: <span class=\"mono\">{example}</span>"
     },
     "unexplained": "뭔가 고장 났는데 위 내용으로 설명이 안 되나요?",
-    "halves": "게임을 테스트할 때마다 PZMM이 활성화된 모드를 절반으로 줄여요."
+    "halves": "게임을 테스트할 때마다 PZMM이 활성화된 모드를 절반으로 줄여요.",
+    "disable": "{id} 비활성화"
   },
   "settings": {
     "label": "설정",
@@ -821,11 +844,19 @@
     "tip": "프로필: 지금 플레이하는 모드 목록",
     "menuLabel": "프로필",
     "newProfile": "새 프로필…",
-    "setUpViewpoint": "Project Viewpoint 설정…"
+    "setUpViewpoint": "Project Viewpoint 설정…",
+    "rename": "이름 바꾸기…",
+    "duplicate": "복제…",
+    "snapshots": "스냅샷…"
   },
   "activity": {
     "title": "활동",
-    "empty": "설치, 업데이트, 오류가 여기에 표시돼요."
+    "empty": "설치, 업데이트, 오류가 여기에 표시돼요.",
+    "progress": "{total}개 중 {done}개",
+    "cancelTip": "다운로드를 멈춰요. 다운로드가 끝난 모드는 그래도 설치돼요.",
+    "copy": "기록 복사",
+    "copyTip": "시간이 포함된 기록 복사(경로의 사용자 이름은 가려져요)",
+    "whatChanged": "변경 사항"
   },
   "links": {
     "label": "PZMM 링크",
@@ -989,7 +1020,11 @@
     "pagesLabel": "페이지",
     "previous": "이전",
     "pageOf": "{page} / {pages} 페이지",
-    "next": "다음"
+    "next": "다음",
+    "hideInstalled": "설치된 항목 숨기기",
+    "hideInstalledTip": "이미 있는 모드(설치됨 또는 구독함)는 빼고 보여줘요",
+    "back": "뒤로",
+    "backTip": "뒤로(Alt+왼쪽)"
   },
   "panel": {
     "moreByAuthorTip": "이 제작자의 다른 모드",
@@ -1034,5 +1069,54 @@
   },
   "installButton": {
     "installAll": "모두 설치"
+  },
+  "snapshots": {
+    "title": "\"{profile}\"의 스냅샷",
+    "intro": "PZMM은 업데이트, 자동 정렬, 그룹화, 모드 제거, 가져오기 전의 목록을 최근 10개까지 보관해요.",
+    "counts": {
+      "other": "모드 {count}개 중 {enabled}개 활성화"
+    },
+    "restore": "복원",
+    "none": "아직 스냅샷이 없어요.",
+    "why": {
+      "update": "모드 업데이트 전",
+      "autosort": "자동 정렬 전",
+      "group": "카테고리별 그룹화 전",
+      "remove": "모드 제거 전",
+      "import": "가져오기 전",
+      "restore": "복원 전"
+    }
+  },
+  "preview": {
+    "updatesProfile": "프로필 \"{name}\"을(를) 업데이트해요: 목록은 바뀌고 섹션과 비활성 모드는 그대로예요.",
+    "createsProfile": "프로필 \"{name}\"을(를) 만들고 전환해요.",
+    "saveTitle": "{save}의 모드를 사용할까요?",
+    "useMods": "이 모드 사용",
+    "sameMods": "활성화된 모드는 그대로예요.",
+    "added": {
+      "other": "모드 {count}개 추가: {ids}"
+    },
+    "removed": {
+      "other": "모드 {count}개 제거: {ids}"
+    },
+    "newFile": "{file}을(를) 만들어요.",
+    "map": "Map=이 {from}에서 {to}(으)로 바뀌어요",
+    "serverTitle": "이 프로필을 {file}에 쓸까요?",
+    "write": "쓰기"
+  },
+  "launch": {
+    "title": {
+      "other": "모드 목록에 문제가 {count}개 있어요. 게임이 모드를 건너뛰거나 로드에 실패할 수 있어요."
+    },
+    "notInstalled": "{id}: 활성화됐지만 설치되지 않음",
+    "fix": "고치기",
+    "anyway": "그래도 실행"
+  },
+  "menu": {
+    "label": "{name}: 작업",
+    "toTop": "로드 순서 맨 위로 이동",
+    "toBottom": "로드 순서 맨 아래로 이동",
+    "copyId": "모드 ID 복사",
+    "showInMaps": "지도에서 보기"
   }
 }

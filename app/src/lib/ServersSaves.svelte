@@ -1,17 +1,21 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { api, type ServersAndSaves } from "./api";
-  import { fmtDateTime } from "./format";
+  import { api, type Save, type ServersAndSaves } from "./api";
+  import { fmtDateTime, modChanges } from "./format";
+  import type { IconName } from "./Icon.svelte";
   import { t, th } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
   import MapOrder from "./MapOrder.svelte";
 
-  let { busy, profile, enabledIds, onImport, onUseSave }: {
+  let { busy, profile, enabledIds, onImport, onUseSave, ask }: {
     busy: boolean;
     profile: string;
     enabledIds: string[];
     onImport: (name: string) => Promise<boolean>;
-    onUseSave: (mode: string, name: string) => Promise<boolean>;
+    /** Switch to a save's mods (after a preview). */
+    onUseSave: (save: Save) => Promise<boolean>;
+    /** A preview to confirm: resolves to the choice picked, -1 for Cancel. */
+    ask: (title: string, lines: string[], choices: { label: string; icon: IconName }[]) => Promise<number>;
   } = $props();
 
   let data = $state<ServersAndSaves | null>(null);
@@ -45,8 +49,17 @@
     e.preventDefault();
     error = "";
     notes = [];
+    const name = target.trim();
     try {
-      notes = await api.serverExport(target.trim(), maps);
+      // what changes first: the mods, Map=, a new file
+      const p = await api.serverPreview(name, maps);
+      const lines = [
+        ...(p.new ? [t("preview.newFile", { file: `${name}.ini` })] : []),
+        ...modChanges(p.added, p.removed),
+        ...(p.maps_from.join(";") !== p.maps_to.join(";") ? [t("preview.map", { from: p.maps_from.join("; ") || "—", to: p.maps_to.join("; ") })] : []),
+      ];
+      if ((await ask(t("preview.serverTitle", { file: `${name}.ini` }), lines, [{ label: t("preview.write"), icon: "upload" }])) !== 0) return;
+      notes = await api.serverExport(name, maps);
       refresh();
     } catch (err) {
       error = String(err);
@@ -140,7 +153,7 @@
               <strong>{s.name}</strong>
               <span class="hint">{t("servers.saves.info", { mode: s.mode, count: s.mods.length, when: when(s.modified), diff: diff(s.mods) })}</span>
             </span>
-            <button disabled={busy} onclick={() => onUseSave(s.mode, s.name)}><Icon name="swap" size={14} />{t("servers.saves.useMods")}</button>
+            <button disabled={busy} onclick={() => onUseSave(s)}><Icon name="swap" size={14} />{t("servers.saves.useMods")}</button>
           </li>
         {/each}
       </ul>

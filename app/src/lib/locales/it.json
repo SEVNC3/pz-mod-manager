@@ -59,7 +59,15 @@
       "one": "{count} mod attiva richiede ZombieBuddy, che non è configurato del tutto (un aggiornamento del gioco potrebbe averlo reimpostato).",
       "other": "{count} mod attive richiedono ZombieBuddy, che non è configurato del tutto (un aggiornamento del gioco potrebbe averlo reimpostato)."
     },
-    "zbSetup": "Configura ZombieBuddy"
+    "zbSetup": "Configura ZombieBuddy",
+    "profileNamePlaceholder": "Nome del profilo",
+    "rename": "Rinomina",
+    "duplicate": "Duplica",
+    "copyName": "{name} copia",
+    "browse": "Sfoglia…",
+    "browseTip": "Installa una mod da un file .zip o da una cartella di questo computer",
+    "browseZip": "File .zip…",
+    "browseFolder": "Una cartella della mod…"
   },
   "mods": {
     "searchPlaceholder": "Cerca mod  ( / )",
@@ -145,7 +153,11 @@
     },
     "restoring": "Ripristino di {id}",
     "zbSetup": "Configurazione di ZombieBuddy",
-    "zbRemove": "Rimozione di ZombieBuddy"
+    "zbRemove": "Rimozione di ZombieBuddy",
+    "copyingProfile": "Copia del profilo come \"{name}\"",
+    "renamingProfile": "Rinomina del profilo in \"{name}\"",
+    "restoringSnapshot": "Ripristino di un'istantanea",
+    "lookingUp": "Ricerca di {id} nel Workshop"
   },
   "log": {
     "appLatest": "PZMM {version} è la versione più recente.",
@@ -178,7 +190,14 @@
     "bisectFound": "Trovata: {id} causa il problema. Il tuo elenco di mod è stato ripristinato.",
     "bisectNone": "Il problema non dipende da una singola mod. Il tuo elenco di mod è stato ripristinato.",
     "sectionExists": "Esiste già una sezione chiamata “{name}”. Scegli un altro nome.",
-    "noneOurs": "Nessuna delle mod selezionate è stata installata da PZMM; per le mod di Steam annulla l'iscrizione in Steam."
+    "noneOurs": "Nessuna delle mod selezionate è stata installata da PZMM; per le mod di Steam annulla l'iscrizione in Steam.",
+    "logCopied": "Registro attività copiato (il tuo nome utente è nascosto nei percorsi).",
+    "logCopyFailed": "Impossibile copiare il registro attività: {error}",
+    "snapshotFailed": "Impossibile salvare un'istantanea del profilo, quindi non è stato cambiato nulla: {error}",
+    "updated": "{name} aggiornata.",
+    "snapshotRestored": "Istantanea ripristinata. Anche la lista che ha sostituito è un'istantanea.",
+    "pickRequirement": "Nessun elemento del Workshop fornisce chiaramente {id}: scegline uno sotto Richiede, nei dettagli.",
+    "idCopied": "{id} copiato."
   },
   "confirm": {
     "group": "Raggruppa per categoria sostituisce le tue sezioni ({sections}) con sezioni per categoria. Ctrl+Z lo annulla. Raggruppare ora?",
@@ -636,7 +655,10 @@
     "description": "Descrizione",
     "restore": "Ripristina versione precedente",
     "steamNote": "Questa mod proviene dalle tue iscrizioni di Steam. Annulla l'iscrizione in Steam per rimuoverla.",
-    "unsubscribe": "Annulla l'iscrizione nella pagina del Workshop"
+    "unsubscribe": "Annulla l'iscrizione nella pagina del Workshop",
+    "whatChanged": "Cosa è cambiato dalla tua versione",
+    "loadingChanges": "Lettura delle note di modifica…",
+    "noChangeNotes": "L'autore non ha scritto note di modifica per questo aggiornamento."
   },
   "loadOrder": {
     "title": "Ordine di caricamento",
@@ -688,7 +710,8 @@
       "other": "{count} errori, il primo in <span class=\"mono\">{example}</span>"
     },
     "unexplained": "Qualcosa non funziona ma niente qui sopra lo spiega?",
-    "halves": "PZMM dimezza le tue mod attive a ogni test del gioco."
+    "halves": "PZMM dimezza le tue mod attive a ogni test del gioco.",
+    "disable": "Disattiva {id}"
   },
   "settings": {
     "label": "Impostazioni",
@@ -876,11 +899,19 @@
     "tip": "Profilo: l'elenco di mod con cui giochi",
     "menuLabel": "Profili",
     "newProfile": "Nuovo profilo…",
-    "setUpViewpoint": "Configura Project Viewpoint…"
+    "setUpViewpoint": "Configura Project Viewpoint…",
+    "rename": "Rinomina…",
+    "duplicate": "Duplica…",
+    "snapshots": "Istantanee…"
   },
   "activity": {
     "title": "Attività",
-    "empty": "Installazioni, aggiornamenti ed errori compaiono qui."
+    "empty": "Installazioni, aggiornamenti ed errori compaiono qui.",
+    "progress": "{done} di {total}",
+    "cancelTip": "Ferma il download. Le mod già scaricate vengono installate comunque.",
+    "copy": "Copia registro",
+    "copyTip": "Copia il registro con gli orari (il tuo nome utente è nascosto nei percorsi)",
+    "whatChanged": "Novità"
   },
   "links": {
     "label": "Link di PZMM",
@@ -1051,7 +1082,11 @@
     "pagesLabel": "Pagine",
     "previous": "Precedente",
     "pageOf": "Pagina {page} di {pages}",
-    "next": "Successiva"
+    "next": "Successiva",
+    "hideInstalled": "Nascondi installate",
+    "hideInstalledTip": "Escludi le mod che hai già (installate o iscritte)",
+    "back": "Indietro",
+    "backTip": "Indietro (Alt+Sinistra)"
   },
   "panel": {
     "moreByAuthorTip": "Altre mod di questo autore",
@@ -1099,5 +1134,58 @@
   },
   "installButton": {
     "installAll": "Installa tutto"
+  },
+  "snapshots": {
+    "title": "Istantanee di \"{profile}\"",
+    "intro": "PZMM conserva le ultime 10 liste di prima di aggiornamenti, ordinamento automatico, raggruppamento, rimozione di mod e importazioni.",
+    "counts": {
+      "one": "{enabled} di {count} mod attiva",
+      "other": "{enabled} di {count} mod attive"
+    },
+    "restore": "Ripristina",
+    "none": "Ancora nessuna istantanea.",
+    "why": {
+      "update": "Prima di aggiornare le mod",
+      "autosort": "Prima dell'ordinamento automatico",
+      "group": "Prima di Raggruppa per categoria",
+      "remove": "Prima di rimuovere mod",
+      "import": "Prima di un'importazione",
+      "restore": "Prima di un ripristino"
+    }
+  },
+  "preview": {
+    "updatesProfile": "Aggiorna il profilo \"{name}\": la sua lista viene sostituita; sezioni e mod disattivate restano.",
+    "createsProfile": "Crea il profilo \"{name}\" e passa a quello.",
+    "saveTitle": "Usare le mod di {save}?",
+    "useMods": "Usa queste mod",
+    "sameMods": "Le mod attive restano le stesse.",
+    "added": {
+      "one": "Aggiunge {count} mod: {ids}",
+      "other": "Aggiunge {count} mod: {ids}"
+    },
+    "removed": {
+      "one": "Rimuove {count} mod: {ids}",
+      "other": "Rimuove {count} mod: {ids}"
+    },
+    "newFile": "Crea {file}.",
+    "map": "Map= cambia da {from} a {to}",
+    "serverTitle": "Scrivere questo profilo in {file}?",
+    "write": "Scrivi"
+  },
+  "launch": {
+    "title": {
+      "one": "{count} problema nella tua lista di mod. Il gioco potrebbe saltare delle mod o non caricarsi.",
+      "other": "{count} problemi nella tua lista di mod. Il gioco potrebbe saltare delle mod o non caricarsi."
+    },
+    "notInstalled": "{id}: attiva ma non installata",
+    "fix": "Correggi",
+    "anyway": "Avvia comunque"
+  },
+  "menu": {
+    "label": "{name}: azioni",
+    "toTop": "Sposta in cima all'ordine di caricamento",
+    "toBottom": "Sposta in fondo all'ordine di caricamento",
+    "copyId": "Copia l'ID della mod",
+    "showInMaps": "Mostra in Mappe"
   }
 }

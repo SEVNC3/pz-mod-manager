@@ -434,6 +434,25 @@ pub fn change_notes(id: &str, page: u32) -> Result<Vec<ChangeNote>> {
     Ok(parse_change_notes(&String::from_utf8_lossy(&super::http_get(&url)?)))
 }
 
+/// The change notes newer than `since` (Unix seconds: the installed version), newest first.
+pub fn change_notes_since(id: &str, since: u64) -> Result<Vec<ChangeNote>> {
+    notes_since(|page| change_notes(id, page), since)
+}
+
+/// Pages (from `page`, 10 notes each, newest first) until one reaches back to `since`; at most 5.
+fn notes_since(mut page: impl FnMut(u32) -> Result<Vec<ChangeNote>>, since: u64) -> Result<Vec<ChangeNote>> {
+    let mut out = vec![];
+    for p in 1..=5 {
+        let notes = page(p)?;
+        let done = notes.len() < 10 || notes.iter().any(|n| n.time <= since);
+        out.extend(notes.into_iter().filter(|n| n.time > since));
+        if done {
+            break;
+        }
+    }
+    Ok(out)
+}
+
 fn parse_change_notes(html: &str) -> Vec<ChangeNote> {
     html.split("class=\"changelog headline\"")
         .skip(1)
@@ -585,9 +604,10 @@ pub fn download(paths: &Paths, app: &str, ids: &[&str], stop: &AtomicBool) -> Re
     static STEAMCMD: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let _one = STEAMCMD.lock().unwrap_or_else(|e| e.into_inner());
     crate::log!("downloading {} workshop item(s)...", ids.len());
+    crate::progress(0, ids.len());
     let mut child = cmd.spawn().with_context(|| format!("running {}", exe.display()))?;
     let out = child.stdout.take().context("SteamCMD's output")?;
-    let (done, stopped) = finished_items(out, ITEM_LIMIT, stop, || {
+    let (done, stopped) = finished_items(out, ITEM_LIMIT, stop, |n| crate::progress(n, ids.len()), || {
         let _ = child.kill();
     });
     let _ = child.wait();
@@ -601,9 +621,10 @@ pub fn download(paths: &Paths, app: &str, ids: &[&str], stop: &AtomicBool) -> Re
     Ok(got)
 }
 
-/// The ids SteamCMD's output `out` reports downloaded, read until it ends. `kill` runs when
-/// no item finishes within `limit` (a stuck download) or `stop` is set; the bool says it ran.
-fn finished_items(out: impl Read + Send + 'static, limit: Duration, stop: &AtomicBool, kill: impl FnOnce()) -> (HashSet<String>, bool) {
+/// The ids SteamCMD's output `out` reports downloaded, read until it ends; `done` hears how many
+/// so far. `kill` runs when no item finishes within `limit` (a stuck download) or `stop` is
+/// set; the bool says it ran.
+fn finished_items(out: impl Read + Send + 'static, limit: Duration, stop: &AtomicBool, mut done_so_far: impl FnMut(usize), kill: impl FnOnce()) -> (HashSet<String>, bool) {
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         for line in BufReader::new(out).lines().map_while(Result::ok) {
@@ -622,6 +643,7 @@ fn finished_items(out: impl Read + Send + 'static, limit: Duration, stop: &Atomi
         match rx.recv_timeout(Duration::from_millis(300)) {
             Ok(id) => {
                 done.insert(id);
+                done_so_far(done.len());
                 since = Instant::now();
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) if since.elapsed() < limit && !stop.load(Relaxed) => {}
@@ -688,7 +710,7 @@ mod tests {
 Success. Downloaded item 1 to \"x\" (5 bytes)
 Success. Downloaded item 22 to \"y\"
 ";
-        let (done, stopped) = finished_items(std::io::Cursor::new(out), Duration::from_secs(60), &never, || panic!("not stuck"));
+        let (done, stopped) = finished_items(std::io::Cursor::new(out), Duration::from_secs(60), &never, |_| {}, || panic!("not stuck"));
         assert_eq!((done, stopped), (["1".to_string(), "22".to_string()].into(), false));
 
         // item 1 finishes, then nothing: stopped after `limit`, item 1 kept
@@ -696,11 +718,11 @@ Success. Downloaded item 22 to \"y\"
         std::io::Write::write_all(&mut w, b"Success. Downloaded item 1 to \"x\"
 Downloading item 2 ...
 ").unwrap();
-        let (done, stopped) = finished_items(r, Duration::from_millis(500), &never, move || drop(w));
+        let (done, stopped) = finished_items(r, Duration::from_millis(500), &never, |_| {}, move || drop(w));
         assert_eq!((done, stopped), (["1".to_string()].into(), true));
 
         let (r, w) = std::io::pipe().unwrap();
-        let (done, stopped) = finished_items(r, Duration::from_secs(60), &AtomicBool::new(true), move || drop(w));
+        let (done, stopped) = finished_items(r, Duration::from_secs(60), &AtomicBool::new(true), |_| {}, move || drop(w));
         assert!(done.is_empty() && stopped, "Stop ends it at once");
     }
 
@@ -750,6 +772,23 @@ Downloading item 2 ...
             <div class="commentthread_comment_timestamp" data-timestamp="1791647977"> now</div>
             <div class="commentthread_comment_text" id="comment_content_1"> Works on 42.21<br>thanks! </div></div>"#;
         assert_eq!(parse_comments(html), [Comment { author: "Spiffo".into(), time: 1791647977, text: "Works on 42.21\nthanks!".into() }]);
+    }
+
+    #[test]
+    fn change_notes_since_the_installed_version() {
+        // pages of 10, newest first: times 100, 99, ... 76
+        let note = |time| ChangeNote { time, text: format!("v{time}") };
+        let asked = std::cell::RefCell::new(vec![]);
+        let pages = |p: u32| {
+            asked.borrow_mut().push(p);
+            Ok((0..10).map(|i| 100 - (p as u64 - 1) * 10 - i).filter(|t| *t > 75).map(note).collect())
+        };
+        let got = notes_since(pages, 88).unwrap();
+        assert_eq!(got.iter().map(|n| n.time).collect::<Vec<_>>(), (89..=100).rev().collect::<Vec<_>>(), "newer than the install only");
+        assert_eq!(asked.take(), [1, 2], "stops at the page that reaches the install");
+        assert_eq!(notes_since(pages, 0).unwrap().len(), 25, "a short page is the last");
+        assert_eq!(asked.take(), [1, 2, 3]);
+        assert!(notes_since(|_| Ok(vec![note(5)]), 5).unwrap().is_empty(), "the installed version itself isn't new");
     }
 
     #[test]

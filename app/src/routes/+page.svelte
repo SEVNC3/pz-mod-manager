@@ -4,7 +4,7 @@
   import { getVersion } from "@tauri-apps/api/app";
   import { check, type Update } from "@tauri-apps/plugin-updater";
   import { relaunch } from "@tauri-apps/plugin-process";
-  import { decodeShare, encodeShare } from "$lib/api";
+  import { decodeShare, describeSource, encodeShare, type ModDetails, type Snapshot } from "$lib/api";
   import { api, zbReady, type Mode, type ModRow, type Row, type View, type ZbStatus } from "$lib/api";
   import Details from "$lib/Details.svelte";
   import Workshop from "$lib/Workshop.svelte";
@@ -14,6 +14,9 @@
   import Links from "$lib/Links.svelte";
   import Icon from "$lib/Icon.svelte";
   import ActivityLog from "$lib/ActivityLog.svelte";
+  import Menu, { type MenuItem } from "$lib/Menu.svelte";
+  import type { IconName } from "$lib/Icon.svelte";
+  import { fmtDateTime, fmtTime, modChanges } from "$lib/format";
   import Findings from "$lib/Findings.svelte";
   import Settings from "$lib/Settings.svelte";
   import { applyPrefs } from "$lib/prefs.svelte";
@@ -121,12 +124,16 @@
   let pending = $state(0);
   const busy = $derived(pending > 0);
   let busyLabel = $state("");
-  let log = $state<{ text: string; en: string; error: boolean }[]>([]);
+  /** `time`: when it was said (ms); `url`: a page it links to (an update's change notes). */
+  let log = $state<{ text: string; en: string; error: boolean; time: number; url?: string }[]>([]);
+  /** Workshop items a download has finished, of how many, while it runs (Cancel stops it). */
+  let progress = $state<[number, number] | null>(null);
   let logOpen = $state(false);
   let search = $state("");
   let filter = $state<"all" | "on" | "off" | "problems">("all");
   let installText = $state("");
-  let newProfile = $state<string | null>(null);
+  /** The profile name being typed: for a new profile, or to rename or copy the active one. */
+  let nameFor = $state<{ kind: "new" | "rename" | "duplicate"; value: string } | null>(null);
   let editingSep = $state<number | null>(null);
   let dragFrom = $state<number | null>(null);
 
@@ -217,16 +224,52 @@
 
   // --- actions ---
   /** An activity line: a key from the locale files, or text as is (the backend's). Its English text picks the icon. */
-  function say(key: string, vars: Vars = {}, error = false) {
-    log.push({ text: t(key, vars), en: t(key, vars, "en"), error });
+  function say(key: string, vars: Vars = {}, error = false, url?: string) {
+    log.push({ text: t(key, vars), en: t(key, vars, "en"), error, time: Date.now(), url });
     if (error) logOpen = true;
+  }
+
+  async function copyLog() {
+    try {
+      // paths in backend lines carry the Windows user name: masked like Copy diagnostics
+      await navigator.clipboard.writeText(await api.maskUser(log.map((l) => `${fmtTime(l.time)}  ${l.text}`).join("\n")));
+      say("log.logCopied");
+    } catch (e) {
+      say("log.logCopyFailed", { error: String(e) }, true);
+    }
+  }
+
+  // --- a question above the tabs (previews, the launch check), in the switch-game card's style ---
+  type Ask = { title: string; lines: string[]; choices: { label: string; icon: IconName }[]; done: (i: number) => void };
+  let asking = $state<Ask | null>(null);
+  /** Show `lines` with a button per choice (the first is the main one) and Cancel; resolves to the choice, -1 for Cancel. */
+  function ask(title: string, lines: string[], choices: Ask["choices"]): Promise<number> {
+    asking?.done(-1);
+    tick().then(() => document.querySelector<HTMLElement>(".mode-plan[role=alertdialog] button")?.focus());
+    return new Promise((done) => (asking = { title, lines, choices, done }));
+  }
+  function answer(i: number) {
+    const a = asking;
+    asking = null;
+    a?.done(i);
+  }
+
+  /** Keep the profile as it's saved before a big change (`label` names it in Snapshots); false if that failed. */
+  async function snapshot(label: string) {
+    try {
+      await api.profileSnapshot(label);
+      return true;
+    } catch (e) {
+      say("log.snapshotFailed", { error: String(e) }, true);
+      return false;
+    }
   }
 
   /**
    * Run a backend job that returns the new view. Errors go to the activity log; returns success.
    * `keepHistory` for list edits (undoable, no new files); `showLog` opens the log for long jobs.
    */
-  async function run(label: string, job: () => Promise<View>, { keepHistory = false, showLog = false } = {}): Promise<boolean> {
+  async function run(label: string, job: () => Promise<View>, { keepHistory = false, showLog = false, renamed = false } = {}): Promise<boolean> {
     if (showLog) logOpen = true;
     // undo covers list edits only: anything else (installs, profile switches) resets it
     if (!keepHistory) undoStack = redoStack = [];
@@ -242,7 +285,7 @@
       if (v.adopted) say("log.adopted", { profile: v.profile });
       if (selected && !v.rows.some((r) => r.kind === "mod" && r.id === selected)) selected = null;
       // a profile seen for the first time (first run, New, Import, Viewpoint) without separators gets autosorted
-      const fresh = v.created || (knownProfiles && !knownProfiles.includes(v.profile));
+      const fresh = v.created || (!renamed && knownProfiles && !knownProfiles.includes(v.profile));
       if (fresh && cfg?.settings.autosort_new !== false && v.rows.length && !v.rows.some((r) => r.kind === "sep")) await groupLibrary(false);
       else if (!keepHistory && before.size) await placeNew(before);
       return true;
@@ -258,6 +301,7 @@
     } finally {
       pending--;
       if (!pending) busyLabel = "";
+      if (!pending) progress = null;
       refreshZb();
       refreshOverlaps();
       if (!keepHistory) refreshStats(); // files may have changed (installs, updates, removals)
@@ -277,6 +321,7 @@
 
   /** Autosort the load order: needed mods on, frameworks first, translations last, every load rule satisfied. */
   async function autosortList() {
+    if (!(await snapshot("autosort"))) return;
     let c: Categories;
     try {
       c = await categories();
@@ -298,6 +343,7 @@
     }
     const own = separators.filter((s) => !c.order.includes(s));
     if (record && own.length && !confirm(t("confirm.group", { sections: own.slice(0, 4).join(", ") + (own.length > 4 ? ", …" : "") }))) return;
+    if (record && !(await snapshot("group"))) return;
     const next = groupByCategory(rows, c.of, c.order);
     const sections = next.filter((r) => r.kind === "sep").length;
     if (await commit(next, order, record)) say(record ? "log.groupedUndo" : "log.grouped", { count: sections });
@@ -363,8 +409,15 @@
       !confirm(t("confirm.updateInSave", { count: inSave.length, mods: inSave.join(", "), save: latestSave!.name }))
     )
       return;
+    if (!(await snapshot("update"))) return;
+    const had = ids.filter((id) => updates.has(id));
     if (await run(ids.length === 1 ? t("busy.updatingOne", { name: ids[0] }) : t("busy.updatingMany", { count: ids.length }), () => api.updateMods(ids), { showLog: true })) {
       updates = new Set([...updates].filter((u) => !ids.includes(u)));
+      // what changed: each updated Workshop mod links to its change notes
+      for (const id of had) {
+        const item = mods.get(id)?.source.match(/^workshop:(\d+)$/)?.[1];
+        if (item) say("log.updated", { name: mods.get(id)?.name || id }, false, `https://steamcommunity.com/sharedfiles/filedetails/changelog/${item}`);
+      }
     }
   }
 
@@ -413,6 +466,61 @@
   // --- share a profile ---
   let importText = $state<string | null>(null);
 
+  /** Open Import, with the share code already in if the clipboard holds one. */
+  async function openImport() {
+    importText = "";
+    tick().then(() => document.getElementById("import-code")?.focus()); // autofocus loses to the button just clicked
+    try {
+      const clip = (await navigator.clipboard.readText()).trim();
+      if (clip.startsWith("PZMM1:") && importText === "") importText = clip;
+    } catch {}
+  }
+
+  // --- snapshots of the profile before big changes ---
+  let snapList = $state<Snapshot[] | null>(null);
+  const openSnapshots = () => api.profileSnapshots().then((s) => (snapList = s)).catch((e) => say(String(e), {}, true));
+  async function restoreSnapshot(id: string) {
+    if (await run(t("busy.restoringSnapshot"), () => api.snapshotRestore(id))) {
+      say("log.snapshotRestored");
+      openSnapshots();
+    }
+  }
+
+  // --- a preview before a save's mods replace the list ---
+  async function useSave(save: Save) {
+    const profile = `Save ${save.name}`; // the backend's name for it
+    const exists = view?.profiles.some((p) => p.toLowerCase() === profile.toLowerCase());
+    const lines = [
+      t(exists ? "preview.updatesProfile" : "preview.createsProfile", { name: profile }),
+      ...modChanges(save.mods.filter((id) => !order.includes(id)), order.filter((id) => !save.mods.includes(id))),
+    ];
+    if ((await ask(t("preview.saveTitle", { save: save.name }), lines, [{ label: t("preview.useMods"), icon: "swap" }])) !== 0) return false;
+    return run(t("busy.loadingSave", { name: save.name }), () => api.saveUse(save.mode, save.name));
+  }
+
+  // --- launch: problems first ---
+  async function launch() {
+    const lines = [
+      ...[...mods.values()].filter((m) => m.on && m.missing).map((m) => t("launch.notInstalled", { id: m.id })),
+      ...[...problems].map(([id, p]) => `${mods.get(id)?.name || id}: ${t(p.key, { id: p.id })}`),
+    ];
+    if (lines.length) {
+      const i = await ask(t("launch.title", { count: lines.length }), lines, [{ label: t("launch.fix"), icon: "wand" }, { label: t("launch.anyway"), icon: "play" }]);
+      if (i === 0) return fixProblems();
+      if (i !== 1) return;
+    }
+    api.launchGame();
+  }
+
+  /** Install what's missing and fix the order, then list what's left. */
+  async function fixProblems() {
+    if (missingReqs.size) await installMissing();
+    else if (fixable) await commitList(sortLoadOrder(list));
+    await tick();
+    tab = "mods";
+    filter = problemCount ? "problems" : "all";
+  }
+
   async function shareProfile() {
     try {
       await navigator.clipboard.writeText(encodeShare(await api.profileExport()));
@@ -438,6 +546,29 @@
   // --- health check ---
   let findings = $state<Finding[] | null>(null);
   let gameErrors = $state<ModErrors[]>([]);
+  /** A finding's Install: the Workshop item that surely provides `req` (else pick one in `by`'s details). */
+  async function installRequirement(req: string, by: string) {
+    pending++;
+    busyLabel = t("busy.lookingUp", { id: req });
+    try {
+      const best = (await api.findRequirement(req, by))[0];
+      if (best?.confirmed && best.fits_build) {
+        if (await installWorkshop(best.id)) checkSetup();
+      } else {
+        selected = by;
+        say("log.pickRequirement", { id: req });
+      }
+    } catch (e) {
+      say(String(e), {}, true);
+    } finally {
+      pending--;
+    }
+  }
+
+  async function disableMod(id: string) {
+    if (mods.get(id)?.on && (await toggle(id))) checkSetup();
+  }
+
   async function checkSetup() {
     try {
       [findings, gameErrors] = await Promise.all([api.doctor(), api.consoleErrors().catch(() => [])]);
@@ -552,8 +683,10 @@
       document.getElementById("mod-search")?.focus();
       return;
     }
-    if (e.key === "Escape" && !typing && (picked.size || selected || modePlan)) {
-      if (modePlan) modePlan = null;
+    if (e.key === "Escape" && !typing && (asking || snapList || picked.size || selected || modePlan)) {
+      if (asking) answer(-1);
+      else if (snapList) snapList = null;
+      else if (modePlan) modePlan = null;
       else if (picked.size) picked = new Set();
       else selected = null;
       return;
@@ -572,7 +705,7 @@
 
   function toggle(id: string) {
     const on = !mods.get(id)?.on;
-    commit(rows.map((r) => (r.kind === "mod" && r.id === id ? { ...r, on } : r)), on ? placeAll([id]) : order);
+    return commit(rows.map((r) => (r.kind === "mod" && r.id === id ? { ...r, on } : r)), on ? placeAll([id]) : order);
   }
 
   /** Turn mods on or off from the Maps tab; turning one on also turns on the installed mods it needs. */
@@ -667,11 +800,67 @@
     else commit(rows.map((x, j) => (j === i ? { kind: "sep", name: name.trim() } : x)));
   }
 
-  async function createProfile(e: Event) {
+  async function submitName(e: Event) {
     e.preventDefault();
-    const name = newProfile?.trim();
-    newProfile = null;
-    if (name) await run(t("busy.creatingProfile", { name }), () => api.profileNew(name));
+    const [kind, name, from] = [nameFor?.kind, nameFor?.value.trim(), view?.profile ?? ""];
+    nameFor = null;
+    if (!name) return;
+    if (kind === "new") await run(t("busy.creatingProfile", { name }), () => api.profileNew(name));
+    else if (kind === "duplicate") await run(t("busy.copyingProfile", { name }), () => api.profileDuplicate(from, name));
+    else if (name !== from) {
+      try {
+        localStorage.setItem(`pzmm.collapsed.${name}`, localStorage.getItem(`pzmm.collapsed.${from}`) ?? "[]"); // folded sections go along
+      } catch {}
+      await run(t("busy.renamingProfile", { name }), () => api.profileRename(from, name), { renamed: true });
+    }
+  }
+
+  // --- right-click menus: a mod row (library or load order), and Browse… ---
+  let rowMenu = $state<{ id: string; x: number; y: number; d: ModDetails | null } | null>(null);
+  let browseAt = $state<{ x: number; y: number } | null>(null);
+  /** The Maps tab's search, for "Show in Maps". */
+  let mapsFind = $state("");
+  $effect(() => {
+    if (tab !== "maps") mapsFind = "";
+  });
+
+  function openMenu(id: string, x: number, y: number) {
+    if (rowMenu?.id === id) return; // the keyboard's own contextmenu event after Shift+F10
+    rowMenu = { id, x, y, d: null };
+    api.details(id).then((d) => rowMenu?.id === id && (rowMenu.d = d)).catch(() => {});
+  }
+  /** Shift+F10 or the menu key on a focused row: its menu, under it. */
+  function menuKey(e: KeyboardEvent, id: string) {
+    if (e.key !== "ContextMenu" && !(e.shiftKey && e.key === "F10")) return false;
+    e.preventDefault();
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    openMenu(id, r.left + 40, r.bottom);
+    return true;
+  }
+  const rowMenuItems = $derived.by((): MenuItem[] => {
+    const m = rowMenu && mods.get(rowMenu.id);
+    if (!rowMenu || !m) return [];
+    const { id, d } = rowMenu;
+    const at = order.indexOf(id);
+    const src = describeSource(m.source);
+    const github = src.label === "GitHub"; // i18n-ignore: a source kind, not text
+    return [
+      { label: t(m.on ? "common.disable" : "common.enable"), icon: m.on ? "x" : "check", run: () => toggle(id), disabled: busy },
+      { label: t("menu.toTop"), icon: "chevron-up", run: () => moveInOrder(at, 0), disabled: busy || at <= 0 },
+      { label: t("menu.toBottom"), icon: "chevron-down", run: () => moveInOrder(at, order.length), disabled: busy || at < 0 || at === order.length - 1 },
+      null,
+      { label: t("details.showFiles"), icon: "folder", run: () => d && api.openPath(d.dir), disabled: !d },
+      ...(src.url ? [{ label: t(github ? "details.githubPage" : "details.workshopPage"), icon: (github ? "external" : "steam") as IconName, run: () => api.openUrl(src.url!) }] : []),
+      { label: t("menu.copyId"), icon: "copy", run: () => navigator.clipboard.writeText(id).then(() => say("log.idCopied", { id })).catch(() => {}) },
+      ...(d?.maps ? [{ label: t("menu.showInMaps"), icon: "search" as IconName, run: () => ((mapsFind = id), (tab = "maps")) }] : []),
+      ...(isOurs(m) ? [null, { label: t("common.remove"), icon: "trash" as IconName, run: () => remove(id), disabled: busy, danger: true }] : []),
+    ];
+  });
+
+  /** Browse…: install picked .zip files, or a mod folder. */
+  async function browseInstall(folder: boolean) {
+    const paths = await api.pickInstall(folder).catch((e) => (say(String(e), {}, true), [] as string[]));
+    if (paths.length) await installAndSettle(paths.length === 1 ? t("busy.installingOne", { name: paths[0] }) : t("busy.installingMany", { count: paths.length }), () => api.install(paths));
   }
 
   // --- bulk selection: Ctrl/Cmd+click toggles, Shift+click selects a range ---
@@ -726,6 +915,7 @@
     if (extra.length && s?.remove_requirements !== "always" &&
       !confirm(t("confirm.alsoRemove", { count: extra.length, ids: extra.join(", ") }))) extra = [];
     const all = ids.length + extra.length;
+    if (all > 1 && !(await snapshot("remove"))) return;
     await run(all === 1 ? t("busy.removingOne", { name: ids[0] }) : t("busy.removingMany", { count: all }), () => api.remove([...ids, ...extra]));
   }
 
@@ -748,6 +938,7 @@
   // --- keyboard: arrows move focus, Alt+arrows reorder, Space toggles ---
   async function rowKey(e: KeyboardEvent, i: number, r: Row) {
     const tr = e.currentTarget as HTMLElement;
+    if (r.kind === "mod" && menuKey(e, r.id)) return;
     const edits = e.key === " " || e.key === "Delete" || (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown"));
     if (busy && edits) return;
     if (e.key === " " && r.kind === "mod") {
@@ -778,6 +969,7 @@
 
   onMount(() => {
     const unlisten = listen<string>("log", (e) => say(e.payload, {}, e.payload.startsWith("error:")));
+    const unlistenProgress = listen<[number, number]>("progress", (e) => (progress = e.payload));
     const settings = api.settingsGet().catch(() => null);
     run(t("busy.loading"), api.load).then(async () => {
       refreshStats();
@@ -789,6 +981,7 @@
     getVersion().then((v) => (appVersion = v));
     return () => {
       unlisten.then((f) => f());
+      unlistenProgress.then((f) => f());
     };
   });
 </script>
@@ -802,18 +995,22 @@
     <img class="brand" src="/brand/pzmm.png" alt="PZMM" width="44" height="44" />
 
     <div class="profile">
-      {#if newProfile !== null}
-        <form onsubmit={createProfile} class="inline">
+      {#if nameFor}
+        <form onsubmit={submitName} class="inline">
           <!-- svelte-ignore a11y_autofocus -->
-          <input type="text" bind:value={newProfile} placeholder={t("app.newProfilePlaceholder")} autofocus
-            onkeydown={(e) => e.key === "Escape" && (newProfile = null)} />
-          <button type="submit" disabled={!newProfile.trim()}><Icon name="plus" size={14} />{t("app.create")}</button>
+          <input type="text" bind:value={nameFor.value} placeholder={t(nameFor.kind === "new" ? "app.newProfilePlaceholder" : "app.profileNamePlaceholder")} autofocus
+            aria-label={t("app.profileNamePlaceholder")} onkeydown={(e) => e.key === "Escape" && (nameFor = null)} />
+          <button type="submit" disabled={!nameFor.value.trim()}>
+            <Icon name={nameFor.kind === "new" ? "plus" : nameFor.kind === "rename" ? "check" : "copy"} size={14} />{t(nameFor.kind === "new" ? "app.create" : nameFor.kind === "rename" ? "app.rename" : "app.duplicate")}</button>
+          <button type="button" class="quiet" onclick={() => (nameFor = null)}><Icon name="x" size={14} />{t("common.cancel")}</button>
         </form>
       {:else}
         <ProfilePicker {view} {busy} onUse={(p) => run(t("busy.switchingProfile"), () => api.profileUse(p))}
-          onSwitchGame={planMode} onNew={() => (newProfile = "")} />
+          onSwitchGame={planMode} onNew={() => (nameFor = { kind: "new", value: "" })}
+          onRename={() => (nameFor = { kind: "rename", value: view?.profile ?? "" })}
+          onDuplicate={() => (nameFor = { kind: "duplicate", value: t("app.copyName", { name: view?.profile ?? "" }) })} onSnapshots={openSnapshots} />
         <button class="quiet" onclick={shareProfile} disabled={busy} title={t("app.shareTip")}><Icon name="share" size={14} />{t("app.share")}</button>
-        <button class="quiet" onclick={() => (importText = "")} disabled={busy} title={t("app.importTip")}><Icon name="upload" size={14} />{t("common.import")}</button>
+        <button class="quiet" onclick={openImport} disabled={busy} title={t("app.importTip")}><Icon name="upload" size={14} />{t("common.import")}</button>
         {#if modeProfiles.length > 1}
           <button class="quiet" onclick={deleteProfile} disabled={busy}><Icon name="trash" size={14} />{t("common.delete")}</button>
         {/if}
@@ -824,8 +1021,17 @@
       <label for="install" class="visually-hidden">{t("app.installLabel")}</label>
       <input id="install" type="text" bind:value={installText} autocomplete="off" spellcheck="false"
         placeholder={t("app.installPlaceholder")} />
+      <button type="button" onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); browseAt = { x: r.left, y: r.bottom + 4 }; }} disabled={busy}
+        title={t("app.browseTip")} aria-haspopup="menu"><Icon name="folder" size={14} />{t("app.browse")}</button>
       <button class="primary" type="submit" disabled={busy || !installText.trim()}><Icon name="download" size={14} />{t("common.install")}</button>
     </form>
+    {#if browseAt}
+      <Menu x={browseAt.x} y={browseAt.y} label={t("app.browse")} onClose={() => (browseAt = null)}
+        items={[{ label: t("app.browseZip"), icon: "download", run: () => browseInstall(false) }, { label: t("app.browseFolder"), icon: "folder", run: () => browseInstall(true) }]} />
+    {/if}
+    {#if rowMenu}
+      <Menu x={rowMenu.x} y={rowMenu.y} label={t("menu.label", { name: mods.get(rowMenu.id)?.name || rowMenu.id })} items={rowMenuItems} onClose={() => (rowMenu = null)} />
+    {/if}
 
   </header>
   {#snippet actions()}
@@ -836,7 +1042,7 @@
         <button onclick={checkUpdatesNow} disabled={busy || checking} title={t("app.checkUpdatesTip")}>
           <Icon name="refresh" size={14} />{checking ? t("app.checking") : t("app.checkUpdates")}</button>
       {/if}
-      <button onclick={api.launchGame} title={cfg?.settings.launch_args ? t("app.launchTipArgs", { args: cfg.settings.launch_args }) : t("app.launchTip")}><Icon name="play" size={14} />{t("app.launch")}</button>
+      <button onclick={launch} title={cfg?.settings.launch_args ? t("app.launchTipArgs", { args: cfg.settings.launch_args }) : t("app.launchTip")}><Icon name="play" size={14} />{t("app.launch")}</button>
     </div>
   {/snippet}
 
@@ -850,6 +1056,38 @@
         <button class="quiet" type="button" onclick={() => (importText = null)}><Icon name="x" size={14} />{t("common.cancel")}</button>
       </div>
     </form>
+  {/if}
+
+  {#if asking}
+    <div class="mode-plan" role="alertdialog" aria-label={asking.title}>
+      <p><strong>{asking.title}</strong></p>
+      {#if asking.lines.length}<ul class="mono">{#each asking.lines as l}<li>{l}</li>{/each}</ul>{/if}
+      <div class="row">
+        {#each asking.choices as c, i}
+          <button class={i === 0 ? "primary" : ""} onclick={() => answer(i)}><Icon name={c.icon} size={14} />{c.label}</button>
+        {/each}
+        <button class="quiet" onclick={() => answer(-1)}><Icon name="x" size={14} />{t("common.cancel")}</button>
+      </div>
+    </div>
+  {/if}
+
+  {#if snapList}
+    <div class="mode-plan" role="region" aria-label={t("snapshots.title", { profile: view?.profile ?? "" })}>
+      <p><strong>{t("snapshots.title", { profile: view?.profile ?? "" })}</strong> {t("snapshots.intro")}</p>
+      {#if snapList.length}
+        <ul class="snaps">
+          {#each snapList as s (s.id)}
+            <li>
+              <span>{fmtDateTime(s.time)} · {t(`snapshots.why.${s.label}`)} <span class="hint-line">· {t("snapshots.counts", { count: s.mods, enabled: s.enabled })}</span></span>
+              <button onclick={() => restoreSnapshot(s.id)} disabled={busy}><Icon name="rollback" size={14} />{t("snapshots.restore")}</button>
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p class="hint-line">{t("snapshots.none")}</p>
+      {/if}
+      <div class="row"><button class="quiet" onclick={() => (snapList = null)}><Icon name="x" size={14} />{t("common.close")}</button></div>
+    </div>
   {/if}
 
   {#if modePlan}
@@ -909,12 +1147,12 @@
   {#if tab === "workshop"}
     <!-- kept mounted above -->
   {:else if tab === "maps"}
-    <Maps {busy} {mods} loadOrder={order} {say} onSetMods={setMods} onInstallWorkshop={installWorkshop} onShowMod={(id) => { selected = id; tab = "mods"; }}
+    <Maps {busy} {mods} loadOrder={order} {say} find={mapsFind} onSetMods={setMods} onInstallWorkshop={installWorkshop} onShowMod={(id) => { selected = id; tab = "mods"; }}
       canUndo={undoStack.length > 0} onUndo={undo} />
   {:else if tab === "servers"}
     <ServersSaves {busy} profile={view?.profile ?? ""} enabledIds={order}
       onImport={(name) => run(t("busy.importingServer", { name }), () => api.serverImport(name), { showLog: true })}
-      onUseSave={(mode, name) => run(t("busy.loadingSave", { name }), () => api.saveUse(mode, name))} />
+      onUseSave={useSave} {ask} />
   {:else if tab === "zb"}
     <ZombieBuddy status={zb} profile={view?.profile ?? ""} {busy}
       onSetup={async () => { await run(t("busy.zbSetup"), api.zbInstall, { showLog: true }); }}
@@ -931,7 +1169,7 @@
       <span>
         {@html th("app.saveDiff", { save: latestSave.name, diffs: [saveDiff.missing.length && t("app.saveMissing", { count: saveDiff.missing.length }), saveDiff.extra.length && t("app.saveExtra", { count: saveDiff.extra.length })].filter(Boolean).join(", ") })}
       </span>
-      <button onclick={() => latestSave && run(t("busy.loadingSave", { name: latestSave.name }), () => api.saveUse(latestSave!.mode, latestSave!.name))}><Icon name="swap" size={14} />{t("app.useSaveMods")}</button>
+      <button onclick={() => latestSave && useSave(latestSave)}><Icon name="swap" size={14} />{t("app.useSaveMods")}</button>
       <button class="quiet" onclick={() => (saveNoticeDismissed = true)}>{t("app.dismiss")}</button>
     </div>
   {/if}
@@ -998,7 +1236,7 @@
     </span>
   </div>
 
-  <Findings {findings} {gameErrors} {bisect} {busy} onClose={() => (findings = null)} onSelect={(id) => (selected = id)}
+  <Findings {findings} {gameErrors} {bisect} {busy} onClose={() => (findings = null)} onSelect={(id) => (selected = id)} onInstall={installRequirement} onDisable={disableMod}
     onBisectStart={bisectStart} onBisectAnswer={bisectAnswer} onBisectStop={bisectStop} />
   <main class:with-details={selected} class:with-panel={!selected && rows.length}>
     <div class="list blueprint">
@@ -1011,7 +1249,7 @@
         </div>
       {:else}
         <ModTable {rows} {order} {visible} {sectionOf} {filtering} {busy} build={view?.build ?? null} {stats} {overlaps} {problems} {updates}
-          {collapsed} {picked} {selected} bind:dragFrom bind:editingSep onRowClick={rowClick} onRowKey={rowKey} onToggle={toggle}
+          {collapsed} {picked} {selected} bind:dragFrom bind:editingSep onRowClick={rowClick} onRowKey={rowKey} onToggle={toggle} onMenu={openMenu}
           onToggleSection={toggleSection} onDrop={dropOn} onRename={renameSep} onRemoveSep={removeSep} />
       {/if}
     </div>
@@ -1022,13 +1260,13 @@
         onRemove={remove} onRollback={(id) => run(t("busy.restoring", { id }), () => api.rollback(id))} onClose={() => (selected = null)} />
     {:else if rows.length}
       <LoadOrder {rows} {order} {mods} {problems} {fixable} {overlaps} {busy} onAutosort={autosortList} onFix={fixLoadOrder}
-        onMove={moveInOrder} onSelect={(id) => (selected = id)} />
+        onMove={moveInOrder} onSelect={(id) => (selected = id)} onMenu={openMenu} onMenuKey={menuKey} />
     {/if}
   </main>
   </section>
   {/if}
 
-  <ActivityLog {log} {busy} {busyLabel} bind:open={logOpen} />
+  <ActivityLog {log} {busy} {busyLabel} {progress} bind:open={logOpen} onCancel={api.installStop} onCopy={copyLog} />
 </div>
 
 <style>
@@ -1106,6 +1344,18 @@
   .mode-plan .row {
     display: flex;
     gap: 8px;
+  }
+  .mode-plan .snaps {
+    list-style: none;
+    padding: 0;
+  }
+  .snaps li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 0;
+    border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
   }
   .hint-line {
     color: var(--muted);

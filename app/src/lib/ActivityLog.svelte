@@ -1,12 +1,19 @@
 <script lang="ts">
+  import { api } from "./api";
+  import { fmtTime } from "./format";
   import { t } from "./i18n.svelte";
   import Icon, { type IconName } from "./Icon.svelte";
 
-  let { log, busy, busyLabel, open = $bindable() }: {
-    log: { text: string; en: string; error: boolean }[];
+  let { log, busy, busyLabel, progress, open = $bindable(), onCancel, onCopy }: {
+    log: { text: string; en: string; error: boolean; time: number; url?: string }[];
     busy: boolean;
     busyLabel: string;
+    /** Workshop items downloaded, of how many (while a download runs). */
+    progress: [number, number] | null;
     open: boolean;
+    /** Stop the download: what finished still installs. */
+    onCancel: () => void;
+    onCopy: () => void;
   } = $props();
 
   /** The icon for an activity line, from what it says (in English: `en`, so it works in every language). */
@@ -28,16 +35,26 @@
 </script>
 
 <footer class="activity" class:open>
-  <button class="quiet bar" aria-expanded={open} onclick={() => (open = !open)}>
-    <span class="dot" class:busy aria-hidden="true"></span>
-    <span class="label">{busy ? busyLabel + "…" : t("activity.title")}</span>
-    {#if log.length}<Icon name={logIcon(log.at(-1)!.en, log.at(-1)!.error)} size={12} />{/if}
-    <span class="last">{log.at(-1)?.text ?? ""}</span>
-  </button>
+  <div class="head">
+    <button class="quiet bar" aria-expanded={open} onclick={() => (open = !open)}>
+      <span class="dot" class:busy aria-hidden="true"></span>
+      <span class="label">{busy ? busyLabel + "…" : t("activity.title")}</span>
+      {#if busy && progress}<span class="count">{t("activity.progress", { done: progress[0], total: progress[1] })}</span>{/if}
+      {#if log.length}<Icon name={logIcon(log.at(-1)!.en, log.at(-1)!.error)} size={12} />{/if}
+      <span class="last">{log.at(-1)?.text ?? ""}</span>
+    </button>
+    {#if busy && progress}
+      <button class="quiet" onclick={onCancel} title={t("activity.cancelTip")}><Icon name="x" size={14} />{t("common.cancel")}</button>
+    {/if}
+    {#if open && log.length}
+      <button class="quiet" onclick={onCopy} title={t("activity.copyTip")}><Icon name="copy" size={14} />{t("activity.copy")}</button>
+    {/if}
+  </div>
   {#if open}
     <ol class="log mono" aria-live="polite">
       {#each log as l}
-        <li class:error={l.error}><Icon name={logIcon(l.en, l.error)} size={12} /><span>{l.text}</span></li>
+        <li class:error={l.error}><span class="time">{fmtTime(l.time)}</span><Icon name={logIcon(l.en, l.error)} size={12} /><span>{l.text}
+          {#if l.url}<button class="quiet link" onclick={() => api.openUrl(l.url!)}>{t("activity.whatChanged")}</button>{/if}</span></li>
       {:else}
         <li class="quiet-line">{t("activity.empty")}</li>
       {/each}
@@ -50,18 +67,35 @@
     border-top: 1px solid var(--line);
     background: var(--panel);
   }
+  .head {
+    display: flex;
+    align-items: center;
+    padding-right: 10px;
+  }
   .bar {
+    flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
     justify-content: flex-start;
     gap: 10px;
-    width: 100%;
     padding: 7px 16px;
     border-radius: 0;
     text-align: left;
   }
   .label {
     font-weight: 700;
+  }
+  .count {
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .time {
+    flex: none;
+    color: var(--muted);
+  }
+  .link {
+    margin-left: 6px;
   }
   .last {
     color: var(--muted);

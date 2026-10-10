@@ -47,6 +47,8 @@ export type ModDetails = {
   info: Record<string, string>;
   ours: boolean;
   has_backup: boolean;
+  /** It adds maps on the build being played. */
+  maps: boolean;
 };
 
 export type WorkshopItem = {
@@ -137,7 +139,11 @@ export function decodeShare(text: string): Shared {
 }
 
 export type ModErrors = { name: string; count: number; example: string; id: string | null };
-export type Finding = { level: "error" | "warning"; subject: string; text: string };
+/** `action`: a fix to offer (install a missing mod, disable an incompatible one). */
+export type Finding = { level: "error" | "warning"; subject: string; text: string; action: { install?: string; disable?: string } | null };
+export type Snapshot = { id: string; time: number; label: string; enabled: number; mods: number };
+/** What writing a server config would change; `maps_to` equals `maps_from` when Map= stays. */
+export type ServerPreview = { new: boolean; added: string[]; removed: string[]; maps_from: string[]; maps_to: string[] };
 export type Stats = { size: number; modified: number };
 export type Overlap = { wins_over: string[]; loses_to: string[] };
 export type Conflict = { other: string; files: number; wins: boolean; examples: string[] };
@@ -208,12 +214,20 @@ export const api = {
   profileNew: (name: string) => invoke<View>("profile_new", { name }),
   profileUse: (name: string) => invoke<View>("profile_use", { name }),
   profileDelete: (name: string) => invoke<View>("profile_delete", { name }),
+  profileRename: (from: string, to: string) => invoke<View>("profile_rename", { from, to }),
+  profileDuplicate: (from: string, to: string) => invoke<View>("profile_duplicate", { from, to }),
+  /** Keep the active profile as saved, before a change (`label` says which). */
+  profileSnapshot: (label: string) => invoke<void>("profile_snapshot", { label }),
+  profileSnapshots: () => invoke<Snapshot[]>("profile_snapshots"),
+  snapshotRestore: (id: string) => invoke<View>("snapshot_restore", { id }),
   setBuild: (build: 41 | 42 | null) => invoke<View>("set_build", { build }),
   details: (id: string) => invoke<ModDetails | null>("details", { id }),
   poster: (id: string) => invoke<ArrayBuffer>("poster", { id }),
   browse: (query: Query) => invoke<Browse>("workshop_browse", { query }),
   workshopInfo: (id: string) => invoke<WorkshopInfo>("workshop_info", { id }),
   workshopChanges: (id: string, page: number) => invoke<ChangeNote[]>("workshop_changes", { id, page }),
+  /** Change notes since the installed version of mod `id`. */
+  modChanges: (id: string) => invoke<ChangeNote[]>("mod_changes", { id }),
   workshopComments: (creator: string, id: string, start: number) => invoke<Comments>("workshop_comments", { creator, id, start }),
   workshopAuthor: (creator: string, page: number) => invoke<Browse>("workshop_author", { creator, page }),
   zbStatus: () => invoke<ZbStatus>("zb_status"),
@@ -231,6 +245,7 @@ export const api = {
   conflicts: (id: string) => invoke<Conflict[]>("conflicts", { id }),
   serversAndSaves: () => invoke<ServersAndSaves>("servers_and_saves"),
   serverMaps: (name: string) => invoke<string[]>("server_maps", { name }),
+  serverPreview: (name: string, maps: string[]) => invoke<ServerPreview>("server_preview", { name, maps }),
   serverExport: (name: string, maps: string[]) => invoke<string[]>("server_export", { name, maps }),
   serverStart: (name: string) => invoke<string>("server_start", { name }),
   serverImport: (name: string) => invoke<View>("server_import", { name }),
@@ -263,6 +278,11 @@ export const api = {
   /** An empty path goes back to autodetect; `moveData` moves PZMM's data along. */
   folderSet: (key: string, path: string, moveData: boolean) => invoke<SettingsView>("folder_set", { key, path, moveData }),
   pickFolder: (start: string) => invoke<string | null>("pick_folder", { start }),
+  /** .zip files (or, with `folder`, a folder) to install. */
+  pickInstall: (folder: boolean) => invoke<string[]>("pick_install", { folder }),
+  /** Cancel the Workshop download in progress ("progress" events count it). */
+  installStop: () => invoke<void>("install_stop"),
+  maskUser: (text: string) => invoke<string>("mask_user", { text }),
   githubTokenSet: (token: string) => invoke<void>("github_token_set", { token }),
   backupsClear: () => invoke<number>("backups_clear"),
   diagnostics: () => invoke<string>("diagnostics"),
