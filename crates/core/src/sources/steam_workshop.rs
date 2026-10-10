@@ -86,6 +86,15 @@ pub struct Item {
     /// Steam's 0-5 star rating and how many votes it's based on (browse results only).
     pub stars: u64,
     pub votes: u64,
+    pub views: u64,
+    pub favorited: u64,
+    pub comments: u64,
+    pub time_created: u64,
+    /// The author's Steam id, and their name when the source has it (browse results do).
+    pub creator: String,
+    pub author: String,
+    /// A collection rather than a mod.
+    pub collection: bool,
 }
 
 #[derive(Debug, Default, serde::Serialize)]
@@ -121,36 +130,109 @@ impl Item {
             num_children: num(v, "num_children"),
             stars: num(v, "star_rating"),
             votes: num(v, "total_votes"),
+            views: num(v, "views"),
+            favorited: num(v, "favorited"),
+            comments: num(v, "num_comments_public"),
+            time_created: num(v, "time_created"),
+            creator: text(v, "creator"),
+            author: String::new(),
+            collection: num(v, "file_type") == 2,
         }
     }
 }
 
-/// Browse sort orders, as Steam names them.
-pub const SORTS: &[&str] = &["trend", "toprated", "totaluniquesubscribers", "mostrecent", "lastupdated"];
+/// Browse sort orders, as Steam names them. Collections only sort by the first four.
+pub const SORTS: &[&str] = &["trend", "toprated", "mostrecent", "lastupdated", "totaluniquesubscribers", "num_parent_collections"];
 
-/// Search or browse the Workshop for `app`. `sort` is one of [`SORTS`] (ignored when
-/// searching); `page` starts at 1; `tag` filters, e.g. "Build 42".
-pub fn browse(app: &str, search: &str, sort: &str, page: u32, tag: Option<&str>) -> Result<Page> {
-    let enc = |s: &str| -> String {
-        s.bytes()
-            .map(|b| if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") })
-            .collect()
-    };
-    let sort = if !search.trim().is_empty() { "textsearch" } else if SORTS.contains(&sort) { sort } else { "trend" };
-    let mut url = format!(
-        "https://steamcommunity.com/workshop/browse/?appid={app}&section=readytouseitems&browsesort={sort}&actualsort={sort}&p={}",
-        page.max(1)
-    );
+/// One Workshop browse request: everything Steam's browse page filters on anonymously.
+#[derive(Clone, Debug, Default, serde::Deserialize)]
+#[serde(default)]
+pub struct Query {
+    pub search: String,
+    /// Where the words must appear: 0 anywhere, 1 title, 2 description.
+    pub scope: u8,
+    /// One of [`SORTS`]; ignored when searching.
+    pub sort: String,
+    /// Popularity window for the "trend" sort, in days (1, 7, 30, 90, 180, 365).
+    pub days: u32,
+    /// From 1.
+    pub page: u32,
+    /// 30 or 50 (Steam ignores other sizes).
+    pub per_page: u32,
+    /// Tags every result has, and tags none has (e.g. "Build 42", "Map").
+    pub required: Vec<String>,
+    pub excluded: Vec<String>,
+    /// Collections instead of mods.
+    pub collections: bool,
+    /// Only what depends on (or, with `collections`, contains) this item.
+    pub child: String,
+    /// Only items other items require (the libraries).
+    pub libraries: bool,
+    /// Only items the author marked incompatible.
+    pub incompatible: bool,
+    /// Unix-time ranges; 0 = open.
+    pub created_from: u64,
+    pub created_to: u64,
+    pub updated_from: u64,
+    pub updated_to: u64,
+}
+
+fn enc(s: &str) -> String {
+    s.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") }).collect()
+}
+
+/// The browse page URL for `q`.
+pub fn browse_url(app: &str, q: &Query) -> String {
+    let search = q.search.trim();
+    let mut sort = if !search.is_empty() { "textsearch" } else if SORTS.contains(&q.sort.as_str()) { q.sort.as_str() } else { "trend" };
+    if q.collections && !["trend", "toprated", "mostrecent", "lastupdated", "textsearch"].contains(&sort) {
+        sort = "trend"; // other sorts return nothing for collections
+    }
+    let section = if q.collections { "collections" } else { "readytouseitems" };
+    let mut url = format!("https://steamcommunity.com/workshop/browse/?appid={app}&section={section}&browsesort={sort}&actualsort={sort}&p={}", q.page.max(1));
     if sort == "trend" {
-        url += "&days=7";
+        url += &format!("&days={}", if q.days == 0 { 7 } else { q.days });
     }
     if sort == "textsearch" {
-        url += &format!("&searchtext={}", enc(search.trim()));
+        url += &format!("&searchtext={}", enc(search));
+        if q.scope > 0 {
+            url += &format!("&search_text_target={}", q.scope.min(2));
+        }
     }
-    if let Some(t) = tag {
-        url += &format!("&requiredtags%5B%5D={}", enc(t));
+    if q.per_page == 50 {
+        url += "&num_per_page=50";
     }
-    parse_browse(&String::from_utf8_lossy(&super::http_get(&url)?))
+    for tag in &q.required {
+        url += &format!("&requiredtags%5B%5D={}", enc(tag));
+    }
+    for tag in &q.excluded {
+        url += &format!("&excludedtags%5B%5D={}", enc(tag));
+    }
+    if valid_id(&q.child) {
+        url += &format!("&childpublishedfileid={}", q.child);
+    }
+    if q.libraries {
+        url += "&special_filter=6";
+    }
+    if q.incompatible {
+        url += "&requiredflags%5B%5D=incompatible";
+    }
+    for (key, v) in [
+        ("created_date_range_filter_start", q.created_from),
+        ("created_date_range_filter_end", q.created_to),
+        ("updated_date_range_filter_start", q.updated_from),
+        ("updated_date_range_filter_end", q.updated_to),
+    ] {
+        if v > 0 {
+            url += &format!("&{key}={v}");
+        }
+    }
+    url
+}
+
+/// Search or browse the Workshop for `app`.
+pub fn browse(app: &str, q: &Query) -> Result<Page> {
+    parse_browse(&String::from_utf8_lossy(&super::http_get(&browse_url(app, q))?))
 }
 
 /// Steam renders the browse page server-side and embeds its data as JSON
@@ -174,7 +256,23 @@ fn parse_browse(html: &str) -> Result<Page> {
                 if let Some(Value::Array(results)) = o.get("results")
                     && results.first().is_some_and(|r| r.get("publishedfileid").is_some())
                 {
-                    *page = Some(Page { total: num(v, "total_count"), items: results.iter().map(Item::from_json).collect() });
+                    // authors' names come alongside, keyed by Steam id
+                    let names: std::collections::HashMap<&str, &str> = o
+                        .get("creator_player_link_details")
+                        .and_then(Value::as_array)
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|p| Some((p["public_data"]["steamid"].as_str()?, p["public_data"]["persona_name"].as_str()?)))
+                        .collect();
+                    let items = results
+                        .iter()
+                        .map(|r| {
+                            let mut i = Item::from_json(r);
+                            i.author = names.get(i.creator.as_str()).map(|n| n.to_string()).unwrap_or_default();
+                            i
+                        })
+                        .collect();
+                    *page = Some(Page { total: num(v, "total_count"), items });
                     return;
                 }
                 o.values().for_each(|x| find(x, page));
@@ -254,6 +352,154 @@ pub fn required_items(id: &str) -> Result<Vec<String>> {
     let req = parse_required(&html);
     CACHE.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(Default::default).insert(id.to_string(), req.clone());
     Ok(req)
+}
+
+/// What an item's Workshop page adds to the API's details.
+#[derive(Debug, Default, serde::Serialize, PartialEq)]
+pub struct ItemPage {
+    /// Full-size screenshot URLs, in order.
+    pub screenshots: Vec<String>,
+    /// YouTube video ids.
+    pub videos: Vec<String>,
+    pub required: Vec<String>,
+}
+
+/// Screenshots, videos and required items from an item's page.
+pub fn item_page(id: &str) -> Result<ItemPage> {
+    if !valid_id(id) {
+        bail!("not a Workshop id: {id}");
+    }
+    let html = String::from_utf8_lossy(&super::http_get(&format!("https://steamcommunity.com/sharedfiles/filedetails/?id={id}"))?).into_owned();
+    Ok(parse_item_page(&html))
+}
+
+fn parse_item_page(html: &str) -> ItemPage {
+    let mut screenshots = vec![];
+    if let Some(start) = html.find("var rgFullScreenshotURLs") {
+        let block = &html[start..];
+        let block = &block[..block.find("];").unwrap_or(block.len())];
+        for part in block.split("'url': '").skip(1) {
+            if let Some(end) = part.find('\'') {
+                screenshots.push(part[..end].replace("&amp;", "&"));
+            }
+        }
+    }
+    let mut videos: Vec<String> = vec![];
+    // the gallery strip shows each video as its YouTube thumbnail
+    for part in html.split("movie_thumb\" src=\"https://img.youtube.com/vi/").skip(1) {
+        let v: String = part.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').collect();
+        if v.len() == 11 && !videos.contains(&v) {
+            videos.push(v);
+        }
+    }
+    ItemPage { screenshots, videos, required: parse_required(html) }
+}
+
+/// Plain text from a scrap of Steam HTML: line breaks kept, tags dropped, entities decoded.
+fn html_text(s: &str) -> String {
+    let s = s.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n");
+    let mut out = String::new();
+    let mut in_tag = false;
+    for c in s.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => out.push(c),
+            _ => {}
+        }
+    }
+    out.replace("&quot;", "\"").replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">").replace("&nbsp;", " ").replace("&amp;", "&").trim().to_string()
+}
+
+#[derive(Debug, Default, serde::Serialize, PartialEq)]
+pub struct ChangeNote {
+    pub time: u64,
+    pub text: String,
+}
+
+/// One page (from 1) of an item's change notes, newest first.
+pub fn change_notes(id: &str, page: u32) -> Result<Vec<ChangeNote>> {
+    if !valid_id(id) {
+        bail!("not a Workshop id: {id}");
+    }
+    let url = format!("https://steamcommunity.com/sharedfiles/filedetails/changelog/{id}?p={}", page.max(1));
+    Ok(parse_change_notes(&String::from_utf8_lossy(&super::http_get(&url)?)))
+}
+
+fn parse_change_notes(html: &str) -> Vec<ChangeNote> {
+    html.split("class=\"changelog headline\"")
+        .skip(1)
+        .filter_map(|block| {
+            let p = block.find("<p id=\"")? + 7;
+            let time: u64 = block[p..].chars().take_while(char::is_ascii_digit).collect::<String>().parse().ok()?;
+            let body = &block[block[p..].find('>')? + p + 1..];
+            Some(ChangeNote { time, text: html_text(&body[..body.find("</p>").unwrap_or(body.len())]) })
+        })
+        .collect()
+}
+
+#[derive(Debug, Default, serde::Serialize, PartialEq)]
+pub struct Comment {
+    pub author: String,
+    pub time: u64,
+    pub text: String,
+}
+
+#[derive(Debug, Default, serde::Serialize)]
+pub struct Comments {
+    pub total: u64,
+    pub comments: Vec<Comment>,
+}
+
+/// Public comments on an item, newest first, 20 from `start`.
+pub fn comments(creator: &str, id: &str, start: u32) -> Result<Comments> {
+    if !valid_id(id) || creator.is_empty() || !creator.chars().all(|c| c.is_ascii_digit()) {
+        bail!("not a Workshop item: {creator}/{id}");
+    }
+    let url = format!("https://steamcommunity.com/comment/PublishedFile_Public/render/{creator}/{id}/");
+    let v = post_form(&url, &format!("start={start}&count=20&feature2=-1"))?;
+    Ok(Comments { total: num(&v, "total_count"), comments: parse_comments(v["comments_html"].as_str().unwrap_or_default()) })
+}
+
+fn parse_comments(html: &str) -> Vec<Comment> {
+    html.split("class=\"commentthread_comment ")
+        .skip(1)
+        .filter_map(|c| {
+            let author = c.split("<bdi>").nth(1)?.split("</bdi>").next()?;
+            let time = c.split("data-timestamp=\"").nth(1)?.chars().take_while(char::is_ascii_digit).collect::<String>().parse().unwrap_or(0);
+            let text = c.split("commentthread_comment_text\"").nth(1)?;
+            let text = &text[text.find('>')? + 1..];
+            Some(Comment { author: html_text(author), time, text: html_text(&text[..text.find("</div>").unwrap_or(text.len())]) })
+        })
+        .collect()
+}
+
+/// One page (from 1) of an author's items for `app`: the author's total and this page's ids.
+pub fn author_items(app: &str, creator: &str, page: u32) -> Result<(u64, Vec<String>)> {
+    if creator.is_empty() || !creator.chars().all(|c| c.is_ascii_digit()) {
+        bail!("not a Steam id: {creator}");
+    }
+    let url = format!("https://steamcommunity.com/profiles/{creator}/myworkshopfiles/?appid={app}&section=readytouseitems&p={}", page.max(1));
+    Ok(parse_author_items(&String::from_utf8_lossy(&super::http_get(&url)?)))
+}
+
+fn parse_author_items(html: &str) -> (u64, Vec<String>) {
+    let total = html
+        .split("workshopBrowsePagingInfo\">")
+        .nth(1)
+        .and_then(|s| s.split(" entries").next())
+        .and_then(|s| s.rsplit(' ').next())
+        .and_then(|n| n.replace(',', "").parse().ok())
+        .unwrap_or(0);
+    let items = html.split("workshopBrowseItems").nth(1).unwrap_or_default();
+    let mut ids: Vec<String> = vec![];
+    for part in items.split("filedetails/?id=").skip(1) {
+        let id: String = part.chars().take_while(char::is_ascii_digit).collect();
+        if !id.is_empty() && !ids.contains(&id) {
+            ids.push(id);
+        }
+    }
+    (total, ids)
 }
 
 fn parse_required(html: &str) -> Vec<String> {
@@ -396,4 +642,51 @@ mod tests {
         assert_eq!(parse_required(html), ["3619862853", "2169435993"]);
         assert!(parse_required("<html>no requirements</html>").is_empty());
     }
+
+    #[test]
+    fn browse_urls() {
+        let q = Query { sort: "trend".into(), days: 30, required: vec!["Build 42".into()], excluded: vec!["Map".into()], per_page: 50, ..Default::default() };
+        let u = browse_url("108600", &q);
+        assert!(u.contains("section=readytouseitems&browsesort=trend&actualsort=trend&p=1&days=30"));
+        assert!(u.contains("&num_per_page=50&requiredtags%5B%5D=Build%2042&excludedtags%5B%5D=Map"));
+        let c = browse_url("108600", &Query { collections: true, sort: "totaluniquesubscribers".into(), child: "123".into(), ..Default::default() });
+        assert!(c.contains("section=collections&browsesort=trend") && c.contains("&days=7&childpublishedfileid=123"));
+        let s = browse_url("108600", &Query { search: "more traits".into(), scope: 1, created_from: 5, libraries: true, ..Default::default() });
+        assert!(s.contains("browsesort=textsearch") && s.contains("searchtext=more%20traits&search_text_target=1"));
+        assert!(s.contains("&special_filter=6") && s.contains("&created_date_range_filter_start=5"));
+    }
+
+    #[test]
+    fn item_pages() {
+        let html = r#"<script>var rgFullScreenshotURLs = [
+            { 'previewid' : '1', 'url': 'https://images.steamusercontent.com/ugc/1/A/?imw=5000&amp;ima=fit' },
+            { 'previewid' : '2', 'url': 'https://images.steamusercontent.com/ugc/2/B/' },
+            ];</script><div class="highlight_strip_item highlight_strip_movie"><img class="movie_thumb" src="https://img.youtube.com/vi/dQw4w9WgXcQ/default.jpg"></div>"#;
+        let page = parse_item_page(html);
+        assert_eq!(page.screenshots, ["https://images.steamusercontent.com/ugc/1/A/?imw=5000&ima=fit", "https://images.steamusercontent.com/ugc/2/B/"]);
+        assert_eq!(page.videos, ["dQw4w9WgXcQ"]);
+    }
+
+    #[test]
+    fn change_notes_and_comments() {
+        let notes = r#"<div class="changelog headline"> Update: 17 Oct </div><div></div><p id="1666019194">v1.4.4<br>- Hotfix &amp; tidy</p>
+            <div class="changelog headline"> Update: 12 Oct </div><p id="1665625756">v1.4.3</p>"#;
+        assert_eq!(
+            parse_change_notes(notes),
+            [ChangeNote { time: 1666019194, text: "v1.4.4\n- Hotfix & tidy".into() }, ChangeNote { time: 1665625756, text: "v1.4.3".into() }]
+        );
+        let html = r#"<div class="commentthread_comment responsive_body_text " id="comment_1"><a class="commentthread_author_link"><bdi>Spiffo</bdi></a>
+            <div class="commentthread_comment_timestamp" data-timestamp="1791647977"> now</div>
+            <div class="commentthread_comment_text" id="comment_content_1"> Works on 42.21<br>thanks! </div></div>"#;
+        assert_eq!(parse_comments(html), [Comment { author: "Spiffo".into(), time: 1791647977, text: "Works on 42.21\nthanks!".into() }]);
+    }
+
+    #[test]
+    fn author_pages() {
+        let html = r#"<div class="workshopBrowsePagingInfo">Showing 1-9 of 1,204 entries</div><a href="x/filedetails/?id=5">nav</a>
+            <div class="workshopBrowseItems"><a href="https://steamcommunity.com/sharedfiles/filedetails/?id=11"><img></a>
+            <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=11">t</a><a href="https://steamcommunity.com/sharedfiles/filedetails/?id=22">u</a></div>"#;
+        assert_eq!(parse_author_items(html), (1204, vec!["11".to_string(), "22".to_string()]));
+    }
 }
+

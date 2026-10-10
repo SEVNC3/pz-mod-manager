@@ -175,7 +175,8 @@ fn run(cli: Cli) -> Result<()> {
         Cmd::List => list(&paths, &p)?,
         Cmd::Search { query, sort, page, build } => {
             let tag = build.map(|b| format!("Build {b}"));
-            let res = sources::steam_workshop::browse(pzmm_core::pz::STEAM_APP, &query.join(" "), &sort, page, tag.as_deref())?;
+            let q = sources::steam_workshop::Query { search: query.join(" "), sort, page, required: tag.into_iter().collect(), ..Default::default() };
+            let res = sources::steam_workshop::browse(pzmm_core::pz::STEAM_APP, &q)?;
             println!("{} results (page {page})", res.total);
             for i in res.items {
                 println!("{:>11}  {:<50} {:>9} subs", i.id, i.title.chars().take(50).collect::<String>(), i.subscriptions);

@@ -288,7 +288,8 @@ pub fn find_mod(mod_id: &str, needed_by: Option<&str>, build: u8) -> Result<Vec<
         })
         .unwrap_or_default();
     let mut ids = required.clone();
-    for i in steam_workshop::browse(pz::STEAM_APP, mod_id, "", 1, None)?.items {
+    let q = steam_workshop::Query { search: mod_id.into(), ..Default::default() };
+    for i in steam_workshop::browse(pz::STEAM_APP, &q)?.items {
         if !ids.contains(&i.id) {
             ids.push(i.id);
         }

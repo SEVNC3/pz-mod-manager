@@ -57,8 +57,46 @@ export type WorkshopItem = {
   /** Steam's 0-5 star rating and its vote count. */
   stars: number;
   votes: number;
+  views: number;
+  favorited: number;
+  comments: number;
+  time_created: number;
+  /** The author's Steam id, and their name (browse results only). */
+  creator: string;
+  author: string;
+  collection: boolean;
   have: boolean;
 };
+
+/** A Workshop browse request (see steam_workshop::Query). */
+export type Query = {
+  search: string;
+  /** 0 anywhere, 1 title, 2 description. */
+  scope: number;
+  sort: string;
+  /** Window for the "trend" sort, in days. */
+  days: number;
+  page: number;
+  per_page: 30 | 50;
+  required: string[];
+  excluded: string[];
+  collections: boolean;
+  /** Only what depends on (or, with collections, contains) this item. */
+  child: string;
+  libraries: boolean;
+  incompatible: boolean;
+  created_from: number;
+  created_to: number;
+  updated_from: number;
+  updated_to: number;
+};
+export const newQuery = (over: Partial<Query> = {}): Query => ({
+  search: "", scope: 0, sort: "totaluniquesubscribers", days: 7, page: 1, per_page: 30, required: [], excluded: [],
+  collections: false, child: "", libraries: false, incompatible: false, created_from: 0, created_to: 0, updated_from: 0, updated_to: 0, ...over,
+});
+export type WorkshopInfo = { item: WorkshopItem | null; screenshots: string[]; videos: string[]; required: WorkshopItem[]; members: WorkshopItem[] };
+export type ChangeNote = { time: number; text: string };
+export type Comments = { total: number; comments: { author: string; time: number; text: string }[] };
 export type Browse = { total: number; items: WorkshopItem[] };
 export type Candidate = Omit<WorkshopItem, "have"> & { confirmed: boolean; required_by_author: boolean; fits_build: boolean };
 
@@ -112,8 +150,11 @@ export const api = {
   setBuild: (build: 41 | 42 | null) => invoke<View>("set_build", { build }),
   details: (id: string) => invoke<Details | null>("details", { id }),
   poster: (id: string) => invoke<ArrayBuffer>("poster", { id }),
-  browse: (search: string, sort: string, page: number, build: number | null) =>
-    invoke<Browse>("workshop_browse", { search, sort, page, build }),
+  browse: (query: Query) => invoke<Browse>("workshop_browse", { query }),
+  workshopInfo: (id: string) => invoke<WorkshopInfo>("workshop_info", { id }),
+  workshopChanges: (id: string, page: number) => invoke<ChangeNote[]>("workshop_changes", { id, page }),
+  workshopComments: (creator: string, id: string, start: number) => invoke<Comments>("workshop_comments", { creator, id, start }),
+  workshopAuthor: (creator: string, page: number) => invoke<Browse>("workshop_author", { creator, page }),
   zbStatus: () => invoke<ZbStatus>("zb_status"),
   zbPreview: (remove: boolean) => invoke<string[]>("zb_preview", { remove }),
   zbInstall: () => invoke<View>("zb_install"),

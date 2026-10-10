@@ -25,6 +25,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: npm ci && npm run check && node scripts/order-check.ts && npm run build
+      - run: npm ci && npm run check && node scripts/order-check.ts && node scripts/bbcode-check.ts && npm run build
         working-directory: app
       - run: cargo clippy -p pzmm-app -- -D warnings
