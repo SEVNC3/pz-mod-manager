@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
+pub mod category;
 pub mod doctor;
 pub mod files;
 pub mod logs;

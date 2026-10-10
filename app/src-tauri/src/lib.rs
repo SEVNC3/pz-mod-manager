@@ -583,6 +583,25 @@ async fn mod_stats() -> Res<BTreeMap<String, pz::files::Stats>> {
     .map_err(|e| e.to_string())?
 }
 
+#[derive(Serialize)]
+struct Categories {
+    /// Section names in list order.
+    order: &'static [&'static str],
+    /// Mod id -> section name.
+    of: BTreeMap<String, String>,
+}
+
+/// Every mod's category (asks Steam for Workshop tags, so outside the lock).
+#[tauri::command]
+async fn categories() -> Res<Categories> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let mods = reading(scan)?;
+        Ok(Categories { order: pz::category::ORDER, of: pz::category::categorize(&mods) })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// For every enabled mod: which enabled mods it overrides, and is overridden by.
 #[tauri::command]
 async fn conflict_summary() -> Res<std::collections::HashMap<String, pz::files::Overlap>> {
@@ -788,7 +807,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
             details, poster, open_path, open_url, workshop_browse, zb_status, zb_preview, zb_install, zb_uninstall,
-            find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, servers_and_saves, server_export, server_import, server_start, save_use,
+            find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_export, server_import, server_start, save_use,
             mode_preview, mode_switch, doctor, console_errors, profile_export, profile_import
         ])
         .run(tauri::generate_context!())

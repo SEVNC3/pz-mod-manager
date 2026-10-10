@@ -13,7 +13,7 @@
   import LayerIcon from "$lib/LayerIcon.svelte";
   import Links from "$lib/Links.svelte";
   import Icon, { type IconName } from "$lib/Icon.svelte";
-  import { bisectRound, findProblems, sortLoadOrder } from "$lib/order";
+  import { bisectRound, findProblems, groupByCategory, placeInSections, sortLoadOrder } from "$lib/order";
   import type { Finding, ModErrors, Overlap, Save, Stats } from "$lib/api";
 
   let tab = $state<"mods" | "workshop" | "servers" | "zb">("mods");
@@ -244,6 +244,7 @@
   async function run(label: string, job: () => Promise<View>, keepHistory = false): Promise<boolean> {
     // undo covers list edits only: anything else (installs, profile switches) resets it
     if (!keepHistory) undoStack = redoStack = [];
+    const before = new Set(rows.flatMap((r) => (r.kind === "mod" ? [r.id] : [])));
     busy = true;
     busyLabel = label;
     try {
@@ -252,6 +253,7 @@
       rows = v.rows;
       if (v.adopted) say(`Picked up changes made in the game's mod menu (profile "${v.profile}").`);
       if (selected && !v.rows.some((r) => r.kind === "mod" && r.id === selected)) selected = null;
+      if (!keepHistory && before.size) await placeNew(before);
       return true;
     } catch (e) {
       say(String(e), true);
@@ -268,6 +270,34 @@
       refreshOverlaps();
       if (!keepHistory) refreshStats(); // files may have changed (installs, updates, removals)
     }
+  }
+
+  /** Regroup the list under a separator per category, from the mods' Workshop tags. */
+  async function sortIntoCategories() {
+    let c: Awaited<ReturnType<typeof api.categories>>;
+    busy = true;
+    busyLabel = "Reading Workshop tags";
+    try {
+      c = await api.categories();
+    } catch (e) {
+      say(String(e), true);
+      return;
+    } finally {
+      busy = false;
+      busyLabel = "";
+    }
+    const next = groupByCategory(rows, c.of, c.order);
+    if (await commit(next)) say(`Sorted your mods into ${next.filter((r) => r.kind === "sep").length} categories. Ctrl+Z puts the old order back.`);
+  }
+
+  /** In a list sorted into categories, file newly installed mods under theirs. */
+  async function placeNew(before: Set<string>) {
+    const fresh = rows.flatMap((r) => (r.kind === "mod" && !before.has(r.id) ? [r.id] : []));
+    if (!fresh.length || !rows.some((r) => r.kind === "sep")) return;
+    try {
+      const c = await api.categories();
+      if (rows.some((r) => r.kind === "sep" && c.order.includes(r.name))) await commit(placeInSections(rows, c.of, c.order, fresh), false);
+    } catch {}
   }
 
   /** Enable disabled requirements and reorder so requirements and load hints hold. */
@@ -859,6 +889,7 @@
     <button class="quiet icon" onclick={undo} disabled={busy || !undoStack.length} title="Undo the last list change (Ctrl+Z)" aria-label="Undo"><Icon name="undo" size={15} /></button>
     <button class="quiet icon" onclick={redo} disabled={busy || !redoStack.length} title="Redo (Ctrl+Y)" aria-label="Redo"><Icon name="redo" size={15} /></button>
     <button class="quiet" onclick={addSeparator} disabled={busy || filtering} title="Add a separator above the selected mod"><Icon name="plus" size={14} />Separator</button>
+    <button class="quiet" onclick={sortIntoCategories} disabled={busy || filtering} title="Group mods under a separator per category, from their Workshop tags. New mods then go under theirs."><Icon name="layers" size={14} />Sort into categories</button>
     </span>
   </div>
 

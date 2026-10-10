@@ -96,6 +96,65 @@ export function sortLoadOrder(rows: Row[]): Row[] {
   return next;
 }
 
+/** Move every enabled mod's requirements and loadModAfter targets that sit below it to just above it. */
+function pullUp(rows: Row[]): Row[] {
+  const next = [...rows];
+  for (let pass = 0, moved = true; moved && pass < next.length; pass++) {
+    moved = false; // ponytail: passes capped at the list length so a cycle can't loop forever
+    for (let i = 0; i < next.length; i++) {
+      const r = next[i];
+      if (!isMod(r) || !r.on) continue;
+      for (const dep of [...(r.requires ?? []), ...(r.load_after ?? [])]) {
+        const j = next.findIndex((x) => isMod(x) && x.on && x.id === dep);
+        if (j <= i) continue;
+        next.splice(i, 0, ...next.splice(j, 1));
+        i++;
+        moved = true;
+      }
+    }
+  }
+  return next;
+}
+
+/**
+ * The list regrouped under one separator per category, sections in `order`. Mods keep
+ * their relative order within a section and the list's own separators are dropped. A
+ * requirement in a later section moves up to just above the mod that needs it.
+ */
+export function groupByCategory(rows: Row[], of: Record<string, string>, order: string[]): Row[] {
+  const cat = (m: ModRow) => (order.includes(of[m.id]) ? of[m.id] : order[order.length - 1]);
+  const mods = rows.filter(isMod);
+  const out: Row[] = [];
+  for (const name of order) {
+    const section = mods.filter((m) => cat(m) === name);
+    if (section.length) out.push({ kind: "sep", name }, ...section);
+  }
+  return pullUp(out);
+}
+
+/**
+ * Move each of `ids` to the end of its category's section, adding the section (in
+ * `order`) when the list doesn't have it yet.
+ */
+export function placeInSections(rows: Row[], of: Record<string, string>, order: string[], ids: string[]): Row[] {
+  const next = [...rows];
+  for (const id of ids) {
+    const name = of[id];
+    const from = next.findIndex((r) => isMod(r) && r.id === id);
+    if (!order.includes(name) || from < 0) continue;
+    const [m] = next.splice(from, 1);
+    let sep = next.findIndex((r) => r.kind === "sep" && r.name === name);
+    if (sep < 0) {
+      sep = next.findIndex((r) => r.kind === "sep" && order.indexOf(r.name) > order.indexOf(name));
+      if (sep < 0) sep = next.length;
+      next.splice(sep, 0, { kind: "sep", name });
+    }
+    const end = next.findIndex((r, i) => i > sep && r.kind === "sep");
+    next.splice(end < 0 ? next.length : end, 0, m);
+  }
+  return pullUp(next);
+}
+
 /**
  * One bisect test: everything enabled that isn't a suspect stays on, plus the first half
  * of the suspects and (transitively) what they require. Returns the ids to enable and

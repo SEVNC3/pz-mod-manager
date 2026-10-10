@@ -1,6 +1,6 @@
 // Self-check for src/lib/order.ts. Run: node scripts/order-check.ts
 import assert from "node:assert/strict";
-import { bisectRound, findProblems, sortLoadOrder } from "../src/lib/order.ts";
+import { bisectRound, findProblems, groupByCategory, placeInSections, sortLoadOrder } from "../src/lib/order.ts";
 import type { Row } from "../src/lib/api.ts";
 
 const mod = (id: string, on = true, extra: Partial<Record<"requires" | "incompatible" | "load_after" | "load_before", string[]>> = {}): Row => ({
@@ -43,5 +43,16 @@ const req = (id: string) => (id === "S1" ? ["Lib"] : []);
 const r1 = bisectRound(list, ["S1", "S2", "S3", "Lib"], req);
 assert.deepEqual(r1.testing, ["S1", "S2"]);
 assert.deepEqual([...r1.on].sort(), ["Keep", "Lib", "S1", "S2"]);
+
+// categories: sections in order, own separators dropped, a later-section requirement moves up
+const order = ["Libs", "Gameplay", "Maps", "Other"];
+const of = { App: "Gameplay", Lib: "Maps", Town: "Maps", Off: "Gameplay" };
+const grouped = groupByCategory([{ kind: "sep", name: "Mine" }, mod("Town"), mod("Off", false), mod("App", true, { requires: ["Lib"] }), mod("Lib"), mod("Gone")], of, order);
+assert.equal(ids(grouped), "#Gameplay -Off +Lib +App #Maps +Town #Other +Gone");
+assert.equal(findProblems(grouped).size, 0);
+
+// a new mod goes to the end of its section, or a new section in its place
+const placed = placeInSections([{ kind: "sep", name: "Gameplay" }, mod("A"), { kind: "sep", name: "Other" }, mod("B"), mod("New"), mod("Map1")], { New: "Gameplay", Map1: "Maps" }, order, ["New", "Map1"]);
+assert.equal(ids(placed), "#Gameplay +A +New #Maps +Map1 #Other +B");
 
 console.log("order-check: ok");

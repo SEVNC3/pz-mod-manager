@@ -122,6 +122,7 @@ export const api = {
   checkUpdates: () => invoke<string[]>("check_updates"),
   updateMods: (ids: string[]) => invoke<View>("update_mods", { ids }),
   modStats: () => invoke<Record<string, Stats>>("mod_stats"),
+  categories: () => invoke<{ order: string[]; of: Record<string, string> }>("categories"),
   conflictSummary: () => invoke<Record<string, Overlap>>("conflict_summary"),
   conflicts: (id: string) => invoke<Conflict[]>("conflicts", { id }),
   serversAndSaves: () => invoke<ServersAndSaves>("servers_and_saves"),
