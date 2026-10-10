@@ -14,6 +14,7 @@ A free, open-source mod manager for **Project Zomboid** (Build 41 and 42), for W
   - the library on the left is yours to organise: separators, dragging whole sections, **Group by category** from Workshop tags, and switching mods on and off
   - the load order beside it is what the game loads: drag it, or **Autosort** it (frameworks first, translations last, every `require` / `loadModAfter` / `loadModBefore` rule satisfied)
   - PZMM writes the same `mods/default.txt` the game reads, and a map order for dedicated servers
+- **Maps:** a cell grid of the world with every Workshop map (installed or not), clashes, the largest set of maps that fit, requirements, presets and server-ready export.
 - **Settings:** every folder PZMM uses with Browse and Detect, update checks, Recycle Bin removal, backup limits and launch arguments.
 - **Profiles:** keep separate mod setups ("Solo", "Friends server") and switch between them from one menu that groups them by game. Changes you make in the game's own mod menu are picked up automatically, and PZMM never saves over them.
 - **Dependencies:** PZMM flags enabled mods whose required mods are missing, disabled or loading too late. **Install missing mods** finds the missing ones on the Workshop: it checks the "Required items" the author lists, and reads "Mod ID: X" from Workshop descriptions. **Fix load order** sorts the rest.
