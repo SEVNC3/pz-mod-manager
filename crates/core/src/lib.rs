@@ -46,6 +46,25 @@ pub fn write_atomic(path: &std::path::Path, bytes: impl AsRef<[u8]>) -> std::io:
     })
 }
 
+/// A `write_atomic` temp file's name: `<file>.<pid>-<n>.pzmm-tmp`.
+fn is_temp(name: &str) -> bool {
+    let tag = name.strip_suffix(".pzmm-tmp").and_then(|n| n.rsplit_once('.')).map_or("", |(_, t)| t);
+    tag.split_once('-').is_some_and(|(pid, n)| [pid, n].iter().all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit())))
+}
+
+/// Delete the temp files a crash mid-`write_atomic` left in the folders PZMM writes to (an
+/// hour old, so another process's write in progress is never touched). Run once at startup.
+pub fn sweep_temp(paths: &pz::Paths) {
+    let profiles = std::fs::read_dir(paths.data.join("profiles")).into_iter().flatten().flatten().map(|e| e.path());
+    let dirs = [paths.data.clone(), paths.mods(), pz::server::dir(paths)].into_iter().chain(profiles);
+    for e in dirs.filter_map(|d| std::fs::read_dir(d).ok()).flatten().flatten() {
+        let old = e.metadata().and_then(|m| m.modified()).is_ok_and(|t| t.elapsed().is_ok_and(|age| age.as_secs() > 3600));
+        if old && e.file_type().is_ok_and(|t| t.is_file()) && is_temp(&e.file_name().to_string_lossy()) {
+            let _ = std::fs::remove_file(e.path());
+        }
+    }
+}
+
 /// Keep the file as it was before PZMM first changed it (`<file>.bak`); later writes
 /// don't overwrite that original.
 pub fn backup_once(path: &std::path::Path) -> std::io::Result<()> {
@@ -114,6 +133,32 @@ mod tests {
         let got = std::fs::read(&file).unwrap();
         assert!((0..8).any(|i| got == payload(i)), "whole file from one writer");
         assert_eq!(std::fs::read_dir(t.path()).unwrap().count(), 1, "no temp files left");
+    }
+
+    #[test]
+    fn sweeps_only_old_temp_files() {
+        let t = tempfile::tempdir().unwrap();
+        let paths = crate::pz::Paths { zomboid: t.path().into(), data: t.path().join("data") };
+        let hour_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(7200);
+        let dirs = [paths.data.clone(), paths.mods(), crate::pz::server::dir(&paths), paths.data.join("profiles/Default")];
+        let mut keep = vec![];
+        for d in &dirs {
+            std::fs::create_dir_all(d).unwrap();
+            for (name, old) in [("default.txt.123-4.pzmm-tmp", true), ("default.txt.123-5.pzmm-tmp", false), ("x.pzmm-tmp", true), ("a.1-.pzmm-tmp", true), ("default.txt", true)] {
+                let f = std::fs::File::create(d.join(name)).unwrap();
+                if old {
+                    f.set_modified(hour_ago).unwrap();
+                }
+                if name != "default.txt.123-4.pzmm-tmp" {
+                    keep.push(d.join(name));
+                }
+            }
+        }
+        super::sweep_temp(&paths);
+        for d in &dirs {
+            assert!(!d.join("default.txt.123-4.pzmm-tmp").exists(), "{}", d.display());
+        }
+        assert!(keep.iter().all(|f| f.exists()), "new temp files and other names stay");
     }
 
     #[test]

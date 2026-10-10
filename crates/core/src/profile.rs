@@ -300,7 +300,7 @@ fn game_maps(paths: &Paths, profile: &Profile, mods: &std::collections::BTreeMap
     // ...and keep their place in the block (after the map they followed), arranged or not
     let anchors: Vec<String> = block.into_iter().filter(|f| unknown.contains(f) || start.contains(f)).collect();
     let line = pz::server::map_order(&pz::server::merge_order(&anchors, &start), &allowed);
-    line.into_iter().filter(|m| m != pz::server::BASE_MAP).collect()
+    line.into_iter().filter(|m| !pz::server::is_base_map(m)).collect()
 }
 
 pub fn delete(paths: &Paths, name: &str) -> Result<()> {
@@ -391,6 +391,11 @@ pub fn apply(paths: &Paths, profile: &Profile, mods: Option<&std::collections::B
     save_state(paths, &State { active: profile.name.clone(), ..s })
 }
 
+/// The mod scan for `apply`, None (and said in the activity log) when it failed.
+pub fn maps_scan<T>(scan: Result<T>) -> Option<T> {
+    scan.inspect_err(|e| crate::log!("error: couldn't read your mods, so the game's map list wasn't updated: {e:#}")).ok()
+}
+
 /// A profile to share with friends or a server: its list plus where each mod comes
 /// from on the Workshop, so the receiver can install what they're missing.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -455,7 +460,7 @@ mod tests {
     use super::*;
 
     fn apply(paths: &Paths, p: &Profile) -> Result<()> {
-        super::apply(paths, p, crate::store::scan(paths).ok().as_ref())
+        super::apply(paths, p, super::maps_scan(crate::store::scan(paths)).as_ref())
     }
 
     #[test]

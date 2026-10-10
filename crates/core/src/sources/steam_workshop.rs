@@ -1,9 +1,12 @@
 //! Steam Workshop: anonymous downloads through SteamCMD, and the folder where the
 //! Steam client keeps the user's own subscriptions.
 
-use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::collections::HashSet;
+use std::io::{BufRead, BufReader, Read};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
@@ -552,7 +555,17 @@ pub fn valid_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 20 && id.bytes().all(|b| b.is_ascii_digit())
 }
 
-pub fn download(paths: &Paths, app: &str, ids: &[&str]) -> Result<Vec<(String, Option<PathBuf>)>> {
+/// Where SteamCMD keeps item `id`: its finished folder, and its partial download.
+pub fn steamcmd_dirs(paths: &Paths, app: &str, id: &str) -> [PathBuf; 2] {
+    let w = paths.data.join("steamcmd/steamapps/workshop");
+    [w.join("content").join(app).join(id), w.join("downloads").join(app).join(id)]
+}
+
+/// How long SteamCMD may go without finishing an item before it's stopped.
+const ITEM_LIMIT: Duration = Duration::from_secs(60 * 60);
+
+/// Setting `stop` ends SteamCMD early; items it finished by then still count.
+pub fn download(paths: &Paths, app: &str, ids: &[&str], stop: &AtomicBool) -> Result<Vec<(String, Option<PathBuf>)>> {
     if let Some(bad) = ids.iter().find(|i| !valid_id(i)) {
         bail!("{bad:?} isn't a Workshop item id");
     }
@@ -573,35 +586,53 @@ pub fn download(paths: &Paths, app: &str, ids: &[&str]) -> Result<Vec<(String, O
     let _one = STEAMCMD.lock().unwrap_or_else(|e| e.into_inner());
     crate::log!("downloading {} workshop item(s)...", ids.len());
     let mut child = cmd.spawn().with_context(|| format!("running {}", exe.display()))?;
-    let reader = child.stdout.take().map(|out| {
-        std::thread::spawn(move || {
-            let mut done = std::collections::HashSet::new();
-            for line in BufReader::new(out).lines().map_while(Result::ok) {
-                let l = line.to_lowercase();
-                if l.contains("workshop") || l.contains("error") {
-                    crate::log!("{}", line.trim());
-                }
-                // "Success. Downloaded item 123 to ..."
-                if let Some(rest) = line.split("Downloaded item ").nth(1) {
-                    done.insert(rest.chars().take_while(char::is_ascii_digit).collect::<String>());
-                }
-            }
-            done
-        })
+    let out = child.stdout.take().context("SteamCMD's output")?;
+    let (done, stopped) = finished_items(out, ITEM_LIMIT, stop, || {
+        let _ = child.kill();
     });
-    // ponytail: one overall limit; a per-item limit if huge downloads ever need longer
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60 * 60);
-    while child.try_wait()?.is_none() {
-        if std::time::Instant::now() > deadline {
-            let _ = child.kill();
-            let _ = child.wait();
-            bail!("SteamCMD didn't finish within an hour and was stopped");
-        }
-        std::thread::sleep(std::time::Duration::from_millis(300));
+    let _ = child.wait();
+    let got: Vec<(String, Option<PathBuf>)> =
+        ids.iter().map(|id| (id.to_string(), Some(steamcmd_dirs(paths, app, id)[0].clone()).filter(|d| done.contains(*id) && d.is_dir()))).collect();
+    if stopped {
+        let why = if stop.load(Relaxed) { "you stopped it" } else { "no download finished within an hour" };
+        let late: Vec<&str> = got.iter().filter(|(_, d)| d.is_none()).map(|(id, _)| id.as_str()).collect();
+        crate::log!("error: SteamCMD was stopped ({why}); not downloaded: {}", late.join(", "));
     }
-    let done = reader.and_then(|r| r.join().ok()).unwrap_or_default();
-    let content: &Path = &exe.parent().unwrap().join("steamapps/workshop/content").join(app);
-    Ok(ids.iter().map(|id| (id.to_string(), Some(content.join(id)).filter(|d| done.contains(*id) && d.is_dir()))).collect())
+    Ok(got)
+}
+
+/// The ids SteamCMD's output `out` reports downloaded, read until it ends. `kill` runs when
+/// no item finishes within `limit` (a stuck download) or `stop` is set; the bool says it ran.
+fn finished_items(out: impl Read + Send + 'static, limit: Duration, stop: &AtomicBool, kill: impl FnOnce()) -> (HashSet<String>, bool) {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        for line in BufReader::new(out).lines().map_while(Result::ok) {
+            let l = line.to_lowercase();
+            if l.contains("workshop") || l.contains("error") {
+                crate::log!("{}", line.trim());
+            }
+            // "Success. Downloaded item 123 to ..."
+            if let Some(rest) = line.split("Downloaded item ").nth(1) {
+                let _ = tx.send(rest.chars().take_while(char::is_ascii_digit).collect::<String>());
+            }
+        }
+    });
+    let (mut done, mut since) = (HashSet::new(), Instant::now());
+    loop {
+        match rx.recv_timeout(Duration::from_millis(300)) {
+            Ok(id) => {
+                done.insert(id);
+                since = Instant::now();
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) if since.elapsed() < limit && !stop.load(Relaxed) => {}
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                kill();
+                done.extend(rx); // the output ends with the process: items finished just before count
+                return (done, true);
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return (done, false),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -647,7 +678,30 @@ mod tests {
         }
         let t = tempfile::tempdir().unwrap();
         let paths = Paths { zomboid: t.path().into(), data: t.path().into() };
-        assert!(download(&paths, "108600", &["+runscript"]).is_err(), "rejected before SteamCMD runs");
+        assert!(download(&paths, "108600", &["+runscript"], &AtomicBool::new(false)).is_err(), "rejected before SteamCMD runs");
+    }
+
+    #[test]
+    fn a_stuck_batch_keeps_what_finished() {
+        let never = AtomicBool::new(false);
+        let out = "Downloading item 1 ...
+Success. Downloaded item 1 to \"x\" (5 bytes)
+Success. Downloaded item 22 to \"y\"
+";
+        let (done, stopped) = finished_items(std::io::Cursor::new(out), Duration::from_secs(60), &never, || panic!("not stuck"));
+        assert_eq!((done, stopped), (["1".to_string(), "22".to_string()].into(), false));
+
+        // item 1 finishes, then nothing: stopped after `limit`, item 1 kept
+        let (r, mut w) = std::io::pipe().unwrap();
+        std::io::Write::write_all(&mut w, b"Success. Downloaded item 1 to \"x\"
+Downloading item 2 ...
+").unwrap();
+        let (done, stopped) = finished_items(r, Duration::from_millis(500), &never, move || drop(w));
+        assert_eq!((done, stopped), (["1".to_string()].into(), true));
+
+        let (r, w) = std::io::pipe().unwrap();
+        let (done, stopped) = finished_items(r, Duration::from_secs(60), &AtomicBool::new(true), move || drop(w));
+        assert!(done.is_empty() && stopped, "Stop ends it at once");
     }
 
     #[test]

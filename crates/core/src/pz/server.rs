@@ -42,6 +42,11 @@ pub struct ServerMods {
 /// The game's own map, which mod maps must come before.
 pub const BASE_MAP: &str = "Muldraugh, KY";
 
+/// `folder` is `BASE_MAP`, in any case and with spaces around it (Windows and the game don't mind).
+pub fn is_base_map(folder: &str) -> bool {
+    folder.trim().eq_ignore_ascii_case(BASE_MAP)
+}
+
 fn value<'a>(text: &'a str, key: &str) -> &'a str {
     text.lines().find_map(|l| l.strip_prefix(key)?.strip_prefix('=')).unwrap_or("").trim()
 }
@@ -65,14 +70,14 @@ pub fn map_order(order: &[String], mod_maps: &[String]) -> Vec<String> {
         return vec![];
     }
     let mut out: Vec<String> = vec![];
-    for m in order.iter().filter(|m| *m != BASE_MAP && (mod_maps.contains(m) || super::maps::is_vanilla(m))) {
+    for m in order.iter().filter(|m| !is_base_map(m) && (mod_maps.contains(m) || super::maps::is_vanilla(m))) {
         if !out.contains(m) {
             out.push(m.clone());
         }
     }
     let at = out.iter().position(|m| super::maps::is_vanilla(m)).unwrap_or(out.len());
     let mut new: Vec<String> = vec![];
-    for m in mod_maps.iter().filter(|m| !out.contains(m) && *m != BASE_MAP) {
+    for m in mod_maps.iter().filter(|m| !out.contains(m) && !is_base_map(m)) {
         if !new.contains(m) {
             new.push(m.clone());
         }
@@ -236,6 +241,8 @@ mod tests {
         // B stays first, the gone map drops, the new C goes before Muldraugh
         assert_eq!(map_order(&ids(&["B", "Gone", "A", BASE_MAP]), &ids(&["A", "B", "C", "A"])), ids(&["B", "A", "C", BASE_MAP]));
         assert_eq!(map_order(&[], &ids(&["A"])), ids(&["A", BASE_MAP]));
+        assert_eq!(map_order(&ids(&[" muldraugh, ky", "A"]), &ids(&["A"])), ids(&["A", BASE_MAP]), "any case: still the base map, still last");
+        assert!(is_base_map("MULDRAUGH, KY ") && !is_base_map("Muldraugh") && !is_base_map("Muldraugh,KY"));
         // Muldraugh is pinned last; the game's other maps keep their place, new mod maps go before them
         assert_eq!(map_order(&ids(&[BASE_MAP, "A", "Riverside, KY", "Gone"]), &ids(&["A", "C"])), ids(&["A", "C", "Riverside, KY", BASE_MAP]));
     }

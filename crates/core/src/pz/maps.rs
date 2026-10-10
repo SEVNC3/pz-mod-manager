@@ -656,20 +656,25 @@ pub fn checked(paths: &Paths) -> BTreeMap<String, Checked> {
     })
 }
 
-/// Add or replace entries in maps-checked.json (the scan and "Check" can both write).
+/// Add or replace entries in maps-checked.json (the scan and "Check" can both write, in the
+/// app and the CLI at once): under the data lock, re-read and merged per item, the newer
+/// `updated` winning.
 pub fn save_checked(paths: &Paths, new: BTreeMap<String, Checked>) -> Result<()> {
-    static WRITE: std::sync::Mutex<()> = std::sync::Mutex::new(());
-    let _w = WRITE.lock().unwrap_or_else(|e| e.into_inner());
     if new.is_empty() {
         return Ok(());
     }
+    let _lock = crate::lock_data(paths)?;
     let mut all = read_checked(paths).context("nothing was saved")?;
     for (id, mut c) in new {
-        // checked by hand since the scan took its snapshot: it stays hand-checked
-        c.manual |= all.get(&id).is_some_and(|o| o.manual);
+        match all.get(&id) {
+            // another scan saved a newer read since this one took its snapshot
+            Some(o) if o.updated > c.updated => continue,
+            // checked by hand since the scan took its snapshot: it stays hand-checked
+            Some(o) => c.manual |= o.manual,
+            None => {}
+        }
         all.insert(id, c);
     }
-    fs::create_dir_all(&paths.data)?;
     Ok(crate::write_atomic(&checked_file(paths), serde_json::to_vec(&all)?)?)
 }
 
@@ -815,25 +820,43 @@ pub fn read_item(dir: &Path, item: &str) -> (BTreeMap<u8, Vec<MapMod>>, BTreeMap
 
 /// Read Workshop `item`'s maps from its file list (keeping them in `maps-checked.json`).
 /// Nothing is installed. When Steam won't give the list and `download` is set, SteamCMD
-/// downloads the item instead, and the download is deleted after reading it.
-pub fn check(paths: &Paths, item: &str, download: bool) -> Result<Checked> {
+/// downloads the item instead, and the download is deleted after reading it. Setting `stop`
+/// ends it (`Fail::Stopped`).
+pub fn check(paths: &Paths, item: &str, download: bool, stop: &AtomicBool) -> Result<Checked> {
     let info = steam_workshop::details(&[item])?.pop().ok_or(Fail::NoItem).with_context(|| format!("workshop:{item}"))?;
-    let never = AtomicBool::new(false);
-    let mut c = match Session::open(&never).and_then(|s| read_listing(&s, &info, &never)) {
+    let mut c = match Session::open(stop).and_then(|s| read_listing(&s, &info, stop)) {
         Ok(c) => c,
+        Err(_) if stop.load(Relaxed) => return Err(Fail::Stopped.into()),
         Err(e) if !download => return Err(e.context(Fail::FileList)),
         Err(e) => {
             crate::log!("workshop:{item}: no file list from Steam ({e:#}), downloading it with SteamCMD instead");
-            let got = steam_workshop::download(paths, super::STEAM_APP, &[item])?;
+            // the download goes on every way out: read, failed, timed out or stopped
+            let _gone = RemoveOnDrop(steam_workshop::steamcmd_dirs(paths, super::STEAM_APP, item));
+            let got = steam_workshop::download(paths, super::STEAM_APP, &[item], stop)?;
+            if stop.load(Relaxed) {
+                return Err(Fail::Stopped.into());
+            }
             let dir = got.into_iter().next().and_then(|(_, d)| d).ok_or(Fail::DownloadFailed).with_context(|| format!("workshop:{item}"))?;
             let (builds, mods) = read_item(&dir, item);
-            fs::remove_dir_all(&dir).with_context(|| format!("deleting the download in {}", dir.display()))?;
             Checked { size: info.file_size, builds, mods, ..Checked::from_item(&info) }
         }
     };
     c.manual = true;
     save_checked(paths, [(item.to_string(), c.clone())].into())?;
     Ok(c)
+}
+
+/// Deletes these folders when dropped.
+struct RemoveOnDrop([PathBuf; 2]);
+
+impl Drop for RemoveOnDrop {
+    fn drop(&mut self) {
+        for d in self.0.iter().filter(|d| d.exists()) {
+            if let Err(e) = fs::remove_dir_all(d) {
+                crate::log!("error: deleting the download in {}: {e}", d.display());
+            }
+        }
+    }
 }
 
 /// The Workshop maps read without installing that aren't installed, one per mod id (when
@@ -1071,7 +1094,7 @@ pub struct Compare {
 /// maps. A missing map's provider is the map mod in `all` (installed first) that adds it,
 /// preferring the server's own mods and Workshop items.
 pub fn compare(server: &super::server::ServerMods, yours: &[String], vanilla: &[String], all: &[MapMod]) -> Compare {
-    let ours = |f: &String| !vanilla.contains(f);
+    let ours = |f: &String| !vanilla.contains(f) && !super::server::is_base_map(f);
     let only_server = server
         .maps
         .iter()
@@ -1490,6 +1513,37 @@ mod tests {
         fs::create_dir(&file).unwrap();
         assert!(set_preset(&paths, "Other", Some(vec![])).is_err());
         assert!(file.is_dir());
+    }
+
+    #[test]
+    fn concurrent_saves_keep_both_batches() {
+        let (_t, paths) = store::tests::temp_paths();
+        // two scans (the app's and the CLI's) saving at once; the data lock is per open file, so threads stand in for processes
+        std::thread::scope(|s| {
+            for scan in ["a", "b"] {
+                let paths = &paths;
+                s.spawn(move || {
+                    for n in 0..10 {
+                        save_checked(paths, [(format!("{scan}{n}"), Checked { updated: 1, ..Default::default() })].into()).unwrap();
+                    }
+                });
+            }
+        });
+        assert_eq!(checked(&paths).len(), 20, "no batch lost");
+        // an older read never replaces a newer one
+        save_checked(&paths, [("a0".to_string(), Checked { updated: 5, title: "new".into(), ..Default::default() })].into()).unwrap();
+        save_checked(&paths, [("a0".to_string(), Checked { updated: 4, title: "old".into(), ..Default::default() })].into()).unwrap();
+        assert_eq!(checked(&paths)["a0"].title, "new");
+    }
+
+    #[test]
+    fn a_checks_download_is_deleted_on_the_way_out() {
+        let t = tempfile::tempdir().unwrap();
+        let (done, partial) = (t.path().join("content/1"), t.path().join("downloads/1"));
+        fs::create_dir_all(done.join("mods")).unwrap();
+        fs::write(done.join("mods/x.txt"), "x").unwrap();
+        drop(RemoveOnDrop([done.clone(), partial.clone()]));
+        assert!(!done.exists() && !partial.exists(), "a missing folder is fine too");
     }
 
     #[test]

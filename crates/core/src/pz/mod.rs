@@ -312,7 +312,7 @@ pub fn write_default(path: &Path, ids: &[String], b41: Option<bool>, maps: Optio
     let maps = match maps {
         Some(m) => {
             // the vanilla map stays last when the game wrote it there (B41 is unverified: keep what it had)
-            let base = |f: &String| f.eq_ignore_ascii_case(server::BASE_MAP);
+            let base = |f: &String| server::is_base_map(f);
             let vanilla = old.map_folders().iter().any(base);
             let m = m.iter().filter(|f| !base(f)).map(String::as_str).chain(vanilla.then_some(server::BASE_MAP));
             format!("\n{}", m.map(|f| format!("    map = {f},\n")).collect::<String>())

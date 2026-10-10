@@ -156,7 +156,7 @@ pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
     });
     if !workshop.is_empty() {
         let refs: Vec<&str> = workshop.iter().map(String::as_str).collect();
-        match steam_workshop::download(paths, pz::STEAM_APP, &refs) {
+        match steam_workshop::download(paths, pz::STEAM_APP, &refs, &std::sync::atomic::AtomicBool::new(false)) {
             Ok(got) => {
                 for (id, dir) in got {
                     report(

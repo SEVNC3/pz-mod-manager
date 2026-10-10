@@ -170,7 +170,7 @@ fn check_servers(paths: &Paths, mods: &BTreeMap<String, Row>, build: u8) -> Vec<
                 out.push(warn(&subject, format!("a mod adds the map {mm}, but Map= doesn't list it")));
             }
         }
-        if let Some(base) = maps.iter().position(|m| *m == "Muldraugh, KY")
+        if let Some(base) = maps.iter().position(|m| server::is_base_map(m))
             && maps[base + 1..].iter().any(|m| mod_maps.iter().any(|mm| mm == m))
         {
             out.push(warn(&subject, "Map= lists mod maps after Muldraugh, KY: mod maps must come first".into()));

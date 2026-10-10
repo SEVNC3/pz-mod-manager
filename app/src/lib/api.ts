@@ -245,6 +245,7 @@ export const api = {
   /** `labels`: the export's words in the UI language (`ids` fills {id} and {folders}, `missing` {ids}). */
   mapsExport: (shown: MapMod[], mapLine: string[], labels: { ids: string; required: string; missing: string }) => invoke<string>("maps_export", { shown, mapLine, labels }),
   mapCheck: (id: string, download: boolean) => invoke<MapMod[]>("map_check", { id, download }),
+  mapCheckStop: () => invoke<void>("map_check_stop"),
   /** Read every Map-tagged Workshop item, both builds ("maps-scan" events report progress). */
   mapScan: () => invoke<MapScan>("map_scan"),
   mapScanStop: () => invoke<void>("map_scan_stop"),

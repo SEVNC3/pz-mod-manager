@@ -208,7 +208,7 @@ fn save(rows: Vec<Row>, order: Vec<String>) -> Res<View> {
             })
             .collect();
         p.order = order;
-        profile::apply(paths, &p, scan(paths).ok().as_ref())?;
+        profile::apply(paths, &p, profile::maps_scan(scan(paths)).as_ref())?;
         view(paths)
     })
 }
@@ -233,7 +233,7 @@ async fn install(sources: Vec<String>) -> Res<View> {
             if !ids.is_empty() {
                 let mut p = active(paths)?;
                 enable_compatible(&mut p, &scan(paths)?, &ids);
-                profile::apply(paths, &p, scan(paths).ok().as_ref())?;
+                profile::apply(paths, &p, profile::maps_scan(scan(paths)).as_ref())?;
             }
             view(paths)
         })
@@ -267,7 +267,7 @@ fn remove(ids: Vec<String>) -> Res<View> {
         }
         let mut p = active(paths)?;
         ids.iter().filter(|i| !refused.contains(i)).for_each(|i| p.forget(i));
-        profile::apply(paths, &p, scan(paths).ok().as_ref())?;
+        profile::apply(paths, &p, profile::maps_scan(scan(paths)).as_ref())?;
         view(paths)
     })
 }
@@ -290,7 +290,7 @@ fn profile_new(name: String) -> Res<View> {
         let current = active(paths)?;
         // a copy of a Viewpoint profile is a Viewpoint profile too
         profile::set_kind(paths, &name, &profile::kind_of(paths, &current.name))?;
-        profile::apply(paths, &Profile { name, ..current }, scan(paths).ok().as_ref())?;
+        profile::apply(paths, &Profile { name, ..current }, profile::maps_scan(scan(paths)).as_ref())?;
         view(paths)
     })
 }
@@ -298,7 +298,7 @@ fn profile_new(name: String) -> Res<View> {
 #[tauri::command(async)]
 fn profile_use(name: String) -> Res<View> {
     locked(|paths| {
-        profile::apply(paths, &profile::load(paths, &name)?, scan(paths).ok().as_ref())?;
+        profile::apply(paths, &profile::load(paths, &name)?, profile::maps_scan(scan(paths)).as_ref())?;
         view(paths)
     })
 }
@@ -315,7 +315,7 @@ fn profile_delete(name: String) -> Res<View> {
 fn set_build(build: Option<u8>) -> Res<View> {
     locked(|paths| {
         profile::set_b41(paths, build.map(|b| b == 41))?;
-        profile::apply(paths, &active(paths)?, scan(paths).ok().as_ref())?;
+        profile::apply(paths, &active(paths)?, profile::maps_scan(scan(paths)).as_ref())?;
         view(paths)
     })
 }
@@ -538,7 +538,7 @@ async fn zb_install() -> Res<View> {
             }
             let mut p = active(paths)?;
             p.set(zb::MOD_ID, true);
-            profile::apply(paths, &p, scan(paths).ok().as_ref())?;
+            profile::apply(paths, &p, profile::maps_scan(scan(paths)).as_ref())?;
             pzmm_core::log!("ZombieBuddy is set up. Java mods ask for your approval the first time they load.");
             view(paths)
         })
@@ -626,7 +626,7 @@ async fn install_missing() -> Res<(View, Vec<String>)> {
             }
             enable.reverse();
             enable_compatible(&mut p, &mods, &enable);
-            profile::apply(paths, &p, scan(paths).ok().as_ref())?;
+            profile::apply(paths, &p, profile::maps_scan(scan(paths)).as_ref())?;
             for id in &unresolved {
                 pzmm_core::log!("{id}: no Workshop item clearly provides it. Use Download in the mod's details to pick one.");
             }
@@ -779,7 +779,7 @@ async fn server_import(name: String) -> Res<View> {
             pzmm_core::log!("installing {} Workshop item(s) the server uses", missing.len());
         }
         fetch_then(&missing, false, |paths, _| {
-            profile::apply(paths, &profile::with_list(paths, &format!("Server {name}"), cfg.mods)?, scan(paths).ok().as_ref())?;
+            profile::apply(paths, &profile::with_list(paths, &format!("Server {name}"), cfg.mods)?, profile::maps_scan(scan(paths)).as_ref())?;
             view(paths)
         })
     })
@@ -802,7 +802,7 @@ fn save_use(mode: String, name: String) -> Res<View> {
     locked(|paths| {
         let save = pz::saves::list(paths).into_iter().find(|s| s.mode == mode && s.name == name);
         let Some(save) = save else { anyhow::bail!("save {mode}/{name} not found") };
-        profile::apply(paths, &profile::with_list(paths, &format!("Save {name}"), save.mods)?, scan(paths).ok().as_ref())?;
+        profile::apply(paths, &profile::with_list(paths, &format!("Save {name}"), save.mods)?, profile::maps_scan(scan(paths)).as_ref())?;
         view(paths)
     })
 }
@@ -911,7 +911,7 @@ fn map_order_save(maps: Vec<String>) -> Res<()> {
         let on = pz::server::mod_maps(&p.enabled(), &scan(paths)?, profile::effective_build(paths));
         let maps: Vec<String> = maps.into_iter().filter(|m| on.contains(m) || maps::is_vanilla(m)).collect();
         if profile::set_map_order(paths, &p.name, &maps)? {
-            profile::apply(paths, &p, scan(paths).ok().as_ref())?;
+            profile::apply(paths, &p, profile::maps_scan(scan(paths)).as_ref())?;
         }
         Ok(())
     })
@@ -949,13 +949,21 @@ async fn map_check(id: String, download: bool) -> Res<Vec<MapMod>> {
         if have {
             return Err(maps::ui_error(&maps::Fail::Installed.into()));
         }
-        let found = maps::check(&Paths::detect(), &id, download).map_err(|e| maps::ui_error(&e))?.builds.remove(&build).unwrap_or_default();
+        MAP_CHECK_STOP.store(false, std::sync::atomic::Ordering::SeqCst);
+        let found = maps::check(&Paths::detect(), &id, download, &MAP_CHECK_STOP).map_err(|e| maps::ui_error(&e))?.builds.remove(&build).unwrap_or_default();
         if found.is_empty() {
             pzmm_core::log!("workshop:{id} adds no maps for Build {build}");
         }
         Ok(found)
     })
     .await
+}
+
+static MAP_CHECK_STOP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[tauri::command]
+fn map_check_stop() {
+    MAP_CHECK_STOP.store(true, std::sync::atomic::Ordering::SeqCst);
 }
 
 static MAP_SCAN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -1290,13 +1298,14 @@ pub fn run() {
             pzmm_core::set_log_sink(move |line| {
                 let _ = handle.emit("log", line.to_string());
             });
+            pzmm_core::sweep_temp(&Paths::detect());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, set_build,
             details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, workshop_comments, workshop_author, zb_status, zb_preview, zb_install, zb_uninstall,
             find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_export, server_import, server_start, save_use,
-            maps_view, map_grid, map_quick_select, map_line, map_order_save, maps_export, map_check, map_scan, map_scan_stop, map_presets, map_preset_set, map_server_compare,
+            maps_view, map_grid, map_quick_select, map_line, map_order_save, maps_export, map_check, map_check_stop, map_scan, map_scan_stop, map_presets, map_preset_set, map_server_compare,
             mode_preview, mode_switch, doctor, console_errors, profile_export, profile_import,
             launch_game, settings_get, settings_set, folder_set, pick_folder, github_token_set, backups_clear, diagnostics
         ])

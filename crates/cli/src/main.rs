@@ -135,11 +135,12 @@ fn main() {
 
 /// Apply `p` with its maps from one fresh mod scan (unreadable mods: the `maps` block is kept).
 fn apply(paths: &Paths, p: &Profile) -> Result<()> {
-    profile::apply(paths, p, store::scan(paths).ok().as_ref())
+    profile::apply(paths, p, profile::maps_scan(store::scan(paths)).as_ref())
 }
 
 fn run(cli: Cli) -> Result<()> {
     let paths = Paths::detect();
+    pzmm_core::sweep_temp(&paths);
     // read-only commands skip the lock; the rest wait for the app to finish its change
     let read_only = matches!(cli.cmd, Cmd::Search { .. } | Cmd::Watch { .. } | Cmd::MapScan { .. });
     let _lock = if read_only { None } else { Some(pzmm_core::lock_data(&paths)?) };

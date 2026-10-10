@@ -134,7 +134,7 @@ pub fn leave(paths: &Paths) -> Result<Profile> {
         None => without_viewpoint(&profile::sync(paths)?.0, &unique_profile_name(paths, PLAIN_PROFILE)),
     };
     profile::set_kind(paths, &p.name, profile::DEFAULT_KIND)?;
-    profile::apply(paths, &p, crate::store::scan(paths).ok().as_ref())?;
+    profile::apply(paths, &p, profile::maps_scan(crate::store::scan(paths)).as_ref())?;
     crate::log!("Switched to Project Zomboid (profile \"{}\").", p.name);
     Ok(p)
 }

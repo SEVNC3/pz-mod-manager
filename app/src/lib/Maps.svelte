@@ -433,6 +433,11 @@
   // --- check one Workshop map without installing it ---
   let checkText = $state("");
   let checking = $state(false);
+  let checkStopping = $state(false);
+  function stopCheck() {
+    checkStopping = true;
+    api.mapCheckStop().catch(() => {});
+  }
   /** The Workshop item in a link or text: its `id=`, else the last long number (never the game's own app id). */
   const workshopIdOf = (text: string) => {
     const id = text.match(/[?&]id=(\d+)/)?.[1] ?? text.match(/\d{4,}/g)?.at(-1);
@@ -443,6 +448,7 @@
     const id = workshopIdOf(checkText.trim());
     if (!id) return say("maps.check.pasteId", {}, true);
     checking = true;
+    checkStopping = false;
     try {
       const { item, members } = await api.workshopInfo(id);
       if (!item) throw new Error(t("maps.check.noItem", { id }));
@@ -452,6 +458,7 @@
       try {
         found = await api.mapCheck(id, false);
       } catch (err) {
+        if (checkStopping) throw err;
         const why = errParts(err);
         if (!confirm(t("maps.check.confirmDownload", { title: item.title, error: why.detail || why.text, size: fmtSize(item.file_size) }))) return;
         found = await api.mapCheck(id, true);
@@ -473,6 +480,7 @@
     const failed: string[] = [];
     let unread = 0;
     for (const [i, it] of members.entries()) {
+      if (checkStopping) break;
       const known = all.filter((m) => itemOf(m.source) === it.id);
       if (known.length) ids.push(...known.map((m) => m.id));
       else if (!it.have && it.tags.includes("Map")) {
@@ -1030,6 +1038,9 @@
       <form class="row" onsubmit={check}>
         <input type="text" bind:value={checkText} placeholder={t("maps.check.placeholder")} spellcheck="false" aria-label={t("maps.check.placeholder")} />
         <button type="submit" disabled={checking || !checkText.trim()}><Icon name="search" size={14} />{checking ? t("maps.check.checking") : t("maps.check.check")}</button>
+        {#if checking}
+          <button type="button" class="quiet" onclick={stopCheck} disabled={checkStopping}><Icon name="x" size={14} />{checkStopping ? t("maps.scan.stopping") : t("maps.scan.stop")}</button>
+        {/if}
       </form>
     </div>
   </div>
