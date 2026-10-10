@@ -140,6 +140,13 @@
     } catch {}
   });
 
+  const SOURCE_HINTS: Record<string, string> = {
+    steam: "Subscribed in Steam; Steam keeps it updated",
+    workshop: "Downloaded from the Workshop by PZMM",
+    github: "Installed from GitHub by PZMM",
+    local: "Installed from a file by PZMM",
+  };
+
   // --- derived ---
   const mods = $derived(new Map(rows.filter((r): r is ModRow => r.kind === "mod").map((r) => [r.id, r])));
   const enabledCount = $derived([...mods.values()].filter((m) => m.on).length);
@@ -352,7 +359,7 @@
 
   async function installWorkshop(id: string) {
     logOpen = true;
-    const ok = await run(`Installing workshop item ${id}`, () => api.install([id]));
+    const ok = await run(`Installing Workshop mod ${id}`, () => api.install([id]));
     if (ok) await settleOrder();
     return ok;
   }
@@ -509,8 +516,10 @@
       document.getElementById("mod-search")?.focus();
       return;
     }
-    if (e.key === "Escape" && !typing && (picked.size || selected)) {
-      if (picked.size) picked = new Set();
+    if (e.key === "Escape" && !typing && (picked.size || selected || modePlan || settingsOpen)) {
+      if (modePlan) modePlan = null;
+      else if (settingsOpen) settingsOpen = false;
+      else if (picked.size) picked = new Set();
       else selected = null;
       return;
     }
@@ -543,7 +552,7 @@
     if (!sources.length) return;
     installText = "";
     logOpen = true;
-    await run(`Installing ${sources.length === 1 ? sources[0] : `${sources.length} items`}`, () => api.install(sources));
+    await run(`Installing ${sources.length === 1 ? sources[0] : `${sources.length} mods`}`, () => api.install(sources));
   }
 
   /** A new separator above the selected mod (or at the top), ready to rename. */
@@ -611,7 +620,7 @@
     const ids = [...picked].filter((id) => mods.get(id) && isOurs(mods.get(id)!));
     if (!ids.length) return say("None of the selected mods were installed by PZMM; unsubscribe Steam mods in Steam.", true);
     const skipped = picked.size - ids.length;
-    if (confirm(`Delete ${ids.length} mod${ids.length === 1 ? "" : "s"} from your Zomboid mods folder?${skipped ? ` (${skipped} not installed by PZMM will be left alone.)` : ""}`)) {
+    if (confirm(`Remove ${ids.length} mod${ids.length === 1 ? "" : "s"}? Their files are deleted from your Zomboid mods folder.${skipped ? ` (${skipped} not installed by PZMM will be left alone.)` : ""}`)) {
       run(`Removing ${ids.length} mods`, () => api.remove(ids)).then(() => (picked = new Set()));
     }
   }
@@ -619,7 +628,7 @@
   const separators = $derived(rows.filter((r) => r.kind === "sep").map((r) => (r as { name: string }).name));
 
   function remove(id: string) {
-    if (confirm(`Delete ${id} from your Zomboid mods folder?`)) run(`Removing ${id}`, () => api.remove([id]));
+    if (confirm(`Remove ${id}? Its files are deleted from your Zomboid mods folder.`)) run(`Removing ${id}`, () => api.remove([id]));
   }
 
   function deleteProfile() {
@@ -726,6 +735,8 @@
       <button class="primary" type="submit" disabled={busy || !installText.trim()}><Icon name="download" size={15} />Install</button>
     </form>
 
+  </header>
+  {#snippet actions()}
     <div class="right">
       {#if updates.size}
         <button class="primary" onclick={() => updateMods([...updates])} disabled={busy}><Icon name="refresh" size={14} />Update {updates.size} {updates.size === 1 ? "mod" : "mods"}</button>
@@ -736,14 +747,14 @@
       <button onclick={() => api.openUrl("steam://rungameid/108600")}><Icon name="play" size={14} />Launch game</button>
       <button class="quiet" aria-expanded={settingsOpen} onclick={() => (settingsOpen = !settingsOpen)}><Icon name="settings" size={15} />Settings</button>
     </div>
-  </header>
+  {/snippet}
 
   {#if importText !== null}
     <form class="mode-plan" onsubmit={importProfile}>
       <label for="import-code"><strong>Import a profile</strong>: paste the share code someone sent you. Missing Workshop mods are installed.</label>
       <div class="row">
         <!-- svelte-ignore a11y_autofocus -->
-        <input id="import-code" type="text" bind:value={importText} placeholder="PZMM1:…" autofocus spellcheck="false" style="flex: 1" />
+        <input id="import-code" type="text" bind:value={importText} onkeydown={(e) => e.key === "Escape" && (importText = null)} placeholder="PZMM1:…" autofocus spellcheck="false" style="flex: 1" />
         <button class="primary" type="submit" disabled={!importText.trim()}>Import</button>
         <button class="quiet" type="button" onclick={() => (importText = null)}>Cancel</button>
       </div>
@@ -828,6 +839,7 @@
       </button>
     {/each}
   </div>
+  {@render actions()}
   <Links />
   </div>
 
@@ -850,7 +862,7 @@
         {[saveDiff.missing.length && `${saveDiff.missing.length} of its mods aren't enabled`, saveDiff.extra.length && `${saveDiff.extra.length} enabled mods weren't in it`].filter(Boolean).join(", ")}.
         Continuing it with this list can break it.
       </span>
-      <button onclick={() => latestSave && run(`Loading the mods of ${latestSave.name}`, () => api.saveUse(latestSave!.mode, latestSave!.name))}>Use the save's mods</button>
+      <button onclick={() => latestSave && run(`Loading the mods of ${latestSave.name}`, () => api.saveUse(latestSave!.mode, latestSave!.name))}>Use this save's mods</button>
       <button class="quiet" onclick={() => (saveNoticeDismissed = true)}>Dismiss</button>
     </div>
   {/if}
@@ -902,7 +914,7 @@
       </span>
     {:else if !missingReqs.size && !fixable}
       <span class="hint">
-        {filtering ? "Clear the search and filter, and sort by load order, to reorder." : "Drag to reorder · Alt+↑/↓ · Space toggles · Ctrl/Shift+click selects several"}
+        {filtering ? "Clear the search and filter, and sort by load order, to reorder." : "Drag or Alt+↑/↓ to reorder · Space toggles · Ctrl/Shift+click selects"}
       </span>
     {:else}
       <span class="spacer"></span>
@@ -1021,7 +1033,7 @@
                   </td>
                   <td class="num mono">{order.get(i) ?? ""}</td>
                   <td class="name">
-                    <span class="title">{r.name || r.id}</span>
+                    <span class="title" title={r.name || r.id}>{r.name || r.id}</span>
                     {#if r.name && r.name !== r.id}<span class="id mono">{r.id}</span>{/if}
                     {#if r.only41 && (view?.build ?? 42) !== 41}
                       <span class="build-badge" title="Built for Build 41 only (no 42/ or common/ folder): on Build 42 it may error or do nothing">B41 only</span>
@@ -1041,11 +1053,11 @@
                     {#if r.missing}
                       <span class="missing">Not installed</span>
                     {:else if problems.has(r.id)}
-                      <span class="missing" title={problems.get(r.id)?.text}>⚠ {problems.get(r.id)?.text}</span>
+                      <span class="missing" title={problems.get(r.id)?.text}><Icon name="alert" size={13} />{problems.get(r.id)?.text}</span>
                     {:else if updates.has(r.id)}
                       <span class="update"><Icon name="update" size={13} />Update available</span>
                     {:else}
-                      <span class="badge" data-kind={r.source.split(":")[0]}>{src.label}</span>
+                      <span class="badge" data-kind={r.source.split(":")[0]} title={SOURCE_HINTS[r.source.split(":")[0]] ?? "Added to the mods folder outside PZMM"}>{src.label}</span>
                     {/if}
                   </td>
                 </tr>
@@ -1130,8 +1142,7 @@
   }
   .tabs button.active {
     color: var(--text);
-    font-weight: 700;
-    border-bottom-color: var(--accent);
+    border-bottom-color: var(--accent-text);
   }
   .alert {
     display: inline-block;
@@ -1241,11 +1252,6 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
-  }
-  .link {
-    padding: 0 2px;
-    text-decoration: underline;
-    text-underline-offset: 2px;
   }
   .findings ul {
     margin: 6px 0 0;
@@ -1370,6 +1376,11 @@
     border-radius: 0;
     background: transparent;
     padding: 5px 12px;
+    color: var(--muted);
+  }
+  .seg button:hover:not(:disabled),
+  .tabs button:hover {
+    color: var(--text);
   }
   .seg button.active {
     background: var(--accent-soft);
@@ -1380,6 +1391,12 @@
     color: var(--muted);
   }
   .hint {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
     color: var(--muted);
     font-size: 12px;
     margin-left: auto;
@@ -1428,7 +1445,8 @@
     font-size: 12px;
   }
   tr.mod.picked {
-    background: color-mix(in oklab, var(--accent) 10%, transparent);
+    background: color-mix(in oklab, var(--accent) 22%, transparent);
+    box-shadow: inset 3px 0 0 var(--accent-text);
   }
   .bulk {
     display: flex;
@@ -1439,7 +1457,7 @@
   }
   tr.mod.selected {
     background: var(--accent-soft);
-    box-shadow: inset 3px 0 0 var(--accent);
+    box-shadow: inset 3px 0 0 var(--accent-text);
   }
   tr.off .title,
   tr.off .num {
@@ -1449,7 +1467,7 @@
     opacity: 0.4;
   }
   tr.drop td {
-    box-shadow: inset 0 2px 0 var(--accent);
+    box-shadow: inset 0 3px 0 var(--accent-text);
   }
   tr:focus-visible {
     outline: 2px solid var(--focus);
@@ -1475,8 +1493,12 @@
     text-align: right;
     color: var(--accent-text);
   }
+  /* max-width: 0 lets an auto-layout cell shrink, so long names ellipsize instead of wrapping */
   .name {
+    max-width: 0;
     overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   .name .title {
     font-weight: 700;
@@ -1544,10 +1566,7 @@
   }
   .src {
     width: 1%;
-    max-width: 320px;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     text-align: right;
   }
   .badge {
@@ -1571,9 +1590,18 @@
     font-size: 12px;
   }
   .missing {
+    display: inline-block;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
     color: var(--danger);
     font-weight: 700;
     font-size: 12px;
+  }
+  .missing :global(.icon) {
+    margin-right: 4px;
   }
   tr.tail td {
     height: 48px;
@@ -1599,8 +1627,8 @@
     box-shadow: 0 1px 0 rgb(0 0 0 / 0.15);
   }
   .tape {
-    padding-right: 58px;
-    background: url(/blood.svg) right -12px center / auto 165% no-repeat, var(--tape);
+    padding-right: 72px;
+    background: url(/blood.svg) right -10px center / auto 140% no-repeat, var(--tape);
   }
   .sep-remove {
     float: right;
@@ -1668,7 +1696,7 @@
     background: var(--line);
   }
   .dot.busy {
-    background: var(--accent);
+    background: var(--accent-text);
     animation: pulse 1s ease-in-out infinite alternate;
   }
   @keyframes pulse {

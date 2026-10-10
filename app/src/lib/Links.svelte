@@ -32,7 +32,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    margin-left: auto;
+    margin-left: 8px;
   }
   button {
     display: grid;

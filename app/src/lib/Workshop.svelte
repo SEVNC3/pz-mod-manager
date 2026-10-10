@@ -172,7 +172,7 @@
             </div>
             <div class="hot-actions">
               {@render installButton(it)}
-              <button class="quiet" onclick={() => steamPage(it)} title="Open on Steam"><Icon name="steam" size={15} /> Steam</button>
+              <button class="quiet" onclick={() => steamPage(it)} title="Open the Workshop page"><Icon name="steam" size={15} /> Workshop page</button>
             </div>
           </li>
         {/each}
@@ -199,7 +199,7 @@
             </div>
             <div class="actions">
               {@render installButton(it)}
-              <button class="quiet" onclick={() => steamPage(it)}><Icon name="steam" size={15} /> Steam page</button>
+              <button class="quiet" onclick={() => steamPage(it)}><Icon name="steam" size={15} /> Workshop page</button>
             </div>
           </li>
         {/each}
@@ -287,7 +287,6 @@
   }
   .rank.top {
     color: var(--accent-text);
-    font-weight: 700;
   }
   .hot-thumb {
     padding: 0;
@@ -369,7 +368,7 @@
     color: var(--line);
   }
   .stars .lit {
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .votes {
     margin-left: 4px;

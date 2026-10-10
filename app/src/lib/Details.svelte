@@ -149,7 +149,7 @@
               {:else}
                 <span class="bad">not installed</span>
                 {#if !found[r]}<button class="find" onclick={() => download(r)} disabled={busy}
-                  title="Find it on the Steam Workshop and download it"><Icon name="download" size={12} />Download</button>{/if}
+                  title="Find it on the Steam Workshop and install it"><Icon name="download" size={12} />Install</button>{/if}
               {/if}
             </span>
             {#if !m && found[r] === "loading"}
@@ -171,7 +171,7 @@
                           {c.subscriptions.toLocaleString()} subscribers{c.confirmed ? " · Mod ID matches" : ""}{c.required_by_author ? " · listed by the author" : ""}{c.fits_build ? "" : " · not tagged for your game build"}
                         </span>
                       </span>
-                      <button class={c.confirmed && c.fits_build ? "primary" : ""} disabled={busy} onclick={() => onInstallWorkshop(c.id)}><Icon name="download" size={14} />Download</button>
+                      <button class={c.confirmed && c.fits_build ? "primary" : ""} disabled={busy} onclick={() => onInstallWorkshop(c.id)}><Icon name="download" size={14} />Install</button>
                     </li>
                   {/each}
                 </ul>
@@ -329,7 +329,7 @@
     padding: 4px 0;
   }
   .cands li.best {
-    border-left: 2px solid var(--accent);
+    border-left: 2px solid var(--accent-text);
     margin-left: -12px;
     padding-left: 10px;
   }

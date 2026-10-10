@@ -70,6 +70,7 @@
   h2 {
     margin: 0 0 4px;
     font-size: 20px;
+    line-height: 1.2;
   }
   h3 {
     margin: 20px 0 6px;

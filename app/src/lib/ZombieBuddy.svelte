@@ -123,7 +123,7 @@
   }
   h2 {
     margin: 0 0 6px;
-    font-size: 24px;
+    font-size: 22px;
   }
   .lede {
     margin: 0 0 14px;
@@ -166,7 +166,7 @@
   .hint {
     display: block;
     color: var(--muted);
-    font-size: 13px;
+    font-size: 12px;
     overflow-wrap: anywhere;
   }
   .needed {

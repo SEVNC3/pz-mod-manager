@@ -173,7 +173,7 @@
   .hint {
     display: block;
     color: var(--muted);
-    font-size: 13px;
+    font-size: 12px;
   }
   .notes {
     margin: 10px 0 0;

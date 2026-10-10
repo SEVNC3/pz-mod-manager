@@ -28,8 +28,9 @@
     fill: var(--accent-text);
     stroke: var(--accent-text);
   }
+  /* being overridden is normal: neutral, so red stays for real problems */
   .loses .bottom {
-    fill: var(--danger);
-    stroke: var(--danger);
+    fill: var(--muted);
+    stroke: var(--muted);
   }
 </style>

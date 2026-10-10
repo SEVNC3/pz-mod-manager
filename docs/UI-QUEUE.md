@@ -15,44 +15,44 @@ Measured contrast (WCAG):
 
 ## P1: visible bugs and contrast failures
 
-1. [ ] **Lighten `--accent-text` and use it for thin indicators.**
+1. [x] **Lighten `--accent-text` and use it for thin indicators.**
    - Set `--accent-text: color-mix(in oklab, var(--accent) 45%, white)`.
    - Use it for the active tab underline, the drop line (also 3px), the selected-row bar, the busy dot and the best-candidate border in Details.
    - Keep `#6e080c` for primary fills, checkboxes and the progress bar.
-2. [ ] **Make multi-selected rows visible.** Picked rows use a 22% accent tint plus a 3px `--accent-text` bar. Today's 10% tint is 1.02:1.
-3. [ ] **Make Workshop star ratings visible.** Lit stars use `--accent-text`. Today lit vs unlit is about 1.1:1.
-4. [ ] **Stop the blood spray covering the end of tape labels.** Increase `.tape` right padding (about 72px) and/or shrink the spray (`auto 140%`).
-5. [ ] **Stop long mod names wrapping their id onto a second line.** Make `.name` nowrap with an ellipsis (`max-width: 0` trick) and put the full name in `title`.
-6. [ ] **Stop long problem text widening the status column and shifting the table.**
+2. [x] **Make multi-selected rows visible.** Picked rows use a 22% accent tint plus a 3px `--accent-text` bar. Today's 10% tint is 1.02:1.
+3. [x] **Make Workshop star ratings visible.** Lit stars use `--accent-text`. Today lit vs unlit is about 1.1:1.
+4. [x] **Stop the blood spray covering the end of tape labels.** Increase `.tape` right padding (about 72px) and/or shrink the spray (`auto 140%`).
+5. [x] **Stop long mod names wrapping their id onto a second line.** Make `.name` nowrap with an ellipsis (`max-width: 0` trick) and put the full name in `title`.
+6. [x] **Stop long problem text widening the status column and shifting the table.**
    - Truncate `.missing` with an ellipsis.
    - Drop the dead `max-width` and ellipsis rules from `.src`.
    - Replace the `⚠` glyph with `Icon alert`.
 
 ## P2: consistency
 
-7. [ ] **Hover states.**
+7. [x] **Hover states.**
    - Button hover border uses `--accent-text`.
    - Primary hover lightens the fill.
    - Inactive segmented-control and tab text is `--muted`, turning `--text` on hover.
-8. [ ] **Header on one row.** Move Update all, Launch game and Settings from the header into the tab bar, before the links. The list starts about 45px higher.
-9. [ ] **Keep the tools on the filter row.** The shortcut hint shrinks and truncates, with shorter text. The full list stays in Settings.
-10. [ ] **Remove the faux bold on the Workshop rank.** Drop `font-weight: 700` from `.rank.top`; Plex Mono is bundled at 400 only.
+8. [x] **Header on one row.** Move Update all, Launch game and Settings from the header into the tab bar, before the links. The list starts about 45px higher.
+9. [x] **Keep the tools on the filter row.** The shortcut hint shrinks and truncates, with shorter text. The full list stays in Settings.
+10. [x] **Remove the faux bold on the Workshop rank.** Drop `font-weight: 700` from `.rank.top`; Plex Mono is bundled at 400 only.
 
 ## P3: polish
 
-11. [ ] **One `.link` rule.** It's defined twice in `+page.svelte`. Hints are 12px everywhere (ServersSaves and ZombieBuddy use 13px).
-12. [ ] **Heading sizes.** ZombieBuddy h2 goes from 24px to 22px to match ServersSaves. LoadOrder h2 gets `line-height: 1.2`.
-13. [ ] **No width shift when switching tabs.** The active tab drops bold; its colour and underline already mark it.
-14. [ ] **Copy pass.**
+11. [x] **One `.link` rule.** It's defined twice in `+page.svelte`. Hints are 12px everywhere (ServersSaves and ZombieBuddy use 13px).
+12. [x] **Heading sizes.** ZombieBuddy h2 goes from 24px to 22px to match ServersSaves. LoadOrder h2 gets `line-height: 1.2`.
+13. [x] **No width shift when switching tabs.** The active tab drops bold; its colour and underline already mark it.
+14. [x] **Copy pass.**
     - Details "Download" becomes "Install".
     - The log says "Installing mod", not "workshop item".
     - Remove confirmations say "Remove", matching the button.
     - "Use this save's mods" everywhere.
     - Workshop "Steam page" buttons become "Workshop page".
-15. [ ] **Esc closes the import form, the mode plan and Settings.**
-16. [ ] **Overlap icon.** The "overridden" layer is `--muted`, not `--danger`; being overridden is normal.
-17. [ ] **Logo.** Recolour the pink cog in `static/brand/pzmm.png` to the blood red. Needs the user's OK: it's a brand asset.
-18. [ ] **Source badge tooltips.** Subscribed: "Subscribed in Steam; Steam keeps it updated". Workshop: "Downloaded from the Workshop by PZMM".
+15. [x] **Esc closes the import form, the mode plan and Settings.**
+16. [x] **Overlap icon.** The "overridden" layer is `--muted`, not `--danger`; being overridden is normal.
+17. [x] **Logo.** Recolour the pink cog in `static/brand/pzmm.png` to the blood red. Needs the user's OK: it's a brand asset.
+18. [x] **Source badge tooltips.** Subscribed: "Subscribed in Steam; Steam keeps it updated". Workshop: "Downloaded from the Workshop by PZMM".
 
 ## Killed (not doing)
 
