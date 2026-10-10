@@ -40,7 +40,7 @@
     <div><dt>Overridden</dt><dd title="Enabled mods with files another mod replaces">{overridden}</dd></div>
   </dl>
 
-  <button class="primary wide" onclick={onAutosort} disabled={busy}><Icon name="wand" size={15} />Autosort</button>
+  <button class="primary wide" onclick={onAutosort} disabled={busy}><Icon name="wand" size={14} />Autosort</button>
   <ol class="steps">
     <li>Turns on mods that your enabled mods need.</li>
     <li>Replaces your sections with one per category, from the mods' Workshop tags: frameworks first, so everything built on them loads after; translations last, so their text wins. It asks first if you have sections of your own.</li>
@@ -49,7 +49,7 @@
   </ol>
 
   {#if fixable}
-    <button class="wide" onclick={onFix} disabled={busy}>Fix {fixable} {fixable === 1 ? "problem" : "problems"} without regrouping</button>
+    <button class="wide" onclick={onFix} disabled={busy}><Icon name="wand" size={14} />Fix {fixable} {fixable === 1 ? "problem" : "problems"} without regrouping</button>
   {/if}
 
   {#if sections.length}

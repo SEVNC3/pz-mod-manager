@@ -234,8 +234,8 @@
         </ol>
       {/if}
       <nav class="pager">
-        <button disabled={changesPage <= 1} onclick={() => loadChanges(changesPage - 1)}>Newer</button>
-        <button disabled={!changes || changes.length < 10} onclick={() => loadChanges(changesPage + 1)}>Older</button>
+        <button disabled={changesPage <= 1} onclick={() => loadChanges(changesPage - 1)}><Icon name="chevron-left" size={14} />Newer</button>
+        <button disabled={!changes || changes.length < 10} onclick={() => loadChanges(changesPage + 1)}>Older<Icon name="chevron-right" size={14} /></button>
       </nav>
     {:else}
       {#if errors.comments}<!-- shown above -->
@@ -246,9 +246,9 @@
           {#each comments.comments as c}<li><strong>{c.author}</strong> <span class="muted">{date(c.time)}</span><p>{c.text}</p></li>{/each}
         </ol>
         <nav class="pager">
-          <button disabled={commentsStart <= 0} onclick={() => loadComments(Math.max(0, commentsStart - 20))}>Newer</button>
+          <button disabled={commentsStart <= 0} onclick={() => loadComments(Math.max(0, commentsStart - 20))}><Icon name="chevron-left" size={14} />Newer</button>
           <span class="muted">{commentsStart + 1}–{Math.min(commentsStart + 20, comments.total)} of {comments.total}</span>
-          <button disabled={commentsStart + 20 >= comments.total} onclick={() => loadComments(commentsStart + 20)}>Older</button>
+          <button disabled={commentsStart + 20 >= comments.total} onclick={() => loadComments(commentsStart + 20)}>Older<Icon name="chevron-right" size={14} /></button>
         </nav>
       {/if}
       <p class="muted small-note">To post a comment, use the Workshop page.</p>

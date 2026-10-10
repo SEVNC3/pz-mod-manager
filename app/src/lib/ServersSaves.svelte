@@ -73,7 +73,7 @@
       <label for="srv">Server config</label>
       <input id="srv" type="text" list="servers" bind:value={target} spellcheck="false" />
       <datalist id="servers">{#each data?.servers ?? [] as s}<option value={s}></option>{/each}</datalist>
-      <button class="primary" type="submit" disabled={busy || !target.trim()}>Write to {target.trim() || "…"}.ini</button>
+      <button class="primary" type="submit" disabled={busy || !target.trim()}><Icon name="upload" size={14} />Write to {target.trim() || "…"}.ini</button>
     </form>
     {#if notes.length}<ul class="notes">{#each notes as n}<li>{n}</li>{/each}</ul>{/if}
     {#if error}<p class="error">{error}</p>{/if}

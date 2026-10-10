@@ -59,7 +59,7 @@
       <ul class="checks">
         {#each checks as [ok, label, hint]}
           <li class:ok>
-            <span class="mark" aria-hidden="true">{ok ? "✓" : "—"}</span>
+            <span class="mark" aria-hidden="true">{#if ok}<Icon name="check" size={12} />{/if}</span>
             <span><strong>{label}</strong><span class="hint">{hint}</span></span>
             <span class="visually-hidden">{ok ? "done" : "not done"}</span>
           </li>
@@ -83,16 +83,16 @@
           {/if}
           <div class="row">
             <button class="primary" onclick={apply} disabled={busy || !plan.lines.length}>
-              {plan.remove ? "Remove" : "Apply changes"}
+              <Icon name={plan.remove ? "trash" : "check"} size={14} />{plan.remove ? "Remove" : "Apply changes"}
             </button>
-            <button class="quiet" onclick={() => (plan = null)}>Cancel</button>
+            <button class="quiet" onclick={() => (plan = null)}><Icon name="x" size={14} />Cancel</button>
           </div>
         </div>
       {:else}
         <div class="row">
           {#if !ready}
             <button class="primary" onclick={() => preview(false)} disabled={busy || !status.game_dir}>
-              {installedAny ? "Repair ZombieBuddy" : "Set up ZombieBuddy"}
+              <Icon name="settings" size={14} />{installedAny ? "Repair ZombieBuddy" : "Set up ZombieBuddy"}
             </button>
           {/if}
           {#if installedAny}

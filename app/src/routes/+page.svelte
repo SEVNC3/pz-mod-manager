@@ -798,7 +798,7 @@
           <!-- svelte-ignore a11y_autofocus -->
           <input type="text" bind:value={newProfile} placeholder="Name, e.g. Friends server" autofocus
             onkeydown={(e) => e.key === "Escape" && (newProfile = null)} />
-          <button type="submit" disabled={!newProfile.trim()}>Create</button>
+          <button type="submit" disabled={!newProfile.trim()}><Icon name="plus" size={14} />Create</button>
         </form>
       {:else}
         <ProfilePicker {view} {busy} onUse={(p) => run("Switching profile", () => api.profileUse(p))}
@@ -815,7 +815,7 @@
       <label for="install" class="visually-hidden">Install a mod</label>
       <input id="install" type="text" bind:value={installText} autocomplete="off" spellcheck="false"
         placeholder="Paste a Workshop link, collection or ID, a GitHub repo (owner/repo), or a .zip path" />
-      <button class="primary" type="submit" disabled={busy || !installText.trim()}><Icon name="download" size={15} />Install</button>
+      <button class="primary" type="submit" disabled={busy || !installText.trim()}><Icon name="download" size={14} />Install</button>
     </form>
 
   </header>
@@ -828,7 +828,7 @@
           <Icon name="refresh" size={14} />{checking ? "Checking…" : "Check for updates"}</button>
       {/if}
       <button onclick={() => api.openUrl("steam://rungameid/108600")}><Icon name="play" size={14} />Launch game</button>
-      <button class="quiet" aria-expanded={settingsOpen} onclick={() => (settingsOpen = !settingsOpen)}><Icon name="settings" size={15} />Settings</button>
+      <button class="quiet" aria-expanded={settingsOpen} onclick={() => (settingsOpen = !settingsOpen)}><Icon name="settings" size={14} />Settings</button>
     </div>
   {/snippet}
 
@@ -838,8 +838,8 @@
       <div class="row">
         <!-- svelte-ignore a11y_autofocus -->
         <input id="import-code" type="text" bind:value={importText} onkeydown={(e) => e.key === "Escape" && (importText = null)} placeholder="PZMM1:…" autofocus spellcheck="false" style="flex: 1" />
-        <button class="primary" type="submit" disabled={!importText.trim()}>Import</button>
-        <button class="quiet" type="button" onclick={() => (importText = null)}>Cancel</button>
+        <button class="primary" type="submit" disabled={!importText.trim()}><Icon name="upload" size={14} />Import</button>
+        <button class="quiet" type="button" onclick={() => (importText = null)}><Icon name="x" size={14} />Cancel</button>
       </div>
     </form>
   {/if}
@@ -848,7 +848,7 @@
     <div class="mode-plan" role="region" aria-label="Switch game">
       {#if modePlan.error}
         <p class="error">{modePlan.error}</p>
-        <button class="quiet" onclick={() => (modePlan = null)}>Close</button>
+        <button class="quiet" onclick={() => (modePlan = null)}><Icon name="x" size={14} />Close</button>
       {:else}
         <p>
           <strong>{modePlan.target === "viewpoint" ? "Switch to Project Viewpoint (3D)?" : "Switch back to Project Zomboid?"}</strong>
@@ -859,8 +859,8 @@
         {#if modePlan.lines.length}
           <ul class="mono">{#each modePlan.lines as l}<li>{l}</li>{/each}</ul>
           <div class="row">
-            <button class="primary" onclick={switchMode} disabled={busy}>Switch</button>
-            <button class="quiet" onclick={() => (modePlan = null)}>Cancel</button>
+            <button class="primary" onclick={switchMode} disabled={busy}><Icon name="swap" size={14} />Switch</button>
+            <button class="quiet" onclick={() => (modePlan = null)}><Icon name="x" size={14} />Cancel</button>
           </div>
         {:else}
           <p class="hint-line">Checking what's needed…</p>
@@ -875,7 +875,7 @@
         <span><strong>PZMM {appUpdate.version} is available.</strong> You have {appVersion}.</span>
         <button class="quiet" onclick={() => api.openUrl(`https://github.com/SEVNC3/pz-mod-manager/releases/tag/v${appUpdate?.version}`)}>What's new</button>
         <button class="quiet" onclick={() => (appUpdateLater = true)}>Later</button>
-        <button class="primary" onclick={installAppUpdate} disabled={busy} title={busy ? "Wait for the current job to finish" : ""}>Update and restart</button>
+        <button class="primary" onclick={installAppUpdate} disabled={busy} title={busy ? "Wait for the current job to finish" : ""}><Icon name="update" size={14} />Update and restart</button>
       {:else}
         <span>Downloading PZMM {appUpdate.version}… {appProgress}%</span>
         <progress max="100" value={appProgress}></progress>
@@ -950,14 +950,14 @@
         {[saveDiff.missing.length && `${saveDiff.missing.length} of its mods aren't enabled`, saveDiff.extra.length && `${saveDiff.extra.length} enabled mods weren't in it`].filter(Boolean).join(", ")}.
         Continuing it with this list can break it.
       </span>
-      <button onclick={() => latestSave && run(`Loading the mods of ${latestSave.name}`, () => api.saveUse(latestSave!.mode, latestSave!.name))}>Use this save's mods</button>
+      <button onclick={() => latestSave && run(`Loading the mods of ${latestSave.name}`, () => api.saveUse(latestSave!.mode, latestSave!.name))}><Icon name="swap" size={14} />Use this save's mods</button>
       <button class="quiet" onclick={() => (saveNoticeDismissed = true)}>Dismiss</button>
     </div>
   {/if}
   {#if zbNeeded}
     <div class="banner" role="status">
       <span>{zb?.required_by.length} enabled {zb?.required_by.length === 1 ? "mod needs" : "mods need"} ZombieBuddy, which isn't set up{zb?.files_current || zb?.launcher_patched ? " completely (a game update may have reset it)" : ""}.</span>
-      <button onclick={() => (tab = "zb")}>Set up ZombieBuddy</button>
+      <button onclick={() => (tab = "zb")}><Icon name="settings" size={14} />Set up ZombieBuddy</button>
     </div>
   {/if}
   <div class="filters">
@@ -988,8 +988,8 @@
     {#if picked.size >= 2}
       <span class="bulk" role="group" aria-label="Selected mods">
         <strong>{picked.size} selected</strong>
-        <button onclick={() => bulkSet(true)} disabled={busy}>Enable</button>
-        <button onclick={() => bulkSet(false)} disabled={busy}>Disable</button>
+        <button onclick={() => bulkSet(true)} disabled={busy}><Icon name="check" size={14} />Enable</button>
+        <button onclick={() => bulkSet(false)} disabled={busy}><Icon name="x" size={14} />Disable</button>
         <select aria-label="Move selected mods" disabled={busy || filtering}
           onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ""; if (v) bulkMove(v); }}>
           <option value="">Move to…</option>
@@ -997,8 +997,8 @@
           {#each separators as s}<option value={s}>Under "{s}"</option>{/each}
           <option value="bottom">Bottom of the list</option>
         </select>
-        <button class="danger" onclick={bulkRemove} disabled={busy}>Remove</button>
-        <button class="quiet" onclick={() => (picked = new Set())}>Clear</button>
+        <button class="danger" onclick={bulkRemove} disabled={busy}><Icon name="trash" size={14} />Remove</button>
+        <button class="quiet" onclick={() => (picked = new Set())}><Icon name="x" size={14} />Clear</button>
       </span>
     {:else if !missingReqs.size && !fixable}
       <span class="hint">
@@ -1009,8 +1009,8 @@
     {/if}
     <span class="tools">
     <button class="quiet" onclick={checkSetup} disabled={busy} title="Check the profile and server configs for problems"><Icon name="pulse" size={14} />Check setup</button>
-    <button class="quiet icon" onclick={undo} disabled={busy || !undoStack.length} title="Undo the last list change (Ctrl+Z)" aria-label="Undo"><Icon name="undo" size={15} /></button>
-    <button class="quiet icon" onclick={redo} disabled={busy || !redoStack.length} title="Redo (Ctrl+Y)" aria-label="Redo"><Icon name="redo" size={15} /></button>
+    <button class="quiet icon" onclick={undo} disabled={busy || !undoStack.length} title="Undo the last list change (Ctrl+Z)" aria-label="Undo"><Icon name="undo" size={16} /></button>
+    <button class="quiet icon" onclick={redo} disabled={busy || !redoStack.length} title="Redo (Ctrl+Y)" aria-label="Redo"><Icon name="redo" size={16} /></button>
     <button class="quiet" onclick={addSeparator} disabled={busy || filtering} title="Add a separator above the selected mod"><Icon name="plus" size={14} />Separator</button>
     </span>
   </div>
@@ -1025,7 +1025,7 @@
       <div class="row">
         <button onclick={() => bisectAnswer(true)} disabled={busy}><Icon name="alert" size={14} />The problem still happens</button>
         <button onclick={() => bisectAnswer(false)} disabled={busy}><Icon name="check" size={14} />The problem is gone</button>
-        <button class="quiet" onclick={bisectStop} disabled={busy}>Stop and restore my list</button>
+        <button class="quiet" onclick={bisectStop} disabled={busy}><Icon name="rollback" size={14} />Stop and restore my list</button>
       </div>
     </div>
   {/if}
@@ -1036,7 +1036,7 @@
         <strong>
           {findings.length === 0 ? "No problems found." : `${findings.filter((f) => f.level === "error").length} errors, ${findings.filter((f) => f.level === "warning").length} warnings`}
         </strong>
-        <button class="quiet" onclick={() => (findings = null)}>Close</button>
+        <button class="quiet" onclick={() => (findings = null)}><Icon name="x" size={14} />Close</button>
       </div>
       {#if findings.length}
         <ul>
@@ -1089,7 +1089,7 @@
                   ondragover={(e) => { e.preventDefault(); dropAt = i; }}
                   ondrop={(e) => { e.preventDefault(); dropOn(i); }}
                   ondblclick={() => !busy && (editingSep = i)} onkeydown={(e) => editingSep !== i && rowKey(e, i, r)}>
-                  <td class="grip" aria-hidden="true">⠿</td>
+                  <td class="grip" aria-hidden="true"><Icon name="grip" size={14} fill /></td>
                   <td colspan="7">
                     {#if editingSep === i}
                       <!-- svelte-ignore a11y_autofocus -->
@@ -1098,7 +1098,7 @@
                         onkeydown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") editingSep = null; }} />
                     {:else}
                       <button class="quiet fold" aria-expanded={!collapsed.has(r.name)} aria-label={`${collapsed.has(r.name) ? "Expand" : "Collapse"} ${r.name}`}
-                        onclick={(e) => { e.stopPropagation(); toggleSection(r.name); }}>{collapsed.has(r.name) ? "▸" : "▾"}</button>
+                        onclick={(e) => { e.stopPropagation(); toggleSection(r.name); }}><Icon name={collapsed.has(r.name) ? "chevron-right" : "chevron-down"} size={14} /></button>
                       <span class="tape" title="Double-click to rename">{r.name}</span>
                       {#if sectionCounts.get(r.name)}
                         {@const c = sectionCounts.get(r.name)!}
@@ -1118,7 +1118,7 @@
                   ondragstart={() => (dragFrom = i)} ondragend={() => { dragFrom = dropAt = null; }}
                   ondragover={(e) => { e.preventDefault(); dropAt = i; }}
                   ondrop={(e) => { e.preventDefault(); dropOn(i); }}>
-                  <td class="grip" aria-hidden="true">{filtering ? "" : "⠿"}</td>
+                  <td class="grip" aria-hidden="true">{#if !filtering}<Icon name="grip" size={14} fill />{/if}</td>
                   <td class="check">
                     <input type="checkbox" checked={r.on} disabled={busy} aria-label={`Enable ${r.name || r.id}`}
                       onclick={(e) => e.stopPropagation()} onchange={() => toggle(r.id)} />
@@ -1145,9 +1145,9 @@
                     {#if r.missing}
                       <span class="missing">Not installed</span>
                     {:else if problems.has(r.id)}
-                      <span class="missing" title={problems.get(r.id)?.text}><Icon name="alert" size={13} />{problems.get(r.id)?.text}</span>
+                      <span class="missing" title={problems.get(r.id)?.text}><Icon name="alert" size={12} />{problems.get(r.id)?.text}</span>
                     {:else if updates.has(r.id)}
-                      <span class="update"><Icon name="update" size={13} />Update available</span>
+                      <span class="update"><Icon name="update" size={12} />Update available</span>
                     {:else}
                       <span class="badge" data-kind={r.source.split(":")[0]} title={SOURCE_HINTS[r.source.split(":")[0]] ?? "Added to the mods folder outside PZMM"}>{src.label}</span>
                     {/if}
@@ -1182,13 +1182,13 @@
     <button class="quiet bar" aria-expanded={logOpen} onclick={() => (logOpen = !logOpen)}>
       <span class="dot" class:busy aria-hidden="true"></span>
       <span class="label">{busy ? busyLabel + "…" : "Activity"}</span>
-      {#if log.length}<Icon name={logIcon(log.at(-1)!.text, log.at(-1)!.error)} size={13} />{/if}
+      {#if log.length}<Icon name={logIcon(log.at(-1)!.text, log.at(-1)!.error)} size={12} />{/if}
       <span class="last">{log.at(-1)?.text ?? ""}</span>
     </button>
     {#if logOpen}
       <ol class="log mono" aria-live="polite">
         {#each log as l}
-          <li class:error={l.error}><Icon name={logIcon(l.text, l.error)} size={13} /><span>{l.text}</span></li>
+          <li class:error={l.error}><Icon name={logIcon(l.text, l.error)} size={12} /><span>{l.text}</span></li>
         {:else}
           <li class="quiet-line">Installs, updates and errors show up here.</li>
         {/each}

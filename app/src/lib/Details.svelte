@@ -96,13 +96,13 @@
 </script>
 
 <aside class="details" aria-label="Mod details">
-  <button class="quiet icon close" onclick={onClose} title="Close (Esc) to see the load order" aria-label="Close details"><Icon name="x" size={18} /></button>
+  <button class="quiet icon close" onclick={onClose} title="Close (Esc) to see the load order" aria-label="Close details"><Icon name="x" size={16} /></button>
   {#if row?.missing}
     <h2>{id}</h2>
     <p class="warn">
       This mod is enabled in your profile but isn't installed. Install it, subscribe to it in Steam, or disable it.
     </p>
-    <button onclick={() => onToggle(id)} disabled={busy}>Disable</button>
+    <button onclick={() => onToggle(id)} disabled={busy}><Icon name="x" size={14} />Disable</button>
   {:else if d}
     {#if poster}
       <img class="poster" src={poster} alt="" />
@@ -112,7 +112,7 @@
 
     <div class="actions">
       <button class={row?.on ? "" : "primary"} onclick={() => onToggle(id)} disabled={busy}>
-        {row?.on ? "Disable" : "Enable"}
+        <Icon name={row?.on ? "x" : "check"} size={14} />{row?.on ? "Disable" : "Enable"}
       </button>
       <button onclick={() => api.openPath(d!.dir)}><Icon name="folder" size={14} />Show files</button>
       {#if source.url}

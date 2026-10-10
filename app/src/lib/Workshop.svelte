@@ -273,10 +273,10 @@
   <aside class="side" aria-label="Browse options">
     <div class="views" role="tablist" aria-label="Workshop view">
       <button type="button" role="tab" aria-selected={view !== "home"} class:active={view !== "home"} onclick={() => show("browse")}>
-        <Icon name="search" size={15} /> Browse
+        <Icon name="search" size={14} /> Browse
       </button>
       <button type="button" role="tab" aria-selected={view === "home"} class:active={view === "home"} onclick={() => show("home")}>
-        <Icon name="flame" size={15} /> Home
+        <Icon name="flame" size={14} /> Home
       </button>
     </div>
 
@@ -413,9 +413,9 @@
         {#each data.items as it (it.id)}{@render card(it)}{/each}
       </ul>
       <nav class="pager" aria-label="Pages">
-        <button disabled={page <= 1 || loading} onclick={() => go(page - 1)}>Previous</button>
+        <button disabled={page <= 1 || loading} onclick={() => go(page - 1)}><Icon name="chevron-left" size={14} />Previous</button>
         <span>Page {page} of {compact.format(pages)}</span>
-        <button disabled={page >= pages || loading} onclick={() => go(page + 1)}>Next</button>
+        <button disabled={page >= pages || loading} onclick={() => go(page + 1)}>Next<Icon name="chevron-right" size={14} /></button>
       </nav>
     {/if}
   </div>
