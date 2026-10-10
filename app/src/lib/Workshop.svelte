@@ -27,6 +27,7 @@
   const TAGS = ["Animals", "Audio", "Balance", "Building", "Clothing/Armor", "Farming", "Food", "Framework", "Hardmode", "Interface", "Items",
     "Language/Translation", "Literature", "Map", "Military", "Misc", "Models", "Multiplayer", "Pop Culture", "QoL", "Realistic", "Silly/Fun",
     "Skills", "Textures", "Traits", "Vehicles", "Weapons", "WIP"];
+  const TAG_LABELS: Record<string, string> = { "Clothing/Armor": "Clothing", "Language/Translation": "Translations", "Silly/Fun": "Silly & fun", "Pop Culture": "Pop culture" };
   const HOME_ROWS: [string, Partial<Query>][] = [
     ["Popular this week", { sort: "trend", days: 7 }],
     ["Most subscribed", { sort: "totaluniquesubscribers" }],
@@ -335,7 +336,7 @@
             {@const state = q.required.includes(t) ? "in" : q.excluded.includes(t) ? "out" : ""}
             <button type="button" class="chip {state}" onclick={() => cycleTag(t)} aria-pressed={state !== ""}
               title={state === "in" ? `Only ${t}` : state === "out" ? `No ${t}` : t}>
-              {#if state === "in"}<Icon name="check" size={12} />{:else if state === "out"}<Icon name="x" size={12} />{/if}{t}
+              <span class="box">{#if state === "in"}<Icon name="check" size={11} />{:else if state === "out"}<Icon name="x" size={11} />{/if}</span>{TAG_LABELS[t] ?? t}
             </button>
           {/each}
         </div>
@@ -512,26 +513,42 @@
     color: var(--muted);
   }
   .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 4px;
   }
   .chip {
-    padding: 2px 9px;
-    border-radius: 999px;
-    font-size: 12px;
+    justify-content: flex-start;
+    gap: 7px;
+    padding: 3px 6px;
+    font-size: 13px;
     color: var(--muted);
-    background: transparent;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chip .box {
+    flex: none;
+    width: 15px;
+    height: 15px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 3px;
   }
   .chip.in {
     color: var(--text);
-    background: var(--accent-soft);
-    border-color: var(--accent-text);
+  }
+  .chip.in .box {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
   }
   .chip.out {
     color: var(--danger);
-    border-color: color-mix(in oklab, var(--danger) 60%, transparent);
     text-decoration: line-through;
+  }
+  .chip.out .box {
+    border-color: var(--danger);
   }
   .dates {
     display: flex;

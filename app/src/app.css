@@ -18,6 +18,9 @@
   --accent-soft: color-mix(in oklab, var(--accent) 32%, transparent);
   --accent-text: color-mix(in oklab, var(--accent) 45%, white);
   --focus: color-mix(in oklab, var(--accent) 50%, white);
+  /* hovering a control lays the blood red over it */
+  --hover: color-mix(in oklab, var(--accent) 34%, transparent);
+  --hover-line: color-mix(in oklab, var(--accent) 70%, transparent);
   --shadow: 0 8px 28px rgb(0 0 0 / 0.35);
 
   --font-body: "Atkinson Hyperlegible", system-ui, sans-serif;
@@ -25,6 +28,15 @@
   --font-marker: "Permanent Marker", "Segoe Print", cursive;
 
   color-scheme: dark;
+}
+
+/* a bright red in the accent's own hue for text and thin indicators: clearly red, and
+   clearly not the dark blood of fills (~5:1 on raised) */
+@supports (color: oklch(from red l c h)) {
+  :root {
+    --accent-text: oklch(from var(--accent) 0.71 0.19 h);
+    --focus: oklch(from var(--accent) 0.74 0.17 h);
+  }
 }
 
 @media (prefers-color-scheme: light) {
@@ -93,7 +105,8 @@ button {
   white-space: nowrap;
 }
 button:hover:not(:disabled) {
-  border-color: var(--accent-text);
+  background: var(--hover);
+  border-color: var(--hover-line);
 }
 button:disabled {
   opacity: 0.5;
@@ -108,12 +121,16 @@ button.primary {
 button.primary:hover:not(:disabled) {
   background: color-mix(in oklab, var(--accent) 85%, white);
 }
-button.quiet {
+/* buttons read as text until hovered; .primary is the one filled call to action */
+button.quiet,
+button:not(.primary) {
   background: transparent;
   border-color: transparent;
 }
-button.quiet:hover:not(:disabled) {
-  background: var(--raised);
+button.quiet:hover:not(:disabled),
+button:not(.primary):hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--hover-line);
 }
 button.danger {
   color: var(--danger);
@@ -127,6 +144,50 @@ select {
   border-radius: 6px;
   padding: 6px 10px;
   min-width: 0;
+}
+
+/* select menus in the app's colours (Chromium's customizable select; elsewhere the native menu) */
+@supports (appearance: base-select) {
+  select,
+  ::picker(select) {
+    appearance: base-select;
+  }
+  select {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  select::picker-icon {
+    color: var(--muted);
+  }
+  select:hover:not(:disabled) {
+    border-color: var(--hover-line);
+  }
+  ::picker(select) {
+    margin-top: 4px;
+    padding: 4px;
+    background: var(--raised);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    box-shadow: var(--shadow);
+  }
+  option {
+    padding: 5px 10px;
+    border-radius: 4px;
+  }
+  option::checkmark {
+    display: none;
+  }
+  option:hover,
+  option:focus-visible {
+    background: var(--hover);
+    outline: none;
+  }
+  option:checked {
+    font-weight: 700;
+    color: var(--accent-text);
+  }
 }
 
 :focus-visible {
