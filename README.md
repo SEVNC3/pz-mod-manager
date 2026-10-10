@@ -5,7 +5,7 @@ A free, open-source mod manager for **Project Zomboid** (Build 41 and 42), for W
 - **Browse the Workshop** inside the app: search, sort and filter by Build 41/42, then install in one click.
 - **Install** from the Steam Workshop (link, ID or a whole collection), from GitHub (`owner/repo`, optionally `@tag`) or from a local `.zip` or folder. You don't need to log in to Steam. If a mod lists other mods it requires, PZMM installs those too.
 - **See everything:** Steam Workshop subscriptions and the mods in your `Zomboid/mods` folder, in one list with each mod's poster, author and description.
-- **Load order:** drag to reorder, group mods under separators, and switch mods on and off. PZMM writes the same `mods/default.txt` the game reads.
+- **Load order:** drag to reorder, group mods under separators, and switch mods on and off. **Autosort** groups mods by category from their Workshop tags (frameworks first, translations last) and fixes every `require` / `loadModAfter` / `loadModBefore` rule in one click. PZMM writes the same `mods/default.txt` the game reads.
 - **Profiles:** keep separate mod setups ("Solo", "Friends server") and switch between them in one click. Changes you make in the game's own mod menu are picked up automatically.
 - **Dependencies:** PZMM flags enabled mods whose required mods are missing, disabled or loading too late. **Install missing mods** finds the missing ones on the Workshop: it checks the "Required items" the author lists, and reads "Mod ID: X" from Workshop descriptions. **Fix load order** sorts the rest.
 - **Conflicts:** each mod's details show which other mods replace the same files, and which copy wins.
@@ -25,6 +25,10 @@ A free, open-source mod manager for **Project Zomboid** (Build 41 and 42), for W
 - **Share a profile:** **Share** copies a code. A friend pastes it into **Import**, and PZMM installs the Workshop mods they're missing.
 - **Saves:** PZMM warns when your latest save was played with a different mod list, and offers to load the save's list.
 - **Ownership:** PZMM only deletes mods it installed. It never touches your Workshop subscriptions or mods you installed by hand.
+
+| Install from a Workshop link | Autosort and fix the load order | Switch to Project Viewpoint |
+|---|---|---|
+| ![Pasting a Workshop link installs the mod](docs/media/install.gif) | ![Autosort groups mods under category separators and clears load-order problems](docs/media/autosort.gif) | ![Switching to Project Viewpoint shows its setup plan](docs/media/viewpoint.gif) |
 
 ## Download
 
