@@ -96,7 +96,7 @@
 </script>
 
 <aside class="details" aria-label="Mod details">
-  <button class="quiet icon close" onclick={onClose} title="Close (Esc) to see the load order" aria-label="Close details"><Icon name="x" size={16} /></button>
+  <button class="quiet icon close" onclick={onClose} title="Close (Esc) to see the load order" aria-label="Close details"><Icon name="x" size={18} /></button>
   {#if row?.missing}
     <h2>{id}</h2>
     <p class="warn">
@@ -229,13 +229,24 @@
     border-left: 1px solid var(--line);
     background: var(--panel);
   }
+  /* sits on the poster, so it needs its own dark disc to show on any image */
   .close {
     position: absolute;
-    top: 8px;
-    right: 8px;
-    padding: 4px;
-    color: var(--muted);
+    top: 22px;
+    right: 26px;
     z-index: 1;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    color: #fff;
+    background: rgb(0 0 0 / 0.7);
+    border: 1px solid rgb(255 255 255 / 0.25);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.5);
+  }
+  .close:hover:not(:disabled) {
+    background: var(--accent);
+    border-color: rgb(255 255 255 / 0.5);
   }
   .poster {
     display: block;
