@@ -412,6 +412,7 @@
     border-bottom: 2px solid transparent;
     padding: 8px 12px 7px;
   }
+  .tabs button:hover:not(:disabled),
   .tabs button.on {
     color: #fff;
     background: var(--accent-soft);

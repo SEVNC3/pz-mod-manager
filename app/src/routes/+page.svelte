@@ -1140,6 +1140,7 @@
     border-bottom: 2px solid transparent;
     position: relative;
   }
+  .tabs button:hover:not(:disabled),
   .tabs button.active {
     color: #fff;
     background: var(--accent-soft);
@@ -1379,8 +1380,7 @@
     padding: 5px 12px;
     color: var(--muted);
   }
-  .seg button:hover:not(:disabled),
-  .tabs button:hover {
+  .seg button:hover:not(:disabled) {
     color: var(--text);
   }
   .seg button.active {
