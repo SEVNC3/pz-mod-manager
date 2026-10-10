@@ -167,6 +167,12 @@ pub fn install_fetched(paths: &Paths, fetched: &[Fetched]) -> Vec<String> {
         if f.subscribed {
             let found: Vec<String> = pz::find_mods(&f.root, 8).into_iter().map(|m| m.id).collect();
             crate::log!("{}: you're subscribed in Steam, which keeps it updated; using that copy ({})", f.source, found.join(", "));
+            // a copy PZMM installed before the subscription would shadow Steam's newer one (core 10)
+            let item = format!("workshop:{}", f.source.trim_start_matches("steam:"));
+            let ours: Vec<String> = store::load(paths).unwrap_or_default().into_iter().filter(|(_, e)| e.source == item).map(|(id, _)| id).collect();
+            if !ours.is_empty() && let Err(e) = store::remove(paths, &ours, crate::settings::load().recycle) {
+                crate::log!("error: removing PZMM's older copy of {}: {e:#}", ours.join(", "));
+            }
             ids.extend(found);
             continue;
         }

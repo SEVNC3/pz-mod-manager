@@ -128,6 +128,9 @@ struct State {
     /// Force the B41 default.txt format; otherwise the file's format is kept.
     #[serde(default)]
     b41: Option<bool>,
+    /// default.txt's format the last time it listed mods: an empty list can't show it.
+    #[serde(default)]
+    seen_b41: Option<bool>,
     /// Profile name -> kind (e.g. "viewpoint"). Untagged profiles are the default kind.
     #[serde(default)]
     kinds: std::collections::BTreeMap<String, String>,
@@ -227,6 +230,17 @@ pub fn load(paths: &Paths, name: &str) -> Result<Profile> {
     Ok(profile)
 }
 
+/// Profile `name` with `ids` enabled in order. An existing one keeps its library (sections,
+/// disabled mods) and takes the new list instead of being replaced.
+pub fn with_list(paths: &Paths, name: &str, ids: Vec<String>) -> Result<Profile> {
+    if !exists(paths, name) {
+        return Ok(Profile::from_ids(name, ids));
+    }
+    let mut p = load(paths, name)?;
+    p.adopt(&ids);
+    Ok(p)
+}
+
 pub fn save(paths: &Paths, profile: &Profile) -> Result<()> {
     valid_name(&profile.name)?;
     let d = dir(paths).join(&profile.name);
@@ -277,7 +291,9 @@ pub fn build(paths: &Paths) -> Option<u8> {
 
 /// The build being played: the forced format, else what default.txt looks like (B42 if unknown).
 pub fn effective_build(paths: &Paths) -> u8 {
-    build(paths).unwrap_or(if pz::read_default(&paths.default_txt()).b41 { 41 } else { 42 })
+    let d = pz::read_default(&paths.default_txt());
+    let b41 = if d.mods.is_empty() { state(paths).seen_b41.unwrap_or(false) } else { d.b41 };
+    build(paths).unwrap_or(if b41 { 41 } else { 42 })
 }
 
 pub fn set_b41(paths: &Paths, b41: Option<bool>) -> Result<()> {
@@ -310,7 +326,10 @@ pub fn sync(paths: &Paths) -> Result<(Profile, bool)> {
 pub fn apply(paths: &Paths, profile: &Profile) -> Result<()> {
     save(paths, profile)?;
     let mut s = state(paths);
-    pz::write_default(&paths.default_txt(), &profile.enabled(), s.b41)?;
+    if let Some(d) = pz::try_read_default(&paths.default_txt()).filter(|d| !d.mods.is_empty()) {
+        s.seen_b41 = Some(d.b41);
+    }
+    pz::write_default(&paths.default_txt(), &profile.enabled(), s.b41.or(s.seen_b41))?;
     let kind = s.kinds.get(&profile.name).cloned().unwrap_or_else(|| DEFAULT_KIND.into());
     s.last.insert(kind, profile.name.clone());
     save_state(paths, &State { active: profile.name.clone(), ..s })
@@ -508,6 +527,33 @@ mod tests {
         apply(&paths, &Profile::from_ids("Default", ids(&["A"]))).unwrap();
         delete(&paths, "3D").unwrap();
         assert_eq!(last_of_kind(&paths, "viewpoint"), None);
+    }
+
+    #[test]
+    fn importing_again_keeps_the_library() {
+        let (_t, paths) = temp_paths();
+        save(&paths, &Profile::parse("Server x", "# --- Maps
++A
+-B
+")).unwrap();
+        let p = with_list(&paths, "Server x", ids(&["C", "A"])).unwrap();
+        assert_eq!((p.to_text().as_str(), p.enabled()), ("# --- Maps
++A
+-B
+# --- 
++C
+", ids(&["C", "A"])));
+        assert_eq!(with_list(&paths, "New", ids(&["A"])).unwrap(), Profile::from_ids("New", ids(&["A"])));
+    }
+
+    #[test]
+    fn b41_format_survives_an_empty_list() {
+        let (_t, paths) = temp_paths();
+        pz::write_default(&paths.default_txt(), &ids(&["A"]), Some(true)).unwrap();
+        apply(&paths, &Profile::from_ids("Default", ids(&[]))).unwrap();
+        assert_eq!(effective_build(&paths), 41);
+        apply(&paths, &Profile::from_ids("Default", ids(&["A"]))).unwrap();
+        assert!(pz::read_default(&paths.default_txt()).b41);
     }
 
     #[test]

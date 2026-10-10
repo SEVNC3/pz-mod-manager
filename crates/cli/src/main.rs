@@ -367,7 +367,7 @@ fn server(paths: &Paths, p: &Profile, action: &str, name: &str) -> Result<()> {
             let have = sources::workshop_available(paths);
             let missing: Vec<Source> = cfg.workshop.iter().filter(|w| !have.contains(*w)).map(|w| Source::Workshop(w.clone())).collect();
             sources::install(paths, &missing, false);
-            let prof = Profile::from_ids(&format!("Server {name}"), cfg.mods);
+            let prof = profile::with_list(paths, &format!("Server {name}"), cfg.mods)?;
             profile::apply(paths, &prof)?;
             println!("now using profile {:?}", prof.name);
         }

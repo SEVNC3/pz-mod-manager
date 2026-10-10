@@ -772,7 +772,7 @@ async fn server_import(name: String) -> Res<View> {
             pzmm_core::log!("installing {} Workshop item(s) the server uses", missing.len());
         }
         fetch_then(&missing, false, |paths, _| {
-            profile::apply(paths, &Profile::from_ids(&format!("Server {name}"), cfg.mods))?;
+            profile::apply(paths, &profile::with_list(paths, &format!("Server {name}"), cfg.mods)?)?;
             view(paths)
         })
     })
@@ -795,7 +795,7 @@ fn save_use(mode: String, name: String) -> Res<View> {
     locked(|paths| {
         let save = pz::saves::list(paths).into_iter().find(|s| s.mode == mode && s.name == name);
         let Some(save) = save else { anyhow::bail!("save {mode}/{name} not found") };
-        profile::apply(paths, &Profile::from_ids(&format!("Save {name}"), save.mods))?;
+        profile::apply(paths, &profile::with_list(paths, &format!("Save {name}"), save.mods)?)?;
         view(paths)
     })
 }

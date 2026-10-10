@@ -119,7 +119,7 @@ This merges their findings. Each item names its source. Work top to bottom; P0 a
 58. [x] **Launch**: extra game arguments (`-debug`, `-nosteam`) and autosort on first run of a new profile.
 59. [x] **About**: version, check for updates, the GitHub, Discord and Ko-fi links, Open log folder, and **Copy diagnostics** (version, folders, profile, mod count and Check setup results, with your user name masked) for bug reports.
 
-## Lower-priority core fixes (1.1.x)
+## Lower-priority core fixes (all done in 1.1.0)
 
 - Updates continue for mods shadowed by a later Steam subscription (core 10).
 - B41 format kept for an empty list (core 13).
