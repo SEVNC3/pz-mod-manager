@@ -26,10 +26,6 @@ A free, open-source mod manager for **Project Zomboid** (Build 41 and 42), for W
 - **Saves:** PZMM warns when your latest save was played with a different mod list, and offers to load the save's list.
 - **Ownership:** PZMM only deletes mods it installed. It never touches your Workshop subscriptions or mods you installed by hand.
 
-| Install from a Workshop link | Autosort and fix the load order | Switch to Project Viewpoint |
-|---|---|---|
-| ![Pasting a Workshop link installs the mod](docs/media/install.gif) | ![Autosort groups mods under category separators and clears load-order problems](docs/media/autosort.gif) | ![Switching to Project Viewpoint shows its setup plan](docs/media/viewpoint.gif) |
-
 ## Download
 
 From the [latest release](../../releases/latest):
