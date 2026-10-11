@@ -4,8 +4,8 @@ From [ROADMAP-1.2.md](ROADMAP-1.2.md). The 1.1 queue is done ([RELEASE-1.1-QUEUE
 
 ## R0: ship 1.1 first
 
-1. [ ] Decide: squash the GIF add/remove commits; noreply email for commits.
-2. [ ] A short real-data pass on the dev build (Maps, Settings, load order on your own profile), then push, CI, tag v1.1.0.
+1. [x] GIF commits taken out of history; every commit (and the old tags) now uses the GitHub noreply email.
+2. [ ] Push and tag v1.1.0 as a **draft pre-release** (early access: no public release or promotion until launch). A short real-data pass on the dev build before publishing the draft.
 3. [ ] Signed releases and an "official download" line in README and the app's About (GitHub has junk repos using the PZMM name).
 
 ## V: verify before building the launcher

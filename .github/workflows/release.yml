@@ -91,10 +91,11 @@ jobs:
               "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
               "platforms": {"windows-x86_64": win_entry, "linux-x86_64": entry("*.AppImage")[1]},
           }, open("dist/latest.json", "w"), indent=2)
-      # hand-written notes when docs/release-notes/<tag>.md exists, else GitHub's commit list
+      # hand-written notes when docs/release-notes/<tag>.md exists, else GitHub's commit list.
+      # Early access: every release is a draft pre-release until publicly launched (publish by hand).
       - run: |
           notes="docs/release-notes/${{ github.ref_name }}.md"
           if [ -f "$notes" ]; then how=(--notes-file "$notes"); else how=(--generate-notes); fi
-          find dist -type f && gh release create ${{ github.ref_name }} $(find dist -type f) --repo ${{ github.repository }} "${how[@]}"
+          find dist -type f && gh release create ${{ github.ref_name }} $(find dist -type f) --repo ${{ github.repository }} --draft --prerelease "${how[@]}"
         env:
           GH_TOKEN: ${{ github.token }}
