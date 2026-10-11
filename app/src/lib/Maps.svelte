@@ -19,6 +19,7 @@
 
 <script lang="ts">
   import { onMount, untrack } from "svelte";
+  import { MediaQuery } from "svelte/reactivity";
   import { api, type Cell, type GridCell, type MapCompare, type MapMod, type MapsView, type ModRow, type WorkshopItem } from "./api";
   import Icon from "./Icon.svelte";
   import MapOrder from "./MapOrder.svelte";
@@ -519,8 +520,8 @@
     );
   }
 
-  // --- the tool panel: tabs floating over the map's right side (its bottom in narrow windows), minimisable,
-  // its width dragged at its left edge ---
+  // --- the tool panel: tabs in a window floating over the map (a sheet over its bottom in narrow windows),
+  // moved by its header, sized by its edges, minimisable ---
   const TABS: [string, string, string, string][] = [["mods", "maps.mapMods", "", "layers"], ["req", "maps.req.title", "", "alert"], ["order", "maps.tabs.order", "maps.export.title", "swap"], ["compare", "maps.tabs.compare", "maps.compare.title", "server"], ["check", "maps.tabs.check", "maps.check.title", "search"]];
   const TAB_IDS = TABS.map(([id]) => id);
   const sideTab = $derived(TAB_IDS.includes(prefs.mapsTab) ? prefs.mapsTab : "mods");
@@ -532,15 +533,36 @@
   const tabBadge = $derived(sideTab === "req" && missing ? t("maps.tabs.missing", { count: missing }) : countOf(sideTab));
   let side = $state<HTMLElement>();
   let mapW = $state(0);
-  /** The map's toolbar height: the panel floats below it. */
+  /** The map's toolbar height: the map (and the panel's box) starts below it. */
   let barH = $state(0);
-  const SIDE_MIN = 360;
-  const clampW = (w: number) => Math.round(Math.max(SIDE_MIN, Math.min(w, mapW * 0.6)));
-  const sideW = $derived(clampW(prefs.mapsPanel));
-  function resizeStart(e: PointerEvent) {
-    const [x0, w0, el] = [e.clientX, sideW, e.currentTarget as HTMLElement];
+  /** Narrow windows: the panel is a sheet over the map's bottom (as the styles below), not movable. */
+  const narrow = new MediaQuery("max-width: 960px");
+  /** Smallest panel; its inset from the map's edges; the height of the grid's x-axis label row. */
+  const [MIN_W, MIN_H, GAP, AXIS] = [360, 320, 12, 16];
+  const clamp = (v: number, lo: number, hi: number) => Math.round(Math.min(hi, Math.max(lo, v)));
+  /** A box kept inside the map; docked (no x, y or h): at the right, below the axis labels, full height. */
+  function inside(p: typeof prefs.mapsPanel) {
+    const w = clamp(p.w, MIN_W, mapW);
+    const h = clamp(p.h ?? height - AXIS - 2 * GAP, MIN_H, height);
+    return { w, h, x: clamp(p.x ?? mapW - GAP - w, 0, mapW - w), y: clamp(p.y ?? AXIS + GAP, 0, height - h) };
+  }
+  const box = $derived(inside(prefs.mapsPanel));
+  /** How each grip moves the box: [x, w] per pixel across, [y, h] per pixel down. */
+  const GRIPS = { move: [1, 0, 1, 0], left: [1, -1, 0, 0], right: [0, 1, 0, 0], bottom: [0, 0, 0, 1], corner: [0, 1, 0, 1] };
+  type Grip = keyof typeof GRIPS;
+  const EDGES: Grip[] = ["left", "right", "bottom"];
+  function shift(b: typeof box, grip: Grip, dx: number, dy: number) {
+    const [kx, kw, ky, kh] = GRIPS[grip];
+    // an edge stops at the map's edge; the left one keeps the right edge put
+    const w = kw ? clamp(b.w + kw * dx, MIN_W, kx ? b.x + b.w : mapW - b.x) : b.w;
+    const h = kh ? clamp(b.h + kh * dy, MIN_H, height - b.y) : b.h;
+    prefs.mapsPanel = inside({ x: kw && kx ? b.x + b.w - w : b.x + kx * dx, y: b.y + ky * dy, w, h });
+  }
+  function grab(e: PointerEvent, grip: Grip) {
+    if (narrow.current || (e.target as HTMLElement).closest("button")) return;
+    const [x0, y0, b, el] = [e.clientX, e.clientY, box, e.currentTarget as HTMLElement];
     el.setPointerCapture(e.pointerId);
-    const to = (m: PointerEvent) => (prefs.mapsPanel = clampW(w0 - (m.clientX - x0)));
+    const to = (m: PointerEvent) => shift(b, grip, m.clientX - x0, m.clientY - y0);
     const end = () => {
       el.removeEventListener("pointermove", to);
       el.removeEventListener("pointerup", end);
@@ -548,11 +570,17 @@
     el.addEventListener("pointermove", to);
     el.addEventListener("pointerup", end);
   }
-  function resizeKey(e: KeyboardEvent) {
-    const step = e.key === "ArrowLeft" ? 20 : e.key === "ArrowRight" ? -20 : 0;
-    if (!step) return;
+  /** Arrow keys on a grip: 20px a press, 80px with Shift. */
+  function nudge(e: KeyboardEvent, grip: Grip) {
+    const d = e.shiftKey ? 80 : 20;
+    const [dx, dy] = ({ ArrowLeft: [-d, 0], ArrowRight: [d, 0], ArrowUp: [0, -d], ArrowDown: [0, d] } as Record<string, number[]>)[e.key] ?? [0, 0];
+    if (narrow.current || e.target !== e.currentTarget || !(dx || dy)) return;
     e.preventDefault();
-    prefs.mapsPanel = clampW(sideW + step);
+    shift(box, grip, dx, dy);
+  }
+  /** Double-clicking the header docks the panel back: at the right, full height. */
+  function dock(e: MouseEvent) {
+    if (!narrow.current && !(e.target as HTMLElement).closest("button")) prefs.mapsPanel = { x: null, y: null, w: box.w, h: null };
   }
 
   // --- the grid: a canvas (thousands of cells), coloured from the theme's tokens; it fills its pane ---
@@ -589,20 +617,26 @@
     return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
   });
 
-  /** The part of the map the open tool panel leaves clear (from its top left): Fit and the zoom buttons use it. */
+  /** The part of the map the open tool panel leaves clear: Fit and the zoom buttons use it. */
   function clear() {
-    const c = canvas?.getBoundingClientRect();
-    const p = side?.getBoundingClientRect();
-    if (!c || !p) return { w: width, h: height };
-    // across the map's bottom in narrow windows (as the styles below), else beside it
-    return matchMedia("(max-width: 960px)").matches ? { w: width, h: Math.min(height, p.top - c.top) } : { w: Math.min(width, p.left - c.left), h: height };
+    const all = { x: 0, y: 0, w: width, h: height };
+    if (prefs.mapsMin || !side || !canvas) return all;
+    // above the sheet in narrow windows, else the biggest strip beside, above or below the panel
+    if (narrow.current) return { ...all, h: Math.min(height, side.getBoundingClientRect().top - canvas.getBoundingClientRect().top) };
+    const { x, y, w, h } = box;
+    const strips = [{ ...all, w: x }, { ...all, x: x + w, w: width - x - w }, { ...all, h: y }, { ...all, y: y + h, h: height - y - h }];
+    return strips.reduce((a, b) => (b.w * b.h > a.w * a.h ? b : a));
   }
+  const clearMid = () => {
+    const c = clear();
+    return [c.x + c.w / 2, c.y + c.h / 2];
+  };
   function fit() {
     if (!bounds || !width) return;
-    const { w, h } = clear();
+    const { x, y, w, h } = clear();
     const [cols, rows] = [bounds.x1 - bounds.x0 + 1, bounds.y1 - bounds.y0 + 1];
     const scale = Math.min(w / (cols + 2), h / (rows + 2));
-    view = { scale, x: (w - cols * scale) / 2 - bounds.x0 * scale, y: (h - rows * scale) / 2 - bounds.y0 * scale };
+    view = { scale, x: x + (w - cols * scale) / 2 - bounds.x0 * scale, y: y + (h - rows * scale) / 2 - bounds.y0 * scale };
   }
   let fitted = false;
   $effect(() => {
@@ -612,7 +646,7 @@
     }
   });
 
-  function zoom(k: number, px = clear().w / 2, py = clear().h / 2) {
+  function zoom(k: number, [px, py] = clearMid()) {
     const scale = Math.min(64, Math.max(1, view.scale * k));
     view = { scale, x: px - ((px - view.x) * scale) / view.scale, y: py - ((py - view.y) * scale) / view.scale };
   }
@@ -716,7 +750,7 @@
   function wheel(e: WheelEvent) {
     e.preventDefault();
     const { px, py } = at(e);
-    zoom(e.deltaY < 0 ? 1.25 : 0.8, px, py);
+    zoom(e.deltaY < 0 ? 1.25 : 0.8, [px, py]);
   }
   const hovered = $derived(hover ? byCell.get(`${hover.x},${hover.y}`) : undefined);
   const KIND = { vanilla: "maps.kind.vanilla", water: "maps.kind.water", map: "", over: "maps.kind.over", conflict: "maps.kind.conflict" };
@@ -724,9 +758,9 @@
 
 <svelte:window onkeydown={undoKey} />
 
-<section class="maps" aria-label={t("maps.label")} style:--side="{sideW}px" style:--bar="{barH}px" bind:clientWidth={mapW}>
-  <div class="world" class:open={!prefs.mapsMin}>
-    <div class="mapbar" bind:clientHeight={barH}>
+<section class="maps" aria-label={t("maps.label")} style:--bar="{barH}px" bind:clientWidth={mapW}>
+  <div class="world">
+    <div class="mapbar" bind:offsetHeight={barH}>
     <div class="head">
       <h2>{t("maps.worldMap")}</h2>
       <div class="legend">
@@ -795,11 +829,16 @@
   </div>
 
   {#if !prefs.mapsMin}
-  <aside class="side" id="maps-panel" aria-label={t("maps.tabs.label")} bind:this={side}>
-    <!-- a window splitter (focusable separator): svelte counts separators as non-interactive -->
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-    <div class="resize" role="separator" aria-orientation="vertical" aria-label={t("maps.resizeLabel")} title={t("maps.resizeTip")} tabindex="0"
-      aria-valuenow={sideW} aria-valuemin={SIDE_MIN} aria-valuemax={Math.round(mapW * 0.6)} onpointerdown={resizeStart} onkeydown={resizeKey}></div>
+  <aside class="side" id="maps-panel" aria-label={t("maps.tabs.label")} bind:this={side} style:--x="{box.x}px" style:--y="{box.y}px" style:--w="{box.w}px" style:--h="{box.h}px">
+    <!-- window splitters (focusable separators) on its edges: svelte counts separators as non-interactive -->
+    {#each EDGES as grip (grip)}
+      {@const tall = grip === "bottom"}
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+      <div class="resize {grip}" role="separator" aria-orientation={tall ? "horizontal" : "vertical"} aria-label={t(tall ? "maps.heightLabel" : "maps.resizeLabel")} title={t(tall ? "maps.heightTip" : "maps.resizeTip")} tabindex="0"
+        aria-valuenow={tall ? box.h : box.w} aria-valuemin={tall ? MIN_H : MIN_W} aria-valuemax={tall ? height : mapW} onpointerdown={(e) => grab(e, grip)} onkeydown={(e) => nudge(e, grip)}></div>
+    {/each}
+    <!-- the corner sizes both ways (the edges do it by keyboard) -->
+    <div class="resize corner" aria-hidden="true" onpointerdown={(e) => grab(e, "corner")}></div>
     <!-- an activity rail, like an IDE's: icons with their names in tooltips, the open tab's name in the header -->
     <div class="rail" role="tablist" aria-orientation="vertical" aria-label={t("maps.tabs.label")} tabindex="-1" onkeydown={(e) => arrowPick(e, TAB_IDS, sideTab, (v) => (prefs.mapsTab = v))}>
       {#each TABS as [id, label, tip, icon] (id)}
@@ -812,7 +851,10 @@
       {/each}
     </div>
     <div class="main">
-    <div class="top">
+    <!-- the title bar moves the panel: drag it, or arrow keys once focused; a double-click docks it -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+    <div class="top" role="group" aria-label={t("maps.moveLabel")} title={narrow.current ? undefined : t("maps.moveTip")} tabindex={narrow.current ? undefined : 0}
+      onpointerdown={(e) => grab(e, "move")} onkeydown={(e) => nudge(e, "move")} ondblclick={dock}>
       <h2>{t(TABS.find(([id]) => id === sideTab)![1])}</h2>
       <button class="quiet icon" onclick={() => (prefs.mapsMin = true)} aria-expanded="true" aria-controls="maps-panel" title={t("maps.minimise")} aria-label={t("maps.minimise")}><Icon name="minimize" size={16} /></button>
     </div>
@@ -1080,8 +1122,8 @@
 </section>
 
 <style>
-  /* the map fills the tab edge to edge under a slim toolbar; the tool panel floats over its right side
-     (its bottom in narrow windows): the tab never scrolls, only the panes do */
+  /* the map fills the tab edge to edge under a slim toolbar; the tool panel is a window floating over it
+     (a sheet over its bottom in narrow windows): the tab never scrolls, only the panes do */
   .maps {
     position: relative;
     display: grid;
@@ -1092,32 +1134,30 @@
   .side {
     position: absolute;
     z-index: 1;
-    top: calc(var(--bar) + 12px);
-    right: 12px;
-    bottom: 12px;
-    width: var(--side);
+    top: calc(var(--bar) + var(--y));
+    left: var(--x);
+    width: var(--w);
+    height: var(--h);
     display: flex;
     background: var(--panel);
+    border: 1px solid var(--line);
     border-radius: 8px;
     box-shadow: var(--card-shadow), var(--shadow);
-    overflow: hidden;
-  }
-  /* the help stops short of the open panel */
-  @media (min-width: 961px) {
-    .world.open .help {
-      right: calc(var(--side) + 16px);
-      width: min(460px, calc(100% - var(--side) - 32px));
-    }
   }
   @media (max-width: 960px) {
     .side {
       top: auto;
       left: 12px;
+      right: 12px;
+      bottom: 12px;
       width: auto;
       height: 45%;
     }
     .resize {
       display: none;
+    }
+    .side .top {
+      cursor: auto;
     }
     /* too short to keep the list's controls put: the whole pane scrolls */
     .side .pane.rows {
@@ -1148,12 +1188,12 @@
     flex: 1;
     min-height: 0;
   }
-  /* minimised: a tab at the map's top right brings the panel back */
+  /* minimised: a tab at the map's top right (below the axis labels) brings the panel back */
   .restore {
     position: absolute;
     z-index: 1;
-    top: 24px;
-    right: 8px;
+    top: 28px;
+    right: 12px;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -1168,6 +1208,7 @@
     flex-direction: column;
     padding-top: 6px;
     background: var(--raised);
+    border-radius: 7px 0 0 7px;
   }
   .rail button {
     position: relative;
@@ -1214,6 +1255,13 @@
     gap: 8px;
     padding: 8px 8px 8px 16px;
     border-bottom: 1px solid var(--line);
+    cursor: move;
+    user-select: none;
+    touch-action: none;
+  }
+  .top:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
   }
   .top h2 {
     flex: 1;
@@ -1382,19 +1430,44 @@
     cursor: crosshair;
     touch-action: none;
   }
-  /* the tool panel's left edge: drag it to resize */
+  /* the tool panel's edges and corner: drag them to resize (they straddle its border) */
   .resize {
     position: absolute;
     z-index: 1;
     top: 0;
     bottom: 0;
-    left: 0;
+    left: -5px;
     width: 8px;
     cursor: ew-resize;
     touch-action: none;
     background: linear-gradient(var(--muted), var(--muted)) center / 3px 36px no-repeat;
     border-radius: 4px;
     opacity: 0.4;
+  }
+  .resize.right {
+    left: auto;
+    right: -5px;
+  }
+  .resize.bottom {
+    top: auto;
+    bottom: -5px;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: 8px;
+    cursor: ns-resize;
+    background-size: 36px 3px;
+  }
+  .resize.corner {
+    z-index: 2;
+    top: auto;
+    left: auto;
+    right: -5px;
+    bottom: -5px;
+    width: 16px;
+    height: 16px;
+    cursor: nwse-resize;
+    background: none;
   }
   .resize:hover,
   .resize:focus-visible {

@@ -8,6 +8,16 @@ const read = (k: string, d: string) => {
     return d;
   }
 };
+/** The Maps tool panel's box (JSON); an older numeric value was its width. */
+const panelBox = () => {
+  let v;
+  try {
+    v = JSON.parse(read("pzmm.mapsPanel", "{}"));
+  } catch {
+    v = {};
+  }
+  return { x: null, y: null, w: 520, h: null, ...(typeof v === "number" ? { w: v } : v) } as { x: number | null; y: number | null; w: number; h: number | null };
+};
 const DEFAULT_ACCENT = "#6e080c"; // the blood on the separator tape (static/blood.svg)
 
 export const prefs = $state({
@@ -22,9 +32,10 @@ export const prefs = $state({
   perPage: (read("pzmm.perPage", "30") === "50" ? 50 : 30) as 30 | 50,
   /** The Maps tab lists every Map-tagged Workshop item (the built-in index, then Steam), not only installed maps. */
   mapsWorkshop: read("pzmm.mapsWorkshop", "1") === "1",
-  /** The Maps tab's tool panel (floating over the map): its open tab, its width in pixels, and whether it's minimised. */
+  /** The Maps tab's tool panel (floating over the map): its open tab, its box in pixels from the map's top left
+   * (x, y and h null: docked at the right, full height), and whether it's minimised. */
   mapsTab: read("pzmm.mapsTab", "mods"),
-  mapsPanel: Number(read("pzmm.mapsPanel", "520")) || 520,
+  mapsPanel: panelBox(),
   mapsMin: read("pzmm.mapsMin", "0") === "1",
   /** The Workshop tab leaves out what's already installed or subscribed. */
   hideInstalled: read("pzmm.hideInstalled", "0") === "1",
@@ -54,7 +65,7 @@ export function applyPrefs() {
     localStorage.setItem("pzmm.workshopView", prefs.workshopView);
     localStorage.setItem("pzmm.mapsWorkshop", prefs.mapsWorkshop ? "1" : "0");
     localStorage.setItem("pzmm.mapsTab", prefs.mapsTab);
-    localStorage.setItem("pzmm.mapsPanel", String(prefs.mapsPanel));
+    localStorage.setItem("pzmm.mapsPanel", JSON.stringify(prefs.mapsPanel));
     localStorage.setItem("pzmm.mapsMin", prefs.mapsMin ? "1" : "0");
     localStorage.setItem("pzmm.perPage", String(prefs.perPage));
     localStorage.setItem("pzmm.hideInstalled", prefs.hideInstalled ? "1" : "0");
