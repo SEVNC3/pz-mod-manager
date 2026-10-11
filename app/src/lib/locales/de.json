@@ -1211,6 +1211,7 @@
   "backend": {
     "stateDamaged": "{file} ist beschädigt ({error}); eine Kopie als state.json.bad behalten und neu begonnen",
     "mapsNotUpdated": "Deine Mods konnten nicht gelesen werden, daher wurde die Kartenliste des Spiels nicht aktualisiert: {error}",
+    "gameReset": "Das Spiel hat seine Modliste geleert (das passiert einmal nach manchen Updates), daher hat PZMM deine behalten: Starte über PZMM, um sie wiederherzustellen",
     "settingsDamaged": "{file} ist beschädigt ({error}); eine Kopie als {copy} behalten und die Standardeinstellungen verwendet",
     "duplicateId": "{source}: einen zweiten Mod mit der ID {id} übersprungen",
     "notOursInMods": "{id} liegt schon in {dir} und wurde nicht von PZMM installiert; nicht angetastet. Entferne diesen Ordner, um diese Kopie zu installieren.",

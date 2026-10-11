@@ -1211,6 +1211,7 @@
   "backend": {
     "stateDamaged": "{file} is damaged ({error}); kept a copy as state.json.bad and started fresh",
     "mapsNotUpdated": "couldn't read your mods, so the game's map list wasn't updated: {error}",
+    "gameReset": "the game emptied its mod list (it does that once after some updates), so PZMM kept yours: launch from PZMM to put it back",
     "settingsDamaged": "{file} is damaged ({error}); kept a copy as {copy} and used the default settings",
     "duplicateId": "{source}: skipped a second mod with the id {id}",
     "notOursInMods": "{id} is already in {dir} and wasn't installed by PZMM; left it alone. Remove that folder to install this copy.",

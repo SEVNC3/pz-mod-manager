@@ -1362,6 +1362,16 @@ fn diagnostics(app: AppHandle) -> Res<String> {
     })
 }
 
+/// Updates install over the running copy: without `/D=` the installer can fall back to its
+/// default folder, leaving shortcuts on the old version (NSIS takes `/D=` last and unquoted).
+fn updater() -> tauri_plugin_updater::Builder {
+    let b = tauri_plugin_updater::Builder::new();
+    match std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.display().to_string())) {
+        Some(dir) if cfg!(windows) => b.installer_arg(format!("/D={dir}")),
+        _ => b,
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1374,7 +1384,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(updater().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let handle = app.handle().clone();

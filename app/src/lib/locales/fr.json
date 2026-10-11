@@ -1211,6 +1211,7 @@
   "backend": {
     "stateDamaged": "{file} est endommagé ({error}) ; une copie a été conservée sous state.json.bad et le fichier a été recréé",
     "mapsNotUpdated": "impossible de lire vos mods, donc la liste des cartes du jeu n'a pas été mise à jour : {error}",
+    "gameReset": "le jeu a vidé sa liste de mods (il le fait une fois après certaines mises à jour), donc PZMM a gardé la vôtre : lancez depuis PZMM pour la rétablir",
     "settingsDamaged": "{file} est endommagé ({error}) ; une copie a été conservée sous {copy} et les paramètres par défaut ont été utilisés",
     "duplicateId": "{source} : un second mod avec l'identifiant {id} a été ignoré",
     "notOursInMods": "{id} est déjà dans {dir} et n'a pas été installé par PZMM ; laissé tel quel. Supprimez ce dossier pour installer cette copie.",

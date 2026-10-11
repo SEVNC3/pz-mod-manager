@@ -524,11 +524,61 @@ pub fn sync(paths: &Paths) -> Result<(Profile, bool)> {
     let mut p = if dir(paths).join(&name).join("modlist.txt").exists() { load(paths, &name)? } else { Profile { name, ..Default::default() } };
     // a missing or unreadable default.txt (game running, odd encoding) says nothing about
     // what's enabled: adopting it would switch the whole profile off
-    let changed = pz::try_read_default(&paths.default_txt()).is_some_and(|game| p.adopt(&game.mods));
+    let game = pz::try_read_default(&paths.default_txt());
+    let reset = game.as_ref().is_some_and(|g| game_reset(paths, &p, g));
+    if reset {
+        crate::say!("gameReset", "the game emptied its mod list (it does that once after some updates), so PZMM kept yours: launch from PZMM to put it back");
+    }
+    let changed = !reset && game.is_some_and(|game| p.adopt(&game.mods));
     if changed || !dir(paths).join(&p.name).exists() {
         save(paths, &p)?;
     }
     Ok((p, changed))
+}
+
+/// Build 42 empties default.txt on its first start after some updates, unless the marker
+/// `mods/reset-mods-<release>.txt` exists (`ZomboidFileSystem.resetDefaultModsForNewRelease`).
+/// True when the game's list is empty, `p` has mods on and a marker is newer than `p`'s last save.
+fn game_reset(paths: &Paths, p: &Profile, game: &pz::DefaultTxt) -> bool {
+    let modified = |f: PathBuf| fs::metadata(f).and_then(|m| m.modified()).ok();
+    let Some(saved) = modified(dir(paths).join(on_disk(paths, &p.name)).join("loadorder.txt")) else { return false };
+    game.mods.is_empty()
+        && !p.enabled().is_empty()
+        && fs::read_dir(paths.zomboid.join("mods"))
+            .into_iter()
+            .flatten()
+            .flatten()
+            .any(|e| e.file_name().to_string_lossy().starts_with("reset-mods-") && modified(e.path()).is_some_and(|t| t > saved))
+}
+
+/// Write the marker that stops Build 42 emptying default.txt (see [`game_reset`]).
+fn keep_through_game_reset(paths: &Paths) {
+    let Some(game) = pz::folders::path("game", &crate::settings::load()) else { return };
+    let Some(release) = ["projectzomboid.jar", "projectzomboid/projectzomboid.jar"].iter().find_map(|j| reset_release(&game.join(j))) else { return };
+    let marker = paths.zomboid.join("mods").join(format!("reset-mods-{release}.txt"));
+    if !marker.exists() {
+        let _ = fs::write(marker, "If this file does not exist, default.txt will be reset to empty (no mods active).");
+    }
+}
+
+/// The marker's release part (`42_00`): the only `<digits>_<digits>` string in the game's `GameWindow` class.
+fn reset_release(jar: &std::path::Path) -> Option<String> {
+    use std::io::Read;
+    let mut class = vec![];
+    zip::ZipArchive::new(fs::File::open(jar).ok()?).ok()?.by_name("zombie/GameWindow.class").ok()?.read_to_end(&mut class).ok()?;
+    // constant pool strings: tag 1, a big-endian u16 length, the bytes
+    let found: HashSet<&str> = (0..class.len().saturating_sub(3))
+        .filter(|&i| class[i] == 1)
+        .filter_map(|i| {
+            let len = u16::from_be_bytes([class[i + 1], class[i + 2]]) as usize;
+            let s = std::str::from_utf8(class.get(i + 3..i + 3 + len)?).ok()?;
+            let (a, b) = s.split_once('_')?;
+            let digits = |t: &str| !t.is_empty() && t.len() <= 4 && t.bytes().all(|c| c.is_ascii_digit());
+            (digits(a) && digits(b)).then_some(s)
+        })
+        .collect();
+    // ponytail: a guess from the class file; two candidates means the game changed, so write nothing
+    (found.len() == 1).then(|| found.into_iter().next().unwrap().to_string())
 }
 
 /// Save `profile`, make it active and write it to the game's mod list, its maps from the mod
@@ -542,6 +592,9 @@ pub fn apply(paths: &Paths, profile: &Profile, mods: Option<&std::collections::B
     let b41 = s.b41.or(s.seen_b41);
     let maps = mods.map(|m| game_maps(paths, profile, m, if b41.unwrap_or(false) { 41 } else { 42 }));
     pz::write_default(&paths.default_txt(), &profile.enabled(), b41, maps.as_deref())?;
+    if b41 != Some(true) {
+        keep_through_game_reset(paths);
+    }
     let kind = s.kinds.get(&profile.name).cloned().unwrap_or_else(|| DEFAULT_KIND.into());
     s.last.insert(kind, profile.name.clone());
     save_state(paths, &State { active: profile.name.clone(), ..s })
@@ -868,6 +921,39 @@ mod tests {
         assert_eq!(sync(&paths).unwrap().0.enabled(), ids(&["A", "B"]));
         fs::remove_file(paths.default_txt()).unwrap();
         assert_eq!(sync(&paths).unwrap().0.enabled(), ids(&["A", "B"]));
+    }
+
+    #[test]
+    fn a_game_reset_keeps_the_profile() {
+        let (_t, paths) = temp_paths();
+        apply(&paths, &Profile::from_ids("Default", ids(&["A", "B"]))).unwrap();
+        let marker = paths.zomboid.join("mods/reset-mods-42_00.txt");
+        let touch = |secs: i64| {
+            let now = std::time::SystemTime::now();
+            let t = if secs > 0 { now + std::time::Duration::from_secs(secs as u64) } else { now - std::time::Duration::from_secs(-secs as u64) };
+            fs::File::options().write(true).open(&marker).unwrap().set_modified(t).unwrap();
+        };
+        // the game's first start after an update: it writes the marker and empties its list
+        fs::write(&marker, "").unwrap();
+        touch(60);
+        pz::write_default(&paths.default_txt(), &[], None, None).unwrap();
+        assert_eq!(sync(&paths).unwrap().0.enabled(), ids(&["A", "B"]));
+        // an old marker: the player emptied the list in game, so it's taken
+        touch(-3600);
+        assert_eq!(sync(&paths).unwrap().0.enabled(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn reads_the_reset_release_from_the_game() {
+        use std::io::Write;
+        let t = tempfile::tempdir().unwrap();
+        let jar = t.path().join("projectzomboid.jar");
+        let mut z = zip::ZipWriter::new(fs::File::create(&jar).unwrap());
+        z.start_file("zombie/GameWindow.class", zip::write::SimpleFileOptions::default()).unwrap();
+        z.write_all(b"\xca\xfe\xba\xbe\x01\x00\x0542_00\x01\x00\x03abc\x01\x00\x0442.1").unwrap();
+        z.finish().unwrap();
+        assert_eq!(reset_release(&jar).as_deref(), Some("42_00"));
+        assert_eq!(reset_release(&t.path().join("missing.jar")), None);
     }
 
     #[test]

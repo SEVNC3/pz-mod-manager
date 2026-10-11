@@ -1351,6 +1351,7 @@
   "backend": {
     "stateDamaged": "{file} jest uszkodzony ({error}); zachowano kopię jako state.json.bad i zaczęto od nowa",
     "mapsNotUpdated": "nie udało się odczytać modów, więc lista map gry nie została zaktualizowana: {error}",
+    "gameReset": "gra wyczyściła swoją listę modów (robi to raz po niektórych aktualizacjach), więc PZMM zachował twoją: uruchom z PZMM, aby ją przywrócić",
     "settingsDamaged": "{file} jest uszkodzony ({error}); zachowano kopię jako {copy} i użyto ustawień domyślnych",
     "duplicateId": "{source}: pominięto drugi mod o identyfikatorze {id}",
     "notOursInMods": "{id} jest już w {dir} i nie został zainstalowany przez PZMM; zostawiono go bez zmian. Usuń ten folder, aby zainstalować tę kopię.",

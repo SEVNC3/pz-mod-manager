@@ -1141,6 +1141,7 @@
   "backend": {
     "stateDamaged": "{file} 已损坏（{error}）；已将副本保留为 state.json.bad，并重新开始",
     "mapsNotUpdated": "无法读取你的模组，因此游戏的地图列表未更新：{error}",
+    "gameReset": "游戏清空了它的模组列表（某些更新后会发生一次），PZMM 保留了你的列表：从 PZMM 启动即可恢复",
     "settingsDamaged": "{file} 已损坏（{error}）；已将副本保留为 {copy}，并使用默认设置",
     "duplicateId": "{source}：已跳过第二个 ID 为 {id} 的模组",
     "notOursInMods": "{id} 已在 {dir} 中，且不是由 PZMM 安装的，已保持原样。如需安装此副本，请删除该文件夹。",

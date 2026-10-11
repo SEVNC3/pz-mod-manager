@@ -1211,6 +1211,7 @@
   "backend": {
     "stateDamaged": "{file} está danificado ({error}); uma cópia foi mantida como state.json.bad e o arquivo foi recriado",
     "mapsNotUpdated": "não foi possível ler seus mods, então a lista de mapas do jogo não foi atualizada: {error}",
+    "gameReset": "o jogo esvaziou a lista de mods (ele faz isso uma vez após algumas atualizações), então o PZMM manteve a sua: inicie pelo PZMM para restaurá-la",
     "settingsDamaged": "{file} está danificado ({error}); uma cópia foi mantida como {copy} e as configurações padrão foram usadas",
     "duplicateId": "{source}: um segundo mod com o id {id} foi ignorado",
     "notOursInMods": "{id} já está em {dir} e não foi instalado pelo PZMM; deixado como está. Remova essa pasta para instalar esta cópia.",

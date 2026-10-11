@@ -1211,6 +1211,7 @@
   "backend": {
     "stateDamaged": "{file} è danneggiato ({error}); conservata una copia come state.json.bad e ripartito da zero",
     "mapsNotUpdated": "impossibile leggere le tue mod, quindi l'elenco delle mappe del gioco non è stato aggiornato: {error}",
+    "gameReset": "il gioco ha svuotato il suo elenco di mod (lo fa una volta dopo alcuni aggiornamenti), quindi PZMM ha mantenuto il tuo: avvia da PZMM per ripristinarlo",
     "settingsDamaged": "{file} è danneggiato ({error}); conservata una copia come {copy} e usate le impostazioni predefinite",
     "duplicateId": "{source}: saltata una seconda mod con l'id {id}",
     "notOursInMods": "{id} è già in {dir} e non è stata installata da PZMM; lasciata com'è. Rimuovi quella cartella per installare questa copia.",
