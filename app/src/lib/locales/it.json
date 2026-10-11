@@ -312,6 +312,16 @@
     "readingFiles": "Lettura dei file delle mappe…",
     "noVanilla": "Le aree vanilla non sono mostrate: l'installazione del gioco non è stata trovata o non è la Build {build}. Controlla le cartelle nelle Impostazioni.",
     "mapMods": "Mod di mappe",
+    "tabs": {
+      "label": "Strumenti mappe",
+      "order": "Ordine ed esportazione",
+      "compare": "Confronta",
+      "check": "Controlla mappa",
+      "missing": {
+        "one": "{count} mancante",
+        "other": "{count} mancanti"
+      }
+    },
     "undoTip": "Annulla l'ultima modifica all'anteprima, selezione rapida, preset o attivazione/disattivazione (Ctrl+Z)",
     "undoLabel": "Annulla",
     "workshopSource": "Mappe del Workshop che non hai installato",
@@ -557,12 +567,8 @@
       "otherProfile": "L'ordine delle mappe non è stato salvato: ora è attivo un altro profilo."
     },
     "updatedAgo": "aggiornata {when}",
-    "expand": "Espandi",
-    "expandTip": "La griglia riempie la scheda (Esc per tornare)",
-    "collapse": "Ripristina",
-    "collapseTip": "Torna alla dimensione normale",
-    "resizeLabel": "Altezza della griglia",
-    "resizeTip": "Trascina, o premi ↑/↓, per cambiare l'altezza della griglia"
+    "resizeLabel": "Larghezza del pannello laterale",
+    "resizeTip": "Trascina, o premi ←/→, per cambiare la larghezza del pannello laterale"
   },
   "mapOrder": {
     "label": "Ordine delle mappe",

@@ -312,6 +312,16 @@
     "readingFiles": "Lecture des fichiers de carte…",
     "noVanilla": "Les zones vanilla ne sont pas affichées : l'installation du jeu est introuvable, ou ce n'est pas Build {build}. Vérifiez les dossiers dans Paramètres.",
     "mapMods": "Mods de cartes",
+    "tabs": {
+      "label": "Outils de cartes",
+      "order": "Ordre et export",
+      "compare": "Comparer",
+      "check": "Vérifier une carte",
+      "missing": {
+        "one": "{count} manquant",
+        "other": "{count} manquants"
+      }
+    },
     "undoTip": "Annuler la dernière modification de prévisualisation, sélection rapide, préréglage ou activation/désactivation (Ctrl+Z)",
     "undoLabel": "Annuler",
     "workshopSource": "Cartes du Workshop non installées",
@@ -557,12 +567,8 @@
       "otherProfile": "L'ordre des cartes n'a pas été enregistré : un autre profil est actif maintenant."
     },
     "updatedAgo": "mis à jour {when}",
-    "expand": "Agrandir",
-    "expandTip": "La grille remplit l'onglet (Échap pour revenir)",
-    "collapse": "Restaurer",
-    "collapseTip": "Revenir à la taille normale",
-    "resizeLabel": "Hauteur de la grille",
-    "resizeTip": "Faites glisser, ou appuyez sur ↑/↓, pour changer la hauteur de la grille"
+    "resizeLabel": "Largeur du panneau latéral",
+    "resizeTip": "Faites glisser, ou appuyez sur ←/→, pour changer la largeur du panneau latéral"
   },
   "mapOrder": {
     "label": "Ordre des cartes",

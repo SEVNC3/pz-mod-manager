@@ -312,6 +312,16 @@
     "readingFiles": "Lendo os arquivos do mapa…",
     "noVanilla": "As áreas vanilla não são exibidas: a instalação do jogo não foi encontrada ou não é da Build {build}. Verifique as pastas nas Configurações.",
     "mapMods": "Mods de mapa",
+    "tabs": {
+      "label": "Ferramentas de mapas",
+      "order": "Ordem e exportação",
+      "compare": "Comparar",
+      "check": "Verificar mapa",
+      "missing": {
+        "one": "{count} faltando",
+        "other": "{count} faltando"
+      }
+    },
     "undoTip": "Desfazer a última mudança de pré-visualização, seleção rápida, predefinição ou ativação/desativação (Ctrl+Z)",
     "undoLabel": "Desfazer",
     "workshopSource": "Mapas da Oficina que você não instalou",
@@ -557,12 +567,8 @@
       "otherProfile": "A ordem dos mapas não foi salva: outro perfil está ativo agora."
     },
     "updatedAgo": "atualizado {when}",
-    "expand": "Expandir",
-    "expandTip": "A grade ocupa a aba inteira (Esc para voltar)",
-    "collapse": "Restaurar",
-    "collapseTip": "Voltar ao tamanho normal",
-    "resizeLabel": "Altura da grade",
-    "resizeTip": "Arraste, ou pressione ↑/↓, para mudar a altura da grade"
+    "resizeLabel": "Largura do painel lateral",
+    "resizeTip": "Arraste, ou pressione ←/→, para mudar a largura do painel lateral"
   },
   "mapOrder": {
     "label": "Ordem dos mapas",

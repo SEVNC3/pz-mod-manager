@@ -312,6 +312,16 @@
     "readingFiles": "Reading the map files…",
     "noVanilla": "Vanilla areas aren't shown: the game install wasn't found, or it isn't Build {build}. Check the folders in Settings.",
     "mapMods": "Map mods",
+    "tabs": {
+      "label": "Map tools",
+      "order": "Order & export",
+      "compare": "Compare",
+      "check": "Check a map",
+      "missing": {
+        "one": "{count} missing",
+        "other": "{count} missing"
+      }
+    },
     "undoTip": "Undo the last preview change, quick select, preset or enable/disable (Ctrl+Z)",
     "undoLabel": "Undo",
     "workshopSource": "Workshop maps you haven't installed",
@@ -557,12 +567,8 @@
       "otherProfile": "The map order wasn't saved: another profile is active now."
     },
     "updatedAgo": "updated {when}",
-    "expand": "Expand",
-    "expandTip": "Fill the tab with the grid (Esc goes back)",
-    "collapse": "Restore",
-    "collapseTip": "Back to the normal size",
-    "resizeLabel": "Grid height",
-    "resizeTip": "Drag, or press ↑/↓, to change the grid's height"
+    "resizeLabel": "Side panel width",
+    "resizeTip": "Drag, or press ←/→, to change the side panel's width"
   },
   "mapOrder": {
     "label": "Map order",

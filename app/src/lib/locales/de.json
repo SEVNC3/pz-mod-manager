@@ -312,6 +312,16 @@
     "readingFiles": "Kartendateien werden gelesen…",
     "noVanilla": "Vanilla-Gebiete werden nicht angezeigt: Die Spielinstallation wurde nicht gefunden oder ist nicht Build {build}. Prüfe die Ordner in den Einstellungen.",
     "mapMods": "Karten-Mods",
+    "tabs": {
+      "label": "Kartenwerkzeuge",
+      "order": "Reihenfolge & Export",
+      "compare": "Vergleichen",
+      "check": "Karte prüfen",
+      "missing": {
+        "one": "{count} fehlt",
+        "other": "{count} fehlen"
+      }
+    },
     "undoTip": "Letzte Änderung an Vorschau, Schnellauswahl, Preset oder Aktivierung rückgängig machen (Ctrl+Z)",
     "undoLabel": "Rückgängig",
     "workshopSource": "Workshop-Karten, die du nicht installiert hast",
@@ -557,12 +567,8 @@
       "otherProfile": "Die Kartenreihenfolge wurde nicht gespeichert: Jetzt ist ein anderes Profil aktiv."
     },
     "updatedAgo": "aktualisiert {when}",
-    "expand": "Vergrößern",
-    "expandTip": "Das Raster füllt den Tab (Esc kehrt zurück)",
-    "collapse": "Wiederherstellen",
-    "collapseTip": "Zurück zur normalen Größe",
-    "resizeLabel": "Rasterhöhe",
-    "resizeTip": "Ziehen oder ↑/↓ drücken, um die Höhe des Rasters zu ändern"
+    "resizeLabel": "Breite der Seitenleiste",
+    "resizeTip": "Ziehen oder ←/→ drücken, um die Breite der Seitenleiste zu ändern"
   },
   "mapOrder": {
     "label": "Kartenreihenfolge",

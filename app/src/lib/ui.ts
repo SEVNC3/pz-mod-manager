@@ -1,4 +1,5 @@
 // Small DOM helpers shared by the views.
+import { tick } from "svelte";
 
 /** The key went to a text field or a select: global shortcuts leave it alone. */
 export const isTyping = (e: KeyboardEvent) =>
@@ -58,4 +59,14 @@ export function menuKeys(e: KeyboardEvent, menu: HTMLElement | undefined, close:
     e.preventDefault();
     items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
   }
+}
+
+/** Left/Right arrows step through a tab list or segmented control and move focus along. */
+export function arrowPick(e: KeyboardEvent, ids: string[], current: string, set: (v: string) => void) {
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  e.preventDefault();
+  const i = (ids.indexOf(current) + (e.key === "ArrowRight" ? 1 : ids.length - 1)) % ids.length;
+  set(ids[i]);
+  const buttons = (e.currentTarget as HTMLElement).querySelectorAll("button");
+  tick().then(() => (buttons[i] as HTMLElement | undefined)?.focus());
 }

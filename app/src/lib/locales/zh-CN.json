@@ -291,6 +291,15 @@
     "readingFiles": "正在读取地图文件…",
     "noVanilla": "未显示原版区域：找不到游戏安装，或其不是 Build {build}。请检查“设置”中的文件夹。",
     "mapMods": "地图模组",
+    "tabs": {
+      "label": "地图工具",
+      "order": "顺序与导出",
+      "compare": "比较",
+      "check": "检查地图",
+      "missing": {
+        "other": "缺少 {count} 个"
+      }
+    },
     "undoTip": "撤销上一次预览更改、快速选择、预设或启用/禁用（Ctrl+Z）",
     "undoLabel": "撤销",
     "workshopSource": "你尚未安装的创意工坊地图",
@@ -514,12 +523,8 @@
       "otherProfile": "地图顺序没有保存：现在启用的是另一个配置方案。"
     },
     "updatedAgo": "{when}更新",
-    "expand": "展开",
-    "expandTip": "让网格填满整个标签页（按 Esc 返回）",
-    "collapse": "还原",
-    "collapseTip": "恢复正常大小",
-    "resizeLabel": "网格高度",
-    "resizeTip": "拖动或按 ↑/↓ 调整网格高度"
+    "resizeLabel": "侧边栏宽度",
+    "resizeTip": "拖动或按 ←/→ 调整侧边栏宽度"
   },
   "mapOrder": {
     "label": "地图顺序",

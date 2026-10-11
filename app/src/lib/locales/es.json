@@ -312,6 +312,16 @@
     "readingFiles": "Leyendo los archivos de mapas…",
     "noVanilla": "No se muestran las zonas vanilla: no se encontró la instalación del juego o no es Build {build}. Revisa las carpetas en Ajustes.",
     "mapMods": "Mods de mapas",
+    "tabs": {
+      "label": "Herramientas de mapas",
+      "order": "Orden y exportación",
+      "compare": "Comparar",
+      "check": "Comprobar mapa",
+      "missing": {
+        "one": "falta {count}",
+        "other": "faltan {count}"
+      }
+    },
     "undoTip": "Deshacer el último cambio de previsualización, selección rápida, preajuste o activación/desactivación (Ctrl+Z)",
     "undoLabel": "Deshacer",
     "workshopSource": "Mapas del Workshop que no has instalado",
@@ -557,12 +567,8 @@
       "otherProfile": "No se guardó el orden de los mapas: ahora hay otro perfil activo."
     },
     "updatedAgo": "actualizado {when}",
-    "expand": "Ampliar",
-    "expandTip": "La cuadrícula ocupa toda la pestaña (Esc para volver)",
-    "collapse": "Restaurar",
-    "collapseTip": "Volver al tamaño normal",
-    "resizeLabel": "Altura de la cuadrícula",
-    "resizeTip": "Arrastra, o pulsa ↑/↓, para cambiar la altura de la cuadrícula"
+    "resizeLabel": "Ancho del panel lateral",
+    "resizeTip": "Arrastra, o pulsa ←/→, para cambiar el ancho del panel lateral"
   },
   "mapOrder": {
     "label": "Orden de mapas",

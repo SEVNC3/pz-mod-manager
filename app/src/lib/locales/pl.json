@@ -354,6 +354,18 @@
     "readingFiles": "Odczytywanie plików map…",
     "noVanilla": "Obszary vanilla nie są pokazywane: nie znaleziono instalacji gry albo to nie jest Build {build}. Sprawdź foldery w Ustawieniach.",
     "mapMods": "Mody z mapami",
+    "tabs": {
+      "label": "Narzędzia map",
+      "order": "Kolejność i eksport",
+      "compare": "Porównaj",
+      "check": "Sprawdź mapę",
+      "missing": {
+        "one": "brak: {count}",
+        "few": "brak: {count}",
+        "many": "brak: {count}",
+        "other": "brak: {count}"
+      }
+    },
     "undoTip": "Cofnij ostatnią zmianę podglądu, szybki wybór, preset lub włączenie/wyłączenie (Ctrl+Z)",
     "undoLabel": "Cofnij",
     "workshopSource": "Mapy z Warsztatu, których nie masz zainstalowanych",
@@ -643,12 +655,8 @@
       "otherProfile": "Kolejność map nie została zapisana: aktywny jest teraz inny profil."
     },
     "updatedAgo": "zaktualizowano {when}",
-    "expand": "Powiększ",
-    "expandTip": "Siatka wypełnia kartę (Esc, aby wrócić)",
-    "collapse": "Przywróć",
-    "collapseTip": "Powrót do normalnego rozmiaru",
-    "resizeLabel": "Wysokość siatki",
-    "resizeTip": "Przeciągnij lub naciśnij ↑/↓, aby zmienić wysokość siatki"
+    "resizeLabel": "Szerokość panelu bocznego",
+    "resizeTip": "Przeciągnij lub naciśnij ←/→, aby zmienić szerokość panelu bocznego"
   },
   "mapOrder": {
     "label": "Kolejność map",

@@ -5,7 +5,7 @@
   import { check, type Update } from "@tauri-apps/plugin-updater";
   import { relaunch } from "@tauri-apps/plugin-process";
   import { decodeShare, describeSource, encodeShare, isOurs, type ModDetails, type Snapshot } from "$lib/api";
-  import { isTyping, trap } from "$lib/ui";
+  import { arrowPick, isTyping, trap } from "$lib/ui";
   import { api, zbReady, type Mode, type ModRow, type Row, type View, type ZbStatus } from "$lib/api";
   import Details from "$lib/Details.svelte";
   import Workshop from "$lib/Workshop.svelte";
@@ -686,15 +686,6 @@
 
   const TAB_IDS = ["mods", "workshop", "maps", "servers", "zb", "settings"];
   const FILTER_IDS = ["all", "on", "off", "problems"];
-  /** Left/Right arrows step through a tab list or segmented control and move focus along. */
-  function arrowPick(e: KeyboardEvent, ids: string[], current: string, set: (v: string) => void) {
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    e.preventDefault();
-    const i = (ids.indexOf(current) + (e.key === "ArrowRight" ? 1 : ids.length - 1)) % ids.length;
-    set(ids[i]);
-    const buttons = (e.currentTarget as HTMLElement).querySelectorAll("button");
-    tick().then(() => (buttons[i] as HTMLElement | undefined)?.focus());
-  }
 
   function globalKey(e: KeyboardEvent) {
     const typing = isTyping(e);

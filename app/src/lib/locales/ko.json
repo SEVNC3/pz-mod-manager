@@ -291,6 +291,15 @@
     "readingFiles": "맵 파일 읽는 중…",
     "noVanilla": "바닐라 지역이 표시되지 않아요. 게임 설치를 찾지 못했거나 Build {build} 버전이 아니에요. 설정에서 폴더를 확인하세요.",
     "mapMods": "맵 모드",
+    "tabs": {
+      "label": "맵 도구",
+      "order": "순서 및 내보내기",
+      "compare": "비교",
+      "check": "맵 확인",
+      "missing": {
+        "other": "{count}개 없음"
+      }
+    },
     "undoTip": "마지막 미리 보기 변경, 빠른 선택, 프리셋 또는 활성화/비활성화 실행 취소 (Ctrl+Z)",
     "undoLabel": "실행 취소",
     "workshopSource": "설치하지 않은 창작마당 맵",
@@ -514,12 +523,8 @@
       "otherProfile": "지도 순서를 저장하지 않았어요. 지금은 다른 프로필이 활성화돼 있어요."
     },
     "updatedAgo": "{when} 업데이트됨",
-    "expand": "확장",
-    "expandTip": "그리드가 탭 전체를 채워요 (Esc로 돌아가기)",
-    "collapse": "복원",
-    "collapseTip": "원래 크기로 돌아가기",
-    "resizeLabel": "그리드 높이",
-    "resizeTip": "드래그하거나 ↑/↓를 눌러 그리드 높이를 바꾸세요"
+    "resizeLabel": "사이드 패널 너비",
+    "resizeTip": "드래그하거나 ←/→를 눌러 사이드 패널 너비를 바꾸세요"
   },
   "mapOrder": {
     "label": "맵 순서",

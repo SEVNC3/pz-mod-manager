@@ -22,6 +22,9 @@ export const prefs = $state({
   perPage: (read("pzmm.perPage", "30") === "50" ? 50 : 30) as 30 | 50,
   /** The Maps tab lists every Map-tagged Workshop item (the built-in index, then Steam), not only installed maps. */
   mapsWorkshop: read("pzmm.mapsWorkshop", "1") === "1",
+  /** The Maps tab's side panel: its open tab, and its width in pixels. */
+  mapsTab: read("pzmm.mapsTab", "mods"),
+  mapsSide: Number(read("pzmm.mapsSide", "500")) || 500,
   /** The Workshop tab leaves out what's already installed or subscribed. */
   hideInstalled: read("pzmm.hideInstalled", "0") === "1",
 });
@@ -49,6 +52,8 @@ export function applyPrefs() {
     localStorage.setItem("pzmm.showIds", prefs.showIds ? "1" : "0");
     localStorage.setItem("pzmm.workshopView", prefs.workshopView);
     localStorage.setItem("pzmm.mapsWorkshop", prefs.mapsWorkshop ? "1" : "0");
+    localStorage.setItem("pzmm.mapsTab", prefs.mapsTab);
+    localStorage.setItem("pzmm.mapsSide", String(prefs.mapsSide));
     localStorage.setItem("pzmm.perPage", String(prefs.perPage));
     localStorage.setItem("pzmm.hideInstalled", prefs.hideInstalled ? "1" : "0");
   } catch {}

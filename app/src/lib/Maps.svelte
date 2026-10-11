@@ -25,7 +25,7 @@
   import { compact, fmtAgo, fmtSize, workshopUrl } from "./format";
   import { t, th, type Vars } from "./i18n.svelte";
   import { prefs } from "./prefs.svelte";
-  import { isTyping } from "./ui";
+  import { arrowPick, isTyping } from "./ui";
 
   let { busy, profile, mods, loadOrder, say, onSetMods, onInstallWorkshop, onShowMod, canUndo, onUndo, find = "" }: {
     busy: boolean;
@@ -136,7 +136,6 @@
     preview = last.preview;
   }
   function undoKey(e: KeyboardEvent) {
-    if (e.key === "Escape" && expanded) return toggleExpand();
     if (isTyping(e) || busy || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== "z") return;
     e.preventDefault();
     undo();
@@ -471,6 +470,7 @@
       }
       checkText = "";
       setPreview(new Set([...preview, ...found.map((m) => m.id)]));
+      if (found.length) prefs.mapsTab = "mods";
       say(found.length ? "maps.check.read" : "maps.check.noMaps", { title: item.title, build: String(data?.build) });
       await load();
     } catch (err) {
@@ -501,6 +501,7 @@
     checkText = "";
     await load();
     setPreview(new Set([...preview, ...ids.filter((id) => !isOn(id))]));
+    if (ids.length) prefs.mapsTab = "mods";
     // up to three sentences, logged as one line
     say(
       [
@@ -515,32 +516,20 @@
     );
   }
 
-  // --- the grid: a canvas (thousands of cells), coloured from the theme's tokens ---
-  const [MIN_H, MAX_H] = [240, 2400];
-  /** The grid's height (drag the handle under it), unless expanded to fill the tab. */
-  let height = $state(460);
-  let expanded = $state(false);
-  let boxH = $state(0);
-  const HEIGHT = $derived(boxH || height);
-  let section = $state<HTMLElement>();
-  let refit = false;
-  function toggleExpand() {
-    expanded = !expanded;
-    if (section) section.scrollTop = 0;
-    refit = true; // once the grid has its new size
-  }
-  $effect(() => {
-    void boxH;
-    if (refit) {
-      refit = false;
-      untrack(fit);
-    }
-  });
-  const clampH = (h: number) => Math.round(Math.min(MAX_H, Math.max(MIN_H, h)));
+  // --- the side panel: tabs beside the map, its width dragged at its left edge ---
+  const TABS: [string, string, string][] = [["mods", "maps.mapMods", ""], ["req", "maps.req.title", ""], ["order", "maps.tabs.order", "maps.export.title"], ["compare", "maps.tabs.compare", "maps.compare.title"], ["check", "maps.tabs.check", "maps.check.title"]];
+  const TAB_IDS = TABS.map(([id]) => id);
+  const sideTab = $derived(TAB_IDS.includes(prefs.mapsTab) ? prefs.mapsTab : "mods");
+  /** Requirements that aren't installed (the Requirements tab's badge). */
+  const missing = $derived(needs.filter((n) => !(n.id && mods.has(n.id))).length);
+  let winW = $state(innerWidth);
+  const SIDE_MIN = 340;
+  const clampW = (w: number) => Math.round(Math.max(SIDE_MIN, Math.min(w, winW / 2)));
+  const sideW = $derived(clampW(prefs.mapsSide));
   function resizeStart(e: PointerEvent) {
-    const [y0, h0, el] = [e.clientY, height, e.currentTarget as HTMLElement];
+    const [x0, w0, el] = [e.clientX, sideW, e.currentTarget as HTMLElement];
     el.setPointerCapture(e.pointerId);
-    const to = (m: PointerEvent) => (height = clampH(h0 + m.clientY - y0));
+    const to = (m: PointerEvent) => (prefs.mapsSide = clampW(w0 - (m.clientX - x0)));
     const end = () => {
       el.removeEventListener("pointermove", to);
       el.removeEventListener("pointerup", end);
@@ -549,11 +538,14 @@
     el.addEventListener("pointerup", end);
   }
   function resizeKey(e: KeyboardEvent) {
-    const step = e.key === "ArrowUp" ? -40 : e.key === "ArrowDown" ? 40 : 0;
+    const step = e.key === "ArrowLeft" ? 20 : e.key === "ArrowRight" ? -20 : 0;
     if (!step) return;
     e.preventDefault();
-    height = clampH(height + step);
+    prefs.mapsSide = clampW(sideW + step);
   }
+
+  // --- the grid: a canvas (thousands of cells), coloured from the theme's tokens; it fills its pane ---
+  let height = $state(0);
   let canvas = $state<HTMLCanvasElement>();
   let probe = $state<HTMLSpanElement>();
   let width = $state(0);
@@ -589,18 +581,18 @@
   function fit() {
     if (!bounds || !width) return;
     const [cols, rows] = [bounds.x1 - bounds.x0 + 1, bounds.y1 - bounds.y0 + 1];
-    const scale = Math.min(width / (cols + 2), HEIGHT / (rows + 2));
-    view = { scale, x: (width - cols * scale) / 2 - bounds.x0 * scale, y: (HEIGHT - rows * scale) / 2 - bounds.y0 * scale };
+    const scale = Math.min(width / (cols + 2), height / (rows + 2));
+    view = { scale, x: (width - cols * scale) / 2 - bounds.x0 * scale, y: (height - rows * scale) / 2 - bounds.y0 * scale };
   }
   let fitted = false;
   $effect(() => {
-    if (!fitted && bounds && width) {
+    if (!fitted && bounds && width && height) {
       fitted = true;
       untrack(fit);
     }
   });
 
-  function zoom(k: number, px = width / 2, py = HEIGHT / 2) {
+  function zoom(k: number, px = width / 2, py = height / 2) {
     const scale = Math.min(64, Math.max(1, view.scale * k));
     view = { scale, x: px - ((px - view.x) * scale) / view.scale, y: py - ((py - view.y) * scale) / view.scale };
   }
@@ -610,7 +602,7 @@
     if (!canvas || !probe || !width || !view.scale) return;
     const dpr = devicePixelRatio || 1;
     canvas.width = width * dpr;
-    canvas.height = HEIGHT * dpr;
+    canvas.height = height * dpr;
     const g = canvas.getContext("2d")!;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     // resolved through an element, so color-mix() and relative colours come back as rgb()
@@ -621,7 +613,7 @@
     const fill = { vanilla: color("--muted"), water: color("--map-water"), map: color("--map-cell"), over: color("--map-over"), conflict: color("--danger") };
     const hues = new Map([...colourOf].map(([id, c]) => [id, color(c)]));
     g.fillStyle = color("--bg");
-    g.fillRect(0, 0, width, HEIGHT);
+    g.fillRect(0, 0, width, height);
     const s = view.scale;
     const gap = s >= 10 ? 1 : 0;
     for (const c of grid) {
@@ -645,7 +637,7 @@
     g.fillStyle = color("--panel");
     g.globalAlpha = 0.85;
     g.fillRect(0, 0, width, 16);
-    g.fillRect(0, 0, 28, HEIGHT);
+    g.fillRect(0, 0, 28, height);
     g.globalAlpha = 1;
     g.fillStyle = color("--muted");
     g.font = "11px 'IBM Plex Mono', monospace";
@@ -653,7 +645,7 @@
     g.textBaseline = "middle";
     for (let x = Math.ceil(-view.x / s / step) * step; view.x + x * s < width; x += step) if (view.x + (x + 0.5) * s > 28) g.fillText(String(x), view.x + (x + 0.5) * s, 8);
     g.textAlign = "right";
-    for (let y = Math.ceil(-view.y / s / step) * step; view.y + y * s < HEIGHT; y += step) if (view.y + (y + 0.5) * s > 16) g.fillText(String(y), 25, view.y + (y + 0.5) * s);
+    for (let y = Math.ceil(-view.y / s / step) * step; view.y + y * s < height; y += step) if (view.y + (y + 0.5) * s > 16) g.fillText(String(y), 25, view.y + (y + 0.5) * s);
   });
 
   onMount(() => {
@@ -697,6 +689,7 @@
       const has = pickedCells.some((c) => c[0] === x && c[1] === y);
       if (e.shiftKey) pickedCells = has ? pickedCells.filter((c) => c[0] !== x || c[1] !== y) : [...pickedCells, [x, y]];
       else pickedCells = has && pickedCells.length === 1 ? [] : [[x, y]];
+      prefs.mapsTab = "mods"; // the list shows the maps there
     }
     drag = null;
   }
@@ -709,27 +702,12 @@
   const KIND = { vanilla: "maps.kind.vanilla", water: "maps.kind.water", map: "", over: "maps.kind.over", conflict: "maps.kind.conflict" };
 </script>
 
-<svelte:window onkeydown={undoKey} />
+<svelte:window onkeydown={undoKey} bind:innerWidth={winW} />
 
-<section class="maps blueprint" class:expanded aria-label={t("maps.label")} bind:this={section}>
-  <div class="inner">
-    <div class="card world" class:expanded>
-      <div class="head">
-        <h2>{t("maps.worldMap")}</h2>
-        <button class="quiet" onclick={() => (help = !help)} aria-expanded={help}><Icon name="info" size={14} />{t("maps.help.button")}</button>
-      </div>
-      {#if help}
-        <div class="help" role="dialog" aria-label={t("maps.help.label")}>
-          <h3>{t("maps.help.gridTitle")}</h3>
-          <p>{@html th("maps.help.grid", { build: data?.build ?? "" })}</p>
-          <h3>{t("maps.help.previewTitle")}</h3>
-          <p>{@html th("maps.help.preview")}</p>
-          <h3>{t("maps.help.workshopTitle")}</h3>
-          <p>{t("maps.help.workshop")}</p>
-          <button class="quiet" onclick={() => (help = false)}><Icon name="x" size={14} />{t("common.close")}</button>
-        </div>
-      {/if}
-      <p class="lede">{t("maps.lede")}</p>
+<section class="maps blueprint" aria-label={t("maps.label")} style:--side="{sideW}px">
+  <div class="card world">
+    <div class="head">
+      <h2>{t("maps.worldMap")}</h2>
       <div class="legend">
         {#if colours}
           {#each drawn.slice(0, 12) as m (m.id)}<span><i style:background={swatch(m.id)}></i>{nameOf(m)}</span>{/each}
@@ -744,158 +722,175 @@
           {#if data?.water.length}<span><i style="background: var(--map-water); opacity: 0.6"></i>{t("maps.legend.river")}</span>{/if}
         {/if}
       </div>
-      <div class="row layers">
-        <label class="check"><input type="checkbox" bind:checked={hideVanilla} />{t("maps.hideVanilla")}</label>
-        <label class="check"><input type="checkbox" bind:checked={colours} />{t("maps.perMapColours")}</label>
-        <span class="zoom">
-          <button class="quiet" onclick={() => zoom(1.25)} aria-label={t("maps.zoomIn")}><Icon name="plus" size={14} />{t("maps.zoomIn")}</button>
-          <button class="quiet" onclick={() => zoom(0.8)}>{t("maps.zoomOut")}</button>
-          <button class="quiet" onclick={fit}>{t("maps.fit")}</button>
-          <button class="quiet" onclick={toggleExpand} aria-pressed={expanded} title={expanded ? t("maps.collapseTip") : t("maps.expandTip")}><Icon name={expanded ? "minimize" : "maximize"} size={14} />{expanded ? t("maps.collapse") : t("maps.expand")}</button>
-        </span>
-      </div>
-      <div class="canvas" bind:clientWidth={width} bind:clientHeight={boxH} style:height={expanded ? undefined : `${height}px`}>
-        <canvas bind:this={canvas}
-          aria-label={t("maps.gridLabel", { maps: shown.length, conflicts: conflictCells, over: overCells })}
-          onpointerdown={down} onpointermove={move} onpointerup={up} onpointerleave={() => (hover = null)} onwheel={wheel}></canvas>
-        <span bind:this={probe} hidden></span>
-        {#if hover}
-          <div class="tip" style:left="{Math.min(hover.px + 14, width - 230)}px" style:top="{Math.min(hover.py + 14, HEIGHT - 140)}px">
-            <strong>{t("maps.cell", { x: hover.x, y: hover.y })}</strong>
-            {#if hovered}
-              {#if KIND[hovered.kind]}<span class="kind {hovered.kind}">{t(KIND[hovered.kind])}</span>{/if}
-              {#each hovered.maps as id}<span>{names.get(id) ?? id}</span>{/each}
-            {:else}
-              <span class="hint">{t("maps.empty")}</span>
-            {/if}
-          </div>
-        {/if}
-        {#if !data}<p class="loading">{t("maps.readingFiles")}</p>{/if}
-      </div>
-      {#if !expanded}
-        <!-- a window splitter (focusable separator): svelte counts separators as non-interactive -->
-        <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-        <div class="resize" role="separator" aria-orientation="horizontal" aria-label={t("maps.resizeLabel")} title={t("maps.resizeTip")} tabindex="0"
-          aria-valuenow={height} aria-valuemin={MIN_H} aria-valuemax={MAX_H} onpointerdown={resizeStart} onkeydown={resizeKey}></div>
-      {/if}
-      {#if data && !data.vanilla}
-        <p class="hint">{t("maps.noVanilla", { build: data.build })}</p>
-      {/if}
     </div>
-
-    <div class="card list">
-      <div class="head">
-        <h2>{t("maps.mapMods")}</h2>
+    <div class="row layers">
+      <label class="check"><input type="checkbox" bind:checked={hideVanilla} />{t("maps.hideVanilla")}</label>
+      <label class="check"><input type="checkbox" bind:checked={colours} />{t("maps.perMapColours")}</label>
+      <span class="zoom">
+        <button class="quiet" onclick={() => zoom(1.25)} aria-label={t("maps.zoomIn")}><Icon name="plus" size={14} />{t("maps.zoomIn")}</button>
+        <button class="quiet" onclick={() => zoom(0.8)}>{t("maps.zoomOut")}</button>
+        <button class="quiet" onclick={fit}>{t("maps.fit")}</button>
         <button class="quiet icon" onclick={undo} disabled={busy || !(history.length || canUndo)} title={t("maps.undoTip")} aria-label={t("maps.undoLabel")}><Icon name="undo" size={16} /></button>
-      </div>
-      <div class="source">
-        <label class="check"><input type="checkbox" bind:checked={prefs.mapsWorkshop} />{t("maps.workshopSource")}</label>
-        <span class="hint note">{t("maps.workshopSourceNote")}</span>
-        {#if prefs.mapsWorkshop}
-          <span class="hint" class:bad={!!scan.error} role="status">{scanText}</span>
-          {#if scan.running}
-            {#if scan.p?.total}<progress max={scan.p.total} value={scan.p.done}></progress>{/if}
-            <button class="quiet" onclick={stopScan} disabled={scan.stopping}><Icon name="x" size={14} />{scan.stopping ? t("maps.scan.stopping") : t("maps.scan.stop")}</button>
-          {:else}
-            <button class="quiet" onclick={startScan} title={t("maps.scan.refreshTip")}><Icon name="refresh" size={14} />{t("common.refresh")}</button>
-          {/if}
-        {/if}
-      </div>
-      <div class="row">
-        <input type="search" bind:value={search} placeholder={t("maps.searchPlaceholder")} aria-label={t("maps.searchLabel")} />
-        <select bind:value={filter} aria-label={t("maps.filterLabel")} title={t("maps.filterLabel")}>
-          {#each FILTERS as [v, label]}<option value={v}>{t(label)}</option>{/each}
-        </select>
-        <select bind:value={sortBy} aria-label={t("maps.sortLabel")} title={t("maps.sortLabel")}>
-          <option value="order">{t("maps.sort.order")}</option>
-          <option value="name">{t("maps.sort.name")}</option>
-          <option value="cells">{t("maps.sort.cells")}</option>
-          <option value="conflicts">{t("maps.sort.conflicts")}</option>
-          <option value="state">{t("maps.sort.state")}</option>
-          <option value="subs">{t("maps.sort.subs")}</option>
-          <option value="updated">{t("maps.sort.updated")}</option>
-          <option value="newest">{t("maps.sort.newest")}</option>
-        </select>
-      </div>
-      {#if pickedCells.length}
-        <p class="filter">
-          <span class="chip">{@html th("maps.pickedCells", { cells: pickedCells.map(([x, y]) => `${x},${y}`).join(" · ") })}</span>
-          {t("maps.mapCount", { count: listed.length })}
-          <button class="quiet" onclick={() => (pickedCells = [])}><Icon name="x" size={14} />{t("maps.clearCells")}</button>
-        </p>
-      {/if}
-      <div class="row bulk">
-        <button onclick={quickSelect} disabled={!listed.length || picking} aria-busy={picking} title={t("maps.quickSelectTip")}><Icon name="wand" size={14} />{picking ? t("maps.quickSelecting") : t("maps.quickSelect")}</button>
-        <button onclick={previewListed} disabled={!listed.length}>{t("maps.previewListed")}</button>
-        {#if preview.size}
-          <button onclick={clearListed}>{t("maps.unpreviewListed")}</button>
-          <button onclick={() => setPreview(new Set())} title={t("maps.enabledOnlyTip")}>{t("maps.enabledOnly")}</button>
-        {/if}
-        {#if previewOff.length}<button onclick={enablePreviewed} disabled={busy}><Icon name="check" size={14} />{t("maps.enablePreviewed", { count: previewOff.length })}</button>{/if}
-        {#if listedOn.length}<button onclick={() => setMods(listedOn, false)} disabled={busy}><Icon name="x" size={14} />{t("maps.disableListed", { count: listedOn.length })}</button>{/if}
-        {#if hidden.size}<button onclick={() => (hidden = new Set())} title={t("maps.unhideTip")}>{t("maps.unhide", { count: hidden.size })}</button>{/if}
-      </div>
-      {#if data && !all.length}
-        <p class="hint">{t("maps.noMaps", { build: data.build })}</p>
-      {/if}
-      <ul class="mods">
-        {#each listed.slice(0, limit) as m (m.id)}
-          {@const installed = mods.has(m.id)}
-          {@const on = isOn(m.id)}
-          {@const item = itemOf(m.source)}
-          {@const meta = metaOf(m)}
-          {@const clash = clashes.get(m.id)}
-          {@const isShown = on || preview.has(m.id)}
-          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-          <li class:shown={isShown} class:hidden={hidden.has(m.id)} onclick={(e) => !on && !(e.target as HTMLElement).closest("button, input, a") && togglePreview(m.id)}>
-            <input type="checkbox" checked={isShown} disabled={on} onchange={() => togglePreview(m.id)}
-              aria-label={t("maps.previewLabel", { name: nameOf(m) })} title={on ? t("maps.alwaysShownTip") : t("maps.previewTip")} />
-            <span class="name">
-              <span class="title"><strong title={nameOf(m)}>{nameOf(m)}</strong>{#if on}<span class="on">{t("common.enabled")}</span>{:else if !installed}<span class="off">{t("maps.notInstalled")}</span>{/if}</span>
-              <span class="hint">{t("maps.cellCount", { count: cellCount(m) })} · {m.maps.map((f) => f.folder).join("; ")}{meta?.author ? ` · ${t("maps.byAuthor", { author: meta.author })}` : ""}{meta?.subscriptions ? ` · ${t("maps.subscribers", { count: meta.subscriptions, n: compact.format(meta.subscriptions) })}` : ""}{!installed && meta?.size ? ` · ${fmtSize(meta.size)}` : ""}{meta?.updated ? ` · ${t("maps.updatedAgo", { when: fmtAgo(meta.updated) })}` : ""}</span>
-              {#each [...(clash?.with ?? [])].slice(0, 3) as [rival, cells] (rival)}
-                <span class="bad line" title={t("maps.conflictsWith", { count: cells.length, name: names.get(rival) ?? rival, cells: cellList(cells) }).replace(/<[^>]+>/g, "")}><span class="txt">{@html th("maps.conflictsWith", { count: cells.length, name: names.get(rival) ?? rival, cells: cellList(cells) })}</span>
-                  <button class="link" onclick={() => swap(m)} disabled={busy} title={t("maps.swapTip")}>{t("maps.swap")}</button></span>
-              {/each}
-              {#if (clash?.with.size ?? 0) > 3}<span class="bad">{t("maps.andMore", { count: clash!.with.size - 3 })}</span>{/if}
-              {#if clash?.over}<span class="over">{t("maps.cellsOverVanilla", { count: clash.over })}</span>{/if}
-              {#if packSize(m) > 1}<span class="hint">{t("maps.packMember", { count: packSize(m) })}</span>{/if}
-              {#each otherItems(m).slice(0, 1) as it (it)}
-                <span class="dupe">{t(otherItems(m).length > 1 ? "maps.dupeModMore" : "maps.dupeMod", { id: m.id, item: data?.items[it]?.title ?? t("maps.workshopItem", { id: it }), count: otherItems(m).length - 1 })}</span>
-              {/each}
-              {#each m.maps.filter((f) => (folderOwners.get(f.folder)?.length ?? 0) > 1) as f (f.folder)}
-                {@const others = folderOwners.get(f.folder)!.filter((id) => id !== m.id)}
-                <span class="dupe">{t(others.length > 2 ? "maps.dupeFolderMore" : "maps.dupeFolder", { folder: f.folder, names: others.slice(0, 2).map((id) => names.get(id) ?? id).join(", "), count: others.length - 2 })}</span>
-              {/each}
-            </span>
-            <span class="btns">
-              {#if isShown}<button class="quiet icon" onclick={() => toggleHidden(m.id)} title={hidden.has(m.id) ? t("maps.showOnGridTip") : t("maps.hideOnGridTip")} aria-label={hidden.has(m.id) ? t("maps.showOnGrid") : t("maps.hideOnGrid")} aria-pressed={hidden.has(m.id)}><Icon name={hidden.has(m.id) ? "eye-off" : "eye"} size={16} /></button>{/if}
-              {#if item}<button class="quiet icon" onclick={() => api.openUrl(workshopUrl(item))} title={t("maps.openWorkshopTip")} aria-label={t("common.workshop")}><Icon name="steam" size={16} /></button>{/if}
-              {#if installed}
-                <button disabled={busy} onclick={() => setMods([m.id], !on)} title={on ? "" : t("maps.alsoTurnsOnTip")}>{on ? t("common.disable") : t("common.enable")}</button>
-              {:else if item}
-                <button disabled={busy} onclick={() => onInstallWorkshop(item)} title={t("maps.installTip")}><Icon name="download" size={14} />{t("common.install")}</button>
-              {/if}
-            </span>
-          </li>
-        {/each}
-      </ul>
-      {#if listed.length > limit}
-        <button class="quiet more" onclick={() => (limit += 150)}>{t("maps.showMore", { count: Math.min(150, listed.length - limit), total: listed.length })}</button>
-      {/if}
+        <button class="quiet" onclick={() => (help = !help)} aria-expanded={help}><Icon name="info" size={14} />{t("maps.help.button")}</button>
+      </span>
     </div>
-
-    <div class="stack">
-      <div class="card">
-        <div class="head">
-          <h2>{t("maps.req.title")}</h2>
-          {#if needs.length}
-            <div class="seg" role="radiogroup" aria-label={t("maps.req.viewLabel")}>
-              <button type="button" role="radio" aria-checked={reqView === "list"} class:active={reqView === "list"} onclick={() => (reqView = "list")} title={t("maps.req.neededByTip")}>{t("maps.req.neededBy")}</button>
-              <button type="button" role="radio" aria-checked={reqView === "tree"} class:active={reqView === "tree"} onclick={() => (reqView = "tree")} title={t("maps.req.treeTip")}>{t("maps.req.tree")}</button>
-            </div>
+    {#if help}
+      <div class="help" role="dialog" aria-label={t("maps.help.label")}>
+        <p class="lede">{t("maps.lede")}</p>
+        <h3>{t("maps.help.gridTitle")}</h3>
+        <p>{@html th("maps.help.grid", { build: data?.build ?? "" })}</p>
+        <h3>{t("maps.help.previewTitle")}</h3>
+        <p>{@html th("maps.help.preview")}</p>
+        <h3>{t("maps.help.workshopTitle")}</h3>
+        <p>{t("maps.help.workshop")}</p>
+        <button class="quiet" onclick={() => (help = false)}><Icon name="x" size={14} />{t("common.close")}</button>
+      </div>
+    {/if}
+    <div class="canvas" bind:clientWidth={width} bind:clientHeight={height}>
+      <canvas bind:this={canvas}
+        aria-label={t("maps.gridLabel", { maps: shown.length, conflicts: conflictCells, over: overCells })}
+        onpointerdown={down} onpointermove={move} onpointerup={up} onpointerleave={() => (hover = null)} onwheel={wheel}></canvas>
+      <span bind:this={probe} hidden></span>
+      {#if hover}
+        <div class="tip" style:left="{Math.min(hover.px + 14, width - 230)}px" style:top="{Math.min(hover.py + 14, height - 140)}px">
+          <strong>{t("maps.cell", { x: hover.x, y: hover.y })}</strong>
+          {#if hovered}
+            {#if KIND[hovered.kind]}<span class="kind {hovered.kind}">{t(KIND[hovered.kind])}</span>{/if}
+            {#each hovered.maps as id}<span>{names.get(id) ?? id}</span>{/each}
+          {:else}
+            <span class="hint">{t("maps.empty")}</span>
           {/if}
         </div>
+      {/if}
+      {#if !data}<p class="loading">{t("maps.readingFiles")}</p>{/if}
+    </div>
+    {#if data && !data.vanilla}
+      <p class="hint">{t("maps.noVanilla", { build: data.build })}</p>
+    {/if}
+  </div>
+
+  <!-- a window splitter (focusable separator): svelte counts separators as non-interactive -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+  <div class="resize" role="separator" aria-orientation="vertical" aria-label={t("maps.resizeLabel")} title={t("maps.resizeTip")} tabindex="0"
+    aria-valuenow={sideW} aria-valuemin={SIDE_MIN} aria-valuemax={Math.round(winW / 2)} onpointerdown={resizeStart} onkeydown={resizeKey}></div>
+
+  <aside class="card side" aria-label={t("maps.tabs.label")}>
+    <div class="tabs" role="tablist" aria-label={t("maps.tabs.label")} tabindex="-1" onkeydown={(e) => arrowPick(e, TAB_IDS, sideTab, (v) => (prefs.mapsTab = v))}>
+      {#each TABS as [id, label, tip] (id)}
+        <button role="tab" id="maps-tab-{id}" aria-controls="maps-pane" aria-selected={sideTab === id} class:active={sideTab === id} title={tip ? t(tip) : undefined} onclick={() => (prefs.mapsTab = id)}>
+          {t(label)}
+          {#if id === "mods"}<span class="badge">{compact.format(listed.length)}</span>
+          {:else if id === "req" && missing}<span class="badge bad">{t("maps.tabs.missing", { count: missing })}</span>{/if}
+        </button>
+      {/each}
+    </div>
+    <div class="pane" class:rows={sideTab === "mods"} id="maps-pane" role="tabpanel" aria-labelledby="maps-tab-{sideTab}">
+      {#if sideTab === "mods"}
+        <div class="source">
+          <label class="check"><input type="checkbox" bind:checked={prefs.mapsWorkshop} />{t("maps.workshopSource")}</label>
+          <span class="hint note">{t("maps.workshopSourceNote")}</span>
+          {#if prefs.mapsWorkshop}
+            <span class="hint" class:bad={!!scan.error} role="status">{scanText}</span>
+            {#if scan.running}
+              {#if scan.p?.total}<progress max={scan.p.total} value={scan.p.done}></progress>{/if}
+              <button class="quiet" onclick={stopScan} disabled={scan.stopping}><Icon name="x" size={14} />{scan.stopping ? t("maps.scan.stopping") : t("maps.scan.stop")}</button>
+            {:else}
+              <button class="quiet" onclick={startScan} title={t("maps.scan.refreshTip")}><Icon name="refresh" size={14} />{t("common.refresh")}</button>
+            {/if}
+          {/if}
+        </div>
+        <div class="row">
+          <input type="search" bind:value={search} placeholder={t("maps.searchPlaceholder")} aria-label={t("maps.searchLabel")} />
+          <select bind:value={filter} aria-label={t("maps.filterLabel")} title={t("maps.filterLabel")}>
+            {#each FILTERS as [v, label]}<option value={v}>{t(label)}</option>{/each}
+          </select>
+          <select bind:value={sortBy} aria-label={t("maps.sortLabel")} title={t("maps.sortLabel")}>
+            <option value="order">{t("maps.sort.order")}</option>
+            <option value="name">{t("maps.sort.name")}</option>
+            <option value="cells">{t("maps.sort.cells")}</option>
+            <option value="conflicts">{t("maps.sort.conflicts")}</option>
+            <option value="state">{t("maps.sort.state")}</option>
+            <option value="subs">{t("maps.sort.subs")}</option>
+            <option value="updated">{t("maps.sort.updated")}</option>
+            <option value="newest">{t("maps.sort.newest")}</option>
+          </select>
+        </div>
+        {#if pickedCells.length}
+          <p class="filter">
+            <span class="chip">{@html th("maps.pickedCells", { cells: pickedCells.map(([x, y]) => `${x},${y}`).join(" · ") })}</span>
+            {t("maps.mapCount", { count: listed.length })}
+            <button class="quiet" onclick={() => (pickedCells = [])}><Icon name="x" size={14} />{t("maps.clearCells")}</button>
+          </p>
+        {/if}
+        <div class="row bulk">
+          <button onclick={quickSelect} disabled={!listed.length || picking} aria-busy={picking} title={t("maps.quickSelectTip")}><Icon name="wand" size={14} />{picking ? t("maps.quickSelecting") : t("maps.quickSelect")}</button>
+          <button onclick={previewListed} disabled={!listed.length}>{t("maps.previewListed")}</button>
+          {#if preview.size}
+            <button onclick={clearListed}>{t("maps.unpreviewListed")}</button>
+            <button onclick={() => setPreview(new Set())} title={t("maps.enabledOnlyTip")}>{t("maps.enabledOnly")}</button>
+          {/if}
+          {#if previewOff.length}<button onclick={enablePreviewed} disabled={busy}><Icon name="check" size={14} />{t("maps.enablePreviewed", { count: previewOff.length })}</button>{/if}
+          {#if listedOn.length}<button onclick={() => setMods(listedOn, false)} disabled={busy}><Icon name="x" size={14} />{t("maps.disableListed", { count: listedOn.length })}</button>{/if}
+          {#if hidden.size}<button onclick={() => (hidden = new Set())} title={t("maps.unhideTip")}>{t("maps.unhide", { count: hidden.size })}</button>{/if}
+        </div>
+        {#if data && !all.length}
+          <p class="hint">{t("maps.noMaps", { build: data.build })}</p>
+        {/if}
+        <div class="scroll">
+          <ul class="mods">
+            {#each listed.slice(0, limit) as m (m.id)}
+              {@const installed = mods.has(m.id)}
+              {@const on = isOn(m.id)}
+              {@const item = itemOf(m.source)}
+              {@const meta = metaOf(m)}
+              {@const clash = clashes.get(m.id)}
+              {@const isShown = on || preview.has(m.id)}
+              <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+              <li class:shown={isShown} class:hidden={hidden.has(m.id)} onclick={(e) => !on && !(e.target as HTMLElement).closest("button, input, a") && togglePreview(m.id)}>
+                <input type="checkbox" checked={isShown} disabled={on} onchange={() => togglePreview(m.id)}
+                  aria-label={t("maps.previewLabel", { name: nameOf(m) })} title={on ? t("maps.alwaysShownTip") : t("maps.previewTip")} />
+                <span class="name">
+                  <span class="title"><strong title={nameOf(m)}>{nameOf(m)}</strong>{#if on}<span class="on">{t("common.enabled")}</span>{:else if !installed}<span class="off">{t("maps.notInstalled")}</span>{/if}</span>
+                  <span class="hint">{t("maps.cellCount", { count: cellCount(m) })} · {m.maps.map((f) => f.folder).join("; ")}{meta?.author ? ` · ${t("maps.byAuthor", { author: meta.author })}` : ""}{meta?.subscriptions ? ` · ${t("maps.subscribers", { count: meta.subscriptions, n: compact.format(meta.subscriptions) })}` : ""}{!installed && meta?.size ? ` · ${fmtSize(meta.size)}` : ""}{meta?.updated ? ` · ${t("maps.updatedAgo", { when: fmtAgo(meta.updated) })}` : ""}</span>
+                  {#each [...(clash?.with ?? [])].slice(0, 3) as [rival, cells] (rival)}
+                    <span class="bad line" title={t("maps.conflictsWith", { count: cells.length, name: names.get(rival) ?? rival, cells: cellList(cells) }).replace(/<[^>]+>/g, "")}><span class="txt">{@html th("maps.conflictsWith", { count: cells.length, name: names.get(rival) ?? rival, cells: cellList(cells) })}</span>
+                      <button class="link" onclick={() => swap(m)} disabled={busy} title={t("maps.swapTip")}>{t("maps.swap")}</button></span>
+                  {/each}
+                  {#if (clash?.with.size ?? 0) > 3}<span class="bad">{t("maps.andMore", { count: clash!.with.size - 3 })}</span>{/if}
+                  {#if clash?.over}<span class="over">{t("maps.cellsOverVanilla", { count: clash.over })}</span>{/if}
+                  {#if packSize(m) > 1}<span class="hint">{t("maps.packMember", { count: packSize(m) })}</span>{/if}
+                  {#each otherItems(m).slice(0, 1) as it (it)}
+                    <span class="dupe">{t(otherItems(m).length > 1 ? "maps.dupeModMore" : "maps.dupeMod", { id: m.id, item: data?.items[it]?.title ?? t("maps.workshopItem", { id: it }), count: otherItems(m).length - 1 })}</span>
+                  {/each}
+                  {#each m.maps.filter((f) => (folderOwners.get(f.folder)?.length ?? 0) > 1) as f (f.folder)}
+                    {@const others = folderOwners.get(f.folder)!.filter((id) => id !== m.id)}
+                    <span class="dupe">{t(others.length > 2 ? "maps.dupeFolderMore" : "maps.dupeFolder", { folder: f.folder, names: others.slice(0, 2).map((id) => names.get(id) ?? id).join(", "), count: others.length - 2 })}</span>
+                  {/each}
+                </span>
+                <span class="btns">
+                  {#if isShown}<button class="quiet icon" onclick={() => toggleHidden(m.id)} title={hidden.has(m.id) ? t("maps.showOnGridTip") : t("maps.hideOnGridTip")} aria-label={hidden.has(m.id) ? t("maps.showOnGrid") : t("maps.hideOnGrid")} aria-pressed={hidden.has(m.id)}><Icon name={hidden.has(m.id) ? "eye-off" : "eye"} size={16} /></button>{/if}
+                  {#if item}<button class="quiet icon" onclick={() => api.openUrl(workshopUrl(item))} title={t("maps.openWorkshopTip")} aria-label={t("common.workshop")}><Icon name="steam" size={16} /></button>{/if}
+                  {#if installed}
+                    <button disabled={busy} onclick={() => setMods([m.id], !on)} title={on ? "" : t("maps.alsoTurnsOnTip")}>{on ? t("common.disable") : t("common.enable")}</button>
+                  {:else if item}
+                    <button disabled={busy} onclick={() => onInstallWorkshop(item)} title={t("maps.installTip")}><Icon name="download" size={14} />{t("common.install")}</button>
+                  {/if}
+                </span>
+              </li>
+            {/each}
+          </ul>
+          {#if listed.length > limit}
+            <button class="quiet more" onclick={() => (limit += 150)}>{t("maps.showMore", { count: Math.min(150, listed.length - limit), total: listed.length })}</button>
+          {/if}
+        </div>
+
+      {:else if sideTab === "req"}
+        {#if needs.length}
+          <div class="seg" role="radiogroup" aria-label={t("maps.req.viewLabel")}>
+            <button type="button" role="radio" aria-checked={reqView === "list"} class:active={reqView === "list"} onclick={() => (reqView = "list")} title={t("maps.req.neededByTip")}>{t("maps.req.neededBy")}</button>
+            <button type="button" role="radio" aria-checked={reqView === "tree"} class:active={reqView === "tree"} onclick={() => (reqView = "tree")} title={t("maps.req.treeTip")}>{t("maps.req.tree")}</button>
+          </div>
+        {/if}
         <p class="lede">{@html th("maps.req.lede")}</p>
         {#if !needs.length}
           <p class="hint">{shown.length ? t("maps.req.nothingElse") : t("maps.req.showOne")}</p>
@@ -963,10 +958,8 @@
             </ul>
           {/each}
         {/if}
-      </div>
 
-      <div class="card">
-        <h2>{t("maps.compare.title")}</h2>
+      {:else if sideTab === "compare"}
         <p class="lede">{@html th("maps.compare.lede")}</p>
         {#if servers.length}
           <div class="row">
@@ -1009,12 +1002,8 @@
             <p class="mono hint">{compared.only_you.join("; ")}</p>
           {/if}
         {/if}
-      </div>
-    </div>
 
-    <div class="stack">
-      <div class="card">
-        <h2>{t("maps.export.title")}</h2>
+      {:else if sideTab === "order"}
         <p class="lede">{@html th("maps.export.lede")}</p>
         {#if mapLine.length}
           <h3>{t("maps.export.orderTitle")}</h3>
@@ -1040,69 +1029,118 @@
           <input type="text" bind:value={presetName} placeholder={t("maps.presets.namePlaceholder")} aria-label={t("maps.presets.namePlaceholder")} />
           <button type="submit" disabled={!presetName.trim() || !shown.length}><Icon name="plus" size={14} />{t("maps.presets.save", { count: shown.length })}</button>
         </form>
-      </div>
-    </div>
 
-    <div class="card wide">
-      <h2>{t("maps.check.title")}</h2>
-      <p class="lede">{t("maps.check.lede")}</p>
-      <form class="row" onsubmit={check}>
-        <input type="text" bind:value={checkText} placeholder={t("maps.check.placeholder")} spellcheck="false" aria-label={t("maps.check.placeholder")} />
-        <button type="submit" disabled={checking || !checkText.trim()}><Icon name="search" size={14} />{checking ? t("maps.check.checking") : t("maps.check.check")}</button>
-        {#if checking}
-          <button type="button" class="quiet" onclick={stopCheck} disabled={checkStopping}><Icon name="x" size={14} />{checkStopping ? t("maps.scan.stopping") : t("maps.scan.stop")}</button>
-        {/if}
-      </form>
+      {:else}
+        <p class="lede">{t("maps.check.lede")}</p>
+        <form class="row" onsubmit={check}>
+          <input type="text" bind:value={checkText} placeholder={t("maps.check.placeholder")} spellcheck="false" aria-label={t("maps.check.placeholder")} />
+          <button type="submit" disabled={checking || !checkText.trim()}><Icon name="search" size={14} />{checking ? t("maps.check.checking") : t("maps.check.check")}</button>
+          {#if checking}
+            <button type="button" class="quiet" onclick={stopCheck} disabled={checkStopping}><Icon name="x" size={14} />{checkStopping ? t("maps.scan.stopping") : t("maps.scan.stop")}</button>
+          {/if}
+        </form>
+      {/if}
     </div>
-  </div>
+  </aside>
 </section>
 
 <style>
+  /* the map fills the tab, the side panel's tabs sit beside it (below it in narrow windows):
+     the tab never scrolls, only the panes do */
   .maps {
-    overflow-y: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 12px var(--side);
+    padding: 12px;
+    overflow: hidden;
     min-height: 0;
   }
-  .inner {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 24px 16px 40px;
-    display: grid;
-    grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr);
-    align-items: start;
-    gap: 16px;
-  }
   @media (max-width: 960px) {
-    .inner {
+    .maps {
       grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) 45%;
+      gap: 12px;
+    }
+    .resize {
+      display: none;
     }
   }
-  .wide {
-    grid-column: 1 / -1;
+  .world {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 16px 14px;
   }
-  /* below the map: two independent stacks, so a short card never leaves a hole */
-  .stack {
-    display: grid;
-    gap: 16px;
-    align-content: start;
-    min-width: 0;
+  .world .canvas {
+    flex: 1;
+    min-height: 0;
   }
-  /* the map list matches the world map's height and scrolls inside it */
-  @media (min-width: 961px) {
-    .inner > .world:not(.expanded),
-    .inner > .list {
-      align-self: stretch;
-    }
-    .list {
-      display: flex;
-      flex-direction: column;
-      height: 0;
-      min-height: 100%;
-    }
-    .list .mods {
-      flex: 1 1 auto;
-      min-height: 160px;
-      max-height: none;
-    }
+  .side {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+  }
+  /* one row of tabs: narrow panels and long translations scroll sideways instead of wrapping */
+  .tabs {
+    display: flex;
+    gap: 0;
+    padding: 0 4px;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs button {
+    flex: none;
+    white-space: nowrap;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    padding: 9px 9px 8px;
+    font-size: 13px;
+  }
+  .tabs button:hover:not(:disabled),
+  .tabs button.active {
+    color: var(--on-selected);
+    background: var(--accent-soft);
+    border-bottom-color: var(--on-selected);
+  }
+  .badge {
+    padding: 0 6px;
+    border-radius: 8px;
+    background: var(--raised);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .badge.bad {
+    color: var(--danger);
+  }
+  .pane {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 12px 16px 16px;
+  }
+  /* Map mods: the controls stay put, the rows scroll */
+  .pane.rows {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+  .pane.rows > * {
+    flex: none;
+  }
+  .pane.rows > .scroll {
+    flex: 1 1 auto;
+    min-height: 120px;
+    overflow-y: auto;
+    margin: 0 -8px;
+    padding: 0 8px 12px;
+  }
+  .pane > .seg {
+    width: fit-content;
+    margin-bottom: 10px;
   }
   /* the name line: the name truncates so its badges and "Hide on grid" stay on the line */
   .name > .title {
@@ -1147,18 +1185,18 @@
     background: var(--panel);
     border-radius: 8px;
     box-shadow: var(--card-shadow);
-    padding: 20px 24px 22px;
     min-width: 0;
+    min-height: 0;
   }
   .head {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 16px;
   }
   h2 {
-    margin: 0 0 6px;
-    font-size: 22px;
+    margin: 0;
+    font-size: 18px;
   }
   h3 {
     margin: 20px 0 4px;
@@ -1183,16 +1221,19 @@
     align-items: center;
     gap: 6px;
   }
+  /* under the toolbar, over the grid */
   .help {
     position: absolute;
     z-index: 2;
-    top: 56px;
     right: 16px;
     width: min(460px, calc(100% - 32px));
     padding: 4px 18px 14px;
     background: var(--raised);
     border-radius: 8px;
     box-shadow: var(--shadow);
+  }
+  .help .lede {
+    margin: 12px 0 0;
   }
   .help h3 {
     margin-top: 12px;
@@ -1205,7 +1246,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 6px 16px;
-    margin-bottom: 4px;
     color: var(--muted);
   }
   .legend i {
@@ -1217,7 +1257,7 @@
     vertical-align: -1px;
   }
   .layers {
-    margin: 0 0 8px;
+    margin: 4px 0 8px;
     color: var(--muted);
   }
   .zoom {
@@ -1237,38 +1277,21 @@
     cursor: crosshair;
     touch-action: none;
   }
+  /* the side panel's left edge: drag it to resize */
   .resize {
-    height: 10px;
-    margin: 2px 0 -6px;
-    cursor: ns-resize;
+    cursor: ew-resize;
     touch-action: none;
-    background: linear-gradient(var(--muted), var(--muted)) center / 36px 3px no-repeat;
+    background: linear-gradient(var(--muted), var(--muted)) center / 3px 36px no-repeat;
     border-radius: 4px;
-    opacity: 0.6;
+    opacity: 0.4;
   }
   .resize:hover,
   .resize:focus-visible {
     opacity: 1;
-    background-color: color-mix(in oklab, var(--accent) 16%, var(--panel));
+    background-color: color-mix(in oklab, var(--accent) 16%, transparent);
   }
   .resize:focus-visible {
     outline: 2px solid var(--focus);
-  }
-  .maps.expanded {
-    position: relative;
-    overflow: hidden;
-  }
-  .world.expanded {
-    position: absolute;
-    inset: 0;
-    z-index: 3;
-    display: flex;
-    flex-direction: column;
-    border-radius: 0;
-  }
-  .world.expanded .canvas {
-    flex: 1;
-    min-height: 0;
   }
   .loading {
     position: absolute;
@@ -1338,10 +1361,6 @@
     padding: 0;
     margin: 10px 0 0;
     border-top: 1px solid var(--line);
-  }
-  .mods {
-    max-height: 620px;
-    overflow-y: auto;
   }
   .mods li,
   .needs li {
