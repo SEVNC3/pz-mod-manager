@@ -656,7 +656,12 @@
     },
     "updatedAgo": "zaktualizowano {when}",
     "resizeLabel": "Szerokość panelu bocznego",
-    "resizeTip": "Przeciągnij lub naciśnij ←/→, aby zmienić szerokość panelu bocznego"
+    "resizeTip": "Przeciągnij lub naciśnij ←/→, aby zmienić szerokość panelu bocznego",
+    "spawnPoints": "Punkty odrodzenia",
+    "hideSpawn": "Ukryj mody punktów odrodzenia",
+    "hideSpawnTip": "Pomiń mody bez komórek mapy: dodają tylko punkty odrodzenia w mieście z gry podstawowej",
+    "minimise": "Zminimalizuj panel narzędzi",
+    "restoreTip": "Pokaż panel narzędzi"
   },
   "mapOrder": {
     "label": "Kolejność map",

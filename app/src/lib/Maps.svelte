@@ -157,6 +157,8 @@
   let search = $state(find);
   type Filter = "all" | "on" | "installed" | "missing" | "conflict" | "over";
   let filter = $state<Filter>("all");
+  /** Leave out mods with no cells (spawn points for a vanilla town). */
+  let hideSpawn = $state(true);
   type Sort = "order" | "name" | "cells" | "conflicts" | "state" | "subs" | "updated" | "newest";
   let sortBy = $state<Sort>("order");
   const rank = $derived(new Map(loadOrder.map((id, i) => [id, i])));
@@ -168,7 +170,7 @@
     const out = all.filter((m) => {
       const c = clashes.get(m.id);
       const pass = { all: true, on: isOn(m.id), installed: mods.has(m.id), missing: !mods.has(m.id), conflict: !!c?.with.size, over: !!c?.over }[filter];
-      if (!pass) return false;
+      if (!pass || (hideSpawn && !cellCount(m))) return false;
       if (pickedCells.length && !pickedCells.some(([x, y]) => m.maps.some((f) => f.cells.some((c) => c[0] === x && c[1] === y)))) return false;
       if (!words.length) return true;
       const meta = metaOf(m);
@@ -186,12 +188,13 @@
       updated: (a, b) => (metaOf(b)?.updated ?? -1) - (metaOf(a)?.updated ?? -1),
       newest: (a, b) => (metaOf(b)?.created ?? -1) - (metaOf(a)?.created ?? -1),
     };
-    return out.sort((a, b) => by[sortBy](a, b) || nameOf(a).localeCompare(nameOf(b)));
+    // spawn-point mods (no cells) after the maps, in every sort
+    return out.sort((a, b) => +!cellCount(a) - +!cellCount(b) || by[sortBy](a, b) || nameOf(a).localeCompare(nameOf(b)));
   });
   // thousands of Workshop maps: draw the list a page at a time
   let limit = $state(150);
   $effect(() => {
-    [search, filter, sortBy, pickedCells, prefs.mapsWorkshop];
+    [search, filter, hideSpawn, sortBy, pickedCells, prefs.mapsWorkshop];
     limit = 150;
   });
 
@@ -516,20 +519,28 @@
     );
   }
 
-  // --- the side panel: tabs beside the map, its width dragged at its left edge ---
-  const TABS: [string, string, string][] = [["mods", "maps.mapMods", ""], ["req", "maps.req.title", ""], ["order", "maps.tabs.order", "maps.export.title"], ["compare", "maps.tabs.compare", "maps.compare.title"], ["check", "maps.tabs.check", "maps.check.title"]];
+  // --- the tool panel: tabs floating over the map's right side (its bottom in narrow windows), minimisable,
+  // its width dragged at its left edge ---
+  const TABS: [string, string, string, string][] = [["mods", "maps.mapMods", "", "layers"], ["req", "maps.req.title", "", "alert"], ["order", "maps.tabs.order", "maps.export.title", "swap"], ["compare", "maps.tabs.compare", "maps.compare.title", "server"], ["check", "maps.tabs.check", "maps.check.title", "search"]];
   const TAB_IDS = TABS.map(([id]) => id);
   const sideTab = $derived(TAB_IDS.includes(prefs.mapsTab) ? prefs.mapsTab : "mods");
   /** Requirements that aren't installed (the Requirements tab's badge). */
   const missing = $derived(needs.filter((n) => !(n.id && mods.has(n.id))).length);
-  let winW = $state(innerWidth);
-  const SIDE_MIN = 340;
-  const clampW = (w: number) => Math.round(Math.max(SIDE_MIN, Math.min(w, winW / 2)));
-  const sideW = $derived(clampW(prefs.mapsSide));
+  /** A tab's count on its icon: the listed maps, the missing requirements. */
+  const countOf = (id: string) => (id === "mods" ? compact.format(listed.length) : id === "req" && missing ? String(missing) : "");
+  /** The open tab's badge, on the minimised panel. */
+  const tabBadge = $derived(sideTab === "req" && missing ? t("maps.tabs.missing", { count: missing }) : countOf(sideTab));
+  let side = $state<HTMLElement>();
+  let mapW = $state(0);
+  /** The map's toolbar height: the panel floats below it. */
+  let barH = $state(0);
+  const SIDE_MIN = 360;
+  const clampW = (w: number) => Math.round(Math.max(SIDE_MIN, Math.min(w, mapW * 0.6)));
+  const sideW = $derived(clampW(prefs.mapsPanel));
   function resizeStart(e: PointerEvent) {
     const [x0, w0, el] = [e.clientX, sideW, e.currentTarget as HTMLElement];
     el.setPointerCapture(e.pointerId);
-    const to = (m: PointerEvent) => (prefs.mapsSide = clampW(w0 - (m.clientX - x0)));
+    const to = (m: PointerEvent) => (prefs.mapsPanel = clampW(w0 - (m.clientX - x0)));
     const end = () => {
       el.removeEventListener("pointermove", to);
       el.removeEventListener("pointerup", end);
@@ -541,7 +552,7 @@
     const step = e.key === "ArrowLeft" ? 20 : e.key === "ArrowRight" ? -20 : 0;
     if (!step) return;
     e.preventDefault();
-    prefs.mapsSide = clampW(sideW + step);
+    prefs.mapsPanel = clampW(sideW + step);
   }
 
   // --- the grid: a canvas (thousands of cells), coloured from the theme's tokens; it fills its pane ---
@@ -578,21 +589,30 @@
     return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
   });
 
+  /** The part of the map the open tool panel leaves clear (from its top left): Fit and the zoom buttons use it. */
+  function clear() {
+    const c = canvas?.getBoundingClientRect();
+    const p = side?.getBoundingClientRect();
+    if (!c || !p) return { w: width, h: height };
+    // across the map's bottom in narrow windows (as the styles below), else beside it
+    return matchMedia("(max-width: 960px)").matches ? { w: width, h: Math.min(height, p.top - c.top) } : { w: Math.min(width, p.left - c.left), h: height };
+  }
   function fit() {
     if (!bounds || !width) return;
+    const { w, h } = clear();
     const [cols, rows] = [bounds.x1 - bounds.x0 + 1, bounds.y1 - bounds.y0 + 1];
-    const scale = Math.min(width / (cols + 2), height / (rows + 2));
-    view = { scale, x: (width - cols * scale) / 2 - bounds.x0 * scale, y: (height - rows * scale) / 2 - bounds.y0 * scale };
+    const scale = Math.min(w / (cols + 2), h / (rows + 2));
+    view = { scale, x: (w - cols * scale) / 2 - bounds.x0 * scale, y: (h - rows * scale) / 2 - bounds.y0 * scale };
   }
   let fitted = false;
   $effect(() => {
-    if (!fitted && bounds && width && height) {
+    if (!fitted && bounds && width && height && mapW) {
       fitted = true;
       untrack(fit);
     }
   });
 
-  function zoom(k: number, px = width / 2, py = height / 2) {
+  function zoom(k: number, px = clear().w / 2, py = clear().h / 2) {
     const scale = Math.min(64, Math.max(1, view.scale * k));
     view = { scale, x: px - ((px - view.x) * scale) / view.scale, y: py - ((py - view.y) * scale) / view.scale };
   }
@@ -702,10 +722,11 @@
   const KIND = { vanilla: "maps.kind.vanilla", water: "maps.kind.water", map: "", over: "maps.kind.over", conflict: "maps.kind.conflict" };
 </script>
 
-<svelte:window onkeydown={undoKey} bind:innerWidth={winW} />
+<svelte:window onkeydown={undoKey} />
 
-<section class="maps blueprint" aria-label={t("maps.label")} style:--side="{sideW}px">
-  <div class="card world">
+<section class="maps" aria-label={t("maps.label")} style:--side="{sideW}px" style:--bar="{barH}px" bind:clientWidth={mapW}>
+  <div class="world" class:open={!prefs.mapsMin}>
+    <div class="mapbar" bind:clientHeight={barH}>
     <div class="head">
       <h2>{t("maps.worldMap")}</h2>
       <div class="legend">
@@ -733,6 +754,7 @@
         <button class="quiet icon" onclick={undo} disabled={busy || !(history.length || canUndo)} title={t("maps.undoTip")} aria-label={t("maps.undoLabel")}><Icon name="undo" size={16} /></button>
         <button class="quiet" onclick={() => (help = !help)} aria-expanded={help}><Icon name="info" size={14} />{t("maps.help.button")}</button>
       </span>
+    </div>
     </div>
     {#if help}
       <div class="help" role="dialog" aria-label={t("maps.help.label")}>
@@ -763,26 +785,36 @@
         </div>
       {/if}
       {#if !data}<p class="loading">{t("maps.readingFiles")}</p>{/if}
+      {#if prefs.mapsMin}
+        <button class="restore" onclick={() => (prefs.mapsMin = false)} aria-expanded="false" title={t("maps.restoreTip")}>{t("maps.tabs.label")}{#if tabBadge}<span class="badge" class:bad={sideTab === "req"}>{tabBadge}</span>{/if}</button>
+      {/if}
     </div>
     {#if data && !data.vanilla}
       <p class="hint">{t("maps.noVanilla", { build: data.build })}</p>
     {/if}
   </div>
 
-  <!-- a window splitter (focusable separator): svelte counts separators as non-interactive -->
-  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-  <div class="resize" role="separator" aria-orientation="vertical" aria-label={t("maps.resizeLabel")} title={t("maps.resizeTip")} tabindex="0"
-    aria-valuenow={sideW} aria-valuemin={SIDE_MIN} aria-valuemax={Math.round(winW / 2)} onpointerdown={resizeStart} onkeydown={resizeKey}></div>
-
-  <aside class="card side" aria-label={t("maps.tabs.label")}>
-    <div class="tabs" role="tablist" aria-label={t("maps.tabs.label")} tabindex="-1" onkeydown={(e) => arrowPick(e, TAB_IDS, sideTab, (v) => (prefs.mapsTab = v))}>
-      {#each TABS as [id, label, tip] (id)}
-        <button role="tab" id="maps-tab-{id}" aria-controls="maps-pane" aria-selected={sideTab === id} class:active={sideTab === id} title={tip ? t(tip) : undefined} onclick={() => (prefs.mapsTab = id)}>
-          {t(label)}
-          {#if id === "mods"}<span class="badge">{compact.format(listed.length)}</span>
-          {:else if id === "req" && missing}<span class="badge bad">{t("maps.tabs.missing", { count: missing })}</span>{/if}
+  {#if !prefs.mapsMin}
+  <aside class="side" id="maps-panel" aria-label={t("maps.tabs.label")} bind:this={side}>
+    <!-- a window splitter (focusable separator): svelte counts separators as non-interactive -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+    <div class="resize" role="separator" aria-orientation="vertical" aria-label={t("maps.resizeLabel")} title={t("maps.resizeTip")} tabindex="0"
+      aria-valuenow={sideW} aria-valuemin={SIDE_MIN} aria-valuemax={Math.round(mapW * 0.6)} onpointerdown={resizeStart} onkeydown={resizeKey}></div>
+    <!-- an activity rail, like an IDE's: icons with their names in tooltips, the open tab's name in the header -->
+    <div class="rail" role="tablist" aria-orientation="vertical" aria-label={t("maps.tabs.label")} tabindex="-1" onkeydown={(e) => arrowPick(e, TAB_IDS, sideTab, (v) => (prefs.mapsTab = v))}>
+      {#each TABS as [id, label, tip, icon] (id)}
+        {@const count = countOf(id)}
+        <button role="tab" id="maps-tab-{id}" aria-controls="maps-pane" aria-selected={sideTab === id} class:active={sideTab === id}
+          title={t(tip || label)} aria-label={count ? `${t(label)} (${count})` : t(label)} onclick={() => (prefs.mapsTab = id)}>
+          <Icon name={icon} size={18} />
+          {#if count}<span class="badge" class:bad={id === "req"}>{count}</span>{/if}
         </button>
       {/each}
+    </div>
+    <div class="main">
+    <div class="top">
+      <h2>{t(TABS.find(([id]) => id === sideTab)![1])}</h2>
+      <button class="quiet icon" onclick={() => (prefs.mapsMin = true)} aria-expanded="true" aria-controls="maps-panel" title={t("maps.minimise")} aria-label={t("maps.minimise")}><Icon name="minimize" size={16} /></button>
     </div>
     <div class="pane" class:rows={sideTab === "mods"} id="maps-pane" role="tabpanel" aria-labelledby="maps-tab-{sideTab}">
       {#if sideTab === "mods"}
@@ -814,6 +846,7 @@
             <option value="updated">{t("maps.sort.updated")}</option>
             <option value="newest">{t("maps.sort.newest")}</option>
           </select>
+          <label class="check" title={t("maps.hideSpawnTip")}><input type="checkbox" bind:checked={hideSpawn} />{t("maps.hideSpawn")}</label>
         </div>
         {#if pickedCells.length}
           <p class="filter">
@@ -851,7 +884,7 @@
                   aria-label={t("maps.previewLabel", { name: nameOf(m) })} title={on ? t("maps.alwaysShownTip") : t("maps.previewTip")} />
                 <span class="name">
                   <span class="title"><strong title={nameOf(m)}>{nameOf(m)}</strong>{#if on}<span class="on">{t("common.enabled")}</span>{:else if !installed}<span class="off">{t("maps.notInstalled")}</span>{/if}</span>
-                  <span class="hint">{t("maps.cellCount", { count: cellCount(m) })} · {m.maps.map((f) => f.folder).join("; ")}{meta?.author ? ` · ${t("maps.byAuthor", { author: meta.author })}` : ""}{meta?.subscriptions ? ` · ${t("maps.subscribers", { count: meta.subscriptions, n: compact.format(meta.subscriptions) })}` : ""}{!installed && meta?.size ? ` · ${fmtSize(meta.size)}` : ""}{meta?.updated ? ` · ${t("maps.updatedAgo", { when: fmtAgo(meta.updated) })}` : ""}</span>
+                  <span class="hint">{cellCount(m) ? t("maps.cellCount", { count: cellCount(m) }) : t("maps.spawnPoints")}{` · `}{m.maps.map((f) => f.folder).join("; ")}{meta?.author ? ` · ${t("maps.byAuthor", { author: meta.author })}` : ""}{meta?.subscriptions ? ` · ${t("maps.subscribers", { count: meta.subscriptions, n: compact.format(meta.subscriptions) })}` : ""}{!installed && meta?.size ? ` · ${fmtSize(meta.size)}` : ""}{meta?.updated ? ` · ${t("maps.updatedAgo", { when: fmtAgo(meta.updated) })}` : ""}</span>
                   {#each [...(clash?.with ?? [])].slice(0, 3) as [rival, cells] (rival)}
                     <span class="bad line" title={t("maps.conflictsWith", { count: cells.length, name: names.get(rival) ?? rival, cells: cellList(cells) }).replace(/<[^>]+>/g, "")}><span class="txt">{@html th("maps.conflictsWith", { count: cells.length, name: names.get(rival) ?? rival, cells: cellList(cells) })}</span>
                       <button class="link" onclick={() => swap(m)} disabled={busy} title={t("maps.swapTip")}>{t("maps.swap")}</button></span>
@@ -1041,69 +1074,150 @@
         </form>
       {/if}
     </div>
+    </div>
   </aside>
+  {/if}
 </section>
 
 <style>
-  /* the map fills the tab, the side panel's tabs sit beside it (below it in narrow windows):
-     the tab never scrolls, only the panes do */
+  /* the map fills the tab edge to edge under a slim toolbar; the tool panel floats over its right side
+     (its bottom in narrow windows): the tab never scrolls, only the panes do */
   .maps {
+    position: relative;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 12px var(--side);
-    padding: 12px;
+    grid-template-columns: minmax(0, 1fr);
     overflow: hidden;
     min-height: 0;
   }
+  .side {
+    position: absolute;
+    z-index: 1;
+    top: calc(var(--bar) + 12px);
+    right: 12px;
+    bottom: 12px;
+    width: var(--side);
+    display: flex;
+    background: var(--panel);
+    border-radius: 8px;
+    box-shadow: var(--card-shadow), var(--shadow);
+    overflow: hidden;
+  }
+  /* the help stops short of the open panel */
+  @media (min-width: 961px) {
+    .world.open .help {
+      right: calc(var(--side) + 16px);
+      width: min(460px, calc(100% - var(--side) - 32px));
+    }
+  }
   @media (max-width: 960px) {
-    .maps {
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: minmax(0, 1fr) 45%;
-      gap: 12px;
+    .side {
+      top: auto;
+      left: 12px;
+      width: auto;
+      height: 45%;
     }
     .resize {
       display: none;
     }
+    /* too short to keep the list's controls put: the whole pane scrolls */
+    .side .pane.rows {
+      display: block;
+      overflow-y: auto;
+    }
+    .side .pane.rows > .scroll {
+      overflow: visible;
+    }
   }
   .world {
+    position: relative;
     display: flex;
     flex-direction: column;
-    padding: 12px 16px 14px;
+    min-width: 0;
+    min-height: 0;
+    background: var(--bg);
+  }
+  .mapbar {
+    padding: 8px 16px 0;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  .world > .hint {
+    padding: 6px 16px;
   }
   .world .canvas {
     flex: 1;
     min-height: 0;
   }
-  .side {
+  /* minimised: a tab at the map's top right brings the panel back */
+  .restore {
+    position: absolute;
+    z-index: 1;
+    top: 24px;
+    right: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--panel);
+    box-shadow: var(--card-shadow), var(--shadow);
+  }
+  /* the panel: an icon rail down its left edge, then the open tab */
+  .rail {
+    flex: none;
+    width: 44px;
     display: flex;
     flex-direction: column;
+    padding-top: 6px;
+    background: var(--raised);
+  }
+  .rail button {
+    position: relative;
+    display: grid;
+    place-items: center;
+    height: 42px;
     padding: 0;
-    overflow: hidden;
-  }
-  /* one row of tabs: narrow panels and long translations scroll sideways instead of wrapping */
-  .tabs {
-    display: flex;
-    gap: 0;
-    padding: 0 4px;
-    border-bottom: 1px solid var(--line);
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .tabs button {
-    flex: none;
-    white-space: nowrap;
     border: 0;
     border-radius: 0;
+    border-left: 2px solid transparent;
     background: transparent;
     color: var(--muted);
-    border-bottom: 2px solid transparent;
-    padding: 9px 9px 8px;
-    font-size: 13px;
   }
-  .tabs button:hover:not(:disabled),
-  .tabs button.active {
+  .rail button:hover:not(:disabled),
+  .rail button.active {
     color: var(--on-selected);
     background: var(--accent-soft);
-    border-bottom-color: var(--on-selected);
+    border-left-color: var(--on-selected);
+  }
+  /* a count on the icon's corner */
+  .rail .badge {
+    position: absolute;
+    top: 3px;
+    right: 2px;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 14px;
+    color: var(--text);
+    background: var(--line);
+  }
+  .rail .badge.bad {
+    background: var(--danger);
+    color: #fff;
+  }
+  .main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 8px 8px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .top h2 {
+    flex: 1;
+    font-size: 16px;
   }
   .badge {
     padding: 0 6px;
@@ -1180,14 +1294,6 @@
   .bad.line .link {
     flex: none;
   }
-  .card {
-    position: relative;
-    background: var(--panel);
-    border-radius: 8px;
-    box-shadow: var(--card-shadow);
-    min-width: 0;
-    min-height: 0;
-  }
   .head {
     display: flex;
     flex-wrap: wrap;
@@ -1257,7 +1363,7 @@
     vertical-align: -1px;
   }
   .layers {
-    margin: 4px 0 8px;
+    margin: 2px 0 6px;
     color: var(--muted);
   }
   .zoom {
@@ -1267,7 +1373,6 @@
   }
   .canvas {
     position: relative;
-    border-radius: 6px;
     overflow: hidden;
   }
   canvas {
@@ -1277,8 +1382,14 @@
     cursor: crosshair;
     touch-action: none;
   }
-  /* the side panel's left edge: drag it to resize */
+  /* the tool panel's left edge: drag it to resize */
   .resize {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 8px;
     cursor: ew-resize;
     touch-action: none;
     background: linear-gradient(var(--muted), var(--muted)) center / 3px 36px no-repeat;
@@ -1292,6 +1403,7 @@
   }
   .resize:focus-visible {
     outline: 2px solid var(--focus);
+    outline-offset: -2px;
   }
   .loading {
     position: absolute;

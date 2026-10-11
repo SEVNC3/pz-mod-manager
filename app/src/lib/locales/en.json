@@ -568,7 +568,12 @@
     },
     "updatedAgo": "updated {when}",
     "resizeLabel": "Side panel width",
-    "resizeTip": "Drag, or press ←/→, to change the side panel's width"
+    "resizeTip": "Drag, or press ←/→, to change the side panel's width",
+    "spawnPoints": "Spawn points",
+    "hideSpawn": "Hide spawn-point mods",
+    "hideSpawnTip": "Leave out mods with no map cells: they only add spawn points to a vanilla town",
+    "minimise": "Minimise the tool panel",
+    "restoreTip": "Show the tool panel"
   },
   "mapOrder": {
     "label": "Map order",

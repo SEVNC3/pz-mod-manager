@@ -61,11 +61,12 @@ export function menuKeys(e: KeyboardEvent, menu: HTMLElement | undefined, close:
   }
 }
 
-/** Left/Right arrows step through a tab list or segmented control and move focus along. */
+/** Arrow keys (Left/Right, or Up/Down for a vertical list) step through a tab list or segmented control and move focus along. */
 export function arrowPick(e: KeyboardEvent, ids: string[], current: string, set: (v: string) => void) {
-  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: ids.length - 1, ArrowUp: ids.length - 1 }[e.key];
+  if (!step) return;
   e.preventDefault();
-  const i = (ids.indexOf(current) + (e.key === "ArrowRight" ? 1 : ids.length - 1)) % ids.length;
+  const i = (ids.indexOf(current) + step) % ids.length;
   set(ids[i]);
   const buttons = (e.currentTarget as HTMLElement).querySelectorAll("button");
   tick().then(() => (buttons[i] as HTMLElement | undefined)?.focus());

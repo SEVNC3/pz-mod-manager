@@ -568,7 +568,12 @@
     },
     "updatedAgo": "mis à jour {when}",
     "resizeLabel": "Largeur du panneau latéral",
-    "resizeTip": "Faites glisser, ou appuyez sur ←/→, pour changer la largeur du panneau latéral"
+    "resizeTip": "Faites glisser, ou appuyez sur ←/→, pour changer la largeur du panneau latéral",
+    "spawnPoints": "Points d'apparition",
+    "hideSpawn": "Masquer les mods de points d'apparition",
+    "hideSpawnTip": "Exclure les mods sans cellule de carte : ils ajoutent seulement des points d'apparition à une ville vanilla",
+    "minimise": "Réduire le panneau d'outils",
+    "restoreTip": "Afficher le panneau d'outils"
   },
   "mapOrder": {
     "label": "Ordre des cartes",

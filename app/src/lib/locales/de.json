@@ -568,7 +568,12 @@
     },
     "updatedAgo": "aktualisiert {when}",
     "resizeLabel": "Breite der Seitenleiste",
-    "resizeTip": "Ziehen oder ←/→ drücken, um die Breite der Seitenleiste zu ändern"
+    "resizeTip": "Ziehen oder ←/→ drücken, um die Breite der Seitenleiste zu ändern",
+    "spawnPoints": "Spawnpunkte",
+    "hideSpawn": "Spawnpunkt-Mods ausblenden",
+    "hideSpawnTip": "Mods ohne Kartenzellen weglassen: Sie fügen einer Vanilla-Stadt nur Spawnpunkte hinzu",
+    "minimise": "Werkzeugleiste minimieren",
+    "restoreTip": "Werkzeugleiste anzeigen"
   },
   "mapOrder": {
     "label": "Kartenreihenfolge",

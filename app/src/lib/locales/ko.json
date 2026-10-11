@@ -524,7 +524,12 @@
     },
     "updatedAgo": "{when} 업데이트됨",
     "resizeLabel": "사이드 패널 너비",
-    "resizeTip": "드래그하거나 ←/→를 눌러 사이드 패널 너비를 바꾸세요"
+    "resizeTip": "드래그하거나 ←/→를 눌러 사이드 패널 너비를 바꾸세요",
+    "spawnPoints": "스폰 지점",
+    "hideSpawn": "스폰 지점 모드 숨기기",
+    "hideSpawnTip": "맵 셀이 없는 모드를 제외합니다: 바닐라 마을에 스폰 지점만 추가합니다",
+    "minimise": "도구 패널 최소화",
+    "restoreTip": "도구 패널 표시"
   },
   "mapOrder": {
     "label": "맵 순서",

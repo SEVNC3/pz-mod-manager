@@ -524,7 +524,12 @@
     },
     "updatedAgo": "{when}更新",
     "resizeLabel": "侧边栏宽度",
-    "resizeTip": "拖动或按 ←/→ 调整侧边栏宽度"
+    "resizeTip": "拖动或按 ←/→ 调整侧边栏宽度",
+    "spawnPoints": "出生点",
+    "hideSpawn": "隐藏出生点模组",
+    "hideSpawnTip": "不显示没有地图格的模组：它们只为原版城镇添加出生点",
+    "minimise": "最小化工具面板",
+    "restoreTip": "显示工具面板"
   },
   "mapOrder": {
     "label": "地图顺序",

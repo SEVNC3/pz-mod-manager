@@ -568,7 +568,12 @@
     },
     "updatedAgo": "aggiornata {when}",
     "resizeLabel": "Larghezza del pannello laterale",
-    "resizeTip": "Trascina, o premi ←/→, per cambiare la larghezza del pannello laterale"
+    "resizeTip": "Trascina, o premi ←/→, per cambiare la larghezza del pannello laterale",
+    "spawnPoints": "Punti di spawn",
+    "hideSpawn": "Nascondi le mod dei punti di spawn",
+    "hideSpawnTip": "Escludi le mod senza celle di mappa: aggiungono solo punti di spawn a una città vanilla",
+    "minimise": "Riduci il pannello strumenti",
+    "restoreTip": "Mostra il pannello strumenti"
   },
   "mapOrder": {
     "label": "Ordine delle mappe",

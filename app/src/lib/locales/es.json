@@ -568,7 +568,12 @@
     },
     "updatedAgo": "actualizado {when}",
     "resizeLabel": "Ancho del panel lateral",
-    "resizeTip": "Arrastra, o pulsa ←/→, para cambiar el ancho del panel lateral"
+    "resizeTip": "Arrastra, o pulsa ←/→, para cambiar el ancho del panel lateral",
+    "spawnPoints": "Puntos de aparición",
+    "hideSpawn": "Ocultar mods de puntos de aparición",
+    "hideSpawnTip": "Omite los mods sin celdas de mapa: solo añaden puntos de aparición a un pueblo vanilla",
+    "minimise": "Minimizar el panel de herramientas",
+    "restoreTip": "Mostrar el panel de herramientas"
   },
   "mapOrder": {
     "label": "Orden de mapas",
