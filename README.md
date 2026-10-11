@@ -134,6 +134,7 @@ The full plan is in [docs/FOUNDATION.md](docs/FOUNDATION.md). To release, set th
 
 - [Discord](https://discord.gg/TfS9NwNHrH): help, ideas and bug reports
 - [Ko-fi](https://ko-fi.com/sevnc3): support development
+- [Nexus Mods](https://www.nexusmods.com/profile/SEVNC3) and [GitHub](https://github.com/SEVNC3): whatever else I'm making
 
 ## Credits
 
