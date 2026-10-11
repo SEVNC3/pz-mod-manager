@@ -144,18 +144,18 @@ Rebuilt from scratch: the Workshop mod (3360392628) forbids redistributing its c
 
 ## Docs and release (hygiene)
 
-- [ ] `package-lock.json` version 1.1.0; the release workflow checks package.json against the tag.
-- [ ] Node: say "22.18 or newer", or pin it.
-- [ ] README:
+- [x] `package-lock.json` version 1.1.0; the release workflow checks package.json against the tag.
+- [x] Node: say "22.18 or newer", or pin it.
+- [x] README:
   - Workshop features.
   - Autosort and section dragging.
   - The "Separator" label.
   - CLI examples.
   - A Credits section (Feather, the fonts, logo.dev logos, game trademarks, not affiliated).
   - CLI help lists PZ_GAME_DIR and PZ_SERVER_DIR.
-- [ ] ROADMAP-1.1 "What shipped" brought up to date. FOUNDATION.md stale files (`reconcile.rs`, `local.rs`, 7z) and the 1.1 row fixed. Add WorkshopPanel to WORKSHOP-PARITY. Mark UI-QUEUE as superseded where later commits changed things.
+- [x] ROADMAP-1.1 "What shipped" brought up to date. FOUNDATION.md stale files (`reconcile.rs`, `local.rs`, 7z) and the 1.1 row fixed. Add WorkshopPanel to WORKSHOP-PARITY. Mark UI-QUEUE as superseded where later commits changed things.
 - [x] Remove the unused `@tauri-apps/plugin-opener` (npm). `serde_json` stays: `generate_context!` needs it.
-- [ ] Release notes from the hygiene draft (`--notes-file`).
+- [x] Release notes from the hygiene draft (`--notes-file`): `docs/release-notes/v1.1.0.md`.
 - [ ] Decide before pushing:
   - Squash the GIF add and remove commits (840 KB in history).
   - Use the GitHub noreply email.
@@ -178,15 +178,4 @@ Rebuilt from scratch: the Workshop mod (3360392628) forbids redistributing its c
 
 ## Ideas for after 1.1 (ux 25)
 
-- "What changed" for updates.
-- List snapshots before updates and autosort.
-- Rename and duplicate profiles; paste a share code from the clipboard.
-- A right-click row menu.
-- A Browse… button for zips.
-- "Hide installed" in the Workshop.
-- Cancel and n-of-m progress for installs (ux 12).
-- Back in the item panel and after "Mods that need this" (ux 6, 7).
-- An install action for missing mods; "Disable X" on incompatibilities (ux 10, 11).
-- Previews before writing a server .ini or switching to a save's mods (ux 16, 17).
-- A copyable activity log with times (ux 22).
-- Launch game warns about problems (ux 24).
+None left: every idea on this list shipped in 1.1 (P7 above).

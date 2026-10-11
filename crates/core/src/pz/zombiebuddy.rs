@@ -39,7 +39,7 @@ pub fn launcher_dir(game: &Path) -> Option<PathBuf> {
 /// Whether a scanned mod's source is the official ZombieBuddy Workshop item. Only its jar
 /// may become the game's JVM agent; a look-alike local mod named ZombieBuddy must not.
 pub fn official_source(source: &str) -> bool {
-    source.strip_prefix("steam:").or_else(|| source.strip_prefix("workshop:")) == Some(WORKSHOP_ID)
+    crate::sources::workshop_item(source) == Some(WORKSHOP_ID)
 }
 
 /// Where the agent goes (the game's launcher folder) and comes from (the official

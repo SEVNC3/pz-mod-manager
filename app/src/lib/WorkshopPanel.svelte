@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { api, type ChangeNote, type Comments, type WorkshopInfo, type WorkshopItem } from "./api";
   import { bbcode } from "./bbcode";
   import { compact, fmtDate, fmtSize, workshopUrl } from "./format";
@@ -7,6 +6,7 @@
   import InstallButton from "./InstallButton.svelte";
   import Stars from "./Stars.svelte";
   import { t } from "./i18n.svelte";
+  import { trap } from "./ui";
 
   // The item panel: everything Steam's item page shows, plus Install.
   let { item, busy, installing, onInstall, onClose, onDependents, onInCollections, onAuthor, onOpen, onBack }: {
@@ -81,28 +81,11 @@
     }
   }
 
-  // a modal dialog: focus moves in, Tab stays inside, Esc closes, focus returns where it was
-  let panel = $state<HTMLElement>();
-  onMount(() => {
-    const back = document.activeElement as HTMLElement | null;
-    panel?.focus();
-    return () => back?.focus?.();
-  });
+  // a modal dialog: focus moves in, Tab stays inside (ui.ts trap), Esc closes, focus returns where it was
   function dialogKey(e: KeyboardEvent) {
     if (e.key === "Escape") {
       e.stopPropagation();
       onClose();
-    } else if (e.key === "Tab" && panel) {
-      const f = [...panel.querySelectorAll<HTMLElement>("button:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])")];
-      if (!f.length) return;
-      const [first, last] = [f[0], f[f.length - 1]];
-      if (e.shiftKey && (document.activeElement === first || document.activeElement === panel)) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
     }
   }
   function pick(t: typeof tab) {
@@ -123,7 +106,7 @@
 </script>
 
 <div class="backdrop" onclick={onClose} aria-hidden="true"></div>
-<div class="panel" role="dialog" aria-modal="true" aria-label={it.title} tabindex="-1" bind:this={panel} onkeydown={dialogKey}>
+<div class="panel" role="dialog" aria-modal="true" aria-label={it.title} tabindex="-1" use:trap={{ self: true }} onkeydown={dialogKey}>
   <header>
     {#if onBack}
       <button class="quiet icon" onclick={onBack} aria-label={t("workshop.back")} title={t("workshop.backTip")}><Icon name="chevron-left" size={16} /></button>

@@ -111,6 +111,11 @@ All verified in the code. None have been reported as hitting a user yet.
 - **Steam client:** Workshop pages open in the Steam client when it's running.
 - **Links:** GitHub, Discord and Ko-fi in the tab bar.
 - **The pre-release queue** in [RELEASE-1.1-QUEUE.md](RELEASE-1.1-QUEUE.md): data-loss, security and freeze fixes found by a second round of reviews.
+- **The library and the load order split** (like Mod Organizer 2), with a map order for servers (queue P4).
+- **A Settings tab**: folders with Browse, Detect and checks, update checks, Recycle Bin removal, backup limits, appearance and launch arguments (queue P5).
+- **A Maps tab**: the world's cell grid with every Workshop map, clashes, the most maps that fit, requirements, presets and export (queue P6).
+- **The ideas list** (queue P7): snapshots, rename and duplicate profiles, right-click menus, Browse…, what changed, download progress and Cancel, previews, launch checks and a copyable log.
+- **10 languages**: English, German, Spanish, French, Italian, Korean, Polish, Brazilian Portuguese, Russian and Simplified Chinese.
 
 **Deliberately skipped (each with a reason):**
 - **Copying the save folder before updates.** Saves can be gigabytes. Mod rollback plus the save warning cover the risk.

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { api, type Folder, type SettingsView, type View } from "./api";
   import { fmtSize } from "./format";
   import { LANGS, systemLang, t, th, type Vars } from "./i18n.svelte";
@@ -45,6 +46,13 @@
     const picked = await api.pickFolder(f.path ?? "").catch(() => null);
     if (picked) setFolder(f, picked);
   }
+
+  // read by the app at start; read again here when that failed (or Try again)
+  let readError = $state("");
+  const read = () => api.settingsGet().then((c) => ((cfg = c), (readError = ""))).catch((e) => (readError = String(e)));
+  onMount(() => {
+    if (!cfg) read();
+  });
 
   const save = () => cfg && api.settingsSet($state.snapshot(cfg.settings)).catch((e) => say("settings.saveFailed", { error: String(e) }, true));
 
@@ -101,7 +109,7 @@
               <button disabled={working} onclick={() => setFolder(f, "")} title={t("settings.folders.detectTip")}><Icon name="search" size={14} />{t("settings.folders.detect")}</button>
               <button disabled={f.status === "missing" || !f.path} onclick={() => f.path && api.openPath(f.path)}><Icon name="external" size={14} />{t("settings.folders.open")}</button>
             </div>
-            {#each f.warnings as w}<p class="warn"><Icon name="alert" size={13} />{w}</p>{/each}
+            {#each f.warnings as w}<p class="warn"><Icon name="alert" size={12} />{w}</p>{/each}
             {#if f.key === "data" && moving}
               <div class="confirm" role="group" aria-label={t("settings.folders.moveLabel")}>
                 <p>{@html th("settings.folders.moveConfirm", { from: f.path ?? "", to: moving.to })}</p>
@@ -113,6 +121,9 @@
           </li>
         {/each}
       </ul>
+    {:else if readError}
+      <p class="error">{t("settings.readFailed", { error: readError })}</p>
+      <button onclick={read}><Icon name="refresh" size={14} />{t("common.tryAgain")}</button>
     {:else}
       <p class="hint">{t("settings.folders.reading")}</p>
     {/if}

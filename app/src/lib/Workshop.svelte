@@ -280,8 +280,8 @@
         {@render stars(it)}
         <span title={t("workshop.subscribersTip")}>{t("workshop.subs", { count: it.subscriptions, n: compact.format(it.subscriptions) })}</span>
         {#if !small}
-          <span title={t("workshop.favouritesTip")}><Icon name="star" size={11} /> {compact.format(it.favorited)}</span>
-          <span title={t("workshop.commentsTip")}><Icon name="message" size={11} /> {compact.format(it.comments)}</span>
+          <span title={t("workshop.favouritesTip")}><Icon name="star" size={12} /> {compact.format(it.favorited)}</span>
+          <span title={t("workshop.commentsTip")}><Icon name="message" size={12} /> {compact.format(it.comments)}</span>
           <span title={t("workshop.postedTip", { date: fmtDate(it.time_created, "long") })}>{t("workshop.updatedOn", { date: fmtDate(it.time_updated, "long") })}</span>
           {#each builds(it.tags) as b}<span class="tag">{b}</span>{/each}
         {/if}
@@ -371,7 +371,7 @@
             {@const state = q.required.includes(tag) ? "in" : q.excluded.includes(tag) ? "out" : ""}
             <button type="button" class="chip {state}" onclick={() => cycleTag(tag)} aria-pressed={state !== ""}
               title={state === "in" ? t("workshop.tagOnlyTip", { tag }) : state === "out" ? t("workshop.tagNoTip", { tag }) : tag}>
-              <span class="box">{#if state === "in"}<Icon name="check" size={11} />{:else if state === "out"}<Icon name="x" size={11} />{/if}</span>{tagName(tag)}
+              <span class="box">{#if state === "in"}<Icon name="check" size={12} />{:else if state === "out"}<Icon name="x" size={12} />{/if}</span>{tagName(tag)}
             </button>
           {/each}
         </div>

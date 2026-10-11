@@ -197,7 +197,8 @@
     "updated": "{name} mis à jour.",
     "snapshotRestored": "Instantané restauré. La liste qu'il a remplacée est aussi un instantané.",
     "pickRequirement": "Aucun élément du Workshop ne fournit clairement {id} : choisissez-en un sous Requiert, dans les détails.",
-    "idCopied": "{id} copié."
+    "idCopied": "{id} copié.",
+    "bisectOtherProfile": "La recherche du mod défectueux se déroule sur le profil « {profile} » : revenez-y pour répondre ou l'arrêter."
   },
   "confirm": {
     "group": "Grouper par catégorie remplace vos propres sections ({sections}) par des sections de catégorie. Ctrl+Z l'annule. Grouper maintenant ?",
@@ -244,7 +245,8 @@
     "import": "Importer",
     "clear": "Effacer",
     "workshop": "Workshop",
-    "refresh": "Actualiser"
+    "refresh": "Actualiser",
+    "tryAgain": "Réessayer"
   },
   "format": {
     "gb": "{n} Go",
@@ -550,7 +552,9 @@
       "noFiles": "Steam ne liste aucun fichier pour cet objet.",
       "fileList": "Steam n'a pas fourni la liste des fichiers de l'objet.",
       "login": "Impossible de se connecter anonymement à Steam.",
-      "downloadFailed": "Le téléchargement a échoué."
+      "downloadFailed": "Le téléchargement a échoué.",
+      "reloaded": "La liste des mods a été modifiée dans le menu des mods du jeu, donc l'ordre des cartes n'a pas été enregistré. Réorganisez-les.",
+      "otherProfile": "L'ordre des cartes n'a pas été enregistré : un autre profil est actif maintenant."
     },
     "updatedAgo": "mis à jour {when}",
     "expand": "Agrandir",
@@ -709,9 +713,9 @@
       "one": "{count} erreur, la première à <span class=\"mono\">{example}</span>",
       "other": "{count} erreurs, la première à <span class=\"mono\">{example}</span>"
     },
-    "unexplained": "Quelque chose ne marche pas mais rien ci-dessus ne l'explique ?",
-    "halves": "PZMM divise vos mods activés en deux à chaque test du jeu.",
-    "disable": "Désactiver {id}"
+    "disable": "Désactiver {id}",
+    "bisectOffer": "Quelque chose plante mais rien ci-dessus ne l'explique ? {link} : PZMM divise par deux vos mods activés à chaque test du jeu.",
+    "finishFirst": "Terminez ou arrêtez d'abord la recherche du mod défectueux."
   },
   "settings": {
     "label": "Paramètres",
@@ -822,7 +826,8 @@
       "diagnostics": "Copier les diagnostics",
       "diagnosticsTip": "Version, dossiers, profil, nombre de mods et résultats de Vérifier la configuration, avec votre nom d'utilisateur masqué",
       "keys": "Clavier : <kbd>/</kbd> rechercher · <kbd>↑</kbd><kbd>↓</kbd> changer de ligne · <kbd>Enter</kbd> détails · <kbd>Space</kbd> activer/désactiver · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> réorganiser · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> annuler/rétablir · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+clic sélectionner plusieurs · <kbd>Esc</kbd> effacer la sélection"
-    }
+    },
+    "readFailed": "Impossible de lire les paramètres : {error}"
   },
   "servers": {
     "label": "Serveurs et sauvegardes",
@@ -1187,5 +1192,81 @@
     "toBottom": "Placer en bas de l'ordre de chargement",
     "copyId": "Copier l'ID du mod",
     "showInMaps": "Afficher dans Cartes"
+  },
+  "backend": {
+    "stateDamaged": "{file} est endommagé ({error}) ; une copie a été conservée sous state.json.bad et le fichier a été recréé",
+    "mapsNotUpdated": "impossible de lire vos mods, donc la liste des cartes du jeu n'a pas été mise à jour : {error}",
+    "settingsDamaged": "{file} est endommagé ({error}) ; une copie a été conservée sous {copy} et les paramètres par défaut ont été utilisés",
+    "duplicateId": "{source} : un second mod avec l'identifiant {id} a été ignoré",
+    "notOursInMods": "{id} est déjà dans {dir} et n'a pas été installé par PZMM ; laissé tel quel. Supprimez ce dossier pour installer cette copie.",
+    "alreadyCurrent": "{id} est déjà à jour ({source})",
+    "installed": "{id} installé ({source})",
+    "backupsPruned": "Les plus anciennes copies de secours ont été supprimées (nombre : {count}) pour les garder sous {mb} MB",
+    "tagsFailed": "Impossible de lire les étiquettes du Workshop : {error}",
+    "dataCopied": "Les données de PZMM ont été copiées vers {to}, mais l'ancien dossier {from} n'a pas pu être supprimé ({error}). Supprimez-le vous-même.",
+    "dataMoved": "Les données de PZMM ont été déplacées vers {to}",
+    "mapIndexBroken": "L'index de cartes intégré de PZMM est illisible ({error}) ; l'analyse du Workshop lit toutes les cartes à la place",
+    "fileDamaged": "{file} est endommagé ({error}) ; une copie a été conservée sous {copy} et le fichier a été recréé",
+    "noFileList": "workshop:{item} : pas de liste de fichiers de Steam ({error}), téléchargement avec SteamCMD à la place",
+    "downloadNotDeleted": "impossible de supprimer le téléchargement dans {dir} : {error}",
+    "switchedViewpoint": "Passage à Project Viewpoint (profil « {name} »). Au premier lancement du jeu, ZombieBuddy vous demande d'approuver le code Java de Viewpoint.",
+    "switchedZomboid": "Passage à Project Zomboid (profil « {name} »).",
+    "downloadingGithub": "téléchargement de github:{spec}...",
+    "subscribedCopy": "{source} : vous y êtes abonné dans Steam, qui le tient à jour ; cette copie est utilisée ({ids})",
+    "oldCopyNotRemoved": "impossible de supprimer l'ancienne copie de PZMM de {ids} : {error}",
+    "pruneFailed": "impossible de nettoyer les copies de secours : {error}",
+    "collectionsFailed": "impossible de vérifier les collections du Workshop : {error}",
+    "collection": "collection {id} : objets : {count}",
+    "requiresAdding": "workshop:{id} nécessite workshop:{req}, ajout en cours",
+    "requiresFailed": "impossible de vérifier ce que nécessite workshop:{id} : {error}",
+    "requiredItemsFailed": "impossible de lire les objets requis de workshop:{item} : {error}",
+    "downloadingSteamcmd": "téléchargement de steamcmd...",
+    "downloadingItems": "téléchargement des objets du Workshop : {count}...",
+    "steamcmdStopped": "SteamCMD a été arrêté (par vous) ; non téléchargé : {ids}",
+    "steamcmdTimedOut": "SteamCMD a été arrêté (aucun téléchargement terminé en une heure) ; non téléchargé : {ids}",
+    "leftOff": "{id} laissé désactivé : il est incompatible avec {other}. Activez-le à la place de {other} si vous le préférez.",
+    "notOurs": "{id} : non installé par PZMM (abonnement au Workshop ou installation manuelle) ; laissé tel quel",
+    "rolledBack": "{id} : version précédente restaurée",
+    "profileCopied": "Le profil « {from} » a été copié sous « {to} ».",
+    "zbSetUp": "ZombieBuddy est configuré. Les mods Java demandent votre approbation à leur premier chargement.",
+    "found": "{id} : trouvé sur le Workshop sous le nom « {title} » ({item})",
+    "lookupFailed": "échec de la recherche de {id} : {error}",
+    "noClearMatch": "{id} : aucun objet du Workshop ne le fournit clairement. Utilisez Télécharger dans les détails du mod pour en choisir un.",
+    "serverItems": "installation des objets du Workshop utilisés par le serveur : {count}",
+    "serverStarted": "Serveur {name} démarré ({script}).",
+    "noMaps": "workshop:{id} n'ajoute aucune carte pour Build {build}",
+    "sharedItems": "installation des objets du Workshop utilisés par le profil partagé : {count}",
+    "imported": "Le profil a été importé sous « {name} ».",
+    "notAFolder": "n'est pas un dossier : {path}",
+    "openFailed": "impossible d'ouvrir {path} : {error}",
+    "httpsOnly": "PZMM n'ouvre que les liens https : {url}",
+    "openUrlFailed": "impossible d'ouvrir {url} : {error} (Steam est-il installé ?)",
+    "launchFailed": "impossible de lancer le jeu ({url}) : {error} (Steam est-il installé ?)",
+    "backupsDeleted": "Toutes les copies de secours ont été supprimées."
+  },
+  "doctor": {
+    "notInstalled": "est activé mais pas installé : le jeu l'ignore",
+    "needsDisabled": "nécessite {req}, qui est désactivé",
+    "needsMissing": "nécessite {req}, qui n'est pas installé",
+    "needsLater": "nécessite {req}, qui se charge après lui",
+    "incompatible": "est incompatible avec {other}, qui est aussi activé",
+    "loadAfter": "devrait se charger après {other}",
+    "loadBefore": "devrait se charger avant {other}",
+    "only41": "est conçu pour Build 41 (pas de dossier 42/ ni common/) ; sur Build 42, il peut provoquer des erreurs ou ne rien faire",
+    "only42": "est conçu pour Build 42 uniquement (pas de mod.info à la racine)",
+    "twoCopies": "est dans Zomboid/mods et aussi abonné dans Steam : la copie de Zomboid/mods l'emporte et ne recevra pas les mises à jour de Steam",
+    "missingEnv": "{path} n'existe pas (défini par {env})",
+    "missingSet": "{path} n'existe pas (défini dans les Paramètres)",
+    "notYet": "{path} n'existe pas encore : lancez le jeu une fois",
+    "notPzEnv": "{path} ne ressemble pas à « {folder} » (défini par {env})",
+    "notPzSet": "{path} ne ressemble pas à « {folder} » (défini dans les Paramètres)",
+    "notPz": "{path} ne ressemble pas à « {folder} »",
+    "folderWarning": "{path} : {warning}",
+    "itemNotListed": "Mods= contient {id}, mais son objet du Workshop {item} n'est pas dans WorkshopItems= : le serveur ne le téléchargera pas",
+    "serverModMissing": "Mods= contient {id}, qui n'est pas installé ici, donc PZMM ne peut pas le vérifier",
+    "itemUnused": "WorkshopItems= contient {item}, mais aucun de ses mods n'est dans Mods=",
+    "backslash": "les entrées de Mods= doivent commencer par une barre oblique inverse sur Build 42 (\\ModId)",
+    "mapNotListed": "un mod ajoute la carte {map}, mais Map= ne la liste pas",
+    "mapsAfterBase": "Map= liste les cartes de mods après Muldraugh, KY : les cartes de mods doivent venir en premier"
   }
 }

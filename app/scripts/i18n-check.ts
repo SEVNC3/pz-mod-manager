@@ -79,6 +79,21 @@ for (const f of sources) {
   }
 }
 
+// the backend's own wording: say!("key", "English") lines are backend.<key>, Check setup findings doctor.<key>;
+// en.json has the same English (an "error: " prefix only marks an error line), so the CLI and the app agree
+const rustDirs = ["../../crates/core/src/", "../src-tauri/src/"].map((d) => new URL(d, import.meta.url));
+const lit = String.raw`"((?:\\.|[^"\\])*)"`;
+const english = (k: string, text: string, where: string) => {
+  if (!(k in en)) errors.push(`${where}: en.json has no ${k} ("${text}")`);
+  else if (en[k] !== text) errors.push(`${where}: en.json's ${k} "${en[k]}" isn't the backend's "${text}"`);
+};
+for (const dir of rustDirs)
+  for (const f of readdirSync(dir, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".rs"))) {
+    const text = readFileSync(new URL(f.replaceAll("\\", "/"), dir), "utf8");
+    for (const m of text.matchAll(new RegExp(String.raw`say!\(\s*"(\w+)",\s*` + lit, "g"))) english(`backend.${m[1]}`, JSON.parse(`"${m[2]}"`).replace(/^error: /, ""), f);
+    for (const m of text.matchAll(new RegExp(String.raw`\b(?:err|warn)\([^,()]+,\s*"(\w+)",\s*` + lit, "g"))) english(`doctor.${m[1]}`, JSON.parse(`"${m[2]}"`), f);
+  }
+
 if (errors.length) {
   console.error(errors.join("\n"));
   console.error(`i18n-check: ${errors.length} problem(s)`);

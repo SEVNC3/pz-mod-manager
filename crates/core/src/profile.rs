@@ -478,7 +478,7 @@ fn state(paths: &Paths) -> State {
     serde_json::from_str(&text).unwrap_or_else(|e| {
         // keep the broken file for inspection instead of silently overwriting it on the next save
         let _ = fs::copy(&path, paths.data.join("state.json.bad"));
-        crate::log!("error: {} is damaged ({e}); kept a copy as state.json.bad and started fresh", path.display());
+        crate::say!("stateDamaged", "error: {file} is damaged ({error}); kept a copy as state.json.bad and started fresh", file = path.display(), error = e);
         State::default()
     })
 }
@@ -549,7 +549,7 @@ pub fn apply(paths: &Paths, profile: &Profile, mods: Option<&std::collections::B
 
 /// The mod scan for `apply`, None (and said in the activity log) when it failed.
 pub fn maps_scan<T>(scan: Result<T>) -> Option<T> {
-    scan.inspect_err(|e| crate::log!("error: couldn't read your mods, so the game's map list wasn't updated: {e:#}")).ok()
+    scan.inspect_err(|e| crate::say!("mapsNotUpdated", "error: couldn't read your mods, so the game's map list wasn't updated: {error}", error = format!("{e:#}"))).ok()
 }
 
 /// A profile to share with friends or a server: its list plus where each mod comes
@@ -577,8 +577,7 @@ pub fn export(paths: &Paths, mods: &std::collections::BTreeMap<String, crate::st
         .iter()
         .filter_map(|l| if let Line::Mod { id, .. } = l { Some(id) } else { None })
         .filter_map(|id| {
-            let src = &mods.get(id)?.source;
-            let item = src.strip_prefix("steam:").or_else(|| src.strip_prefix("workshop:"))?;
+            let item = crate::sources::workshop_item(&mods.get(id)?.source)?;
             Some((id.clone(), item.to_string()))
         })
         .collect();

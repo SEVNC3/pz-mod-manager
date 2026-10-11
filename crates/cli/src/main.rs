@@ -7,7 +7,10 @@ use pzmm_core::store;
 
 /// PZMM - Project Zomboid Mod Manager
 #[derive(Parser)]
-#[command(version, after_help = "Env: PZ_HOME (default ~/Zomboid), PZMM_DATA, PZ_GAME_DIR, PZ_SERVER_DIR, GITHUB_TOKEN. They win over the app's Settings (settings.json in the config folder).")]
+#[command(
+    version,
+    after_help = "Snapshots: before updates, removals and imports (and the app's Autosort and grouping) PZMM keeps the profile's last 10 lists: pzmm snapshot list, pzmm snapshot restore <id>.\nEnv: PZ_HOME (default ~/Zomboid), PZMM_DATA, PZ_GAME_DIR, PZ_SERVER_DIR, GITHUB_TOKEN. They win over the app's Settings (settings.json in the config folder)."
+)]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -45,6 +48,9 @@ enum Cmd {
     /// Manage profiles (named mod setups)
     #[command(subcommand)]
     Profile(ProfileCmd),
+    /// The active profile's snapshots (its lists from before big changes)
+    #[command(subcommand)]
+    Snapshot(SnapshotCmd),
     /// Force the default.txt format: 41 or 42 (default: keep the file's format)
     Build { build: u8 },
     /// Search the Steam Workshop (no query: most popular this week)
@@ -124,6 +130,18 @@ enum ProfileCmd {
     /// Install what a shared profile needs from the Workshop, then use it
     Import { file: std::path::PathBuf },
     Delete { name: String },
+    /// Rename a profile (the active one too)
+    Rename { from: String, to: String },
+    /// Copy a profile under a new name (stays on the active one)
+    Duplicate { from: String, to: String },
+}
+
+#[derive(Subcommand)]
+enum SnapshotCmd {
+    /// Newest first: id, when, why, mods enabled
+    List,
+    /// Put the active profile back as snapshot <id> had it (its current list is snapshotted first)
+    Restore { id: String },
 }
 
 fn main() {
@@ -318,6 +336,27 @@ fn run(cli: Cli) -> Result<()> {
             println!("now using {:?}", p.name);
         }
         Cmd::Profile(ProfileCmd::Delete { name }) => profile::delete(&paths, &name)?,
+        Cmd::Profile(ProfileCmd::Rename { from, to }) => {
+            profile::rename(&paths, &from, to.trim())?;
+            println!("renamed {from:?} to {:?}", to.trim());
+        }
+        Cmd::Profile(ProfileCmd::Duplicate { from, to }) => {
+            profile::duplicate(&paths, &from, to.trim())?;
+            println!("copied {from:?} as {:?}", to.trim());
+        }
+        Cmd::Snapshot(SnapshotCmd::List) => {
+            let snaps = profile::snapshots(&paths, &p.name);
+            if snaps.is_empty() {
+                println!("no snapshots of {:?} yet", p.name);
+            }
+            for s in snaps {
+                println!("{:>14}  {:<12} {:<9} {} of {} mods enabled", s.id, ago(s.time), s.label, s.enabled, s.mods);
+            }
+        }
+        Cmd::Snapshot(SnapshotCmd::Restore { id }) => {
+            apply(&paths, &profile::restore(&paths, &p.name, &id)?)?;
+            println!("restored {:?} from snapshot {id} (the list it replaced is a snapshot too)", p.name);
+        }
         Cmd::Build { build } => profile::set_b41(&paths, Some(match build {
             41 => true,
             42 => false,
@@ -326,6 +365,15 @@ fn run(cli: Cli) -> Result<()> {
         .and_then(|_| apply(&paths, &p))?,
     }
     Ok(())
+}
+
+/// How long ago Unix time secs was, roughly.
+fn ago(secs: u64) -> String {
+    match store::now().saturating_sub(secs) {
+        d if d < 3600 => format!("{} min ago", d / 60),
+        d if d < 86_400 => format!("{} h ago", d / 3600),
+        d => format!("{} days ago", d / 86_400),
+    }
 }
 
 /// Enabled mods in load order, then the rest of the library.

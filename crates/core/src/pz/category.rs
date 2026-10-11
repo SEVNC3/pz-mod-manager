@@ -65,7 +65,7 @@ static TAGS: Mutex<Option<HashMap<String, Vec<String>>>> = Mutex::new(None);
 /// The category of every mod. Steam being unreachable only loses the tags: those mods
 /// fall back to Maps or Other.
 pub fn categorize(mods: &BTreeMap<String, Row>) -> BTreeMap<String, String> {
-    let item = |r: &Row| r.source.strip_prefix("steam:").or(r.source.strip_prefix("workshop:")).map(String::from);
+    let item = |r: &Row| crate::sources::workshop_item(&r.source).map(String::from);
     let mut cache = TAGS.lock().unwrap_or_else(|e| e.into_inner());
     let tags = cache.get_or_insert_with(HashMap::new);
     let mut todo: Vec<String> = mods.values().filter_map(item).filter(|i| !tags.contains_key(i)).collect();
@@ -75,7 +75,7 @@ pub fn categorize(mods: &BTreeMap<String, Row>) -> BTreeMap<String, String> {
         let ids: Vec<&str> = chunk.iter().map(String::as_str).collect();
         match steam_workshop::details(&ids) {
             Ok(items) => tags.extend(items.into_iter().map(|i| (i.id, i.tags))),
-            Err(e) => crate::log!("Couldn't read Workshop tags: {e:#}"),
+            Err(e) => crate::say!("tagsFailed", "Couldn't read Workshop tags: {error}", error = format!("{e:#}")),
         }
     }
     mods.iter()

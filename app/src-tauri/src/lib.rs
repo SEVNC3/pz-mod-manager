@@ -26,7 +26,9 @@ fn locked<T>(f: impl FnOnce(&Paths) -> anyhow::Result<T>) -> Res<T> {
     f(&paths).map_err(|e| format!("{e:#}"))
 }
 
-/// For read-only commands (row clicks, status): same locks, but reuses the scan cache.
+/// For commands that read (row clicks, status): same locks, but reuses the scan cache. Only writes
+/// that never change mods belong here: `active` saving in-game list changes it picks up.
+/// Anything else that writes (profiles, map order, server files, presets) goes through `locked`.
 fn reading<T>(f: impl FnOnce(&Paths) -> anyhow::Result<T>) -> Res<T> {
     let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let paths = Paths::detect();
@@ -192,13 +194,17 @@ fn load() -> Res<View> {
 }
 
 /// Save the library (order, on/off, separators) and the load order to the active profile and the game.
+/// `profile` is the one the rows were drawn from: when another is active now, nothing is saved.
 #[tauri::command(async)]
-fn save(rows: Vec<Row>, order: Vec<String>) -> Res<View> {
+fn save(rows: Vec<Row>, order: Vec<String>, profile: String) -> Res<View> {
     locked(|paths| {
         let (mut p, adopted) = profile::sync(paths)?;
         if adopted {
             // the rows were drawn before the game's mod menu changed the list; saving them would undo that
             anyhow::bail!("The mod list was changed in the game's mod menu, so PZMM reloaded it. Make your change again.");
+        }
+        if p.name != profile {
+            anyhow::bail!("The active profile is now \"{}\", so this change to \"{profile}\" wasn't saved.", p.name);
         }
         p.lines = rows
             .into_iter()
@@ -219,7 +225,7 @@ fn enable_compatible(p: &mut Profile, mods: &BTreeMap<String, store::Row>, ids: 
     let clashes = |a: &str, b: &str| mods.get(a).is_some_and(|m| m.incompatible.iter().any(|x| x == b));
     for id in ids {
         match p.enabled().into_iter().find(|o| o != id && (clashes(id, o) || clashes(o, id))) {
-            Some(o) => pzmm_core::log!("{id} left off: it's incompatible with {o}. Enable it instead of {o} if you prefer it."),
+            Some(o) => pzmm_core::say!("leftOff", "{id} left off: it's incompatible with {other}. Enable it instead of {other} if you prefer it.", id = id, other = o),
             None => p.set(id, true),
         }
     }
@@ -241,29 +247,12 @@ async fn install(sources: Vec<String>) -> Res<View> {
     .await
 }
 
-#[tauri::command]
-async fn update_all() -> Res<View> {
-    blocking(|| {
-        let mut seen = std::collections::HashSet::new();
-        let all: Vec<Source> = reading(store::load)?
-            .into_values()
-            .filter(|e| seen.insert(e.source.clone()))
-            .filter_map(|e| Source::from_index(&e.source))
-            .collect();
-        if all.is_empty() {
-            pzmm_core::log!("nothing to update: no mods were installed through PZMM");
-        }
-        fetch_then(&all, false, |paths, _| view(paths))
-    })
-    .await
-}
-
 #[tauri::command(async)]
 fn remove(ids: Vec<String>) -> Res<View> {
     locked(|paths| {
         let refused = store::remove(paths, &ids, settings::load().recycle)?;
         for id in &refused {
-            pzmm_core::log!("{id}: not installed by PZMM (Workshop subscription or manual install); left alone");
+            pzmm_core::say!("notOurs", "{id}: not installed by PZMM (Workshop subscription or manual install); left alone", id = id);
         }
         let mut p = active(paths)?;
         ids.iter().filter(|i| !refused.contains(i)).for_each(|i| p.forget(i));
@@ -276,7 +265,7 @@ fn remove(ids: Vec<String>) -> Res<View> {
 fn rollback(id: String) -> Res<View> {
     locked(|paths| {
         store::rollback(paths, &id)?;
-        pzmm_core::log!("{id}: restored the previous version");
+        pzmm_core::say!("rolledBack", "{id}: restored the previous version", id = id);
         view(paths)
     })
 }
@@ -317,20 +306,21 @@ fn profile_rename(from: String, to: String) -> Res<View> {
 fn profile_duplicate(from: String, to: String) -> Res<View> {
     locked(|paths| {
         profile::duplicate(paths, &from, to.trim())?;
-        pzmm_core::log!("Copied the profile \"{from}\" as \"{}\".", to.trim());
+        pzmm_core::say!("profileCopied", "Copied the profile \"{from}\" as \"{to}\".", from = from, to = to.trim());
         view(paths)
     })
 }
 
-/// Keep the active profile as it's saved now, before a change labelled `label`.
+/// Keep the active profile as it's saved now, before a change labelled `label` (as saved: in-game
+/// changes are left for the next view to pick up, so it can say so).
 #[tauri::command(async)]
-fn profile_snapshot(label: String) -> Res<()> {
-    reading(|paths| profile::snapshot(paths, &active(paths)?.name, &label))
+fn snapshot_create(label: String) -> Res<()> {
+    locked(|paths| profile::snapshot(paths, &profile::active_name(paths), &label))
 }
 
 /// The active profile's snapshots, newest first.
 #[tauri::command(async)]
-fn profile_snapshots() -> Res<Vec<profile::SnapshotInfo>> {
+fn snapshot_list() -> Res<Vec<profile::SnapshotInfo>> {
     reading(|paths| Ok(profile::snapshots(paths, &profile::active_name(paths))))
 }
 
@@ -599,7 +589,7 @@ async fn zb_install() -> Res<View> {
             let mut p = active(paths)?;
             p.set(zb::MOD_ID, true);
             profile::apply(paths, &p, profile::maps_scan(scan(paths)).as_ref())?;
-            pzmm_core::log!("ZombieBuddy is set up. Java mods ask for your approval the first time they load.");
+            pzmm_core::say!("zbSetUp", "ZombieBuddy is set up. Java mods ask for your approval the first time they load.");
             view(paths)
         })
     })
@@ -619,16 +609,11 @@ fn zb_uninstall() -> Res<View> {
 
 // --- missing requirements ---
 
-/// The Workshop item a mod came from, if any (`steam:<id>` or `workshop:<id>`).
-fn workshop_item(row: &store::Row) -> Option<&str> {
-    row.source.strip_prefix("steam:").or_else(|| row.source.strip_prefix("workshop:"))
-}
-
 /// Workshop items that may provide `mod_id`, which the installed mod `needed_by` requires.
 #[tauri::command]
 async fn find_requirement(mod_id: String, needed_by: String) -> Res<Vec<sources::Candidate>> {
     blocking(move || {
-        let hint = scan(&Paths::detect()).ok().and_then(|m| m.get(&needed_by).and_then(workshop_item).map(String::from));
+        let hint = scan(&Paths::detect()).ok().and_then(|m| m.get(&needed_by).and_then(|r| sources::workshop_item(&r.source)).map(String::from));
         let build = profile::effective_build(&Paths::detect());
         sources::find_mod(&mod_id, hint.as_deref(), build)
     })
@@ -648,7 +633,7 @@ async fn install_missing() -> Res<(View, Vec<String>)> {
                 let Some(m) = mods.get(&id) else { continue };
                 for r in &m.requires {
                     if !mods.contains_key(r) && !wanted.iter().any(|(w, _)| w == r) {
-                        wanted.push((r.clone(), workshop_item(m).map(String::from)));
+                        wanted.push((r.clone(), sources::workshop_item(&m.source).map(String::from)));
                     }
                 }
             }
@@ -660,12 +645,12 @@ async fn install_missing() -> Res<(View, Vec<String>)> {
         for (id, hint) in wanted {
             match sources::find_mod(&id, hint.as_deref(), build) {
                 Ok(c) if c.first().is_some_and(|c| c.sure()) => {
-                    pzmm_core::log!("{id}: found on the Workshop as \"{}\" ({})", c[0].item.title, c[0].item.id);
+                    pzmm_core::say!("found", "{id}: found on the Workshop as \"{title}\" ({item})", id = id, title = c[0].item.title, item = c[0].item.id);
                     items.push(Source::Workshop(c[0].item.id.clone()));
                 }
                 Ok(_) => unresolved.push(id),
                 Err(e) => {
-                    pzmm_core::log!("error: looking up {id}: {e:#}");
+                    pzmm_core::say!("lookupFailed", "error: looking up {id}: {error}", id = id, error = format!("{e:#}"));
                     unresolved.push(id);
                 }
             }
@@ -688,7 +673,7 @@ async fn install_missing() -> Res<(View, Vec<String>)> {
             enable_compatible(&mut p, &mods, &enable);
             profile::apply(paths, &p, profile::maps_scan(scan(paths)).as_ref())?;
             for id in &unresolved {
-                pzmm_core::log!("{id}: no Workshop item clearly provides it. Use Download in the mod's details to pick one.");
+                pzmm_core::say!("noClearMatch", "{id}: no Workshop item clearly provides it. Use Download in the mod's details to pick one.", id = id);
             }
             Ok((view(paths)?, unresolved))
         })
@@ -815,7 +800,7 @@ fn server_maps(name: String) -> Res<Vec<String>> {
 /// Write the active profile into `Server/<name>.ini`, its maps in `maps` order (empty: as the config has them). Returns notes for the user.
 #[tauri::command(async)]
 fn server_export(name: String, maps: Vec<String>) -> Res<Vec<String>> {
-    reading(|paths| {
+    locked(|paths| {
         let notes = pz::server::export(paths, &name, &active(paths)?.enabled(), &scan(paths)?, Some(maps.as_slice()).filter(|m| !m.is_empty()))?;
         if !maps.is_empty() {
             profile::set_map_order(paths, &profile::active_name(paths), &maps)?;
@@ -842,7 +827,7 @@ async fn server_import(name: String) -> Res<View> {
             Ok((cfg, missing))
         })?;
         if !missing.is_empty() {
-            pzmm_core::log!("installing {} Workshop item(s) the server uses", missing.len());
+            pzmm_core::say!("serverItems", "installing {count} Workshop item(s) the server uses", count = missing.len());
         }
         fetch_then(&missing, false, |paths, _| {
             profile::apply(paths, &profile::with_list(paths, &format!("Server {name}"), cfg.mods)?, profile::maps_scan(scan(paths)).as_ref())?;
@@ -855,9 +840,9 @@ async fn server_import(name: String) -> Res<View> {
 /// Start the dedicated server with config `name`.
 #[tauri::command(async)]
 fn server_start(name: String) -> Res<String> {
-    reading(|paths| {
+    locked(|paths| {
         let script = pz::server::start(paths, &name)?;
-        pzmm_core::log!("Started the {name} server ({}).", script.display());
+        pzmm_core::say!("serverStarted", "Started the {name} server ({script}).", name = name, script = script.display());
         Ok(script.display().to_string())
     })
 }
@@ -916,7 +901,7 @@ struct MapsView {
 
 /// Every map's cells (walks map folders the cache doesn't know yet, so outside the lock).
 #[tauri::command]
-async fn maps_view() -> Res<MapsView> {
+async fn map_view() -> Res<MapsView> {
     blocking(|| -> Res<_> {
         let (mods, build, checked) = reading(|paths| Ok((scan(paths)?, profile::effective_build(paths), maps::checked(paths))))?;
         let paths = Paths::detect();
@@ -944,7 +929,7 @@ async fn maps_view() -> Res<MapsView> {
     .await
 }
 
-/// The grid for the shown maps (the UI sends back what `maps_view` gave it).
+/// The grid for the shown maps (the UI sends back what `map_view` gave it).
 #[tauri::command(async)]
 fn map_grid(vanilla: Vec<maps::Cell>, water: Vec<maps::Cell>, shown: Vec<MapMod>) -> Vec<maps::GridCell> {
     maps::grid(&vanilla, &water, &shown.iter().collect::<Vec<_>>())
@@ -970,10 +955,18 @@ fn map_line(order: Vec<String>, folders: Vec<String>) -> Res<Vec<String>> {
 
 /// Keep a `Map=` list the player arranged with the active profile (its enabled maps only:
 /// previewed ones never), and give the game the enabled maps in that order (default.txt's `maps` block).
+/// Refused when `profile` (the one the list was arranged for) isn't active any more, or when the
+/// game's mod menu changed the list since the Maps tab read it.
 #[tauri::command(async)]
-fn map_order_save(maps: Vec<String>) -> Res<()> {
-    reading(|paths| {
-        let p = active(paths)?;
+fn map_order_save(maps: Vec<String>, profile: String) -> Res<()> {
+    locked(|paths| {
+        let (p, adopted) = profile::sync(paths)?;
+        if adopted {
+            anyhow::bail!("maps.err.reloaded");
+        }
+        if p.name != profile {
+            anyhow::bail!("maps.err.otherProfile");
+        }
         let on = pz::server::mod_maps(&p.enabled(), &scan(paths)?, profile::effective_build(paths));
         let maps: Vec<String> = maps.into_iter().filter(|m| on.contains(m) || maps::is_vanilla(m)).collect();
         if profile::set_map_order(paths, &p.name, &maps)? {
@@ -986,7 +979,7 @@ fn map_order_save(maps: Vec<String>) -> Res<()> {
 /// Clipboard text for the shown maps: links, mod ids, requirements (looked up on the Workshop
 /// when PZMM doesn't know them) and the server lines, worded with `labels` (the UI's language).
 #[tauri::command]
-async fn maps_export(mut shown: Vec<MapMod>, map_line: Vec<String>, labels: maps::ExportLabels) -> Res<String> {
+async fn map_export(mut shown: Vec<MapMod>, map_line: Vec<String>, labels: maps::ExportLabels) -> Res<String> {
     blocking(move || -> Res<_> {
         let (mods, build, checked, order) = reading(|paths| Ok((scan(paths)?, profile::effective_build(paths), maps::checked(paths), profile::peek(paths).enabled())))?;
         let known = maps::workshop_maps(&checked, build, &mods).0;
@@ -995,7 +988,7 @@ async fn maps_export(mut shown: Vec<MapMod>, map_line: Vec<String>, labels: maps
         let mut find = |id: &str, needed_by: Option<&str>| match sources::find_mod(id, needed_by, build) {
             Ok(c) => c.into_iter().next().filter(|c| c.sure()).map(|c| (c.item.title, c.item.id)),
             Err(e) => {
-                pzmm_core::log!("error: looking up {id}: {e:#}");
+                pzmm_core::say!("lookupFailed", "error: looking up {id}: {error}", id = id, error = format!("{e:#}"));
                 None
             }
         };
@@ -1018,7 +1011,7 @@ async fn map_check(id: String, download: bool) -> Res<Vec<MapMod>> {
         MAP_CHECK_STOP.store(false, std::sync::atomic::Ordering::SeqCst);
         let found = maps::check(&Paths::detect(), &id, download, &MAP_CHECK_STOP).map_err(|e| maps::ui_error(&e))?.builds.remove(&build).unwrap_or_default();
         if found.is_empty() {
-            pzmm_core::log!("workshop:{id} adds no maps for Build {build}");
+            pzmm_core::say!("noMaps", "workshop:{id} adds no maps for Build {build}", id = id, build = build);
         }
         Ok(found)
     })
@@ -1079,7 +1072,7 @@ fn map_presets() -> Res<BTreeMap<String, Vec<String>>> {
 /// Save a named set of maps; no `ids` deletes it.
 #[tauri::command(async)]
 fn map_preset_set(name: String, ids: Option<Vec<String>>) -> Res<BTreeMap<String, Vec<String>>> {
-    reading(|paths| {
+    locked(|paths| {
         maps::set_preset(paths, &name, ids)?;
         Ok(maps::presets(paths))
     })
@@ -1119,11 +1112,11 @@ async fn profile_import(shared: profile::Shared) -> Res<View> {
     blocking(move || {
         let needs = reading(|paths| Ok(profile::import_needs(&shared, &scan(paths)?)))?;
         if !needs.is_empty() {
-            pzmm_core::log!("installing {} Workshop item(s) the shared profile uses", needs.len());
+            pzmm_core::say!("sharedItems", "installing {count} Workshop item(s) the shared profile uses", count = needs.len());
         }
         fetch_then(&needs, false, |paths, _| {
             let p = profile::import(paths, &shared)?;
-            pzmm_core::log!("Imported the profile as \"{}\".", p.name);
+            pzmm_core::say!("imported", "Imported the profile as \"{name}\".", name = p.name);
             view(paths)
         })
     })
@@ -1189,11 +1182,11 @@ async fn mode_switch(mode: String) -> Res<View> {
 fn open_path(app: AppHandle, path: String) -> Res<()> {
     // folders only: a file path here could launch a program
     if !std::path::Path::new(&path).is_dir() {
-        pzmm_core::log!("error: not a folder: {path}");
+        pzmm_core::say!("notAFolder", "error: not a folder: {path}", path = path);
         return Err(format!("not a folder: {path}"));
     }
     app.opener().open_path(&path, None::<&str>).map_err(|e| {
-        pzmm_core::log!("error: couldn't open {path}: {e}");
+        pzmm_core::say!("openFailed", "error: couldn't open {path}: {error}", path = path, error = e);
         e.to_string()
     })
 }
@@ -1201,7 +1194,7 @@ fn open_path(app: AppHandle, path: String) -> Res<()> {
 #[tauri::command(async)]
 fn open_url(app: AppHandle, url: String) -> Res<()> {
     if !(url.starts_with("https://") || url == format!("steam://rungameid/{}", pz::STEAM_APP)) {
-        pzmm_core::log!("error: PZMM only opens https links: {url}");
+        pzmm_core::say!("httpsOnly", "error: PZMM only opens https links: {url}", url = url);
         return Err(format!("refusing to open {url}"));
     }
     // Workshop pages open in the Steam client when it's running (Subscribe works there), unless
@@ -1210,7 +1203,7 @@ fn open_url(app: AppHandle, url: String) -> Res<()> {
     let steam = workshop && settings::load().workshop_links != "browser" && sources::steam_workshop::client_running();
     let url = if steam { format!("steam://openurl/{url}") } else { url };
     app.opener().open_url(&url, None::<&str>).map_err(|e| {
-        pzmm_core::log!("error: couldn't open {url}: {e} (is Steam installed?)");
+        pzmm_core::say!("openUrlFailed", "error: couldn't open {url}: {error} (is Steam installed?)", url = url, error = e);
         e.to_string()
     })
 }
@@ -1230,7 +1223,7 @@ fn launch_url(args: &str) -> String {
 fn launch_game(app: AppHandle) -> Res<()> {
     let url = launch_url(&settings::load().launch_args);
     app.opener().open_url(&url, None::<&str>).map_err(|e| {
-        pzmm_core::log!("error: couldn't start the game ({url}): {e} (is Steam installed?)");
+        pzmm_core::say!("launchFailed", "error: couldn't start the game ({url}): {error} (is Steam installed?)", url = url, error = e);
         e.to_string()
     })
 }
@@ -1334,7 +1327,7 @@ fn github_token_set(token: String) -> Res<()> {
 fn backups_clear() -> Res<u64> {
     locked(|paths| {
         store::clear_backups(paths)?;
-        pzmm_core::log!("Deleted all backups.");
+        pzmm_core::say!("backupsDeleted", "Deleted all backups.");
         Ok(store::backups_size(paths))
     })
 }
@@ -1386,7 +1379,7 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
             pzmm_core::set_log_sink(move |line| {
-                let _ = handle.emit("log", line.to_string());
+                let _ = handle.emit("log", line);
             });
             let handle = app.handle().clone();
             pzmm_core::set_progress_sink(move |done, total| {
@@ -1396,10 +1389,10 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            load, save, install, update_all, remove, rollback, profile_new, profile_use, profile_delete, profile_rename, profile_duplicate, profile_snapshot, profile_snapshots, snapshot_restore, set_build,
+            load, save, install, remove, rollback, profile_new, profile_use, profile_delete, profile_rename, profile_duplicate, snapshot_create, snapshot_list, snapshot_restore, set_build,
             details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, mod_changes, workshop_comments, workshop_author, zb_status, zb_preview, zb_install, zb_uninstall,
             find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_preview, server_export, server_import, server_start, save_use,
-            maps_view, map_grid, map_quick_select, map_line, map_order_save, maps_export, map_check, map_check_stop, map_scan, map_scan_stop, map_presets, map_preset_set, map_server_compare,
+            map_view, map_grid, map_quick_select, map_line, map_order_save, map_export, map_check, map_check_stop, map_scan, map_scan_stop, map_presets, map_preset_set, map_server_compare,
             mode_preview, mode_switch, doctor, console_errors, profile_export, profile_import,
             launch_game, settings_get, settings_set, folder_set, pick_folder, pick_install, install_stop, mask_user, github_token_set, backups_clear, diagnostics
         ])

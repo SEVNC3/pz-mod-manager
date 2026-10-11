@@ -225,7 +225,8 @@
     "updated": "{name} обновлён.",
     "snapshotRestored": "Снимок восстановлен. Заменённый список тоже сохранён как снимок.",
     "pickRequirement": "Ни один предмет Мастерской точно не содержит {id}: выберите вариант в разделе «Требует» в подробностях.",
-    "idCopied": "{id} скопирован."
+    "idCopied": "{id} скопирован.",
+    "bisectOtherProfile": "Поиск сломанного мода идёт на профиле «{profile}»: вернитесь к нему, чтобы ответить или остановить поиск."
   },
   "confirm": {
     "group": "Группировка по категориям заменит ваши разделы ({sections}) разделами категорий. Ctrl+Z отменит это. Сгруппировать?",
@@ -284,7 +285,8 @@
     "import": "Импорт",
     "clear": "Очистить",
     "workshop": "Мастерская",
-    "refresh": "Обновить"
+    "refresh": "Обновить",
+    "tryAgain": "Повторить"
   },
   "format": {
     "gb": "{n} ГБ",
@@ -636,7 +638,9 @@
       "noFiles": "Steam не показывает файлов для этого предмета.",
       "fileList": "Steam не выдал список файлов предмета.",
       "login": "Не удалось анонимно войти в Steam.",
-      "downloadFailed": "Загрузка не удалась."
+      "downloadFailed": "Загрузка не удалась.",
+      "reloaded": "Список модов изменили в меню модов игры, поэтому порядок карт не сохранён. Расставьте их заново.",
+      "otherProfile": "Порядок карт не сохранён: теперь активен другой профиль."
     },
     "updatedAgo": "обновлено {when}",
     "expand": "Развернуть",
@@ -811,9 +815,9 @@
       "many": "{count} ошибок, первая в <span class=\"mono\">{example}</span>",
       "other": "{count} ошибки, первая в <span class=\"mono\">{example}</span>"
     },
-    "unexplained": "Что-то ломается, но ничто выше этого не объясняет?",
-    "halves": "PZMM делит включённые моды пополам при каждой проверке в игре.",
-    "disable": "Отключить {id}"
+    "disable": "Отключить {id}",
+    "bisectOffer": "Что-то ломается, а выше причины не видно? {link}: PZMM при каждой проверке игры сокращает число включённых модов вдвое.",
+    "finishFirst": "Сначала завершите или остановите поиск сломанного мода."
   },
   "settings": {
     "label": "Настройки",
@@ -924,7 +928,8 @@
       "diagnostics": "Копировать диагностику",
       "diagnosticsTip": "Версия, папки, профиль, число модов и результаты проверки настройки; имя пользователя скрыто",
       "keys": "Клавиатура: <kbd>/</kbd> поиск · <kbd>↑</kbd><kbd>↓</kbd> переход по строкам · <kbd>Enter</kbd> подробности · <kbd>Space</kbd> вкл./выкл. · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> изменить порядок · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> отменить/повторить · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+клик выбрать несколько · <kbd>Esc</kbd> снять выделение"
-    }
+    },
+    "readFailed": "Не удалось прочитать настройки: {error}"
   },
   "servers": {
     "label": "Серверы и сохранения",
@@ -1325,5 +1330,81 @@
     "toBottom": "В конец порядка загрузки",
     "copyId": "Копировать ID мода",
     "showInMaps": "Показать в Картах"
+  },
+  "backend": {
+    "stateDamaged": "{file} повреждён ({error}); копия сохранена как state.json.bad, начато заново",
+    "mapsNotUpdated": "не удалось прочитать ваши моды, поэтому список карт игры не обновлён: {error}",
+    "settingsDamaged": "{file} повреждён ({error}); копия сохранена как {copy}, использованы настройки по умолчанию",
+    "duplicateId": "{source}: пропущен второй мод с id {id}",
+    "notOursInMods": "{id} уже есть в {dir} и установлен не PZMM; оставлен как есть. Удалите эту папку, чтобы установить эту копию.",
+    "alreadyCurrent": "{id} уже актуален ({source})",
+    "installed": "{id} установлен ({source})",
+    "backupsPruned": "Удалены самые старые резервные копии (количество: {count}), чтобы они занимали не больше {mb} MB",
+    "tagsFailed": "Не удалось прочитать теги Мастерской: {error}",
+    "dataCopied": "Данные PZMM скопированы в {to}, но старую папку {from} удалить не удалось ({error}). Удалите её сами.",
+    "dataMoved": "Данные PZMM перенесены в {to}",
+    "mapIndexBroken": "Встроенный индекс карт PZMM не читается ({error}); вместо него сканирование Мастерской читает каждую карту",
+    "fileDamaged": "{file} повреждён ({error}); копия сохранена как {copy}, начато заново",
+    "noFileList": "workshop:{item}: Steam не дал список файлов ({error}), вместо этого загрузка через SteamCMD",
+    "downloadNotDeleted": "не удалось удалить загруженные файлы в {dir}: {error}",
+    "switchedViewpoint": "Переключено на Project Viewpoint (профиль «{name}»). При первом запуске игры ZombieBuddy попросит одобрить Java-код Viewpoint.",
+    "switchedZomboid": "Переключено на Project Zomboid (профиль «{name}»).",
+    "downloadingGithub": "загрузка github:{spec}...",
+    "subscribedCopy": "{source}: вы подписаны на него в Steam, который его обновляет; используется эта копия ({ids})",
+    "oldCopyNotRemoved": "не удалось удалить старую копию PZMM для {ids}: {error}",
+    "pruneFailed": "не удалось очистить резервные копии: {error}",
+    "collectionsFailed": "не удалось проверить коллекции Мастерской: {error}",
+    "collection": "коллекция {id}: предметов: {count}",
+    "requiresAdding": "workshop:{id} требует workshop:{req}, добавляем",
+    "requiresFailed": "не удалось проверить, что требует workshop:{id}: {error}",
+    "requiredItemsFailed": "не удалось прочитать требуемые предметы workshop:{item}: {error}",
+    "downloadingSteamcmd": "загрузка steamcmd...",
+    "downloadingItems": "загрузка предметов Мастерской: {count}...",
+    "steamcmdStopped": "SteamCMD остановлен (вами); не загружено: {ids}",
+    "steamcmdTimedOut": "SteamCMD остановлен (ни одна загрузка не завершилась за час); не загружено: {ids}",
+    "leftOff": "{id} оставлен выключенным: он несовместим с {other}. Включите его вместо {other}, если он вам нужнее.",
+    "notOurs": "{id}: установлен не PZMM (подписка на Мастерскую или ручная установка); оставлен как есть",
+    "rolledBack": "{id}: восстановлена предыдущая версия",
+    "profileCopied": "Профиль «{from}» скопирован как «{to}».",
+    "zbSetUp": "ZombieBuddy настроен. Java-моды просят вашего одобрения при первой загрузке.",
+    "found": "{id}: найден в Мастерской как «{title}» ({item})",
+    "lookupFailed": "не удалось найти {id}: {error}",
+    "noClearMatch": "{id}: ни один предмет Мастерской явно его не содержит. Выберите один через Скачать в сведениях о моде.",
+    "serverItems": "установка предметов Мастерской, которые использует сервер: {count}",
+    "serverStarted": "Сервер {name} запущен ({script}).",
+    "noMaps": "workshop:{id} не добавляет карт для Build {build}",
+    "sharedItems": "установка предметов Мастерской, которые использует общий профиль: {count}",
+    "imported": "Профиль импортирован как «{name}».",
+    "notAFolder": "не папка: {path}",
+    "openFailed": "не удалось открыть {path}: {error}",
+    "httpsOnly": "PZMM открывает только ссылки https: {url}",
+    "openUrlFailed": "не удалось открыть {url}: {error} (Steam установлен?)",
+    "launchFailed": "не удалось запустить игру ({url}): {error} (Steam установлен?)",
+    "backupsDeleted": "Все резервные копии удалены."
+  },
+  "doctor": {
+    "notInstalled": "включён, но не установлен: игра его пропускает",
+    "needsDisabled": "требует {req}, который отключён",
+    "needsMissing": "требует {req}, который не установлен",
+    "needsLater": "требует {req}, который загружается позже",
+    "incompatible": "несовместим с {other}, который тоже включён",
+    "loadAfter": "должен загружаться после {other}",
+    "loadBefore": "должен загружаться перед {other}",
+    "only41": "рассчитан на Build 41 (нет папки 42/ или common/); в Build 42 может выдавать ошибки или ничего не делать",
+    "only42": "рассчитан только на Build 42 (нет mod.info в корне)",
+    "twoCopies": "есть в Zomboid/mods и одновременно в подписках Steam: побеждает копия из Zomboid/mods, и обновления Steam она не получит",
+    "missingEnv": "{path} не существует (задано через {env})",
+    "missingSet": "{path} не существует (задано в Настройках)",
+    "notYet": "{path} ещё не существует: запустите игру один раз",
+    "notPzEnv": "{path} не похоже на «{folder}» (задано через {env})",
+    "notPzSet": "{path} не похоже на «{folder}» (задано в Настройках)",
+    "notPz": "{path} не похоже на «{folder}»",
+    "folderWarning": "{path}: {warning}",
+    "itemNotListed": "В Mods= есть {id}, но его предмета Мастерской {item} нет в WorkshopItems=: сервер его не загрузит",
+    "serverModMissing": "В Mods= есть {id}, который здесь не установлен, поэтому PZMM не может его проверить",
+    "itemUnused": "В WorkshopItems= есть {item}, но ни одного его мода нет в Mods=",
+    "backslash": "записи в Mods= в Build 42 должны начинаться с обратной косой черты (\\ModId)",
+    "mapNotListed": "мод добавляет карту {map}, но в Map= её нет",
+    "mapsAfterBase": "В Map= карты модов стоят после Muldraugh, KY: карты модов должны идти первыми"
   }
 }

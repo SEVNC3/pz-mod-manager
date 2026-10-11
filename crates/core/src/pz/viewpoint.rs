@@ -119,9 +119,10 @@ pub fn enter(paths: &Paths, mods: &BTreeMap<String, Row>) -> Result<Profile> {
     };
     profile::set_kind(paths, &p.name, KIND)?;
     profile::apply(paths, &p, Some(mods))?;
-    crate::log!(
-        "Switched to Project Viewpoint (profile \"{}\"). The first time the game starts, ZombieBuddy asks you to approve Viewpoint's Java code.",
-        p.name
+    crate::say!(
+        "switchedViewpoint",
+        "Switched to Project Viewpoint (profile \"{name}\"). The first time the game starts, ZombieBuddy asks you to approve Viewpoint's Java code.",
+        name = p.name
     );
     Ok(p)
 }
@@ -135,7 +136,7 @@ pub fn leave(paths: &Paths) -> Result<Profile> {
     };
     profile::set_kind(paths, &p.name, profile::DEFAULT_KIND)?;
     profile::apply(paths, &p, profile::maps_scan(crate::store::scan(paths)).as_ref())?;
-    crate::log!("Switched to Project Zomboid (profile \"{}\").", p.name);
+    crate::say!("switchedZomboid", "Switched to Project Zomboid (profile \"{name}\").", name = p.name);
     Ok(p)
 }
 

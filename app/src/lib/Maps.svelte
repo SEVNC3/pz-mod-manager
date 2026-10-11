@@ -25,9 +25,12 @@
   import { compact, fmtAgo, fmtSize, workshopUrl } from "./format";
   import { t, th, type Vars } from "./i18n.svelte";
   import { prefs } from "./prefs.svelte";
+  import { isTyping } from "./ui";
 
-  let { busy, mods, loadOrder, say, onSetMods, onInstallWorkshop, onShowMod, canUndo, onUndo, find = "" }: {
+  let { busy, profile, mods, loadOrder, say, onSetMods, onInstallWorkshop, onShowMod, canUndo, onUndo, find = "" }: {
     busy: boolean;
+    /** The active profile: an arranged Map= order is saved to it, never to one switched to since. */
+    profile: string;
     /** The library by mod id: what's installed and on. */
     mods: Map<string, ModRow>;
     /** The enabled mods' ids in load order. */
@@ -63,7 +66,7 @@
   /** Clicked cells (shift-click adds): the list shows only the maps covering one of them. */
   let pickedCells = $state<Cell[]>([]);
 
-  const load = () => api.mapsView().then((v) => (data = v)).catch((e) => say(errText(e), {}, true));
+  const load = () => api.mapView().then((v) => (data = v)).catch((e) => say(errText(e), {}, true));
   // after installs, removals and toggles (busy flips back), like Details; as the scan reads, and
   // when it ends (even if the tab was closed and opened again meanwhile)
   $effect(() => {
@@ -134,8 +137,7 @@
   }
   function undoKey(e: KeyboardEvent) {
     if (e.key === "Escape" && expanded) return toggleExpand();
-    const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
-    if (typing || busy || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== "z") return;
+    if (isTyping(e) || busy || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== "z") return;
     e.preventDefault();
     undo();
   }
@@ -367,13 +369,14 @@
   function arranged(line: string[]) {
     lineFor++; // an answer still on its way is older than this
     clearTimeout(saving);
-    saving = setTimeout(() => api.mapOrderSave(line).catch((e) => say(errText(e), {}, true)), 600);
+    const to = profile; // as arranged: the prop follows a switch made while the save waits
+    saving = setTimeout(() => api.mapOrderSave(line, to).catch((e) => say(errText(e), {}, true)), 600);
   }
 
   async function exportMaps() {
     try {
       const labels = { ids: t("maps.export.text.ids"), required: t("maps.export.text.required"), missing: t("maps.export.text.missing") };
-      await navigator.clipboard.writeText(await api.mapsExport(shown, $state.snapshot(mapLine), labels));
+      await navigator.clipboard.writeText(await api.mapExport(shown, $state.snapshot(mapLine), labels));
       say("maps.export.copied", { count: shown.length });
     } catch (e) {
       say(errText(e), {}, true);

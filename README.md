@@ -32,6 +32,13 @@ A free, open-source mod manager for **Project Zomboid** (Build 41 and 42), for W
 
   It also counts the Lua errors in your last session's `console.txt` per mod. **Find the broken mod** narrows down a crash by halving your mods each time you test the game.
 - **Big lists:** select several mods at once (Ctrl/Shift+click), fold separators, sort by name, size or last change, and undo with Ctrl+Z.
+- **Everyday:**
+  - **Snapshots:** before updates, Autosort, Group by category, big removals and imports, PZMM keeps the profile's list; restore one from the profile menu
+  - rename and duplicate profiles
+  - right-click a mod for quick actions, and **Browse…** for zips and folders
+  - **What changed:** a mod's change notes since your version, before and after updating
+  - progress and **Cancel** for downloads; **Launch game** warns about problems first; an activity log with times and **Copy log**
+- **Languages:** English, Deutsch, Español, Français, Italiano, 한국어, Polski, Português (Brasil), Русский and 简体中文 (Settings → Language).
 - **Share a profile:** **Share** copies a code. A friend pastes it into **Import**, and PZMM installs the Workshop mods they're missing.
 - **Saves:** PZMM warns when your latest save was played with a different mod list, and offers to load the save's list.
 - **Ownership:** PZMM only deletes mods it installed. It never touches your Workshop subscriptions or mods you installed by hand.
@@ -51,8 +58,8 @@ The Windows installer isn't code-signed yet, so Windows may show a SmartScreen w
 ## Use
 
 1. Paste a Workshop link, a GitHub repo or a zip path into the box at the top, then click **Install**. The mod is installed and enabled.
-2. Tick or untick mods to enable or disable them. Drag rows to change the load order. With a row selected, you can also use the keyboard: **Space** toggles it and **Alt+↑/↓** moves it.
-3. Use **Separator** to group your library, or **Group by category** to sort it into sections, and **Autosort** to fix the load order. Double-click a separator to rename it, drag it to move its whole section, and press **Delete** to remove it (its mods stay where they are).
+2. Tick or untick mods to enable or disable them. The library on the left is your own arrangement: drag rows (or press **Alt+↑/↓** on a selected row) to organise it, and **Space** toggles a mod. What the game loads is the **load order** beside it: drag its entries, press **Alt+↑/↓** on one, or click **Autosort**.
+3. Use **Separator** to group your library, or **Group by category** to sort it into sections. Double-click a separator to rename it, drag it to move its whole section, and press **Delete** to remove it (its mods stay where they are).
 4. Click **Launch game**.
 
 **Build 41 or 42?** PZMM keeps whatever format your `default.txt` already uses. If the file is new, PZMM uses the Build 42 format. To set it yourself, go to **Settings → Game build**. Before each save, the previous file is kept as `default.txt.bak`.
@@ -72,6 +79,10 @@ pzmm profile list
 pzmm profile new Server
 pzmm profile use Server
 pzmm profile delete Server
+pzmm profile rename Server "Friends server"
+pzmm profile duplicate Solo "Solo test"   # a copy; stays on the active profile
+pzmm snapshot list           # the active profile's lists from before big changes
+pzmm snapshot restore 1791000000000   # the id from snapshot list
 pzmm build 41                # force the B41 default.txt format
 pzmm search snow --sort toprated --build 42 --page 2
 pzmm outdated                # Workshop mods with updates waiting

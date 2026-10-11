@@ -3,13 +3,16 @@
   import type { Mode, View } from "./api";
   import { t } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
+  import { menuKeys } from "./ui";
 
   // One picker for "which mod list am I playing": every profile, grouped under its game.
   // Picking a profile from the other game goes through the mode switch (onSwitchGame).
-  // Rename, Duplicate and Snapshots act on the active profile.
-  let { view, busy, onUse, onSwitchGame, onNew, onRename, onDuplicate, onSnapshots }: {
+  // Rename, Duplicate and Snapshots act on the active profile. While `lock` says why (a search for a
+  // broken mod is running on this profile), only Snapshots is open: the rest would leave or change it.
+  let { view, busy, lock = "", onUse, onSwitchGame, onNew, onRename, onDuplicate, onSnapshots }: {
     view: View | null;
     busy: boolean;
+    lock?: string;
     onUse: (name: string) => void;
     onSwitchGame: (target: Mode, profile?: string) => void;
     onNew: () => void;
@@ -49,18 +52,6 @@
     if (kindOf(p) === mode) onUse(p);
     else onSwitchGame(kindOf(p), p);
   }
-  function menuKey(e: KeyboardEvent) {
-    const items = [...(root?.querySelectorAll<HTMLElement>("[role^=menuitem]") ?? [])];
-    const i = items.indexOf(document.activeElement as HTMLElement);
-    if (e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
-      close();
-    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
-    } else if (e.key === "Tab") close(false);
-  }
 </script>
 
 <svelte:window onpointerdown={(e) => open && !root?.contains(e.target as Node) && close(false)} />
@@ -76,34 +67,35 @@
 
   {#if open}
     <!-- svelte-ignore a11y_interactive_supports_focus -->
-    <div class="menu" role="menu" aria-label={t("profile.menuLabel")} tabindex="-1" onkeydown={menuKey}>
+    <div class="popup-menu" role="menu" aria-label={t("profile.menuLabel")} tabindex="-1" onkeydown={(e) => menuKeys(e, root, close)}>
       {#each groups as g}
         {#if g.profiles.length}
           <div class="group" role="presentation">
             <img src={g.img} alt={g.label} height="16" />
           </div>
           {#each g.profiles as p}
-            <button role="menuitemradio" aria-checked={p === view?.profile} class="item" class:on={p === view?.profile} onclick={() => pick(p)}>
+            <button role="menuitemradio" aria-checked={p === view?.profile} class="item" class:on={p === view?.profile} onclick={() => pick(p)}
+              disabled={!!lock && p !== view?.profile} title={p === view?.profile ? "" : lock}>
               <span class="tick">{#if p === view?.profile}<Icon name="check" size={14} />{/if}</span>{p}
             </button>
           {/each}
         {/if}
       {/each}
       <div class="sep" role="separator"></div>
-      <button role="menuitem" class="item" onclick={() => { close(false); onNew(); }}>
+      <button role="menuitem" class="item" onclick={() => { close(false); onNew(); }} disabled={!!lock} title={lock}>
         <span class="tick"><Icon name="plus" size={14} /></span>{t("profile.newProfile")}
       </button>
-      <button role="menuitem" class="item" onclick={() => { close(false); onRename(); }}>
+      <button role="menuitem" class="item" onclick={() => { close(false); onRename(); }} disabled={!!lock} title={lock}>
         <span class="tick"><Icon name="check" size={14} /></span>{t("profile.rename")}
       </button>
-      <button role="menuitem" class="item" onclick={() => { close(false); onDuplicate(); }}>
+      <button role="menuitem" class="item" onclick={() => { close(false); onDuplicate(); }} disabled={!!lock} title={lock}>
         <span class="tick"><Icon name="copy" size={14} /></span>{t("profile.duplicate")}
       </button>
       <button role="menuitem" class="item" onclick={() => { close(); onSnapshots(); }}>
         <span class="tick"><Icon name="rollback" size={14} /></span>{t("profile.snapshots")}
       </button>
       {#if !hasViewpoint}
-        <button role="menuitem" class="item" onclick={() => { close(); onSwitchGame("viewpoint"); }}>
+        <button role="menuitem" class="item" onclick={() => { close(); onSwitchGame("viewpoint"); }} disabled={!!lock} title={lock}>
           <span class="tick"><Icon name="swap" size={14} /></span>{t("profile.setUpViewpoint")}
         </button>
       {/if}
@@ -143,19 +135,10 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
-  .menu {
+  .popup-menu {
     position: absolute;
     top: calc(100% + 4px);
     left: 0;
-    z-index: 30;
-    min-width: 260px;
-    padding: 4px;
-    background: var(--raised);
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    box-shadow: var(--shadow);
-    display: flex;
-    flex-direction: column;
   }
   .group {
     padding: 8px 10px 4px;
@@ -166,25 +149,8 @@
     width: auto;
     opacity: 0.8;
   }
-  .item {
-    justify-content: flex-start;
-    gap: 6px;
-    padding: 5px 10px;
-    border-radius: 4px;
-    text-align: left;
-  }
   .item.on {
     font-weight: 700;
-  }
-  .tick {
-    width: 16px;
-    display: inline-flex;
-    color: inherit;
-  }
-  .sep {
-    height: 1px;
-    margin: 4px 6px;
-    background: var(--line);
   }
   /* the wordmarks are white: darken them on the light theme */
   :global(:root[data-theme="light"]) .picker img {

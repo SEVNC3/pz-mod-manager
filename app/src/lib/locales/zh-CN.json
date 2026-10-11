@@ -183,7 +183,8 @@
     "updated": "已更新 {name}。",
     "snapshotRestored": "已恢复快照。被替换的列表也保存为了快照。",
     "pickRequirement": "没有创意工坊项目明确提供 {id}：请在详情的“需要”中选择一个。",
-    "idCopied": "已复制 {id}。"
+    "idCopied": "已复制 {id}。",
+    "bisectOtherProfile": "查找出问题的模组正在配置方案“{profile}”上进行：请切回该方案来回答或停止查找。"
   },
   "confirm": {
     "group": "“按类别分组”会将你自己的分组（{sections}）替换为类别分组。按 Ctrl+Z 可撤销。现在分组吗？",
@@ -224,7 +225,8 @@
     "import": "导入",
     "clear": "清除",
     "workshop": "创意工坊",
-    "refresh": "刷新"
+    "refresh": "刷新",
+    "tryAgain": "重试"
   },
   "format": {
     "gb": "{n} GB",
@@ -507,7 +509,9 @@
       "noFiles": "Steam 没有列出此物品的任何文件。",
       "fileList": "Steam 没有提供该物品的文件列表。",
       "login": "无法匿名登录 Steam。",
-      "downloadFailed": "下载失败。"
+      "downloadFailed": "下载失败。",
+      "reloaded": "模组列表已在游戏内的模组菜单中更改，因此地图顺序没有保存。请重新排列。",
+      "otherProfile": "地图顺序没有保存：现在启用的是另一个配置方案。"
     },
     "updatedAgo": "{when}更新",
     "expand": "展开",
@@ -658,9 +662,9 @@
     "errorCount": {
       "other": "{count} 个错误，首个位于 <span class=\"mono\">{example}</span>"
     },
-    "unexplained": "有东西出错，但上面的内容都无法解释？",
-    "halves": "每次你测试游戏时，PZMM 都会将已启用的模组减半。",
-    "disable": "禁用 {id}"
+    "disable": "禁用 {id}",
+    "bisectOffer": "出了问题，但上面没有任何解释？{link}：PZMM 每次测试游戏时都会把你已启用的模组减半。",
+    "finishFirst": "请先完成或停止查找出问题的模组。"
   },
   "settings": {
     "label": "设置",
@@ -771,7 +775,8 @@
       "diagnostics": "复制诊断信息",
       "diagnosticsTip": "版本、文件夹、配置方案、模组数量和“检查设置”结果，用户名已隐去",
       "keys": "键盘：<kbd>/</kbd> 搜索 · <kbd>↑</kbd><kbd>↓</kbd> 在行间移动 · <kbd>Enter</kbd> 详情 · <kbd>Space</kbd> 启用/禁用 · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> 调整顺序 · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> 撤销/重做 · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+点击 多选 · <kbd>Esc</kbd> 清除选择"
-    }
+    },
+    "readFailed": "无法读取设置：{error}"
   },
   "servers": {
     "label": "服务器与存档",
@@ -1118,5 +1123,81 @@
     "toBottom": "移到加载顺序的最后面",
     "copyId": "复制模组 ID",
     "showInMaps": "在地图中显示"
+  },
+  "backend": {
+    "stateDamaged": "{file} 已损坏（{error}）；已将副本保留为 state.json.bad，并重新开始",
+    "mapsNotUpdated": "无法读取你的模组，因此游戏的地图列表未更新：{error}",
+    "settingsDamaged": "{file} 已损坏（{error}）；已将副本保留为 {copy}，并使用默认设置",
+    "duplicateId": "{source}：已跳过第二个 ID 为 {id} 的模组",
+    "notOursInMods": "{id} 已在 {dir} 中，且不是由 PZMM 安装的，已保持原样。如需安装此副本，请删除该文件夹。",
+    "alreadyCurrent": "{id} 已是最新（{source}）",
+    "installed": "已安装 {id}（{source}）",
+    "backupsPruned": "已删除最旧的备份（数量：{count}），使备份保持在 {mb} MB 以内",
+    "tagsFailed": "无法读取创意工坊标签：{error}",
+    "dataCopied": "已将 PZMM 的数据复制到 {to}，但无法删除旧文件夹 {from}（{error}）。请自行删除。",
+    "dataMoved": "已将 PZMM 的数据移动到 {to}",
+    "mapIndexBroken": "PZMM 内置的地图索引无法解析（{error}）；创意工坊扫描将改为读取每一张地图",
+    "fileDamaged": "{file} 已损坏（{error}）；已将副本保留为 {copy}，并重新开始",
+    "noFileList": "workshop:{item}：Steam 未提供文件列表（{error}），改用 SteamCMD 下载",
+    "downloadNotDeleted": "无法删除 {dir} 中的下载内容：{error}",
+    "switchedViewpoint": "已切换到 Project Viewpoint（配置方案“{name}”）。首次启动游戏时，ZombieBuddy 会请你批准 Viewpoint 的 Java 代码。",
+    "switchedZomboid": "已切换到 Project Zomboid（配置方案“{name}”）。",
+    "downloadingGithub": "正在下载 github:{spec}...",
+    "subscribedCopy": "{source}：你已在 Steam 中订阅，由 Steam 保持更新；使用该副本（{ids}）",
+    "oldCopyNotRemoved": "无法移除 PZMM 为 {ids} 保留的旧副本：{error}",
+    "pruneFailed": "无法清理备份：{error}",
+    "collectionsFailed": "无法检查创意工坊合集：{error}",
+    "collection": "合集 {id}：物品数：{count}",
+    "requiresAdding": "workshop:{id} 需要 workshop:{req}，正在添加",
+    "requiresFailed": "无法检查 workshop:{id} 需要什么：{error}",
+    "requiredItemsFailed": "无法读取 workshop:{item} 所需的物品：{error}",
+    "downloadingSteamcmd": "正在下载 steamcmd...",
+    "downloadingItems": "正在下载创意工坊物品，数量：{count}...",
+    "steamcmdStopped": "SteamCMD 已停止（由你停止）；未下载：{ids}",
+    "steamcmdTimedOut": "SteamCMD 已停止（一小时内没有任何下载完成）；未下载：{ids}",
+    "leftOff": "{id} 已保持禁用：它与 {other} 不兼容。如果更喜欢它，请启用它来代替 {other}。",
+    "notOurs": "{id}：不是由 PZMM 安装的（创意工坊订阅或手动安装），已保持原样",
+    "rolledBack": "{id}：已恢复到上一版本",
+    "profileCopied": "已将配置方案“{from}”复制为“{to}”。",
+    "zbSetUp": "ZombieBuddy 已设置完成。Java 模组首次加载时会请求你的批准。",
+    "found": "{id}：在创意工坊中找到，名称为“{title}”（{item}）",
+    "lookupFailed": "查找 {id} 失败：{error}",
+    "noClearMatch": "{id}：没有创意工坊物品能明确提供它。请在模组详情中使用“下载”来选择一个。",
+    "serverItems": "正在安装服务器使用的创意工坊物品，数量：{count}",
+    "serverStarted": "已启动 {name} 服务器（{script}）。",
+    "noMaps": "workshop:{id} 没有为 Build {build} 添加地图",
+    "sharedItems": "正在安装共享配置方案使用的创意工坊物品，数量：{count}",
+    "imported": "已将配置方案导入为“{name}”。",
+    "notAFolder": "不是文件夹：{path}",
+    "openFailed": "无法打开 {path}：{error}",
+    "httpsOnly": "PZMM 只打开 https 链接：{url}",
+    "openUrlFailed": "无法打开 {url}：{error}（是否已安装 Steam？）",
+    "launchFailed": "无法启动游戏（{url}）：{error}（是否已安装 Steam？）",
+    "backupsDeleted": "已删除所有备份。"
+  },
+  "doctor": {
+    "notInstalled": "已启用但未安装：游戏会跳过它",
+    "needsDisabled": "需要 {req}，但它已被禁用",
+    "needsMissing": "需要 {req}，但它未安装",
+    "needsLater": "需要 {req}，但它加载得更晚",
+    "incompatible": "与 {other} 不兼容，而它也已启用",
+    "loadAfter": "应在 {other} 之后加载",
+    "loadBefore": "应在 {other} 之前加载",
+    "only41": "是为 Build 41 制作的（没有 42/ 或 common/ 文件夹）；在 Build 42 上可能报错或无效果",
+    "only42": "仅为 Build 42 制作（根目录没有 mod.info）",
+    "twoCopies": "既在 Zomboid/mods 中，又在 Steam 中订阅：以 Zomboid/mods 中的副本为准，不会获得 Steam 的更新",
+    "missingEnv": "{path} 不存在（由 {env} 设置）",
+    "missingSet": "{path} 不存在（在设置中指定）",
+    "notYet": "{path} 尚不存在：请先启动一次游戏",
+    "notPzEnv": "{path} 看起来不像“{folder}”（由 {env} 设置）",
+    "notPzSet": "{path} 看起来不像“{folder}”（在设置中指定）",
+    "notPz": "{path} 看起来不像“{folder}”",
+    "folderWarning": "{path}：{warning}",
+    "itemNotListed": "Mods= 中有 {id}，但它的创意工坊物品 {item} 不在 WorkshopItems= 中：服务器不会下载它",
+    "serverModMissing": "Mods= 中有 {id}，但它未安装在此处，因此 PZMM 无法检查",
+    "itemUnused": "WorkshopItems= 中有 {item}，但它的模组都不在 Mods= 中",
+    "backslash": "在 Build 42 上，Mods= 中的条目需要以反斜杠开头（\\ModId）",
+    "mapNotListed": "有模组添加了地图 {map}，但 Map= 中没有列出它",
+    "mapsAfterBase": "Map= 把模组地图列在 Muldraugh, KY 之后：模组地图必须排在前面"
   }
 }

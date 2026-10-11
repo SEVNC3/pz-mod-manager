@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{Paths, is_version_dir};
 use crate::sources::steam_manifest::Session;
+use crate::sources::workshop_item;
 use crate::sources::steam_workshop::{self, Item};
 use crate::store;
 
@@ -605,7 +606,7 @@ fn seed() -> &'static BTreeMap<String, Checked> {
             return BTreeMap::new();
         }
         parse_seed(SEED).unwrap_or_else(|e| {
-            crate::log!("error: PZMM's built-in map index doesn't parse ({e:#}); the Workshop scan reads every map instead");
+            crate::say!("mapIndexBroken", "error: PZMM's built-in map index doesn't parse ({error}); the Workshop scan reads every map instead", error = format!("{e:#}"));
             BTreeMap::new()
         })
     })
@@ -634,7 +635,7 @@ fn read_json<T: serde::de::DeserializeOwned + Default>(file: &Path) -> Result<T>
         let bad = file.with_extension("json.bad");
         if fs::read(&bad).ok().as_deref() != Some(bytes.as_slice()) {
             let _ = fs::copy(file, &bad);
-            crate::log!("error: {} is damaged ({e}); kept a copy as {} and started over", file.display(), bad.display());
+            crate::say!("fileDamaged", "error: {file} is damaged ({error}); kept a copy as {copy} and started over", file = file.display(), error = e, copy = bad.display());
         }
         T::default()
     }))
@@ -829,7 +830,7 @@ pub fn check(paths: &Paths, item: &str, download: bool, stop: &AtomicBool) -> Re
         Err(_) if stop.load(Relaxed) => return Err(Fail::Stopped.into()),
         Err(e) if !download => return Err(e.context(Fail::FileList)),
         Err(e) => {
-            crate::log!("workshop:{item}: no file list from Steam ({e:#}), downloading it with SteamCMD instead");
+            crate::say!("noFileList", "workshop:{item}: no file list from Steam ({error}), downloading it with SteamCMD instead", item = item, error = format!("{e:#}"));
             // the download goes on every way out: read, failed, timed out or stopped
             let _gone = RemoveOnDrop(steam_workshop::steamcmd_dirs(paths, super::STEAM_APP, item));
             let got = steam_workshop::download(paths, super::STEAM_APP, &[item], stop)?;
@@ -853,7 +854,7 @@ impl Drop for RemoveOnDrop {
     fn drop(&mut self) {
         for d in self.0.iter().filter(|d| d.exists()) {
             if let Err(e) = fs::remove_dir_all(d) {
-                crate::log!("error: deleting the download in {}: {e}", d.display());
+                crate::say!("downloadNotDeleted", "error: deleting the download in {dir}: {error}", dir = d.display(), error = e);
             }
         }
     }
@@ -1134,11 +1135,6 @@ pub fn set_preset(paths: &Paths, name: &str, ids: Option<Vec<String>>) -> Result
     };
     fs::create_dir_all(&paths.data)?;
     Ok(crate::write_atomic(&presets_file(paths), serde_json::to_vec_pretty(&all)?)?)
-}
-
-/// The Workshop item in a source string (`steam:<id>` or `workshop:<id>`).
-pub fn workshop_item(source: &str) -> Option<&str> {
-    source.strip_prefix("steam:").or_else(|| source.strip_prefix("workshop:")).filter(|i| !i.is_empty())
 }
 
 /// The export's words, in the UI's language: `ids` fills `{id}` and `{folders}`, `missing`

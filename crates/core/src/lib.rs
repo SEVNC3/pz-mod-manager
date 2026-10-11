@@ -8,19 +8,43 @@ pub mod store;
 
 use std::sync::OnceLock;
 
-type Sink = Box<dyn Fn(&str) + Send + Sync>;
+/// An activity line: its English `text` and, for lines worded by PZMM, the locale key
+/// (`backend.<key>` in the app's locale files) and the values for its `{placeholders}`.
+#[derive(serde::Serialize)]
+pub struct LogLine {
+    pub text: String,
+    pub key: Option<&'static str>,
+    pub vars: std::collections::BTreeMap<&'static str, String>,
+}
+
+type Sink = Box<dyn Fn(&LogLine) + Send + Sync>;
 static SINK: OnceLock<Sink> = OnceLock::new();
 
 /// Send progress/error lines somewhere other than stdout (the desktop app's activity log).
-pub fn set_log_sink(f: impl Fn(&str) + Send + Sync + 'static) {
+pub fn set_log_sink(f: impl Fn(&LogLine) + Send + Sync + 'static) {
     let _ = SINK.set(Box::new(f));
 }
 
-pub fn log_line(msg: &str) {
+fn emit(line: LogLine) {
     match SINK.get() {
-        Some(f) => f(msg),
-        None => println!("{msg}"),
+        Some(f) => f(&line),
+        None => println!("{}", line.text),
     }
+}
+
+/// A line as it is (tool output, error details): it reads the same in every language.
+pub fn log_line(msg: &str) {
+    emit(LogLine { text: msg.into(), key: None, vars: Default::default() });
+}
+
+/// `template` with each `{name}` replaced by its value in `vars`.
+pub fn fill(template: &str, vars: &[(&'static str, String)]) -> String {
+    vars.iter().fold(template.to_string(), |s, (k, v)| s.replace(&format!("{{{k}}}"), v))
+}
+
+/// A line PZMM words itself: English from `template` (the CLI prints it), and the key the app translates.
+pub fn log_keyed(key: &'static str, template: &str, vars: &[(&'static str, String)]) {
+    emit(LogLine { text: fill(template, vars), key: Some(key), vars: vars.iter().cloned().collect() });
 }
 
 type ProgressSink = Box<dyn Fn(usize, usize) + Send + Sync>;
@@ -40,6 +64,16 @@ pub fn progress(done: usize, total: usize) {
 #[macro_export]
 macro_rules! log {
     ($($t:tt)*) => { $crate::log_line(&format!($($t)*)) };
+}
+
+/// `say!(key, template, name = value, ...)` with literal key and template: a translatable activity line (see `log_keyed`).
+/// The English must match `backend.<key>` in app/src/lib/locales/en.json (scripts/i18n-check.ts checks it);
+/// a template starting with "error: " is an error line (en.json leaves that prefix out).
+#[macro_export]
+macro_rules! say {
+    ($key:literal, $template:literal $(, $name:ident = $value:expr)* $(,)?) => {
+        $crate::log_keyed($key, $template, &[$((stringify!($name), $value.to_string())),*])
+    };
 }
 
 /// Write via a temp file + rename, so a crash never leaves a half-written file.
@@ -119,6 +153,13 @@ pub fn lock_data(paths: &pz::Paths) -> std::io::Result<std::fs::File> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn fills_placeholders() {
+        let vars = [("id", "A".to_string()), ("other", "B".to_string())];
+        assert_eq!(super::fill("{id} left off: it's incompatible with {other}. Enable it instead of {other}", &vars), "A left off: it's incompatible with B. Enable it instead of B");
+        assert_eq!(super::fill("{missing} stays", &vars), "{missing} stays");
+    }
+
     #[test]
     fn safe_file_names() {
         for ok in ["ModOptions", "Trash and Corpses", "TLOG_Remaster Flamethrower", "mod.v2", "Comic"] {

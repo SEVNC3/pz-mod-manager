@@ -67,7 +67,7 @@ pub fn load_from(path: &Path) -> Settings {
         let bad = path.with_extension("json.bad");
         if fs::read(&bad).ok().as_deref() != Some(text.as_bytes()) {
             let _ = fs::copy(path, &bad);
-            crate::log!("error: {} is damaged ({e}); kept a copy as {} and used the default settings", path.display(), bad.display());
+            crate::say!("settingsDamaged", "error: {file} is damaged ({error}); kept a copy as {copy} and used the default settings", file = path.display(), error = e, copy = bad.display());
         }
         Settings::default()
     })

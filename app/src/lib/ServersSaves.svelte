@@ -7,8 +7,10 @@
   import Icon from "./Icon.svelte";
   import MapOrder from "./MapOrder.svelte";
 
-  let { busy, profile, enabledIds, onImport, onUseSave, ask }: {
+  let { busy, lock = "", profile, enabledIds, onImport, onUseSave, ask }: {
     busy: boolean;
+    /** Why switching profile is blocked now ("" when it isn't): Use as profile and Use these mods wait. */
+    lock?: string;
     profile: string;
     enabledIds: string[];
     onImport: (name: string) => Promise<boolean>;
@@ -129,7 +131,7 @@
             <span class="name mono">{s}.ini</span>
             <span class="btns">
               <button disabled={busy} onclick={() => start(s)} title={t("servers.startTip")}><Icon name="server" size={14} />{t("servers.start")}</button>
-              <button disabled={busy} onclick={async () => { if (await onImport(s)) refresh(); }}><Icon name="upload" size={14} />{t("servers.useAsProfile")}</button>
+              <button disabled={busy || !!lock} title={lock} onclick={async () => { if (await onImport(s)) refresh(); }}><Icon name="upload" size={14} />{t("servers.useAsProfile")}</button>
             </span>
           </li>
         {/each}
@@ -153,7 +155,7 @@
               <strong>{s.name}</strong>
               <span class="hint">{t("servers.saves.info", { mode: s.mode, count: s.mods.length, when: when(s.modified), diff: diff(s.mods) })}</span>
             </span>
-            <button disabled={busy} onclick={() => onUseSave(s)}><Icon name="swap" size={14} />{t("servers.saves.useMods")}</button>
+            <button disabled={busy || !!lock} title={lock} onclick={() => onUseSave(s)}><Icon name="swap" size={14} />{t("servers.saves.useMods")}</button>
           </li>
         {/each}
       </ul>

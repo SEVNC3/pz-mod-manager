@@ -20,7 +20,11 @@ pub struct Finding {
     pub level: Level,
     /// The mod or file it's about.
     pub subject: String,
+    /// In English (the CLI, diagnostics).
     pub text: String,
+    /// The app's wording: doctor.<key> in its locale files, with the values for its {placeholders}.
+    pub key: &'static str,
+    pub vars: BTreeMap<&'static str, String>,
     /// What would fix it, for a button beside it.
     pub action: Option<Action>,
 }
@@ -33,12 +37,18 @@ pub enum Action {
     Disable(String),
 }
 
-fn err(subject: &str, text: String) -> Finding {
-    Finding { level: Level::Error, subject: subject.into(), text, action: None }
+/// A finding worded by the English template (with {name} placeholders) and keyed for the app;
+/// scripts/i18n-check.ts checks the template matches doctor.<key> in en.json.
+fn finding(level: Level, subject: &str, key: &'static str, template: &str, vars: &[(&'static str, String)]) -> Finding {
+    Finding { level, subject: subject.into(), text: crate::fill(template, vars), key, vars: vars.iter().cloned().collect(), action: None }
 }
 
-fn warn(subject: &str, text: String) -> Finding {
-    Finding { level: Level::Warning, subject: subject.into(), text, action: None }
+fn err(subject: &str, key: &'static str, template: &str, vars: &[(&'static str, String)]) -> Finding {
+    finding(Level::Error, subject, key, template, vars)
+}
+
+fn warn(subject: &str, key: &'static str, template: &str, vars: &[(&'static str, String)]) -> Finding {
+    finding(Level::Warning, subject, key, template, vars)
 }
 
 /// Check the enabled mods (in load order) for `build` (41/42), against everything
@@ -52,39 +62,41 @@ pub fn check(paths: &Paths, enabled: &[String], mods: &BTreeMap<String, Row>, bu
     let pos: HashMap<&str, usize> = enabled.iter().enumerate().map(|(i, id)| (id.as_str(), i)).collect();
     for (i, id) in enabled.iter().enumerate() {
         let Some(m) = mods.get(id) else {
-            out.push(err(id, "enabled but not installed: the game skips it".into()));
+            out.push(err(id, "notInstalled", "enabled but not installed: the game skips it", &[]));
             continue;
         };
         for r in &m.requires {
+            let req = [("req", r.clone())];
             match pos.get(r.as_str()) {
-                None if mods.contains_key(r) => out.push(err(id, format!("needs {r}, which is disabled"))),
-                None => out.push(Finding { action: Some(Action::Install(r.clone())), ..err(id, format!("needs {r}, which isn't installed")) }),
-                Some(&j) if j > i => out.push(err(id, format!("needs {r}, which loads after it"))),
+                None if mods.contains_key(r) => out.push(err(id, "needsDisabled", "needs {req}, which is disabled", &req)),
+                None => out.push(Finding { action: Some(Action::Install(r.clone())), ..err(id, "needsMissing", "needs {req}, which isn't installed", &req) }),
+                Some(&j) if j > i => out.push(err(id, "needsLater", "needs {req}, which loads after it", &req)),
                 Some(_) => {}
             }
         }
         for x in &m.incompatible {
             if pos.contains_key(x.as_str()) {
-                out.push(Finding { action: Some(Action::Disable(x.clone())), ..err(id, format!("is incompatible with {x}, which is also enabled")) });
+                let other = [("other", x.clone())];
+                out.push(Finding { action: Some(Action::Disable(x.clone())), ..err(id, "incompatible", "is incompatible with {other}, which is also enabled", &other) });
             }
         }
         for a in &m.load_after {
             if pos.get(a.as_str()).is_some_and(|&j| j > i) {
-                out.push(warn(id, format!("should load after {a}")));
+                out.push(warn(id, "loadAfter", "should load after {other}", &[("other", a.clone())]));
             }
         }
         for b in &m.load_before {
             if pos.get(b.as_str()).is_some_and(|&j| j < i) {
-                out.push(warn(id, format!("should load before {b}")));
+                out.push(warn(id, "loadBefore", "should load before {other}", &[("other", b.clone())]));
             }
         }
         if build >= 42 && !m.supports_42 {
-            out.push(warn(id, "is built for Build 41 (no 42/ or common/ folder); on Build 42 it may error or do nothing".into()));
+            out.push(warn(id, "only41", "is built for Build 41 (no 42/ or common/ folder); on Build 42 it may error or do nothing", &[]));
         } else if build == 41 && !m.supports_41 {
-            out.push(warn(id, "is built for Build 42 only (no root mod.info)".into()));
+            out.push(warn(id, "only42", "is built for Build 42 only (no root mod.info)", &[]));
         }
         if !m.source.starts_with("steam:") && subscribed.contains(id) {
-            out.push(warn(id, "is in Zomboid/mods and also subscribed in Steam: the Zomboid/mods copy wins and won't get Steam's updates".into()));
+            out.push(warn(id, "twoCopies", "is in Zomboid/mods and also subscribed in Steam: the Zomboid/mods copy wins and won't get Steam's updates", &[]));
         }
     }
     out.extend(check_servers(paths, mods, build));
@@ -96,18 +108,19 @@ fn check_folders() -> Vec<Finding> {
     let mut out = vec![];
     for f in super::folders::list(&crate::settings::load()) {
         let Some(p) = &f.path else { continue };
-        let by = match f.env {
-            Some(env) if f.overridden => format!(" (set by {env})"),
-            _ if f.custom => " (set in Settings)".into(),
-            _ => String::new(),
-        };
-        match f.status {
-            "missing" if !by.is_empty() => out.push(err(f.label, format!("{} doesn't exist{by}", p.display()))),
-            "missing" if f.key == "zomboid" => out.push(warn(f.label, format!("{} doesn't exist yet: start the game once", p.display()))),
-            "not_pz" => out.push(warn(f.label, format!("{} doesn't look like the {}{by}", p.display(), f.label))),
+        let path = ("path", p.display().to_string());
+        let folder = ("folder", f.label.to_string());
+        let env = f.env.filter(|_| f.overridden).map(|e| ("env", e.to_string()));
+        match (f.status, env) {
+            ("missing", Some(env)) => out.push(err(f.label, "missingEnv", "{path} doesn't exist (set by {env})", &[path.clone(), env])),
+            ("missing", None) if f.custom => out.push(err(f.label, "missingSet", "{path} doesn't exist (set in Settings)", std::slice::from_ref(&path))),
+            ("missing", None) if f.key == "zomboid" => out.push(warn(f.label, "notYet", "{path} doesn't exist yet: start the game once", std::slice::from_ref(&path))),
+            ("not_pz", Some(env)) => out.push(warn(f.label, "notPzEnv", "{path} doesn't look like the {folder} (set by {env})", &[path.clone(), folder, env])),
+            ("not_pz", None) if f.custom => out.push(warn(f.label, "notPzSet", "{path} doesn't look like the {folder} (set in Settings)", &[path.clone(), folder])),
+            ("not_pz", None) => out.push(warn(f.label, "notPz", "{path} doesn't look like the {folder}", &[path.clone(), folder])),
             _ => {}
         }
-        out.extend(f.warnings.iter().map(|w| warn(f.label, format!("{}: {w}", p.display()))));
+        out.extend(f.warnings.iter().map(|w| warn(f.label, "folderWarning", "{path}: {warning}", &[path.clone(), ("warning", w.clone())])));
     }
     out
 }
@@ -153,37 +166,38 @@ fn check_servers(paths: &Paths, mods: &BTreeMap<String, Row>, build: u8) -> Vec<
         for id in &cfg.mods {
             match mods.get(id) {
                 Some(m) => {
-                    if let Some(item) = m.source.strip_prefix("steam:").or_else(|| m.source.strip_prefix("workshop:")) {
+                    if let Some(item) = crate::sources::workshop_item(&m.source) {
                         needed_items.insert(item.to_string());
                         if !workshop.contains(item) {
-                            out.push(err(&subject, format!("Mods= has {id}, but its Workshop item {item} isn't in WorkshopItems=: the server won't download it")));
+                            let vars = [("id", id.clone()), ("item", item.to_string())];
+                            out.push(err(&subject, "itemNotListed", "Mods= has {id}, but its Workshop item {item} isn't in WorkshopItems=: the server won't download it", &vars));
                         }
                     }
                 }
-                None => out.push(warn(&subject, format!("Mods= has {id}, which isn't installed here, so PZMM can't check it"))),
+                None => out.push(warn(&subject, "serverModMissing", "Mods= has {id}, which isn't installed here, so PZMM can't check it", &[("id", id.clone())])),
             }
         }
         for item in &cfg.workshop {
             if !needed_items.contains(item) && mods.values().any(|m| m.source.ends_with(&format!(":{item}"))) {
-                out.push(warn(&subject, format!("WorkshopItems= has {item}, but none of its mods are in Mods=")));
+                out.push(warn(&subject, "itemUnused", "WorkshopItems= has {item}, but none of its mods are in Mods=", &[("item", item.clone())]));
             }
         }
         let mods_line = text.lines().find_map(|l| l.strip_prefix("Mods=")).unwrap_or("");
         if build >= 42 && !cfg.mods.is_empty() && !mods_line.contains('\\') {
-            out.push(err(&subject, "Mods= entries need a leading backslash on Build 42 (\\ModId)".into()));
+            out.push(err(&subject, "backslash", "Mods= entries need a leading backslash on Build 42 (\\ModId)", &[]));
         }
         let map_line = text.lines().find_map(|l| l.strip_prefix("Map=")).unwrap_or("");
         let maps: Vec<&str> = map_line.split(';').map(str::trim).filter(|m| !m.is_empty()).collect();
         let mod_maps = server::mod_maps(&cfg.mods, mods, build);
         for mm in &mod_maps {
             if !maps.contains(&mm.as_str()) {
-                out.push(warn(&subject, format!("a mod adds the map {mm}, but Map= doesn't list it")));
+                out.push(warn(&subject, "mapNotListed", "a mod adds the map {map}, but Map= doesn't list it", &[("map", mm.clone())]));
             }
         }
         if let Some(base) = maps.iter().position(|m| server::is_base_map(m))
             && maps[base + 1..].iter().any(|m| mod_maps.iter().any(|mm| mm == m))
         {
-            out.push(warn(&subject, "Map= lists mod maps after Muldraugh, KY: mod maps must come first".into()));
+            out.push(warn(&subject, "mapsAfterBase", "Map= lists mod maps after Muldraugh, KY: mod maps must come first", &[]));
         }
     }
     out

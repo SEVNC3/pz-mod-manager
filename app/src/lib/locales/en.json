@@ -197,7 +197,8 @@
     "updated": "Updated {name}.",
     "snapshotRestored": "Restored the snapshot. The list it replaced is a snapshot too.",
     "pickRequirement": "No Workshop item clearly provides {id}: pick one under Requires in the details.",
-    "idCopied": "Copied {id}."
+    "idCopied": "Copied {id}.",
+    "bisectOtherProfile": "The search for the broken mod runs on the profile \"{profile}\": switch back to it to answer or stop."
   },
   "confirm": {
     "group": "Group by category replaces your own sections ({sections}) with category sections. Ctrl+Z undoes it. Group now?",
@@ -244,7 +245,8 @@
     "import": "Import",
     "clear": "Clear",
     "workshop": "Workshop",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "tryAgain": "Try again"
   },
   "format": {
     "gb": "{n} GB",
@@ -550,7 +552,9 @@
       "noFiles": "Steam lists no files for this item.",
       "fileList": "Steam didn't give the item's file list.",
       "login": "Couldn't log in to Steam anonymously.",
-      "downloadFailed": "The download failed."
+      "downloadFailed": "The download failed.",
+      "reloaded": "The mod list was changed in the game's mod menu, so the map order wasn't saved. Arrange it again.",
+      "otherProfile": "The map order wasn't saved: another profile is active now."
     },
     "updatedAgo": "updated {when}",
     "expand": "Expand",
@@ -709,9 +713,9 @@
       "one": "{count} error, first at <span class=\"mono\">{example}</span>",
       "other": "{count} errors, first at <span class=\"mono\">{example}</span>"
     },
-    "unexplained": "Something breaks but nothing above explains it?",
-    "halves": "PZMM halves your enabled mods each time you test the game.",
-    "disable": "Disable {id}"
+    "disable": "Disable {id}",
+    "bisectOffer": "Something breaks but nothing above explains it? {link}: PZMM halves your enabled mods each time you test the game.",
+    "finishFirst": "Finish or stop the search for the broken mod first."
   },
   "settings": {
     "label": "Settings",
@@ -822,7 +826,8 @@
       "diagnostics": "Copy diagnostics",
       "diagnosticsTip": "Version, folders, profile, mod count and Check setup results, with your user name masked",
       "keys": "Keyboard: <kbd>/</kbd> search · <kbd>↑</kbd><kbd>↓</kbd> move between rows · <kbd>Enter</kbd> details · <kbd>Space</kbd> enable/disable · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> reorder · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> undo/redo · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+click select several · <kbd>Esc</kbd> clear selection"
-    }
+    },
+    "readFailed": "Couldn't read the settings: {error}"
   },
   "servers": {
     "label": "Servers and saves",
@@ -1187,5 +1192,81 @@
     "toBottom": "Move to the bottom of the load order",
     "copyId": "Copy mod ID",
     "showInMaps": "Show in Maps"
+  },
+  "backend": {
+    "stateDamaged": "{file} is damaged ({error}); kept a copy as state.json.bad and started fresh",
+    "mapsNotUpdated": "couldn't read your mods, so the game's map list wasn't updated: {error}",
+    "settingsDamaged": "{file} is damaged ({error}); kept a copy as {copy} and used the default settings",
+    "duplicateId": "{source}: skipped a second mod with the id {id}",
+    "notOursInMods": "{id} is already in {dir} and wasn't installed by PZMM; left it alone. Remove that folder to install this copy.",
+    "alreadyCurrent": "{id} is already up to date ({source})",
+    "installed": "installed {id} ({source})",
+    "backupsPruned": "Deleted the {count} oldest backup(s) to keep backups under {mb} MB",
+    "tagsFailed": "Couldn't read Workshop tags: {error}",
+    "dataCopied": "Copied PZMM's data to {to}, but couldn't delete the old folder {from} ({error}). Delete it yourself.",
+    "dataMoved": "Moved PZMM's data to {to}",
+    "mapIndexBroken": "PZMM's built-in map index doesn't parse ({error}); the Workshop scan reads every map instead",
+    "fileDamaged": "{file} is damaged ({error}); kept a copy as {copy} and started over",
+    "noFileList": "workshop:{item}: no file list from Steam ({error}), downloading it with SteamCMD instead",
+    "downloadNotDeleted": "deleting the download in {dir}: {error}",
+    "switchedViewpoint": "Switched to Project Viewpoint (profile \"{name}\"). The first time the game starts, ZombieBuddy asks you to approve Viewpoint's Java code.",
+    "switchedZomboid": "Switched to Project Zomboid (profile \"{name}\").",
+    "downloadingGithub": "downloading github:{spec}...",
+    "subscribedCopy": "{source}: you're subscribed in Steam, which keeps it updated; using that copy ({ids})",
+    "oldCopyNotRemoved": "removing PZMM's older copy of {ids}: {error}",
+    "pruneFailed": "pruning backups: {error}",
+    "collectionsFailed": "couldn't check for Workshop collections: {error}",
+    "collection": "collection {id}: {count} item(s)",
+    "requiresAdding": "workshop:{id} requires workshop:{req}, adding it",
+    "requiresFailed": "couldn't check what workshop:{id} requires: {error}",
+    "requiredItemsFailed": "couldn't read workshop:{item}'s required items: {error}",
+    "downloadingSteamcmd": "downloading steamcmd...",
+    "downloadingItems": "downloading {count} workshop item(s)...",
+    "steamcmdStopped": "SteamCMD was stopped (you stopped it); not downloaded: {ids}",
+    "steamcmdTimedOut": "SteamCMD was stopped (no download finished within an hour); not downloaded: {ids}",
+    "leftOff": "{id} left off: it's incompatible with {other}. Enable it instead of {other} if you prefer it.",
+    "notOurs": "{id}: not installed by PZMM (Workshop subscription or manual install); left alone",
+    "rolledBack": "{id}: restored the previous version",
+    "profileCopied": "Copied the profile \"{from}\" as \"{to}\".",
+    "zbSetUp": "ZombieBuddy is set up. Java mods ask for your approval the first time they load.",
+    "found": "{id}: found on the Workshop as \"{title}\" ({item})",
+    "lookupFailed": "looking up {id}: {error}",
+    "noClearMatch": "{id}: no Workshop item clearly provides it. Use Download in the mod's details to pick one.",
+    "serverItems": "installing {count} Workshop item(s) the server uses",
+    "serverStarted": "Started the {name} server ({script}).",
+    "noMaps": "workshop:{id} adds no maps for Build {build}",
+    "sharedItems": "installing {count} Workshop item(s) the shared profile uses",
+    "imported": "Imported the profile as \"{name}\".",
+    "notAFolder": "not a folder: {path}",
+    "openFailed": "couldn't open {path}: {error}",
+    "httpsOnly": "PZMM only opens https links: {url}",
+    "openUrlFailed": "couldn't open {url}: {error} (is Steam installed?)",
+    "launchFailed": "couldn't start the game ({url}): {error} (is Steam installed?)",
+    "backupsDeleted": "Deleted all backups."
+  },
+  "doctor": {
+    "notInstalled": "enabled but not installed: the game skips it",
+    "needsDisabled": "needs {req}, which is disabled",
+    "needsMissing": "needs {req}, which isn't installed",
+    "needsLater": "needs {req}, which loads after it",
+    "incompatible": "is incompatible with {other}, which is also enabled",
+    "loadAfter": "should load after {other}",
+    "loadBefore": "should load before {other}",
+    "only41": "is built for Build 41 (no 42/ or common/ folder); on Build 42 it may error or do nothing",
+    "only42": "is built for Build 42 only (no root mod.info)",
+    "twoCopies": "is in Zomboid/mods and also subscribed in Steam: the Zomboid/mods copy wins and won't get Steam's updates",
+    "missingEnv": "{path} doesn't exist (set by {env})",
+    "missingSet": "{path} doesn't exist (set in Settings)",
+    "notYet": "{path} doesn't exist yet: start the game once",
+    "notPzEnv": "{path} doesn't look like the {folder} (set by {env})",
+    "notPzSet": "{path} doesn't look like the {folder} (set in Settings)",
+    "notPz": "{path} doesn't look like the {folder}",
+    "folderWarning": "{path}: {warning}",
+    "itemNotListed": "Mods= has {id}, but its Workshop item {item} isn't in WorkshopItems=: the server won't download it",
+    "serverModMissing": "Mods= has {id}, which isn't installed here, so PZMM can't check it",
+    "itemUnused": "WorkshopItems= has {item}, but none of its mods are in Mods=",
+    "backslash": "Mods= entries need a leading backslash on Build 42 (\\ModId)",
+    "mapNotListed": "a mod adds the map {map}, but Map= doesn't list it",
+    "mapsAfterBase": "Map= lists mod maps after Muldraugh, KY: mod maps must come first"
   }
 }

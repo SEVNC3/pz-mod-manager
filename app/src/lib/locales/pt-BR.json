@@ -197,7 +197,8 @@
     "updated": "{name} atualizado.",
     "snapshotRestored": "Instantâneo restaurado. A lista que ele substituiu também é um instantâneo.",
     "pickRequirement": "Nenhum item da Oficina fornece {id} com certeza: escolha um em Requer, nos detalhes.",
-    "idCopied": "{id} copiado."
+    "idCopied": "{id} copiado.",
+    "bisectOtherProfile": "A busca pelo mod quebrado está em andamento no perfil “{profile}”: volte para ele para responder ou interrompê-la."
   },
   "confirm": {
     "group": "Agrupar por categoria substitui suas seções ({sections}) por seções de categoria. Ctrl+Z desfaz. Agrupar agora?",
@@ -244,7 +245,8 @@
     "import": "Importar",
     "clear": "Limpar",
     "workshop": "Oficina",
-    "refresh": "Recarregar"
+    "refresh": "Recarregar",
+    "tryAgain": "Tentar novamente"
   },
   "format": {
     "gb": "{n} GB",
@@ -550,7 +552,9 @@
       "noFiles": "A Steam não lista arquivos para este item.",
       "fileList": "A Steam não forneceu a lista de arquivos do item.",
       "login": "Não foi possível entrar na Steam anonimamente.",
-      "downloadFailed": "O download falhou."
+      "downloadFailed": "O download falhou.",
+      "reloaded": "A lista de mods foi alterada no menu de mods do jogo, então a ordem dos mapas não foi salva. Organize-a novamente.",
+      "otherProfile": "A ordem dos mapas não foi salva: outro perfil está ativo agora."
     },
     "updatedAgo": "atualizado {when}",
     "expand": "Expandir",
@@ -709,9 +713,9 @@
       "one": "{count} erro, o primeiro em <span class=\"mono\">{example}</span>",
       "other": "{count} erros, o primeiro em <span class=\"mono\">{example}</span>"
     },
-    "unexplained": "Algo quebra, mas nada acima explica?",
-    "halves": "O PZMM divide seus mods ativados pela metade a cada vez que você testa o jogo.",
-    "disable": "Desativar {id}"
+    "disable": "Desativar {id}",
+    "bisectOffer": "Algo quebra, mas nada acima explica? {link}: o PZMM reduz pela metade seus mods ativados a cada teste do jogo.",
+    "finishFirst": "Termine ou interrompa primeiro a busca pelo mod quebrado."
   },
   "settings": {
     "label": "Configurações",
@@ -822,7 +826,8 @@
       "diagnostics": "Copiar diagnóstico",
       "diagnosticsTip": "Versão, pastas, perfil, número de mods e resultados de Verificar configuração, com seu nome de usuário mascarado",
       "keys": "Teclado: <kbd>/</kbd> busca · <kbd>↑</kbd><kbd>↓</kbd> mover entre linhas · <kbd>Enter</kbd> detalhes · <kbd>Space</kbd> ativar/desativar · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> reordenar · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> desfazer/refazer · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+clique seleciona vários · <kbd>Esc</kbd> limpar seleção"
-    }
+    },
+    "readFailed": "Não foi possível ler as configurações: {error}"
   },
   "servers": {
     "label": "Servidores e saves",
@@ -1187,5 +1192,81 @@
     "toBottom": "Mover para o fim da ordem de carregamento",
     "copyId": "Copiar ID do mod",
     "showInMaps": "Mostrar em Mapas"
+  },
+  "backend": {
+    "stateDamaged": "{file} está danificado ({error}); uma cópia foi mantida como state.json.bad e o arquivo foi recriado",
+    "mapsNotUpdated": "não foi possível ler seus mods, então a lista de mapas do jogo não foi atualizada: {error}",
+    "settingsDamaged": "{file} está danificado ({error}); uma cópia foi mantida como {copy} e as configurações padrão foram usadas",
+    "duplicateId": "{source}: um segundo mod com o id {id} foi ignorado",
+    "notOursInMods": "{id} já está em {dir} e não foi instalado pelo PZMM; deixado como está. Remova essa pasta para instalar esta cópia.",
+    "alreadyCurrent": "{id} já está atualizado ({source})",
+    "installed": "{id} instalado ({source})",
+    "backupsPruned": "Os backups mais antigos foram excluídos (quantidade: {count}) para manter os backups abaixo de {mb} MB",
+    "tagsFailed": "Não foi possível ler as tags da Oficina: {error}",
+    "dataCopied": "Os dados do PZMM foram copiados para {to}, mas não foi possível excluir a pasta antiga {from} ({error}). Exclua-a você mesmo.",
+    "dataMoved": "Os dados do PZMM foram movidos para {to}",
+    "mapIndexBroken": "O índice de mapas integrado do PZMM não pôde ser lido ({error}); a verificação da Oficina lê cada mapa em vez dele",
+    "fileDamaged": "{file} está danificado ({error}); uma cópia foi mantida como {copy} e o arquivo foi recriado",
+    "noFileList": "workshop:{item}: a Steam não deu a lista de arquivos ({error}); baixando com o SteamCMD",
+    "downloadNotDeleted": "não foi possível excluir o download em {dir}: {error}",
+    "switchedViewpoint": "Mudou para Project Viewpoint (perfil “{name}”). Na primeira vez que o jogo iniciar, o ZombieBuddy pede para você aprovar o código Java do Viewpoint.",
+    "switchedZomboid": "Mudou para Project Zomboid (perfil “{name}”).",
+    "downloadingGithub": "baixando github:{spec}...",
+    "subscribedCopy": "{source}: você está inscrito na Steam, que o mantém atualizado; usando essa cópia ({ids})",
+    "oldCopyNotRemoved": "não foi possível remover a cópia antiga do PZMM de {ids}: {error}",
+    "pruneFailed": "não foi possível limpar os backups: {error}",
+    "collectionsFailed": "não foi possível verificar as coleções da Oficina: {error}",
+    "collection": "coleção {id}: itens: {count}",
+    "requiresAdding": "workshop:{id} exige workshop:{req}, adicionando",
+    "requiresFailed": "não foi possível verificar o que workshop:{id} exige: {error}",
+    "requiredItemsFailed": "não foi possível ler os itens exigidos por workshop:{item}: {error}",
+    "downloadingSteamcmd": "baixando steamcmd...",
+    "downloadingItems": "baixando itens da Oficina: {count}...",
+    "steamcmdStopped": "O SteamCMD foi interrompido (por você); não baixados: {ids}",
+    "steamcmdTimedOut": "O SteamCMD foi interrompido (nenhum download terminou em uma hora); não baixados: {ids}",
+    "leftOff": "{id} foi deixado desativado: é incompatível com {other}. Ative-o no lugar de {other} se preferir.",
+    "notOurs": "{id}: não instalado pelo PZMM (inscrição na Oficina ou instalação manual); deixado como está",
+    "rolledBack": "{id}: versão anterior restaurada",
+    "profileCopied": "O perfil “{from}” foi copiado como “{to}”.",
+    "zbSetUp": "O ZombieBuddy está configurado. Mods Java pedem sua aprovação na primeira vez que carregam.",
+    "found": "{id}: encontrado na Oficina como “{title}” ({item})",
+    "lookupFailed": "falha ao procurar {id}: {error}",
+    "noClearMatch": "{id}: nenhum item da Oficina o fornece com clareza. Use Baixar nos detalhes do mod para escolher um.",
+    "serverItems": "instalando itens da Oficina que o servidor usa: {count}",
+    "serverStarted": "Servidor {name} iniciado ({script}).",
+    "noMaps": "workshop:{id} não adiciona mapas para Build {build}",
+    "sharedItems": "instalando itens da Oficina que o perfil compartilhado usa: {count}",
+    "imported": "O perfil foi importado como “{name}”.",
+    "notAFolder": "não é uma pasta: {path}",
+    "openFailed": "não foi possível abrir {path}: {error}",
+    "httpsOnly": "O PZMM só abre links https: {url}",
+    "openUrlFailed": "não foi possível abrir {url}: {error} (a Steam está instalada?)",
+    "launchFailed": "não foi possível iniciar o jogo ({url}): {error} (a Steam está instalada?)",
+    "backupsDeleted": "Todos os backups foram excluídos."
+  },
+  "doctor": {
+    "notInstalled": "está ativado, mas não instalado: o jogo o ignora",
+    "needsDisabled": "precisa de {req}, que está desativado",
+    "needsMissing": "precisa de {req}, que não está instalado",
+    "needsLater": "precisa de {req}, que carrega depois dele",
+    "incompatible": "é incompatível com {other}, que também está ativado",
+    "loadAfter": "deveria carregar depois de {other}",
+    "loadBefore": "deveria carregar antes de {other}",
+    "only41": "foi feito para Build 41 (sem pasta 42/ nem common/); no Build 42 pode dar erro ou não fazer nada",
+    "only42": "foi feito apenas para Build 42 (sem mod.info na raiz)",
+    "twoCopies": "está em Zomboid/mods e também inscrito na Steam: a cópia de Zomboid/mods prevalece e não receberá as atualizações da Steam",
+    "missingEnv": "{path} não existe (definido por {env})",
+    "missingSet": "{path} não existe (definido em Configurações)",
+    "notYet": "{path} ainda não existe: inicie o jogo uma vez",
+    "notPzEnv": "{path} não parece ser “{folder}” (definido por {env})",
+    "notPzSet": "{path} não parece ser “{folder}” (definido em Configurações)",
+    "notPz": "{path} não parece ser “{folder}”",
+    "folderWarning": "{path}: {warning}",
+    "itemNotListed": "Mods= contém {id}, mas o item da Oficina {item} dele não está em WorkshopItems=: o servidor não vai baixá-lo",
+    "serverModMissing": "Mods= contém {id}, que não está instalado aqui, então o PZMM não consegue verificá-lo",
+    "itemUnused": "WorkshopItems= contém {item}, mas nenhum dos mods dele está em Mods=",
+    "backslash": "as entradas de Mods= precisam de uma barra invertida no início no Build 42 (\\ModId)",
+    "mapNotListed": "um mod adiciona o mapa {map}, mas Map= não o lista",
+    "mapsAfterBase": "Map= lista mapas de mods depois de Muldraugh, KY: os mapas de mods devem vir primeiro"
   }
 }

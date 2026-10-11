@@ -139,8 +139,8 @@ export function decodeShare(text: string): Shared {
 }
 
 export type ModErrors = { name: string; count: number; example: string; id: string | null };
-/** `action`: a fix to offer (install a missing mod, disable an incompatible one). */
-export type Finding = { level: "error" | "warning"; subject: string; text: string; action: { install?: string; disable?: string } | null };
+/** `key`: doctor.<key> in the locale files, worded with `vars` (`text` is the English); `action`: a fix to offer (install a missing mod, disable an incompatible one). */
+export type Finding = { level: "error" | "warning"; subject: string; text: string; key: string; vars: Record<string, string>; action: { install?: string; disable?: string } | null };
 export type Snapshot = { id: string; time: number; label: string; enabled: number; mods: number };
 /** What writing a server config would change; `maps_to` equals `maps_from` when Map= stays. */
 export type ServerPreview = { new: boolean; added: string[]; removed: string[]; maps_from: string[]; maps_to: string[] };
@@ -204,11 +204,10 @@ export type SettingsView = { settings: Settings; folders: Folder[]; token_saved:
 
 export const api = {
   load: () => invoke<View>("load"),
-  // the backend only stores order, on/off and separators
-  save: (rows: Row[], order: string[]) =>
-    invoke<View>("save", { rows: rows.map((r) => (r.kind === "mod" ? { kind: r.kind, id: r.id, on: r.on } : { kind: r.kind, name: r.name })), order }),
+  // the backend only stores order, on/off and separators; `profile`: the one the rows are from (refused if another is active)
+  save: (rows: Row[], order: string[], profile: string) =>
+    invoke<View>("save", { rows: rows.map((r) => (r.kind === "mod" ? { kind: r.kind, id: r.id, on: r.on } : { kind: r.kind, name: r.name })), order, profile }),
   install: (sources: string[]) => invoke<View>("install", { sources }),
-  updateAll: () => invoke<View>("update_all"),
   remove: (ids: string[]) => invoke<View>("remove", { ids }),
   rollback: (id: string) => invoke<View>("rollback", { id }),
   profileNew: (name: string) => invoke<View>("profile_new", { name }),
@@ -217,8 +216,8 @@ export const api = {
   profileRename: (from: string, to: string) => invoke<View>("profile_rename", { from, to }),
   profileDuplicate: (from: string, to: string) => invoke<View>("profile_duplicate", { from, to }),
   /** Keep the active profile as saved, before a change (`label` says which). */
-  profileSnapshot: (label: string) => invoke<void>("profile_snapshot", { label }),
-  profileSnapshots: () => invoke<Snapshot[]>("profile_snapshots"),
+  snapshotCreate: (label: string) => invoke<void>("snapshot_create", { label }),
+  snapshotList: () => invoke<Snapshot[]>("snapshot_list"),
   snapshotRestore: (id: string) => invoke<View>("snapshot_restore", { id }),
   setBuild: (build: 41 | 42 | null) => invoke<View>("set_build", { build }),
   details: (id: string) => invoke<ModDetails | null>("details", { id }),
@@ -250,15 +249,16 @@ export const api = {
   serverStart: (name: string) => invoke<string>("server_start", { name }),
   serverImport: (name: string) => invoke<View>("server_import", { name }),
   saveUse: (mode: string, name: string) => invoke<View>("save_use", { mode, name }),
-  mapsView: () => invoke<MapsView>("maps_view"),
+  mapView: () => invoke<MapsView>("map_view"),
   mapGrid: (vanilla: Cell[], water: Cell[], shown: MapMod[]) => invoke<GridCell[]>("map_grid", { vanilla, water, shown }),
   /** `fixed`: the enabled maps, which stay (listed or not). */
   mapQuickSelect: (all: MapMod[], fixed: MapMod[], ranks: Record<string, number>) => invoke<string[]>("map_quick_select", { all, fixed, ranks }),
   /** The Map= list for `folders`: `order`'s arrangement, the profile's saved one for maps it lacks. */
   mapLine: (order: string[], folders: string[]) => invoke<string[]>("map_line", { order, folders }),
-  mapOrderSave: (maps: string[]) => invoke<void>("map_order_save", { maps }),
+  /** Refused (maps.err.*) unless `profile`, the one it was arranged for, is still active. */
+  mapOrderSave: (maps: string[], profile: string) => invoke<void>("map_order_save", { maps, profile }),
   /** `labels`: the export's words in the UI language (`ids` fills {id} and {folders}, `missing` {ids}). */
-  mapsExport: (shown: MapMod[], mapLine: string[], labels: { ids: string; required: string; missing: string }) => invoke<string>("maps_export", { shown, mapLine, labels }),
+  mapExport: (shown: MapMod[], mapLine: string[], labels: { ids: string; required: string; missing: string }) => invoke<string>("map_export", { shown, mapLine, labels }),
   mapCheck: (id: string, download: boolean) => invoke<MapMod[]>("map_check", { id, download }),
   mapCheckStop: () => invoke<void>("map_check_stop"),
   /** Read every Map-tagged Workshop item, both builds ("maps-scan" events report progress). */
@@ -291,6 +291,9 @@ export const api = {
   openPath: (path: string) => invoke<void>("open_path", { path }).catch(() => {}),
   openUrl: (url: string) => invoke<void>("open_url", { url }).catch(() => {}),
 };
+
+/** Installed by PZMM (so it can update and remove it), not a Steam subscription or a manual install. */
+export const isOurs = (m: ModRow) => /^(workshop|github|local):/.test(m.source);
 
 /** Human label + page URL for a source string from the backend. */
 export function describeSource(source: string): { label: string; url: string | null } {

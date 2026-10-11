@@ -36,6 +36,8 @@
 {/if}
 
 {#if findings}
+  <!-- one sentence for the search offer, its button where the {link} is -->
+  {@const [before, after = ""] = t("findings.bisectOffer").split("{link}")}
   <div class="findings" role="region" aria-label={t("findings.setupCheck")}>
     <div class="findings-head">
       <strong>
@@ -46,7 +48,7 @@
     {#if findings.length}
       <ul>
         {#each findings as f}
-          <li class={f.level}><span class="mono">{f.subject}</span> {f.text}
+          <li class={f.level}><span class="mono">{f.subject}</span> {t(`doctor.${f.key}`, f.vars)}
             {#if f.action?.install}
               {@const id = f.action.install}
               <button class="fix" onclick={() => onInstall(id, f.subject)} disabled={busy}><Icon name="download" size={12} />{t("common.install")}</button>
@@ -69,11 +71,7 @@
         {/each}
       </ul>
     {/if}
-    <p class="findings-sub">
-      {t("findings.unexplained")}
-      <button class="quiet link" onclick={onBisectStart} disabled={busy}>{t("findings.findBroken")}</button>:
-      {t("findings.halves")}
-    </p>
+    <p class="findings-sub">{before}<button class="quiet link" onclick={onBisectStart} disabled={busy}>{t("findings.findBroken")}</button>{after}</p>
   </div>
 {/if}
 

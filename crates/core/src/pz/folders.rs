@@ -217,12 +217,12 @@ pub fn move_data_dir(from: &Path, to: &Path) -> Result<()> {
                 return Err(e).with_context(|| format!("copying PZMM's data to {} (nothing was moved)", to.display()));
             }
             if let Err(e) = fs::remove_dir_all(from) {
-                crate::log!("Copied PZMM's data to {}, but couldn't delete the old folder {} ({e}). Delete it yourself.", to.display(), from.display());
+                crate::say!("dataCopied", "Copied PZMM's data to {to}, but couldn't delete the old folder {from} ({error}). Delete it yourself.", to = to.display(), from = from.display(), error = e);
             }
         }
         Err(e) => return Err(e).with_context(|| format!("moving {} (close the game and any PZMM command line, then try again)", from.display())),
     }
-    crate::log!("Moved PZMM's data to {}", to.display());
+    crate::say!("dataMoved", "Moved PZMM's data to {to}", to = to.display());
     Ok(())
 }
 

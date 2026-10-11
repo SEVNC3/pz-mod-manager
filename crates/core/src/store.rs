@@ -132,7 +132,7 @@ pub fn install(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> 
     let mut ids: Vec<String> = vec![];
     for m in found {
         if ids.contains(&m.id) {
-            crate::log!("{source}: skipped a second mod with the id {}", m.id);
+            crate::say!("duplicateId", "{source}: skipped a second mod with the id {id}", source = source, id = m.id);
             continue;
         }
         let dest = match mod_dir(paths, &m.id) {
@@ -143,15 +143,16 @@ pub fn install(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> 
             }
         };
         if dest.exists() && !index.contains_key(&m.id) {
-            crate::log!(
-                "error: {} is already in {} and wasn't installed by PZMM; left it alone. Remove that folder to install this copy.",
-                m.id,
-                paths.mods().display()
+            crate::say!(
+                "notOursInMods",
+                "error: {id} is already in {dir} and wasn't installed by PZMM; left it alone. Remove that folder to install this copy.",
+                id = m.id,
+                dir = paths.mods().display()
             );
             continue;
         }
         if dest.exists() && same_tree(&m.dir, &dest) {
-            crate::log!("{} is already up to date ({source})", m.id);
+            crate::say!("alreadyCurrent", "{id} is already up to date ({source})", id = m.id, source = source);
         } else {
             // staged outside Zomboid/mods so the game never sees a half-copied mod
             let staging = paths.data.join("staging").join(&m.id);
@@ -170,7 +171,7 @@ pub fn install(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> 
                 move_dir(&dest, &backup)?;
             }
             move_dir(&staging, &dest).with_context(|| format!("moving {} into place", m.id))?;
-            crate::log!("installed {} ({source})", m.id);
+            crate::say!("installed", "installed {id} ({source})", id = m.id, source = source);
         }
         index.insert(m.id.clone(), Entry { source: source.to_string(), installed_at: now() });
         save(paths, &index)?;
@@ -258,7 +259,7 @@ pub fn prune_backups(paths: &Paths, cap: u64) -> Result<usize> {
         gone += 1;
     }
     if gone > 0 {
-        crate::log!("Deleted the {gone} oldest backup(s) to keep backups under {} MB", cap >> 20);
+        crate::say!("backupsPruned", "Deleted the {count} oldest backup(s) to keep backups under {mb} MB", count = gone, mb = cap >> 20);
     }
     Ok(gone)
 }

@@ -395,6 +395,40 @@ input[type="checkbox"] {
   cursor: default;
 }
 
+/* popup menus (the profile picker, right-click menus, Browse…): one look; ui.ts menuKeys gives them one set of keys */
+.popup-menu {
+  z-index: 40;
+  min-width: 240px;
+  padding: 4px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+.popup-menu .item {
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  text-align: left;
+}
+.popup-menu .item.danger {
+  color: var(--danger);
+}
+/* the icon (or a profile's tick) column */
+.popup-menu .tick {
+  width: 16px;
+  flex: none;
+  display: inline-flex;
+}
+.popup-menu .sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--line);
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

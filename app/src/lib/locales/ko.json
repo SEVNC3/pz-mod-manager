@@ -183,7 +183,8 @@
     "updated": "{name} 업데이트 완료.",
     "snapshotRestored": "스냅샷을 복원했어요. 대체된 목록도 스냅샷으로 남아 있어요.",
     "pickRequirement": "{id}을(를) 확실히 제공하는 창작마당 항목이 없어요. 세부 정보의 필요 항목에서 하나를 고르세요.",
-    "idCopied": "{id} 복사됨."
+    "idCopied": "{id} 복사됨.",
+    "bisectOtherProfile": "문제 모드 찾기가 “{profile}” 프로필에서 진행 중이에요. 그 프로필로 돌아가 답하거나 중지하세요."
   },
   "confirm": {
     "group": "카테고리별 그룹화를 하면 직접 만든 섹션({sections})이 카테고리 섹션으로 바뀌어요. Ctrl+Z로 되돌릴 수 있어요. 지금 그룹화할까요?",
@@ -224,7 +225,8 @@
     "import": "가져오기",
     "clear": "지우기",
     "workshop": "창작마당",
-    "refresh": "새로 고침"
+    "refresh": "새로 고침",
+    "tryAgain": "다시 시도"
   },
   "format": {
     "gb": "{n} GB",
@@ -507,7 +509,9 @@
       "noFiles": "Steam에 이 아이템의 파일이 나와 있지 않아요.",
       "fileList": "Steam이 아이템의 파일 목록을 주지 않았어요.",
       "login": "Steam에 익명으로 로그인하지 못했어요.",
-      "downloadFailed": "다운로드에 실패했어요."
+      "downloadFailed": "다운로드에 실패했어요.",
+      "reloaded": "게임의 모드 메뉴에서 모드 목록이 바뀌어서 지도 순서를 저장하지 않았어요. 다시 정렬하세요.",
+      "otherProfile": "지도 순서를 저장하지 않았어요. 지금은 다른 프로필이 활성화돼 있어요."
     },
     "updatedAgo": "{when} 업데이트됨",
     "expand": "확장",
@@ -658,9 +662,9 @@
     "errorCount": {
       "other": "오류 {count}개, 첫 오류 위치: <span class=\"mono\">{example}</span>"
     },
-    "unexplained": "뭔가 고장 났는데 위 내용으로 설명이 안 되나요?",
-    "halves": "게임을 테스트할 때마다 PZMM이 활성화된 모드를 절반으로 줄여요.",
-    "disable": "{id} 비활성화"
+    "disable": "{id} 비활성화",
+    "bisectOffer": "뭔가 고장 났는데 위에서는 이유를 알 수 없나요? {link}: PZMM이 게임을 테스트할 때마다 활성화된 모드를 절반씩 줄여요.",
+    "finishFirst": "문제 모드 찾기를 먼저 끝내거나 중지하세요."
   },
   "settings": {
     "label": "설정",
@@ -771,7 +775,8 @@
       "diagnostics": "진단 정보 복사",
       "diagnosticsTip": "버전, 폴더, 프로필, 모드 수, 설정 점검 결과 (사용자 이름은 가려짐)",
       "keys": "키보드: <kbd>/</kbd> 검색 · <kbd>↑</kbd><kbd>↓</kbd> 행 이동 · <kbd>Enter</kbd> 상세 정보 · <kbd>Space</kbd> 활성화/비활성화 · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> 순서 변경 · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> 실행 취소/다시 실행 · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+클릭 여러 개 선택 · <kbd>Esc</kbd> 선택 해제"
-    }
+    },
+    "readFailed": "설정을 읽지 못했어요: {error}"
   },
   "servers": {
     "label": "서버 및 세이브",
@@ -1118,5 +1123,81 @@
     "toBottom": "로드 순서 맨 아래로 이동",
     "copyId": "모드 ID 복사",
     "showInMaps": "지도에서 보기"
+  },
+  "backend": {
+    "stateDamaged": "{file} 파일이 손상되었어요({error}). 사본을 state.json.bad로 보관하고 새로 시작했어요",
+    "mapsNotUpdated": "모드를 읽지 못해서 게임의 지도 목록을 갱신하지 않았어요: {error}",
+    "settingsDamaged": "{file} 파일이 손상되었어요({error}). 사본을 {copy}(으)로 보관하고 기본 설정을 사용했어요",
+    "duplicateId": "{source}: ID가 {id}인 두 번째 모드를 건너뛰었어요",
+    "notOursInMods": "{id}은(는) 이미 {dir}에 있고 PZMM이 설치한 것이 아니어서 그대로 두었어요. 이 사본을 설치하려면 그 폴더를 지우세요.",
+    "alreadyCurrent": "{id}은(는) 이미 최신 상태예요({source})",
+    "installed": "{id} 설치함({source})",
+    "backupsPruned": "백업을 {mb}MB 이하로 유지하려고 가장 오래된 백업을 삭제했어요(개수: {count})",
+    "tagsFailed": "창작마당 태그를 읽지 못했어요: {error}",
+    "dataCopied": "PZMM 데이터를 {to}(으)로 복사했지만 이전 폴더 {from}은(는) 삭제하지 못했어요({error}). 직접 삭제하세요.",
+    "dataMoved": "PZMM 데이터를 {to}(으)로 옮겼어요",
+    "mapIndexBroken": "PZMM에 내장된 지도 색인을 해석할 수 없어요({error}). 대신 창작마당 스캔이 모든 지도를 읽어요",
+    "fileDamaged": "{file} 파일이 손상되었어요({error}). 사본을 {copy}(으)로 보관하고 새로 시작했어요",
+    "noFileList": "workshop:{item}: Steam에서 파일 목록을 받지 못해서({error}) 대신 SteamCMD로 다운로드해요",
+    "downloadNotDeleted": "{dir}의 다운로드 파일을 삭제하지 못했어요: {error}",
+    "switchedViewpoint": "Project Viewpoint(“{name}” 프로필)로 전환했어요. 게임을 처음 시작할 때 ZombieBuddy가 Viewpoint의 Java 코드를 승인하라고 요청해요.",
+    "switchedZomboid": "Project Zomboid(“{name}” 프로필)로 전환했어요.",
+    "downloadingGithub": "github:{spec} 다운로드 중...",
+    "subscribedCopy": "{source}: Steam에서 구독 중이고 Steam이 업데이트를 관리하므로 그 사본을 사용해요({ids})",
+    "oldCopyNotRemoved": "{ids}의 PZMM 이전 사본을 제거하지 못했어요: {error}",
+    "pruneFailed": "백업을 정리하지 못했어요: {error}",
+    "collectionsFailed": "창작마당 컬렉션을 확인하지 못했어요: {error}",
+    "collection": "컬렉션 {id}: 항목 {count}개",
+    "requiresAdding": "workshop:{id}에 workshop:{req}이(가) 필요해서 추가해요",
+    "requiresFailed": "workshop:{id}에 무엇이 필요한지 확인하지 못했어요: {error}",
+    "requiredItemsFailed": "workshop:{item}의 필요 항목을 읽지 못했어요: {error}",
+    "downloadingSteamcmd": "steamcmd 다운로드 중...",
+    "downloadingItems": "창작마당 항목 {count}개 다운로드 중...",
+    "steamcmdStopped": "SteamCMD가 중지되었어요(직접 중지함). 다운로드되지 않음: {ids}",
+    "steamcmdTimedOut": "SteamCMD가 중지되었어요(한 시간 안에 끝난 다운로드가 없음). 다운로드되지 않음: {ids}",
+    "leftOff": "{id}은(는) {other}와(과) 호환되지 않아서 꺼 두었어요. 더 쓰고 싶다면 {other} 대신 활성화하세요.",
+    "notOurs": "{id}: PZMM이 설치한 것이 아니어서(창작마당 구독 또는 직접 설치) 그대로 두었어요",
+    "rolledBack": "{id}: 이전 버전으로 복원했어요",
+    "profileCopied": "“{from}” 프로필을 “{to}”(으)로 복사했어요.",
+    "zbSetUp": "ZombieBuddy 설정을 마쳤어요. Java 모드는 처음 로드할 때 승인을 요청해요.",
+    "found": "{id}: 창작마당에서 “{title}”({item})(으)로 찾았어요",
+    "lookupFailed": "{id} 조회 실패: {error}",
+    "noClearMatch": "{id}: 이를 분명하게 제공하는 창작마당 항목이 없어요. 모드 상세 정보의 다운로드로 하나를 고르세요.",
+    "serverItems": "서버가 사용하는 창작마당 항목 {count}개 설치 중",
+    "serverStarted": "{name} 서버를 시작했어요({script}).",
+    "noMaps": "workshop:{id}은(는) Build {build}용 지도를 추가하지 않아요",
+    "sharedItems": "공유된 프로필이 사용하는 창작마당 항목 {count}개 설치 중",
+    "imported": "프로필을 “{name}”(으)로 가져왔어요.",
+    "notAFolder": "폴더가 아니에요: {path}",
+    "openFailed": "{path}을(를) 열지 못했어요: {error}",
+    "httpsOnly": "PZMM은 https 링크만 열어요: {url}",
+    "openUrlFailed": "{url}을(를) 열지 못했어요: {error} (Steam이 설치되어 있나요?)",
+    "launchFailed": "게임을 시작하지 못했어요({url}): {error} (Steam이 설치되어 있나요?)",
+    "backupsDeleted": "모든 백업을 삭제했어요."
+  },
+  "doctor": {
+    "notInstalled": "활성화돼 있지만 설치되지 않았어요: 게임이 건너뛰어요",
+    "needsDisabled": "{req}이(가) 필요한데 비활성화돼 있어요",
+    "needsMissing": "{req}이(가) 필요한데 설치되어 있지 않아요",
+    "needsLater": "{req}이(가) 필요한데 그쪽이 나중에 로드돼요",
+    "incompatible": "{other}와(과) 호환되지 않는데 둘 다 활성화돼 있어요",
+    "loadAfter": "{other} 뒤에 로드되어야 해요",
+    "loadBefore": "{other} 앞에 로드되어야 해요",
+    "only41": "Build 41용이에요(42/ 또는 common/ 폴더 없음). Build 42에서는 오류가 나거나 작동하지 않을 수 있어요",
+    "only42": "Build 42 전용이에요(루트에 mod.info 없음)",
+    "twoCopies": "Zomboid/mods에 있으면서 Steam에서도 구독 중이에요: Zomboid/mods 사본이 우선하며 Steam 업데이트를 받지 못해요",
+    "missingEnv": "{path}이(가) 없어요({env}이(가) 지정함)",
+    "missingSet": "{path}이(가) 없어요(설정에서 지정함)",
+    "notYet": "{path}이(가) 아직 없어요: 게임을 한 번 시작하세요",
+    "notPzEnv": "{path}은(는) “{folder}” 같지 않아요({env}이(가) 지정함)",
+    "notPzSet": "{path}은(는) “{folder}” 같지 않아요(설정에서 지정함)",
+    "notPz": "{path}은(는) “{folder}” 같지 않아요",
+    "folderWarning": "{path}: {warning}",
+    "itemNotListed": "Mods=에 {id}이(가) 있지만 해당 창작마당 항목 {item}이(가) WorkshopItems=에 없어요: 서버가 다운로드하지 않아요",
+    "serverModMissing": "Mods=에 여기에 설치되지 않은 {id}이(가) 있어서 PZMM이 확인할 수 없어요",
+    "itemUnused": "WorkshopItems=에 {item}이(가) 있지만 그 모드가 Mods=에 하나도 없어요",
+    "backslash": "Build 42에서는 Mods= 항목 앞에 역슬래시가 필요해요(\\ModId)",
+    "mapNotListed": "어떤 모드가 지도 {map}을(를) 추가하지만 Map=에 없어요",
+    "mapsAfterBase": "Map=에서 모드 지도가 Muldraugh, KY 뒤에 있어요: 모드 지도가 먼저 와야 해요"
   }
 }

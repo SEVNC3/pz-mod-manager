@@ -554,7 +554,7 @@ fn steamcmd(paths: &Paths) -> Result<PathBuf> {
     let dir = paths.data.join("steamcmd");
     let exe = dir.join(if cfg!(windows) { "steamcmd.exe" } else { "steamcmd.sh" });
     if !exe.exists() {
-        crate::log!("downloading steamcmd...");
+        crate::say!("downloadingSteamcmd", "downloading steamcmd...");
         std::fs::create_dir_all(&dir)?;
         if cfg!(windows) {
             super::unzip(&super::download(&format!("{STEAMCMD_URL}steamcmd.zip"))?, &dir)?;
@@ -603,7 +603,7 @@ pub fn download(paths: &Paths, app: &str, ids: &[&str], stop: &AtomicBool) -> Re
     // one SteamCMD at a time: two sessions fight over its folder
     static STEAMCMD: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let _one = STEAMCMD.lock().unwrap_or_else(|e| e.into_inner());
-    crate::log!("downloading {} workshop item(s)...", ids.len());
+    crate::say!("downloadingItems", "downloading {count} workshop item(s)...", count = ids.len());
     crate::progress(0, ids.len());
     let mut child = cmd.spawn().with_context(|| format!("running {}", exe.display()))?;
     let out = child.stdout.take().context("SteamCMD's output")?;
@@ -614,9 +614,12 @@ pub fn download(paths: &Paths, app: &str, ids: &[&str], stop: &AtomicBool) -> Re
     let got: Vec<(String, Option<PathBuf>)> =
         ids.iter().map(|id| (id.to_string(), Some(steamcmd_dirs(paths, app, id)[0].clone()).filter(|d| done.contains(*id) && d.is_dir()))).collect();
     if stopped {
-        let why = if stop.load(Relaxed) { "you stopped it" } else { "no download finished within an hour" };
-        let late: Vec<&str> = got.iter().filter(|(_, d)| d.is_none()).map(|(id, _)| id.as_str()).collect();
-        crate::log!("error: SteamCMD was stopped ({why}); not downloaded: {}", late.join(", "));
+        let late = got.iter().filter(|(_, d)| d.is_none()).map(|(id, _)| id.as_str()).collect::<Vec<_>>().join(", ");
+        if stop.load(Relaxed) {
+            crate::say!("steamcmdStopped", "error: SteamCMD was stopped (you stopped it); not downloaded: {ids}", ids = late);
+        } else {
+            crate::say!("steamcmdTimedOut", "error: SteamCMD was stopped (no download finished within an hour); not downloaded: {ids}", ids = late);
+        }
     }
     Ok(got)
 }

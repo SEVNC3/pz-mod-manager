@@ -193,12 +193,12 @@ pub fn install_fetched(paths: &Paths, fetched: &[Fetched]) -> Vec<String> {
     for f in fetched {
         if f.subscribed {
             let found: Vec<String> = pz::find_mods(&f.root, 8).into_iter().map(|m| m.id).collect();
-            crate::log!("{}: you're subscribed in Steam, which keeps it updated; using that copy ({})", f.source, found.join(", "));
+            crate::say!("subscribedCopy", "{source}: you're subscribed in Steam, which keeps it updated; using that copy ({ids})", source = f.source, ids = found.join(", "));
             // a copy PZMM installed before the subscription would shadow Steam's newer one (core 10)
             let item = format!("workshop:{}", f.source.trim_start_matches("steam:"));
             let ours: Vec<String> = store::load(paths).unwrap_or_default().into_iter().filter(|(_, e)| e.source == item).map(|(id, _)| id).collect();
             if !ours.is_empty() && let Err(e) = store::remove(paths, &ours, crate::settings::load().recycle) {
-                crate::log!("error: removing PZMM's older copy of {}: {e:#}", ours.join(", "));
+                crate::say!("oldCopyNotRemoved", "error: removing PZMM's older copy of {ids}: {error}", ids = ours.join(", "), error = format!("{e:#}"));
             }
             ids.extend(found);
             continue;
@@ -210,7 +210,7 @@ pub fn install_fetched(paths: &Paths, fetched: &[Fetched]) -> Vec<String> {
     }
     let cap = crate::settings::load().backup_cap_mb << 20;
     if cap > 0 && let Err(e) = store::prune_backups(paths, cap) {
-        crate::log!("error: pruning backups: {e:#}");
+        crate::say!("pruneFailed", "error: pruning backups: {error}", error = format!("{e:#}"));
     }
     ids
 }
@@ -218,6 +218,11 @@ pub fn install_fetched(paths: &Paths, fetched: &[Fetched]) -> Vec<String> {
 /// Download and install in one go (the CLI; the app splits the two to keep its lock short).
 pub fn install(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<String> {
     install_fetched(paths, &fetch(paths, sources, resolve))
+}
+
+/// The Workshop item a mod comes from: "steam:<id>" (a subscription) or "workshop:<id>" (PZMM's install).
+pub fn workshop_item(source: &str) -> Option<&str> {
+    source.strip_prefix("steam:").or_else(|| source.strip_prefix("workshop:")).filter(|i| !i.is_empty())
 }
 
 /// Workshop ids the game can already load: Steam subscriptions and PZMM installs.
@@ -238,14 +243,14 @@ pub fn workshop_available(paths: &Paths) -> HashSet<String> {
 fn expand_workshop(paths: &Paths, ids: Vec<String>) -> Vec<String> {
     let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
     let collections = steam_workshop::collections(&refs).unwrap_or_else(|e| {
-        crate::log!("error: couldn't check for Workshop collections: {e:#}");
+        crate::say!("collectionsFailed", "error: couldn't check for Workshop collections: {error}", error = format!("{e:#}"));
         Default::default()
     });
     let mut queue = std::collections::VecDeque::new();
     for id in ids {
         match collections.get(&id) {
             Some(items) => {
-                crate::log!("collection {id}: {} item(s)", items.len());
+                crate::say!("collection", "collection {id}: {count} item(s)", id = id, count = items.len());
                 queue.extend(items.iter().cloned());
             }
             None => queue.push_back(id),
@@ -262,11 +267,11 @@ fn expand_workshop(paths: &Paths, ids: Vec<String>) -> Vec<String> {
         match steam_workshop::required_items(&id) {
             Ok(req) => {
                 for r in req.into_iter().filter(|r| !have.contains(r) && !seen.contains(r)) {
-                    crate::log!("workshop:{id} requires workshop:{r}, adding it");
+                    crate::say!("requiresAdding", "workshop:{id} requires workshop:{req}, adding it", id = id, req = r);
                     queue.push_back(r);
                 }
             }
-            Err(e) => crate::log!("error: couldn't check what workshop:{id} requires: {e:#}"),
+            Err(e) => crate::say!("requiresFailed", "error: couldn't check what workshop:{id} requires: {error}", id = id, error = format!("{e:#}")),
         }
     }
     out
@@ -325,7 +330,7 @@ pub fn find_mod(mod_id: &str, needed_by: Option<&str>, build: u8) -> Result<Vec<
     let required = needed_by
         .map(|item| {
             steam_workshop::required_items(item).unwrap_or_else(|e| {
-                crate::log!("couldn't read workshop:{item}'s required items: {e:#}");
+                crate::say!("requiredItemsFailed", "couldn't read workshop:{item}'s required items: {error}", item = item, error = format!("{e:#}"));
                 vec![]
             })
         })
