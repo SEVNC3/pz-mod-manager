@@ -2,6 +2,11 @@
 
 A free, open-source mod manager for **Project Zomboid** (Build 41 and 42), for Windows and Linux.
 
+> [!WARNING]
+> **Early access.** PZMM is still in development and hasn't launched yet. Every release is a pre-release, so you may run into bugs. Back up your saves before using it.
+>
+> **Found a bug?** Report it on [Discord](https://discord.gg/TfS9NwNHrH) or [open a GitHub issue](https://github.com/SEVNC3/pz-mod-manager/issues/new?template=bug_report.yml). Say what you did, what happened and what you expected, and paste the diagnostics from **Settings > About > Copy diagnostics** (your user name is masked).
+
 - **Browse the Workshop** inside the app, with everything Steam's own Workshop offers without logging in:
   - search titles or descriptions, and sort by popularity over any period from today to a year
   - require or exclude any of Project Zomboid's tags, and filter by build, posting or update date
@@ -133,7 +138,9 @@ The full plan is in [docs/FOUNDATION.md](docs/FOUNDATION.md). To release, set th
 ## Community
 
 - [Discord](https://discord.gg/TfS9NwNHrH): help, ideas and bug reports
+- [GitHub issues](https://github.com/SEVNC3/pz-mod-manager/issues/new?template=bug_report.yml): bug reports with the diagnostics attached
 - [Ko-fi](https://ko-fi.com/sevnc3): support development
+- [Nexus Mods](https://www.nexusmods.com/profile/SEVNC3) and [GitHub](https://github.com/SEVNC3): whatever else I'm making
 
 ## Credits
 
