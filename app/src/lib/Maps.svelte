@@ -851,10 +851,10 @@
             <input type="checkbox" checked={isShown} disabled={on} onchange={() => togglePreview(m.id)}
               aria-label={t("maps.previewLabel", { name: nameOf(m) })} title={on ? t("maps.alwaysShownTip") : t("maps.previewTip")} />
             <span class="name">
-              <span><strong>{nameOf(m)}</strong>{#if on}<span class="on">{t("common.enabled")}</span>{:else if !installed}<span class="off">{t("maps.notInstalled")}</span>{/if}{#if isShown}<button class="link hide" onclick={() => toggleHidden(m.id)} title={hidden.has(m.id) ? t("maps.showOnGridTip") : t("maps.hideOnGridTip")}>{hidden.has(m.id) ? t("maps.showOnGrid") : t("maps.hideOnGrid")}</button>{/if}</span>
+              <span class="title"><strong title={nameOf(m)}>{nameOf(m)}</strong>{#if on}<span class="on">{t("common.enabled")}</span>{:else if !installed}<span class="off">{t("maps.notInstalled")}</span>{/if}</span>
               <span class="hint">{t("maps.cellCount", { count: cellCount(m) })} · {m.maps.map((f) => f.folder).join("; ")}{meta?.author ? ` · ${t("maps.byAuthor", { author: meta.author })}` : ""}{meta?.subscriptions ? ` · ${t("maps.subscribers", { count: meta.subscriptions, n: compact.format(meta.subscriptions) })}` : ""}{!installed && meta?.size ? ` · ${fmtSize(meta.size)}` : ""}{meta?.updated ? ` · ${t("maps.updatedAgo", { when: fmtAgo(meta.updated) })}` : ""}</span>
               {#each [...(clash?.with ?? [])].slice(0, 3) as [rival, cells] (rival)}
-                <span class="bad">{@html th("maps.conflictsWith", { count: cells.length, name: names.get(rival) ?? rival, cells: cellList(cells) })}
+                <span class="bad line" title={t("maps.conflictsWith", { count: cells.length, name: names.get(rival) ?? rival, cells: cellList(cells) }).replace(/<[^>]+>/g, "")}><span class="txt">{@html th("maps.conflictsWith", { count: cells.length, name: names.get(rival) ?? rival, cells: cellList(cells) })}</span>
                   <button class="link" onclick={() => swap(m)} disabled={busy} title={t("maps.swapTip")}>{t("maps.swap")}</button></span>
               {/each}
               {#if (clash?.with.size ?? 0) > 3}<span class="bad">{t("maps.andMore", { count: clash!.with.size - 3 })}</span>{/if}
@@ -869,7 +869,8 @@
               {/each}
             </span>
             <span class="btns">
-              {#if item}<button class="quiet" onclick={() => api.openUrl(workshopUrl(item))} title={t("maps.openWorkshopTip")}><Icon name="steam" size={14} />{t("common.workshop")}</button>{/if}
+              {#if isShown}<button class="quiet icon" onclick={() => toggleHidden(m.id)} title={hidden.has(m.id) ? t("maps.showOnGridTip") : t("maps.hideOnGridTip")} aria-label={hidden.has(m.id) ? t("maps.showOnGrid") : t("maps.hideOnGrid")} aria-pressed={hidden.has(m.id)}><Icon name={hidden.has(m.id) ? "eye-off" : "eye"} size={16} /></button>{/if}
+              {#if item}<button class="quiet icon" onclick={() => api.openUrl(workshopUrl(item))} title={t("maps.openWorkshopTip")} aria-label={t("common.workshop")}><Icon name="steam" size={16} /></button>{/if}
               {#if installed}
                 <button disabled={busy} onclick={() => setMods([m.id], !on)} title={on ? "" : t("maps.alsoTurnsOnTip")}>{on ? t("common.disable") : t("common.enable")}</button>
               {:else if item}
@@ -884,158 +885,162 @@
       {/if}
     </div>
 
-    <div class="card">
-      <div class="head">
-        <h2>{t("maps.req.title")}</h2>
-        {#if needs.length}
-          <div class="seg" role="radiogroup" aria-label={t("maps.req.viewLabel")}>
-            <button type="button" role="radio" aria-checked={reqView === "list"} class:active={reqView === "list"} onclick={() => (reqView = "list")} title={t("maps.req.neededByTip")}>{t("maps.req.neededBy")}</button>
-            <button type="button" role="radio" aria-checked={reqView === "tree"} class:active={reqView === "tree"} onclick={() => (reqView = "tree")} title={t("maps.req.treeTip")}>{t("maps.req.tree")}</button>
-          </div>
+    <div class="stack">
+      <div class="card">
+        <div class="head">
+          <h2>{t("maps.req.title")}</h2>
+          {#if needs.length}
+            <div class="seg" role="radiogroup" aria-label={t("maps.req.viewLabel")}>
+              <button type="button" role="radio" aria-checked={reqView === "list"} class:active={reqView === "list"} onclick={() => (reqView = "list")} title={t("maps.req.neededByTip")}>{t("maps.req.neededBy")}</button>
+              <button type="button" role="radio" aria-checked={reqView === "tree"} class:active={reqView === "tree"} onclick={() => (reqView = "tree")} title={t("maps.req.treeTip")}>{t("maps.req.tree")}</button>
+            </div>
+          {/if}
+        </div>
+        <p class="lede">{@html th("maps.req.lede")}</p>
+        {#if !needs.length}
+          <p class="hint">{shown.length ? t("maps.req.nothingElse") : t("maps.req.showOne")}</p>
+        {/if}
+        {#snippet needState(n: Need)}
+          {@const m = n.id ? mods.get(n.id) : undefined}
+          <span class="state {m ? (m.on ? 'is-on' : 'is-off') : 'is-missing'}">{m ? (m.on ? t("maps.req.on") : t("maps.req.off")) : t("maps.notInstalled")}</span>
+        {/snippet}
+        {#snippet needButtons(n: Need)}
+          {@const m = n.id ? mods.get(n.id) : undefined}
+          {@const item = needItem(n)}
+          <span class="btns">
+            {#if item}<button class="quiet" onclick={() => api.openUrl(workshopUrl(item))} title={t("maps.openWorkshopTip")}><Icon name="steam" size={14} />{t("common.workshop")}</button>{/if}
+            {#if m && !m.on}
+              <button disabled={busy} onclick={() => setMods([n.id], true)}>{t("common.enable")}</button>
+            {:else if !m && n.id}
+              <button disabled={busy} onclick={() => installNeed(n)} title={t("maps.req.findTip")}><Icon name="download" size={14} />{t("common.install")}</button>
+              {#if finding[n.id]?.[0] === "maps.req.noClearResult" && n.by.some((b) => mods.has(b))}
+                <button class="quiet" onclick={() => onShowMod(n.by.find((b) => mods.has(b))!)}>{t("maps.req.pickInDetails")}</button>
+              {/if}
+            {/if}
+          </span>
+        {/snippet}
+        {#if reqView === "list"}
+          {#each GROUPS as [g, title] (g)}
+            {@const group = needs.filter((n) => n.group === g)}
+            {#if group.length}
+              <h3>{t(title)}</h3>
+              <ul class="needs">
+                {#each group as n (n.key)}
+                  <li>
+                    <span class="name">
+                      <span class="mono">{n.id || n.folder}</span>
+                      {@render needState(n)}
+                      <span class="hint">{t(n.folder && n.id ? "maps.req.neededByMap" : n.folder ? "maps.req.neededByFolder" : "maps.req.neededByOnly", { folder: n.folder, names: n.by.map((id) => names.get(id) ?? id).join(", ") })}</span>
+                      {#if finding[n.id]}<span class="hint">{t(...finding[n.id])}</span>{/if}
+                    </span>
+                    {@render needButtons(n)}
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          {/each}
+        {:else}
+          {#snippet branch(root: MapMod, id: string, depth: number, path: string[])}
+            {@const n = needs.find((x) => x.key === id) ?? { key: id, id, folder: "", by: [root.id], group: "missing" as Group }}
+            <li style:padding-left="{8 + depth * 18}px">
+              <span class="name">
+                <span><span class="mono">{id}</span> {@render needState(n)}{#if path.includes(id)}<span class="hint"> {t("maps.req.loop")}</span>{/if}</span>
+                {#if finding[id]}<span class="hint">{t(...finding[id])}</span>{/if}
+              </span>
+              {@render needButtons(n)}
+            </li>
+            {#if !path.includes(id)}
+              {#each requiresOf(id) as r (r)}{@render branch(root, r, depth + 1, [...path, id])}{/each}
+            {/if}
+          {/snippet}
+          {#each shown.filter((m) => m.requires.length || m.maps.some((f) => f.lots.some((l) => !data?.vanilla_folders.includes(l)))) as m (m.id)}
+            <h3>{nameOf(m)}</h3>
+            <ul class="needs tree">
+              {#each m.requires as r (r)}{@render branch(m, r, 0, [m.id])}{/each}
+              {#each needs.filter((n) => n.folder && n.by.includes(m.id)) as n (n.key)}
+                <li><span class="name"><span><span class="mono">{n.id || n.folder}</span> {@render needState(n)} <span class="hint">{t("maps.req.map", { folder: n.folder })}</span></span></span>{@render needButtons(n)}</li>
+              {/each}
+            </ul>
+          {/each}
         {/if}
       </div>
-      <p class="lede">{@html th("maps.req.lede")}</p>
-      {#if !needs.length}
-        <p class="hint">{shown.length ? t("maps.req.nothingElse") : t("maps.req.showOne")}</p>
-      {/if}
-      {#snippet needState(n: Need)}
-        {@const m = n.id ? mods.get(n.id) : undefined}
-        <span class="state {m ? (m.on ? 'is-on' : 'is-off') : 'is-missing'}">{m ? (m.on ? t("maps.req.on") : t("maps.req.off")) : t("maps.notInstalled")}</span>
-      {/snippet}
-      {#snippet needButtons(n: Need)}
-        {@const m = n.id ? mods.get(n.id) : undefined}
-        {@const item = needItem(n)}
-        <span class="btns">
-          {#if item}<button class="quiet" onclick={() => api.openUrl(workshopUrl(item))} title={t("maps.openWorkshopTip")}><Icon name="steam" size={14} />{t("common.workshop")}</button>{/if}
-          {#if m && !m.on}
-            <button disabled={busy} onclick={() => setMods([n.id], true)}>{t("common.enable")}</button>
-          {:else if !m && n.id}
-            <button disabled={busy} onclick={() => installNeed(n)} title={t("maps.req.findTip")}><Icon name="download" size={14} />{t("common.install")}</button>
-            {#if finding[n.id]?.[0] === "maps.req.noClearResult" && n.by.some((b) => mods.has(b))}
-              <button class="quiet" onclick={() => onShowMod(n.by.find((b) => mods.has(b))!)}>{t("maps.req.pickInDetails")}</button>
-            {/if}
+
+      <div class="card">
+        <h2>{t("maps.compare.title")}</h2>
+        <p class="lede">{@html th("maps.compare.lede")}</p>
+        {#if servers.length}
+          <div class="row">
+            <select bind:value={server} aria-label={t("maps.compare.serverLabel")}>
+              <!-- i18n-ignore: file names -->
+              {#each servers as s (s)}<option value={s}>{s}.ini</option>{/each}
+            </select>
+            <button onclick={compareServer} disabled={!server}><Icon name="server" size={14} />{t("maps.compare.compare")}</button>
+          </div>
+        {:else}
+          <p class="hint">{t("maps.compare.noServers")}</p>
+        {/if}
+        {#if compared}
+          {#if !compared.only_server.length && !compared.only_you.length}
+            <p class="hint">{t("maps.compare.same", { server })}</p>
           {/if}
-        </span>
-      {/snippet}
-      {#if reqView === "list"}
-        {#each GROUPS as [g, title] (g)}
-          {@const group = needs.filter((n) => n.group === g)}
-          {#if group.length}
-            <h3>{t(title)}</h3>
+          {#if compared.only_server.length}
+            <h3>{t("maps.compare.onlyServer")}</h3>
             <ul class="needs">
-              {#each group as n (n.key)}
+              {#each compared.only_server as s (s.folder)}
+                {@const m = byId(s.id)}
+                {@const row = s.id ? mods.get(s.id) : undefined}
                 <li>
-                  <span class="name">
-                    <span class="mono">{n.id || n.folder}</span>
-                    {@render needState(n)}
-                    <span class="hint">{t(n.folder && n.id ? "maps.req.neededByMap" : n.folder ? "maps.req.neededByFolder" : "maps.req.neededByOnly", { folder: n.folder, names: n.by.map((id) => names.get(id) ?? id).join(", ") })}</span>
-                    {#if finding[n.id]}<span class="hint">{t(...finding[n.id])}</span>{/if}
+                  <span class="name"><span class="mono">{s.folder}</span>
+                    <span class="hint">{m ? nameOf(m) : s.id ? s.id : t("maps.compare.noKnownMap")}{row ? ` · ${row.on ? t("maps.compare.on") : t("maps.compare.installed")}` : s.item ? ` · ${t("maps.compare.notInstalled")}` : ""}</span></span>
+                  <span class="btns">
+                    {#if s.id && !row?.on && byId(s.id)}<button class="quiet" onclick={() => s.id && !preview.has(s.id) && togglePreview(s.id)}>{t("maps.compare.preview")}</button>{/if}
+                    {#if row && !row.on}
+                      <button disabled={busy} onclick={() => setMods([s.id!], true)}>{t("common.enable")}</button>
+                    {:else if !row && s.item}
+                      <button disabled={busy} onclick={() => onInstallWorkshop(s.item!)}><Icon name="download" size={14} />{t("common.install")}</button>
+                    {/if}
                   </span>
-                  {@render needButtons(n)}
                 </li>
               {/each}
             </ul>
           {/if}
-        {/each}
-      {:else}
-        {#snippet branch(root: MapMod, id: string, depth: number, path: string[])}
-          {@const n = needs.find((x) => x.key === id) ?? { key: id, id, folder: "", by: [root.id], group: "missing" as Group }}
-          <li style:padding-left="{8 + depth * 18}px">
-            <span class="name">
-              <span><span class="mono">{id}</span> {@render needState(n)}{#if path.includes(id)}<span class="hint"> {t("maps.req.loop")}</span>{/if}</span>
-              {#if finding[id]}<span class="hint">{t(...finding[id])}</span>{/if}
-            </span>
-            {@render needButtons(n)}
-          </li>
-          {#if !path.includes(id)}
-            {#each requiresOf(id) as r (r)}{@render branch(root, r, depth + 1, [...path, id])}{/each}
+          {#if compared.only_you.length}
+            <h3>{t("maps.compare.onlyYou")}</h3>
+            <p class="mono hint">{compared.only_you.join("; ")}</p>
           {/if}
-        {/snippet}
-        {#each shown.filter((m) => m.requires.length || m.maps.some((f) => f.lots.some((l) => !data?.vanilla_folders.includes(l)))) as m (m.id)}
-          <h3>{nameOf(m)}</h3>
-          <ul class="needs tree">
-            {#each m.requires as r (r)}{@render branch(m, r, 0, [m.id])}{/each}
-            {#each needs.filter((n) => n.folder && n.by.includes(m.id)) as n (n.key)}
-              <li><span class="name"><span><span class="mono">{n.id || n.folder}</span> {@render needState(n)} <span class="hint">{t("maps.req.map", { folder: n.folder })}</span></span></span>{@render needButtons(n)}</li>
-            {/each}
-          </ul>
-        {/each}
-      {/if}
-    </div>
-
-    <div class="card">
-      <h2>{t("maps.export.title")}</h2>
-      <p class="lede">{@html th("maps.export.lede")}</p>
-      {#if mapLine.length}
-        <h3>{t("maps.export.orderTitle")}</h3>
-        <p class="hint">{@html th("maps.export.orderHint")}</p>
-        <MapOrder bind:maps={mapLine} onarrange={arranged} lotsOf={(f) => lotsByFolder.get(f) ?? []} />
-      {/if}
-      <div class="row">
-        <button class="primary" onclick={exportMaps} disabled={!shown.length}><Icon name="copy" size={14} />{t("maps.export.copy", { count: shown.length })}</button>
-      </div>
-      <h3>{t("maps.presets.title")}</h3>
-      <p class="hint">{t("maps.presets.hint")}</p>
-      <div class="row">
-        {#if Object.keys(presets).length}
-          <select bind:value={presetPick} aria-label={t("maps.presets.label")}>
-            <option value="">{t("maps.presets.pick")}</option>
-            {#each Object.entries(presets) as [name, ids] (name)}<option value={name}>{name} ({ids.length})</option>{/each}
-          </select>
-          <button onclick={loadPreset} disabled={!presetPick}>{t("maps.presets.preview")}</button>
-          <button class="danger" onclick={deletePreset} disabled={!presetPick}><Icon name="trash" size={14} />{t("common.delete")}</button>
         {/if}
       </div>
-      <form class="row" onsubmit={savePreset}>
-        <input type="text" bind:value={presetName} placeholder={t("maps.presets.namePlaceholder")} aria-label={t("maps.presets.namePlaceholder")} />
-        <button type="submit" disabled={!presetName.trim() || !shown.length}><Icon name="plus" size={14} />{t("maps.presets.save", { count: shown.length })}</button>
-      </form>
     </div>
 
-    <div class="card">
-      <h2>{t("maps.compare.title")}</h2>
-      <p class="lede">{@html th("maps.compare.lede")}</p>
-      {#if servers.length}
+    <div class="stack">
+      <div class="card">
+        <h2>{t("maps.export.title")}</h2>
+        <p class="lede">{@html th("maps.export.lede")}</p>
+        {#if mapLine.length}
+          <h3>{t("maps.export.orderTitle")}</h3>
+          <p class="hint">{@html th("maps.export.orderHint")}</p>
+          <MapOrder bind:maps={mapLine} onarrange={arranged} lotsOf={(f) => lotsByFolder.get(f) ?? []} />
+        {/if}
         <div class="row">
-          <select bind:value={server} aria-label={t("maps.compare.serverLabel")}>
-            <!-- i18n-ignore: file names -->
-            {#each servers as s (s)}<option value={s}>{s}.ini</option>{/each}
-          </select>
-          <button onclick={compareServer} disabled={!server}><Icon name="server" size={14} />{t("maps.compare.compare")}</button>
+          <button class="primary" onclick={exportMaps} disabled={!shown.length}><Icon name="copy" size={14} />{t("maps.export.copy", { count: shown.length })}</button>
         </div>
-      {:else}
-        <p class="hint">{t("maps.compare.noServers")}</p>
-      {/if}
-      {#if compared}
-        {#if !compared.only_server.length && !compared.only_you.length}
-          <p class="hint">{t("maps.compare.same", { server })}</p>
-        {/if}
-        {#if compared.only_server.length}
-          <h3>{t("maps.compare.onlyServer")}</h3>
-          <ul class="needs">
-            {#each compared.only_server as s (s.folder)}
-              {@const m = byId(s.id)}
-              {@const row = s.id ? mods.get(s.id) : undefined}
-              <li>
-                <span class="name"><span class="mono">{s.folder}</span>
-                  <span class="hint">{m ? nameOf(m) : s.id ? s.id : t("maps.compare.noKnownMap")}{row ? ` · ${row.on ? t("maps.compare.on") : t("maps.compare.installed")}` : s.item ? ` · ${t("maps.compare.notInstalled")}` : ""}</span></span>
-                <span class="btns">
-                  {#if s.id && !row?.on && byId(s.id)}<button class="quiet" onclick={() => s.id && !preview.has(s.id) && togglePreview(s.id)}>{t("maps.compare.preview")}</button>{/if}
-                  {#if row && !row.on}
-                    <button disabled={busy} onclick={() => setMods([s.id!], true)}>{t("common.enable")}</button>
-                  {:else if !row && s.item}
-                    <button disabled={busy} onclick={() => onInstallWorkshop(s.item!)}><Icon name="download" size={14} />{t("common.install")}</button>
-                  {/if}
-                </span>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-        {#if compared.only_you.length}
-          <h3>{t("maps.compare.onlyYou")}</h3>
-          <p class="mono hint">{compared.only_you.join("; ")}</p>
-        {/if}
-      {/if}
+        <h3>{t("maps.presets.title")}</h3>
+        <p class="hint">{t("maps.presets.hint")}</p>
+        <div class="row">
+          {#if Object.keys(presets).length}
+            <select bind:value={presetPick} aria-label={t("maps.presets.label")}>
+              <option value="">{t("maps.presets.pick")}</option>
+              {#each Object.entries(presets) as [name, ids] (name)}<option value={name}>{name} ({ids.length})</option>{/each}
+            </select>
+            <button onclick={loadPreset} disabled={!presetPick}>{t("maps.presets.preview")}</button>
+            <button class="danger" onclick={deletePreset} disabled={!presetPick}><Icon name="trash" size={14} />{t("common.delete")}</button>
+          {/if}
+        </div>
+        <form class="row" onsubmit={savePreset}>
+          <input type="text" bind:value={presetName} placeholder={t("maps.presets.namePlaceholder")} aria-label={t("maps.presets.namePlaceholder")} />
+          <button type="submit" disabled={!presetName.trim() || !shown.length}><Icon name="plus" size={14} />{t("maps.presets.save", { count: shown.length })}</button>
+        </form>
+      </div>
     </div>
 
     <div class="card wide">
@@ -1073,6 +1078,69 @@
   }
   .wide {
     grid-column: 1 / -1;
+  }
+  /* below the map: two independent stacks, so a short card never leaves a hole */
+  .stack {
+    display: grid;
+    gap: 16px;
+    align-content: start;
+    min-width: 0;
+  }
+  /* the map list matches the world map's height and scrolls inside it */
+  @media (min-width: 961px) {
+    .inner > .world:not(.expanded),
+    .inner > .list {
+      align-self: stretch;
+    }
+    .list {
+      display: flex;
+      flex-direction: column;
+      height: 0;
+      min-height: 100%;
+    }
+    .list .mods {
+      flex: 1 1 auto;
+      min-height: 160px;
+      max-height: none;
+    }
+  }
+  /* the name line: the name truncates so its badges and "Hide on grid" stay on the line */
+  .name > .title {
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .name > .title strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .name > .title > :not(strong) {
+    flex: none;
+  }
+  /* each warning is one line; the full text is in its tooltip */
+  .name > .bad,
+  .name > .over,
+  .name > .dupe,
+  .name > .hint {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .name > .bad.line {
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
+  }
+  .bad.line .txt {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bad.line .link {
+    flex: none;
   }
   .card {
     position: relative;
@@ -1288,9 +1356,6 @@
   .mods li {
     cursor: pointer;
   }
-  .mods li.shown {
-    box-shadow: inset 3px 0 0 var(--accent-text);
-  }
   .mods li:hover,
   .needs li:hover {
     background: color-mix(in oklab, var(--accent) 16%, var(--panel));
@@ -1355,11 +1420,6 @@
   }
   .mods li.hidden strong {
     opacity: 0.6;
-  }
-  .link.hide {
-    margin-left: 10px;
-    font-size: 12px;
-    color: var(--muted);
   }
   .source .note {
     flex-basis: 100%;
