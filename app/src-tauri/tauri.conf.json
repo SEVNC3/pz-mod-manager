@@ -44,6 +44,11 @@
     "createUpdaterArtifacts": true
   },
   "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["pzmm"]
+      }
+    },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVDRjA1RkZEMjNCODdDMDkKUldRSmZMZ2ovVi93WEtqNm55b0JVZkFGOFN5YmEvckkyUCtMakZlRmxXWHZ0TFJPdEtUSDhSK2sK",
       "endpoints": [

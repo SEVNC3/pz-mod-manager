@@ -1,12 +1,13 @@
 <script lang="ts">
   import { tick } from "svelte";
+  import { fmtNum } from "./format";
   import Icon from "./Icon.svelte";
   import { t, th } from "./i18n.svelte";
   import LayerIcon, { overlapLabel } from "./LayerIcon.svelte";
   import type { ModRow, Overlap, Row } from "./api";
   import type { Problem } from "./order";
 
-  let { rows, order, mods, problems, fixable, overlaps, busy, onAutosort, onFix, onMove, onSelect, onMenu, onMenuKey }: {
+  let { rows, order, mods, problems, fixable, overlaps, busy, onAutosort, onSortAz, onFix, onMove, onSelect, onMenu, onMenuKey }: {
     rows: Row[];
     /** The load order: enabled mod ids. */
     order: string[];
@@ -17,6 +18,8 @@
     overlaps: Record<string, Overlap>;
     busy: boolean;
     onAutosort: () => void;
+    /** Put the load order A-Z (requirements and rules still hold). */
+    onSortAz: () => void;
     onFix: () => void;
     /** The mod at `from` dropped before position `to`. */
     onMove: (from: number, to: number) => void;
@@ -79,8 +82,8 @@
   <p class="lede">{t("loadOrder.lede")}</p>
 
   <dl class="facts">
-    <div><dt>{t("common.enabled")}</dt><dd>{order.length}</dd></div>
-    <div class:bad={problems.size}><dt>{t("loadOrder.problems")}</dt><dd>{problems.size}</dd></div>
+    <div><dt>{t("common.enabled")}</dt><dd>{fmtNum(order.length)}</dd></div>
+    <div class:bad={problems.size}><dt>{t("loadOrder.problems")}</dt><dd>{fmtNum(problems.size)}</dd></div>
     <div><dt>{t("loadOrder.overridden")}</dt><dd title={t("loadOrder.overriddenTip")}>{overridden}</dd></div>
   </dl>
 
@@ -93,7 +96,10 @@
   </ol>
 
   {#if fixable}
-    <button class="wide" onclick={onFix} disabled={busy}><Icon name="wand" size={14} />{t("loadOrder.fix", { count: fixable })}</button>
+    <button class="wide" onclick={onFix} disabled={busy} title={t("mods.fixTip")}><Icon name="wand" size={14} />{t("mods.fix")}</button>
+  {/if}
+  {#if order.length > 1}
+    <button class="wide quiet" onclick={onSortAz} disabled={busy} title={t("loadOrder.sortAzTip")}><Icon name="layers" size={14} />{t("loadOrder.sortAz")}</button>
   {/if}
 
   {#if order.length}
@@ -114,6 +120,7 @@
             <span class="title" title={m?.name || id}>{m?.name || id}</span>
             {#if m?.name && m.name !== id}<span class="id mono">{id}</span>{/if}
           </span>
+          {#if m?.pinned}<span class="pin" title={t("loadOrder.pinned")}><Icon name="lock" size={12} /></span>{/if}
           {#if m?.missing || problems.has(id)}
             <span class="problem" title={m?.missing ? t("loadOrder.notInstalled") : p && t(p.key, { id: p.id })}><Icon name="alert" size={12} /></span>
           {/if}
@@ -218,7 +225,7 @@
   }
   li:not(.tail):hover .id,
   li.selected .id {
-    color: rgb(255 255 255 / 0.72);
+    color: color-mix(in oklab, var(--on-selected) 72%, transparent);
   }
   .num {
     flex: none;
@@ -243,5 +250,9 @@
   .problem {
     display: inline-flex;
     color: var(--danger);
+  }
+  .pin {
+    display: inline-flex;
+    color: var(--muted);
   }
 </style>

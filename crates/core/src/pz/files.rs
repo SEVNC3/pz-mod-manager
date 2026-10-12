@@ -1,15 +1,17 @@
 //! What a mod's files do to the game: which files override other mods (by load order) and
 //! which maps it adds.
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 
 use super::is_version_dir;
 
 /// Game-visible paths a mod provides under `media/`, B42 `42/` and `common/` folded together.
 /// The mod folder plus its version folders (`42/`, `42.13/`, `common/`): where `media/` can live.
-fn content_roots(mod_dir: &Path) -> Vec<PathBuf> {
+pub(crate) fn content_roots(mod_dir: &Path) -> Vec<PathBuf> {
     std::iter::once(mod_dir.to_path_buf())
         .chain(
             fs::read_dir(mod_dir)
@@ -22,7 +24,42 @@ fn content_roots(mod_dir: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-pub fn media_files(mod_dir: &Path) -> BTreeSet<String> {
+/// A cheap stamp of a mod folder: the modified times of it, its version folders and their `media`.
+/// Installs and Workshop updates replace the folder, so these change with it.
+fn stamp(dir: &Path) -> Vec<Option<SystemTime>> {
+    content_roots(dir).into_iter().flat_map(|r| [r.join("media"), r]).map(|p| fs::metadata(p).and_then(|m| m.modified()).ok()).collect()
+}
+
+type Cache<T> = Mutex<BTreeMap<PathBuf, (Vec<Option<SystemTime>>, T)>>;
+
+static MEDIA: Cache<Arc<BTreeSet<String>>> = Mutex::new(BTreeMap::new());
+static STATS: Cache<Stats> = Mutex::new(BTreeMap::new());
+
+/// `walk(dir)`, kept until the folder's [`stamp`] changes or [`forget`]: overlaps, sizes and
+/// Performance look at every enabled mod's files each time.
+fn kept<T: Clone>(cache: &Cache<T>, dir: &Path, walk: impl FnOnce(&Path) -> T) -> T {
+    let s = stamp(dir);
+    if let Some((at, v)) = cache.lock().unwrap_or_else(|e| e.into_inner()).get(dir)
+        && *at == s
+    {
+        return v.clone();
+    }
+    let v = walk(dir);
+    cache.lock().unwrap_or_else(|e| e.into_inner()).insert(dir.to_path_buf(), (s, v.clone()));
+    v
+}
+
+/// Drop what [`kept`] keeps (a reload: a file changed deep in a folder leaves its stamp as it was).
+pub fn forget() {
+    MEDIA.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    STATS.lock().unwrap_or_else(|e| e.into_inner()).clear();
+}
+
+fn media_files(mod_dir: &Path) -> Arc<BTreeSet<String>> {
+    kept(&MEDIA, mod_dir, |d| Arc::new(walk_media(d)))
+}
+
+fn walk_media(mod_dir: &Path) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     for root in content_roots(mod_dir) {
         let mut stack = vec![root.join("media")];
@@ -78,8 +115,8 @@ pub struct Overlap {
 pub fn overlaps(mods: &[(String, PathBuf)]) -> std::collections::HashMap<String, Overlap> {
     let mut owners: std::collections::HashMap<String, Vec<usize>> = Default::default();
     for (i, (_, dir)) in mods.iter().enumerate() {
-        for f in media_files(dir) {
-            owners.entry(f).or_default().push(i);
+        for f in media_files(dir).iter() {
+            owners.entry(f.clone()).or_default().push(i);
         }
     }
     let mut out: std::collections::HashMap<String, Overlap> = Default::default();
@@ -94,15 +131,22 @@ pub fn overlaps(mods: &[(String, PathBuf)]) -> std::collections::HashMap<String,
     out
 }
 
-/// A mod folder's total size in bytes and its newest file time (seconds since 1970).
+/// A mod folder's total size in bytes, its newest file time and when the folder was made
+/// (installed or subscribed; 0 where the system doesn't keep it), in seconds since 1970.
 #[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize)]
 pub struct Stats {
     pub size: u64,
     pub modified: u64,
+    pub created: u64,
 }
 
 pub fn stats(dir: &Path) -> Stats {
-    let mut s = Stats::default();
+    kept(&STATS, dir, walk_stats)
+}
+
+fn walk_stats(dir: &Path) -> Stats {
+    let secs = |t: std::io::Result<std::time::SystemTime>| t.ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs());
+    let mut s = Stats { created: fs::metadata(dir).map_or(0, |m| secs(m.created())), ..Default::default() };
     let mut stack = vec![dir.to_path_buf()];
     while let Some(d) = stack.pop() {
         for e in fs::read_dir(&d).into_iter().flatten().flatten() {
@@ -111,12 +155,24 @@ pub fn stats(dir: &Path) -> Stats {
                 stack.push(e.path());
             } else if let Ok(meta) = e.metadata() {
                 s.size += meta.len();
-                let t = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs());
-                s.modified = s.modified.max(t);
+                s.modified = s.modified.max(secs(meta.modified()));
             }
         }
     }
     s
+}
+
+/// Languages a mod has texts in: its `media/lua/shared/Translate/<LANG>` folders (`EN`, `RU`, `PTBR`...).
+pub fn languages(mod_dir: &Path) -> Vec<String> {
+    let mut out: Vec<String> = content_roots(mod_dir)
+        .into_iter()
+        .flat_map(|root| fs::read_dir(root.join("media/lua/shared/Translate")).into_iter().flatten().flatten())
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
+        .map(|e| e.file_name().to_string_lossy().to_uppercase())
+        .collect();
+    out.sort();
+    out.dedup();
+    out
 }
 
 /// Map folder names a mod adds (`media/maps/<Name>`).
@@ -143,6 +199,18 @@ mod tests {
     }
 
     #[test]
+    fn languages_from_translate_folders() {
+        let t = tempfile::tempdir().unwrap();
+        let m = t.path().join("M");
+        touch(&m.join("media/lua/shared/Translate/RU/UI_RU.txt"));
+        touch(&m.join("42/media/lua/shared/Translate/ptbr/UI.json"));
+        touch(&m.join("common/media/lua/shared/Translate/RU/IG_UI.json"));
+        touch(&m.join("media/lua/shared/Translate/stray.txt"));
+        assert_eq!(languages(&m), ["PTBR", "RU"]);
+        assert!(languages(&t.path().join("none")).is_empty());
+    }
+
+    #[test]
     fn finds_conflicts_and_maps() {
         let t = tempfile::tempdir().unwrap();
         let a = t.path().join("A");
@@ -166,11 +234,20 @@ mod tests {
 
         let c = t.path().join("C");
         touch(&c.join("media/lua/shared/Items.lua"));
-        let o = overlaps(&[("A".into(), a.clone()), ("B".into(), b.clone()), ("C".into(), c)]);
+        let o = overlaps(&[("A".into(), a.clone()), ("B".into(), b.clone()), ("C".into(), c.clone())]);
         assert_eq!(o["C"].wins_over.iter().collect::<Vec<_>>(), ["A", "B"]);
         assert!(o["C"].loses_to.is_empty());
         assert_eq!(o["A"].loses_to.iter().collect::<Vec<_>>(), ["C"]);
         assert!(o["A"].wins_over.is_empty(), "A loads first, so it beats no one");
         assert!(maps(&a).is_empty());
+
+        // kept until the folder changes
+        assert_eq!(stats(&c).size, 1);
+        touch(&c.join("media/More.txt"));
+        assert_eq!((media_files(&c).len(), stats(&c).size), (2, 2), "a new file is seen");
+        touch(&c.join("media/lua/shared/Deep.lua"));
+        assert_eq!(media_files(&c).len(), 2, "deep inside: kept");
+        forget();
+        assert_eq!(media_files(&c).len(), 3, "until a reload");
     }
 }

@@ -10,17 +10,26 @@ repository.workspace = true
 anyhow = "1.0.104"
 dirs = "7.0.0"
 flate2 = "1.1.10"
+getrandom = "0.3.4"
 keyring = "4.2.0"
+ring = "0.17.14"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.151", features = ["preserve_order"] }
 steamroom = "0.3.0"
 steamroom-client = "0.3.0"
+# FTP with explicit TLS for rented servers' files (rustls and ring are already in the tree)
+suppaftp = { version = "12.1.2", features = ["rustls-ring"] }
 tar = "0.4.46"
 tempfile = "3.27.0"
 tokio = { version = "1", features = ["rt-multi-thread", "time", "macros"] }
 trash = "5.2.9"
 ureq = "3.4.2"
+# the same roots ureq trusts, for FTPS
+webpki-roots = "1.0.9"
 zip = "9.0.1"
 
 [target."cfg(windows)".dependencies]
+# loads the game's own steam_api64.dll to ask the Steam client for servers (pz::steam_client)
+libloading = "0.8"
 winreg = "0.56.0"

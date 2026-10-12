@@ -2,19 +2,18 @@
   import { tick } from "svelte";
   import Icon from "./Icon.svelte";
   import { t } from "./i18n.svelte";
-  import { autosortMaps, sortMaps } from "./order";
+  import { autosortMaps, BASE_MAP as BASE, sortMaps } from "./order";
 
   // a Map= line (Servers & saves, Maps): drag, Alt+arrows or the buttons to arrange; Muldraugh stays last
   // `onarrange`: the player moved something (not called when `maps` is set from outside)
   // `lotsOf`: a folder's map.info lots= (the maps it builds on), for Autosort
   let { maps = $bindable(), onarrange, lotsOf = () => [] }: { maps: string[]; onarrange?: (maps: string[]) => void; lotsOf?: (folder: string) => string[] } = $props();
 
-  const BASE = "Muldraugh, KY";
   let mapFrom = $state<number | null>(null);
   let mapAt = $state<number | null>(null);
 
   function arrange(next: string[]) {
-    maps = sortMaps(next, BASE);
+    maps = sortMaps(next);
     onarrange?.(maps);
   }
 
@@ -67,7 +66,7 @@
     ondragover={(e) => { e.preventDefault(); mapAt = maps.length; }}
     ondrop={(e) => { e.preventDefault(); dropMap(maps.length); }}></li>
 </ol>
-<button class="quiet" onclick={() => arrange(autosortMaps(maps, lotsOf, BASE))} title={t("mapOrder.autosortTip")}><Icon name="wand" size={14} />{t("mapOrder.autosort")}</button>
+<button class="quiet" onclick={() => arrange(autosortMaps(maps, lotsOf))} title={t("mapOrder.autosortTip")}><Icon name="wand" size={14} />{t("mapOrder.autosort")}</button>
 
 <style>
   .maps {

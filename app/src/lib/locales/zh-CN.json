@@ -1,18 +1,141 @@
 {
   "tabs": {
+    "home": "主页",
     "mods": "我的模组",
+    "feed": "最新动态",
     "workshop": "浏览创意工坊",
     "maps": "地图",
-    "servers": "服务器与存档",
-    "zb": "ZombieBuddy",
+    "servers": "服务器",
+    "saves": "存档",
+    "zb": "Java 模组",
+    "authoring": "制作模组",
     "settings": "设置"
+  },
+  "home": {
+    "playButton": "开始游戏",
+    "notAnswering": "无响应",
+    "joinTip": "先在独立的配置档中准备好它的模组，再加入",
+    "details": "详情",
+    "updatesFailed": "无法检查更新",
+    "noneUpdated": "上次游玩后没有更新",
+    "health": {
+      "ok": "检查设置：一切正常",
+      "problems": {
+        "other": "检查设置：{count} 个问题"
+      },
+      "fix": "修复",
+      "run": "检查",
+      "failed": "无法运行设置检查"
+    },
+    "newsFailed": "无法加载新闻",
+    "noNews": "暂无新闻",
+    "mayAffect": "可能影响模组",
+    "mayAffectTip": "在你上次游玩后发布：去看看最新动态",
+    "firstMods": "还没有启用模组：去创意工坊挑一些吧。",
+    "community": "社区",
+    "news": "The Indie Stone 新闻",
+    "links": {
+      "website": "Project Zomboid 官网",
+      "forums": "The Indie Stone 论坛",
+      "discord": "Project Zomboid Discord",
+      "wiki": "PZwiki",
+      "wikiModding": "PZwiki：模组制作",
+      "moddingDiscord": "PZ Modding Community Discord（非官方）",
+      "reddit": "Reddit 上的 r/projectzomboid",
+      "workshop": "Steam 创意工坊",
+      "pzmm": "PZMM Discord"
+    },
+    "groups": {
+      "favourites": "收藏",
+      "recent": "最近",
+      "hosted": "你的服务器",
+      "popular": "热门"
+    },
+    "more": "更多",
+    "switchProfile": "切换配置档",
+    "stat": {
+      "players": "玩家",
+      "ping": "延迟",
+      "map": "地图",
+      "build": "版本",
+      "port": "端口",
+      "played": "上次游玩的服务器",
+      "playedGame": "上次游玩",
+      "mods": "模组",
+      "problems": "问题",
+      "updates": "更新"
+    },
+    "copyAddress": "复制地址",
+    "copied": "已复制",
+    "manage": "管理",
+    "findServer": "查找服务器",
+    "continue": "继续 {save}",
+    "continueTip": "启动游戏：在游戏菜单中选择 {save}（PZMM 无法让游戏直接打开指定存档）。上次游玩：{ago}。",
+    "zb": {
+      "missing": {
+        "other": "{count} 个模组需要 ZombieBuddy"
+      },
+      "partial": "ZombieBuddy 未完全设置"
+    },
+    "serverDiscord": "服务器 Discord",
+    "serverSite": "服务器网站",
+    "copyLink": "复制加入链接",
+    "featured": "The Indie Stone 精选",
+    "activity": "有新更新的模组",
+    "andMore": {
+      "other": "还有 {count} 个"
+    },
+    "tag": {
+      "major": "重大更新",
+      "patch": "补丁",
+      "news": "新闻"
+    },
+    "library": "库",
+    "search": "搜索",
+    "none": {
+      "favourites": "还没有收藏。",
+      "popular": "人最多的服务器目前都没有使用模组。",
+      "game": "游戏保存的服务器列表是空的。"
+    },
+    "popularFailed": "无法连接服务器列表。",
+    "gameList": "Steam 的列表没有加载（Steam 在运行吗？），所以这些来自游戏保存的服务器列表。",
+    "toGetShort": {
+      "other": "需下载 {count} 个"
+    },
+    "official": "官方",
+    "server": {
+      "toGet": {
+        "other": "需要下载 {count} 个模组"
+      },
+      "ready": {
+        "other": "{count} 个模组已就绪"
+      },
+      "get": "获取模组",
+      "toGetUnlisted": {
+        "other": "列出的模组中有 {count} 个需要下载，另有 {unlisted} 个未显示"
+      },
+      "readyListed": {
+        "other": "列出的 {count} 个模组已就绪，另有 {unlisted} 个未显示"
+      }
+    },
+    "serverInfo": "查看服务器信息",
+    "serverInfoSub": "在线玩家、模组和设置，在“服务器”中查看",
+    "pickServer": "选择一个服务器，然后点击“加入”",
+    "deselect": "再次点击（或按 Esc）返回你的配置文件",
+    "singleplayer": "单人游戏",
+    "findingMods": "正在查找它的模组…",
+    "gameListKey": "在这里列出 Steam 的服务器需要 Steam Web API 密钥，所以这些来自游戏保存的服务器列表。",
+    "popularKept": "列表获取于{ago}。刷新会询问 Steam，你会短暂显示为正在游戏。",
+    "popularAsk": "列出最热门的服务器会询问 Steam，你会短暂显示为正在游戏。",
+    "listServers": "列出服务器",
+    "passwordTip": "需要密码：未保存密码时，点击加入会在服务器页打开该服务器的详情并在那里询问密码"
   },
   "app": {
     "newProfilePlaceholder": "名称，例如：好友服务器",
     "create": "创建",
     "share": "分享",
-    "shareTip": "复制一段可供他人导入的代码",
-    "importTip": "从分享码导入配置方案",
+    "shareTip": "复制他人可导入的分享码，或将配置保存为游戏模组菜单或 Mod Manager 中的预设",
+    "importTip": "从分享码、创意工坊合集或其他模组管理器的列表导入配置",
     "installLabel": "安装模组",
     "installPlaceholder": "粘贴创意工坊链接、合集或 ID、GitHub 仓库（owner/repo）或 .zip 路径",
     "updateMods": {
@@ -24,7 +147,7 @@
     "launchTip": "通过 Steam 启动",
     "launchTipArgs": "通过 Steam 启动，附带参数 {args}",
     "launch": "启动游戏",
-    "importIntro": "<strong>导入配置方案</strong>：粘贴别人发给你的分享码。缺少的创意工坊模组会自动安装。",
+    "importIntro": "<strong>导入配置</strong>：粘贴分享码、创意工坊合集或物品链接（可一次多个），或从游戏模组菜单分享的预设。缺少的创意工坊模组会被安装。",
     "switchGameLabel": "切换游戏",
     "switchToViewpoint": "切换到 Project Viewpoint（3D）？",
     "switchToZomboid": "切换回 Project Zomboid？",
@@ -62,12 +185,30 @@
     "browse": "浏览…",
     "browseTip": "从这台电脑上的 .zip 文件或文件夹安装模组",
     "browseZip": ".zip 文件…",
-    "browseFolder": "模组文件夹…"
+    "browseFolder": "模组文件夹…",
+    "importPlaceholder": "PZMM1:…、合集链接，或 名称:ModA;ModB;",
+    "importSaved": "或此电脑上保存的列表",
+    "shareCode": "复制分享码",
+    "saveGamePreset": "保存为游戏模组菜单中的预设",
+    "saveModManagerPreset": "保存为 Mod Manager 预设",
+    "loadFailed": "无法读取你的模组：{error}",
+    "openFolders": "在设置中检查文件夹",
+    "moreTabs": "更多标签页"
   },
   "mods": {
     "searchPlaceholder": "搜索模组  ( / )",
     "searchLabel": "搜索模组",
     "showLabel": "显示",
+    "filters": "筛选",
+    "filtersN": {
+      "other": "筛选（{count}）"
+    },
+    "filtersTip": "收藏、隐藏的模组、类型、你的标签和语言",
+    "clearFilterTip": "关闭此筛选",
+    "clearFilters": "清除筛选",
+    "more": "更多",
+    "kindHeading": "类型",
+    "tagHeading": "你的标签",
     "filterAll": "全部",
     "filterProblems": "问题",
     "filterProblemsN": "问题（{count}）",
@@ -77,9 +218,6 @@
     "sortSize": "大小",
     "sortUpdated": "最后修改",
     "sortStatus": "问题优先",
-    "count": {
-      "other": "已启用 {enabled} · 共 {count} 个模组"
-    },
     "installMissingTip": "在创意工坊中查找并安装：{ids}",
     "installMissing": "安装缺失的模组（{count}）",
     "fixTip": "启用必需的模组，并按 require / loadModAfter / loadModBefore 规则排列模组",
@@ -101,15 +239,23 @@
     "undo": "撤销",
     "redoTip": "重做（Ctrl+Y）",
     "redo": "重做",
-    "separatorTip": "在所选模组上方添加分隔符",
-    "separator": "分隔符",
-    "groupTip": "根据创意工坊标签，将模组按类别各归入一个分组。加载顺序不变。",
+    "addSeparator": "添加分隔符",
     "group": "按类别分组",
     "loading": "正在加载你的模组…",
     "emptyTitle": "物资库里还什么都没有。",
     "emptyHint": "在上方粘贴 Steam 创意工坊链接即可安装模组，或在 Steam 中订阅模组：订阅的模组会自动显示在这里。",
     "newSection": "新分组",
-    "newSectionN": "新分组 {n}"
+    "newSectionN": "新分组 {n}",
+    "filterFavourites": "收藏",
+    "filterHidden": "已隐藏",
+    "filterHiddenN": "已隐藏（{count}）",
+    "kindAny": "所有类型",
+    "sortEnabled": "已启用的在前",
+    "sortInstalled": "安装日期",
+    "inLanguage": "我的语言（{language}）",
+    "selectAll": "全选",
+    "skipFavourites": "跳过收藏",
+    "skipFavouritesTip": "启用和禁用不会改动你的收藏"
   },
   "busy": {
     "loading": "正在加载",
@@ -136,6 +282,9 @@
     "loadingSave": "正在加载 {name} 的模组",
     "creatingProfile": "正在创建配置方案“{name}”",
     "deletingProfile": "正在删除配置方案“{name}”",
+    "pruningProfiles": {
+      "other": "正在删除 {count} 个服务器配置文件"
+    },
     "removingOne": "正在移除 {name}",
     "removingMany": {
       "other": "正在移除 {count} 个模组"
@@ -146,7 +295,11 @@
     "copyingProfile": "正在将配置方案复制为“{name}”",
     "renamingProfile": "正在将配置方案重命名为“{name}”",
     "restoringSnapshot": "正在恢复快照",
-    "lookingUp": "正在创意工坊上查找 {id}"
+    "lookingUp": "正在创意工坊上查找 {id}",
+    "settingUpServer": "正在准备 {name}",
+    "checking": "正在检查你的模组",
+    "importingCollection": "正在安装合集",
+    "readingCollection": "正在读取合集"
   },
   "log": {
     "appLatest": "PZMM {version} 已是最新版本。",
@@ -184,7 +337,16 @@
     "snapshotRestored": "已恢复快照。被替换的列表也保存为了快照。",
     "pickRequirement": "没有创意工坊项目明确提供 {id}：请在详情的“需要”中选择一个。",
     "idCopied": "已复制 {id}。",
-    "bisectOtherProfile": "查找出问题的模组正在配置方案“{profile}”上进行：请切回该方案来回答或停止查找。"
+    "bisectOtherProfile": "查找出问题的模组正在配置方案“{profile}”上进行：请切回该方案来回答或停止查找。",
+    "pinned": "已将 {id} 固定在加载顺序中的相邻模组之间。自动排序和 Mod Load Order Sorter 会保持它的位置。",
+    "unpinned": "已取消固定 {id}。",
+    "savedGamePreset": "已将“{name}”保存为游戏模组菜单中的预设。",
+    "savedModManagerPreset": "已将“{name}”保存为 Mod Manager 预设。",
+    "sortedAz": "已按 A-Z 排序加载顺序；依赖和加载规则仍然优先（Ctrl+Z 撤销）。",
+    "playFailed": "无法启动游戏：{error}",
+    "appUpdateFound": "PZMM {version} 已发布：标签页上方有“更新并重启”。",
+    "bisectSaveFailed": "无法保存下一份测试列表，因此查找没有继续。快照中有你查找之前的列表。",
+    "bisectRestoreFailed": "无法把模组列表恢复到查找之前的样子：请在快照中恢复（查找出错模组之前）。"
   },
   "confirm": {
     "group": "“按类别分组”会将你自己的分组（{sections}）替换为类别分组。按 Ctrl+Z 可撤销。现在分组吗？",
@@ -203,12 +365,40 @@
       "other": "移除 {count} 个模组？它们的文件将从你的 Zomboid 模组文件夹中删除。"
     },
     "removeSkipped": {
-      "other": " （{count} 个非 PZMM 安装的模组将保持不动。）"
+      "other": "{count} 个非 PZMM 安装的模组将保持不动。"
     },
     "alsoRemove": {
       "other": "同时移除 {ids}？你没有其他模组需要它们。"
     },
-    "deleteProfile": "删除配置方案“{name}”？你的模组仍会保持安装。PZMM 将切换到“{other}”。"
+    "removeToo": {
+      "other": "一并移除"
+    },
+    "keepThem": {
+      "other": "保留"
+    },
+    "deleteProfile": "删除配置方案“{name}”？你的模组仍会保持安装。PZMM 将切换到“{other}”。",
+    "neededTitle": {
+      "other": "{count} 个已启用的模组需要 {name}"
+    },
+    "needsLine": "{name}（需要 {needs}）",
+    "theseMods": {
+      "other": "这 {count} 个模组"
+    },
+    "disableToo": {
+      "other": "一并禁用"
+    },
+    "disableOnly": "禁用，其余保持启用",
+    "deleteOther": "删除配置文件“{name}”？你的模组仍会保留安装。",
+    "pruneProfiles": {
+      "other": "删除 {count} 个不再使用的服务器配置文件？它们的服务器不在你的加入记录、收藏或你托管的服务器中。你的模组仍会保留安装。"
+    },
+    "removeTrashOne": "移除 {name}？其文件将从你的 Zomboid 模组文件夹移至回收站。",
+    "removeTrashMany": {
+      "other": "移除 {count} 个模组？它们的文件将从你的 Zomboid 模组文件夹移至回收站。"
+    },
+    "removeUsedBy": {
+      "other": "另有 {count} 个配置方案也在使用：{profiles}"
+    }
   },
   "common": {
     "cancel": "取消",
@@ -245,6 +435,7 @@
     "workshop": "创意工坊",
     "steam": "已订阅",
     "local": "本地文件",
+    "localShort": "本地",
     "manual": "手动"
   },
   "api": {
@@ -276,6 +467,8 @@
     },
     "hideVanilla": "隐藏原版",
     "perMapColours": "按地图着色",
+    "world": "世界地图",
+    "worldTip": "在网格下绘制每张地图自带世界地图中的水域、道路和建筑（未附带的地图保持纯网格）",
     "zoomIn": "放大",
     "zoomOut": "缩小",
     "fit": "适应",
@@ -465,11 +658,13 @@
         "other": "保存显示的 {count} 张"
       },
       "confirmReplace": "替换预设“{name}”？",
+      "replace": "替换",
       "saved": {
         "other": "已将显示的 {count} 张地图保存为“{name}”。"
       },
       "previewing": "正在预览“{name}”。",
-      "previewingMissing": "正在预览“{name}”；未找到：{ids}（请安装它们，或开启“创意工坊地图”）。"
+      "previewingMissing": "正在预览“{name}”；未找到：{ids}（请安装它们，或开启“创意工坊地图”）。",
+      "confirmRemove": "移除预设“{name}”？"
     },
     "compare": {
       "title": "与服务器比较",
@@ -496,6 +691,7 @@
       "noItem": "不存在创意工坊物品 {id}。",
       "alreadyInstalled": "{title} 已安装：如果它添加了地图，它们已在列表中。",
       "confirmDownload": "Steam 未提供“{title}”的文件列表（{error}）。是否改为下载它（{size}）来读取其单元格？不会安装任何内容，下载的文件随后会被删除。",
+      "download": "下载",
       "read": "已读取 {title}：它已在网格上预览，并以未安装状态显示在列表中。",
       "noMaps": "{title} 没有为 Build {build} 添加地图。",
       "readingMember": "正在读取 {title}（{n}/{total}）…",
@@ -533,7 +729,30 @@
     "hideSpawn": "隐藏出生点模组",
     "hideSpawnTip": "不显示没有地图格的模组：它们只为原版城镇添加出生点",
     "minimise": "最小化工具面板",
-    "restoreTip": "显示工具面板"
+    "restoreTip": "显示工具面板",
+    "gridEmpty": "网格上什么都没有：在列表中勾选一张地图即可显示。",
+    "bg": {
+      "title": "背景图片",
+      "lede": "在 Build {build} 网格下方显示你自己的图片来代替世界地图，例如来自维基的地图。图片保留在磁盘上的原位置；“校准”会通过两个点将其对齐。",
+      "pick": "使用图片作为背景…",
+      "calibrate": "校准",
+      "reset": "重置",
+      "resetTip": "不再使用此图片：重新显示世界地图",
+      "missing": "找不到背景图片（{path}），因此改为显示世界地图。",
+      "unreadable": "无法将 {path} 读取为 PNG 或 JPEG 图片。",
+      "spot": "第 {n} 个点（共 2 个）",
+      "stepImage": "点击图片上一个在世界地图上也能找到的位置，例如十字路口（或用方向键移动地图，按 Enter 选取中间的十字）。",
+      "stepWorld": "现在在世界地图上点击同一位置（图片暂时隐藏），按 Enter 选取十字，或在下方输入其图块或单元格坐标。",
+      "spotLabel": "在世界中的位置 (x, y)",
+      "unitLabel": "图块或单元格",
+      "tiles": "图块",
+      "cells": "单元格",
+      "set": "设定该点",
+      "cancelTip": "停止校准 (Esc)",
+      "badSpot": "请输入 x 和 y 两个数字，例如 10620, 9750。",
+      "tooClose": "这两个点无法对齐图片：请选择在水平和垂直方向上都相距较远的两个点，并在图片和世界中按相同顺序选取。请从第 1 个点重新开始。",
+      "lined": "背景图片已对齐。"
+    }
   },
   "mapOrder": {
     "label": "地图顺序",
@@ -583,7 +802,15 @@
       "github": "由 PZMM 从 GitHub 安装",
       "local": "由 PZMM 从文件安装",
       "manual": "在 PZMM 之外添加到模组文件夹"
-    }
+    },
+    "openWorkshop": "打开创意工坊页面",
+    "favourite": "已收藏",
+    "byAuthor": "{name}，作者 {author}",
+    "neededBy": {
+      "other": "被 {count} 个模组需要"
+    },
+    "neededByTip": "需要它的已启用模组：{names}",
+    "languagesTip": "包含以下语言的文本：{languages}"
   },
   "details": {
     "label": "模组详情",
@@ -630,11 +857,32 @@
     "unsubscribe": "在创意工坊页面取消订阅",
     "whatChanged": "你的版本之后的更改",
     "loadingChanges": "正在读取更改说明…",
-    "noChangeNotes": "作者没有为这次更新写更改说明。"
+    "noChangeNotes": "作者没有为这次更新写更改说明。",
+    "tags": "你的标签",
+    "addTag": "添加标签",
+    "removeTag": "移除标签 {tag}",
+    "neededBy": "被以下模组需要",
+    "rules": "加载规则",
+    "loadFirst": "最先加载",
+    "loadLast": "最后加载",
+    "position": {
+      "none": "否",
+      "on": "整个列表中",
+      "category": "所在分类中"
+    },
+    "loadAfter": "在其后加载",
+    "loadBefore": "在其前加载",
+    "incompatible": "不兼容",
+    "category": "Sorter 分类",
+    "addRuleMod": "添加模组 ID",
+    "fromMod": "来自模组自己的 mod.info",
+    "removeRuleMod": "移除 {id}",
+    "rulesHint": "保存在 Mod Load Order Sorter 的 sorting_rules.txt 中；自动排序和修复加载顺序也会遵循。",
+    "clearRules": "清除这些规则"
   },
   "loadOrder": {
     "title": "加载顺序",
-    "lede": "模组按从上到下的顺序加载。当两个模组修改同一个文件时，靠下的那个优先。左侧的库由你自由整理：它的顺序不会影响这里。",
+    "lede": "模组按从上到下的顺序加载。当两个模组修改同一个文件时，靠下的那个优先。库由你自由整理：它的顺序不会影响这里。",
     "problems": "问题",
     "overridden": "被覆盖",
     "overriddenTip": "有文件被其他模组替换的已启用模组",
@@ -645,13 +893,13 @@
       "rules": "移动模组，使每条 <span class=\"mono\">require</span>、<span class=\"mono\">loadModAfter</span> 和 <span class=\"mono\">loadModBefore</span> 规则都得到满足。",
       "keep": "其余保持你的顺序。按 Ctrl+Z 可恢复原顺序。"
     },
-    "fix": {
-      "other": "修复 {count} 个问题，不自动排序"
-    },
     "modsInOrder": "按加载顺序排列的模组",
     "dragHint": "拖动或 Alt+↑/↓ 调整顺序 · Enter 或双击打开模组",
     "notInstalled": "未安装",
-    "librarySections": "库分组"
+    "librarySections": "库分组",
+    "pinned": "已固定：自动排序会把它保持在相邻模组之间",
+    "sortAz": "A-Z 排序",
+    "sortAzTip": "按字母顺序排列加载顺序，只在依赖和加载规则需要时移动模组"
   },
   "findings": {
     "findBroken": "查找出问题的模组",
@@ -672,20 +920,33 @@
     "warnings": {
       "other": "{count} 个警告"
     },
-    "luaErrors": "<strong>上次游戏中的 Lua 错误</strong>（来自 console.txt）：",
     "errorCount": {
       "other": "{count} 个错误，首个位于 <span class=\"mono\">{example}</span>"
     },
     "disable": "禁用 {id}",
     "bisectOffer": "出了问题，但上面没有任何解释？{link}：PZMM 每次测试游戏时都会把你已启用的模组减半。",
-    "finishFirst": "请先完成或停止查找出问题的模组。"
+    "finishFirst": "请先完成或停止查找出问题的模组。",
+    "logErrors": "<strong>{file} 中的错误</strong>（上次运行）：",
+    "firstError": "第一个真正的错误，位于第 {line} 行。",
+    "pointsAt": "指向：",
+    "bisectSuspects": {
+      "other": "{link}，从日志指向的 {count} 个模组开始：PZMM 先测试它们，再把其余的减半。"
+    },
+    "dismiss": "已检查",
+    "dismissTip": "你已检查并信任此文件：在文件改变之前，PZMM 不再对它发出警告",
+    "bisectLeft": "配置方案“{profile}”上查找出问题的模组还没有完成",
+    "bisectLeftLine": {
+      "other": "仍有 {count} 个模组可疑。从停下的地方继续，或恢复查找前的模组列表。"
+    },
+    "bisectResume": "继续查找",
+    "bisectRestore": "恢复之前的列表"
   },
   "settings": {
     "label": "设置",
     "saveFailed": "无法保存设置：{error}",
     "tokenSaved": "已将 GitHub 令牌保存到系统凭据存储中。",
     "tokenForgot": "已清除 GitHub 令牌。",
-    "confirmClearBackups": "删除所有备份（{size}）？之后将无法把模组恢复到旧版本。",
+    "confirmClearBackups": "永久删除所有备份（{size}）？它们不会移至回收站，之后将无法把模组恢复到旧版本。",
     "diagnosticsCopied": "已复制诊断信息（你的用户名已隐去）。请将其粘贴到错误报告中。",
     "diagnosticsFailed": "无法复制诊断信息：{error}",
     "language": "语言",
@@ -710,7 +971,23 @@
       "moveConfirm": "将你的 PZMM 数据从 <span class=\"mono\">{from}</span> 移动到 <span class=\"mono\">{to}</span>？如果不移动，PZMM 在新位置将从空白开始。",
       "moveData": "移动数据",
       "switchWithoutMoving": "切换但不移动",
-      "reading": "正在读取文件夹…"
+      "reading": "正在读取文件夹…",
+      "hintSaves": "存档备份存放的位置；更改之前的备份会留在原来的文件夹",
+      "name": {
+        "game": "Project Zomboid 安装目录",
+        "zomboid": "Zomboid 用户文件夹",
+        "server": "专用服务器安装目录",
+        "workshop": "Steam 创意工坊文件夹",
+        "data": "PZMM 数据",
+        "saves": "存档备份"
+      },
+      "warn": {
+        "driveRoot": "驱动器根目录不能存放 PZMM 数据：请在其中选择一个文件夹。",
+        "inGame": "PZMM 数据不能放在游戏文件夹中：Steam 验证或重新安装游戏时会将其删除。",
+        "oneDrive": "它位于 OneDrive 中，在游戏或 PZMM 使用文件时，OneDrive 可能锁定或替换它们。",
+        "noWrite": "PZMM 无法在此写入（没有权限）。",
+        "lowSpace": "此驱动器仅剩 {size} 可用空间。"
+      }
     },
     "downloads": {
       "title": "下载与更新",
@@ -725,7 +1002,11 @@
       "openIn": "创意工坊页面打开方式",
       "inSteam": "Steam（运行时）",
       "inBrowser": "浏览器",
-      "appUpdates": "PZMM 启动时检查新版本"
+      "appUpdates": "PZMM 启动时检查新版本",
+      "updates": "更新",
+      "updatesHint": "PZMM 多久检查一次你的模组和它自身的新版本。",
+      "workshop": "创意工坊",
+      "workshopHint": "创意工坊页面在哪里打开，以及创意工坊标签页从哪里开始。"
     },
     "token": {
       "title": "GitHub 令牌",
@@ -734,6 +1015,15 @@
       "savedPlaceholder": "已保存令牌",
       "save": "保存令牌",
       "forget": "清除"
+    },
+    "steamKey": {
+      "title": "Steam Web API 密钥",
+      "hint": "可选。没有密钥时，“服务器”会在 Steam 客户端运行期间通过它列出所有服务器。有了密钥，即使 Steam 没有运行也能获取 Steam 的完整列表，还能看到好友正在玩的服务器。它保存在系统凭据存储中，绝不会写入文件。",
+      "get": "获取密钥",
+      "savedPlaceholder": "已保存密钥",
+      "save": "保存密钥",
+      "saved": "已将 Steam Web API 密钥保存到系统凭据存储。",
+      "forgot": "已忘记 Steam Web API 密钥。"
     },
     "repair": {
       "title": "修复",
@@ -754,7 +1044,10 @@
       "backupCapHint": "0 = 无限制；最旧的先删除",
       "backupsHint": "更新时会将模组的旧版本保留为备份（在其详情中点击“恢复旧版本”）。",
       "backupsUse": "备份占用 <strong>{size}</strong>",
-      "clearBackups": "清除备份"
+      "clearBackups": "清除备份",
+      "mods": "移除模组",
+      "modsHint": "移除的模组去哪里，以及它们所需的模组如何处理。",
+      "backups": "模组备份"
     },
     "appearance": {
       "title": "外观",
@@ -773,13 +1066,31 @@
       "perPage": "创意工坊每页结果数",
       "compact": "紧凑行",
       "showIds": "在名称旁显示 mod ID",
-      "windowHint": "窗口会记住其大小和位置。"
+      "favFirst": "在排序和筛选后的列表中把收藏置顶",
+      "look": "主题与语言",
+      "lookHint": "PZMM 的外观。窗口会记住它的大小和位置。",
+      "lists": "模组列表",
+      "listsHint": "检查模组所依据的游戏版本，以及列表显示的内容。"
     },
     "launch": {
       "title": "启动",
       "args": "额外游戏参数",
       "argsHint": "“启动游戏”会通过 Steam 传递这些参数，Steam 会询问一次是否允许。",
-      "autosort": "首次使用新配置方案时，按类别对其模组分组"
+      "autosort": "首次使用新配置方案时，按类别对其模组分组",
+      "profileTitle": "用 {profile} 启动时",
+      "profileArgs": "它自己的参数",
+      "ownFolder": "独立的游戏文件夹",
+      "ownFolderHint": "它的存档、选项、日志和模组列表与你的 Zomboid 文件夹分开存放，服务器的配置方案就碰不到你的世界。这些存档不会显示在“存档”里，你手动放进 Zomboid/mods 的模组在那里也看不到。",
+      "tray": "关闭窗口时把 PZMM 留在托盘",
+      "trayHint": "关闭窗口后，服务器计划、更新检查和崩溃监视仍会继续。从托盘图标退出。",
+      "autostart": "登录电脑时在托盘中启动 PZMM",
+      "keepMarks": "在你新建或切换到的每个配置中，保持收藏启用、隐藏的模组禁用",
+      "section": "启动与通知",
+      "gameHint": "“启动游戏”如何启动 Project Zomboid。",
+      "profileHint": "仅用于此配置档；其他配置档保留各自的设置。",
+      "profiles": "配置档",
+      "profilesHint": "新建或切换到某个配置档时 PZMM 会做什么。",
+      "trayTitle": "托盘与开机启动"
     },
     "about": {
       "title": "关于",
@@ -788,12 +1099,56 @@
       "openLogs": "打开日志文件夹",
       "diagnostics": "复制诊断信息",
       "diagnosticsTip": "版本、文件夹、配置方案、模组数量和“检查设置”结果，用户名已隐去",
-      "keys": "键盘：<kbd>/</kbd> 搜索 · <kbd>↑</kbd><kbd>↓</kbd> 在行间移动 · <kbd>Enter</kbd> 详情 · <kbd>Space</kbd> 启用/禁用 · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> 调整顺序 · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> 撤销/重做 · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+点击 多选 · <kbd>Esc</kbd> 清除选择"
+      "official": "唯一的官方下载在 GitHub 上；其他网站的副本可能被篡改：",
+      "keys": "键盘：<kbd>/</kbd> 搜索 · <kbd>↑</kbd><kbd>↓</kbd> 在行间移动 · <kbd>Enter</kbd> 详情 · <kbd>Space</kbd> 启用/禁用 · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> 调整顺序 · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> 撤销/重做 · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+点击 多选 · <kbd>Esc</kbd> 清除选择",
+      "help": "帮助",
+      "helpHint": "用于报告错误：游戏日志和 PZMM 诊断信息。"
     },
-    "readFailed": "无法读取设置：{error}"
+    "readFailed": "无法读取设置：{error}",
+    "saveBackups": {
+      "title": "存档备份",
+      "onLaunch": "PZMM 启动游戏时备份最近玩过的存档",
+      "onExit": "游戏关闭时备份玩过的存档",
+      "keep": "每个存档保留的自动备份数",
+      "keepHint": "0 表示全部保留。有名称的槽位永远不会被删除。",
+      "hint": "只有由 PZMM 启动的游戏，PZMM 才能察觉它的运行和崩溃。崩溃后，玩过的存档会被备份并像槽位一样保留。",
+      "every": "游戏时定时备份，间隔（分钟）",
+      "everyHint": "0 为关闭。只备份上次之后有变化的存档。"
+    },
+    "notify": {
+      "title": "通知",
+      "when": "PZMM 窗口不在前台时，在以下情况通知我",
+      "crash": "服务器崩溃",
+      "restart": "服务器的模组已更新、需要重启",
+      "downloads": "安装和更新完成",
+      "favourites": "收藏的服务器上线且有空位（每两分钟检查一次）"
+    },
+    "sections": "设置分区",
+    "keys": {
+      "title": "账户与密钥"
+    },
+    "desc": {
+      "downloads": "PZMM 何时检查更新、创意工坊如何打开，以及修复。",
+      "keys": "GitHub 和 Steam 的可选密钥，保存在系统的凭据存储中。",
+      "backups": "移除的模组会怎样处理，以及模组和存档的备份。",
+      "appearance": "语言、主题以及模组列表显示的内容。",
+      "launch": "游戏如何启动、托盘，以及 PZMM 会提醒你什么。",
+      "about": "你的 PZMM 版本、帮助和诊断信息。"
+    },
+    "countries": {
+      "title": "服务器国家/地区",
+      "show": "在服务器浏览器中显示每个服务器的国家/地区"
+    }
   },
   "servers": {
-    "label": "服务器与存档",
+    "label": "服务器",
+    "rail": {
+      "label": "服务器列表与你的服务器",
+      "play": "游玩",
+      "browse": "浏览服务器",
+      "overview": "概览"
+    },
+    "recent": "最近加入",
     "sameMods": "与当前配置方案的模组相同",
     "notInProfile": {
       "other": "{count} 个不在你的配置方案中"
@@ -801,7 +1156,6 @@
     "notInTheirs": {
       "other": "你有 {count} 个不在其中"
     },
-    "started": "已用 {how} 启动 {name} 服务器。其控制台窗口会显示进度。",
     "title": "专用服务器",
     "lede": "将“{profile}”配置方案写入服务器配置，使服务器以相同顺序加载相同的模组。它会设置 <span class=\"mono\">Mods=</span>、<span class=\"mono\">WorkshopItems=</span>，当你的模组添加地图时还会设置 <span class=\"mono\">Map=</span>。其他设置均保持不变。",
     "config": "服务器配置",
@@ -812,18 +1166,1062 @@
     "mapOrderHint": "服务器按从上到下的顺序加载地图：模组地图要放在 <span class=\"mono\">Muldraugh, KY</span> 之前。拖动或按 Alt+↑/↓ 调整；点击“写入”保存。",
     "join": "沿用服务器的配置",
     "joinHint": "根据服务器配置创建配置方案：缺少的创意工坊模组会被安装，并复制模组顺序。",
-    "startTip": "启动此专用服务器",
-    "start": "启动服务器",
     "useAsProfile": "用作配置方案",
     "noConfigs": "<span class=\"mono\">{dir}</span> 中还没有服务器配置。",
     "saves": {
       "title": "存档",
       "lede": "每个存档都会记住游玩时使用的模组。继续游戏前先加载存档的模组，就不会缺少任何东西。",
+      "ownFolder": "此配置使用自己的游戏文件夹，因此这里是它的存档（{dir}）。切换到没有独立文件夹的配置即可查看其他存档。",
       "none": "还没有带模组列表的存档。",
       "info": {
         "other": "{mode} · {count} 个模组 · 游玩于 {when} · {diff}"
       },
       "useMods": "使用此存档的模组"
+    },
+    "hostedHint": "PZMM 运行的服务器不在此列出：它们在各自的“模组”标签页中获取模组。"
+  },
+  "launcher": {
+    "title": "加入服务器",
+    "lede": "找到一个模组服务器，把它的模组原样装进一个专属配置方案，然后加入。你的其他配置方案保持不变。",
+    "direct": "直接连接",
+    "directHint": "IP:端口，或粘贴 pzmm://join 链接",
+    "lookUp": "查找",
+    "badAddress": "不是服务器地址：请输入 IP:端口（或主机名），或粘贴 pzmm://join 链接。",
+    "views": {
+      "favourites": "收藏",
+      "history": "历史",
+      "friends": "好友"
+    },
+    "startSteam": "启动 Steam 后刷新，或者在设置中添加 Steam Web API 密钥，这样不开 Steam 也能列出所有服务器。",
+    "addKey": "在设置中添加密钥",
+    "filtersLabel": "筛选",
+    "search": "按名称搜索",
+    "build": "版本",
+    "anyBuild": "任意版本",
+    "b42": "Build 42",
+    "b41": "Build 41",
+    "mods": "模组",
+    "anyMods": "任意模组",
+    "onlyMine": "只要我已有的模组",
+    "atMost": "最多下载 N 个",
+    "atMostCount": "最多下载的模组数",
+    "map": "地图",
+    "players": "玩家",
+    "anyPlayers": "任意玩家数",
+    "notEmpty": "非空",
+    "notFull": "未满",
+    "password": "密码",
+    "anyPassword": "有无密码均可",
+    "noPassword": "无密码",
+    "withPassword": "有密码",
+    "pvp": "PvP",
+    "anyPvp": "PvP 或 PvE",
+    "pvpOn": "PvP",
+    "pvpOff": "PvE",
+    "sort": "排序",
+    "byPlayers": "玩家最多",
+    "byPing": "延迟最低",
+    "byName": "名称",
+    "modsFilterHint": "在游戏外，服务器只显示前几个模组：PZMM 把其余的算作需要下载。",
+    "listing": "正在从 Steam 获取服务器列表…",
+    "from": "来源：{sources}",
+    "sources": {
+      "steam": "Steam 客户端",
+      "web": "Steam Web API",
+      "game": "游戏保存的列表"
+    },
+    "shown": {
+      "other": "{total} 个服务器中的 {count} 个"
+    },
+    "asking": "已询问 {done}/{total}",
+    "empty": {
+      "internet": "Steam 没有列出任何服务器。试试刷新。",
+      "favourites": "还没有收藏：给服务器加星即可留在这里。",
+      "history": "你加入过的服务器会显示在这里。",
+      "game": "游戏自己的列表也是空的：启动 Steam 后刷新，或者在游戏的“加入”界面添加服务器。",
+      "friends": "你的 Steam 好友现在都不在 Project Zomboid 服务器上，或者他们的游戏详情没有公开。",
+      "gameKey": "游戏自己的列表也是空的：在设置中添加 Steam Web API 密钥，或者在游戏的“加入”界面添加服务器。"
+    },
+    "col": {
+      "name": "服务器",
+      "map": "地图",
+      "players": "玩家",
+      "ping": "延迟",
+      "build": "版本",
+      "mods": "模组",
+      "country": "国家/地区"
+    },
+    "favourite": "收藏",
+    "unfavourite": "取消收藏",
+    "locked": "需要密码",
+    "pvpTag": "PvP",
+    "ms": "{n} 毫秒",
+    "vanilla": "原版",
+    "modsToGet": {
+      "other": "需获取 {count} 个"
+    },
+    "modsHave": "都已有",
+    "more": "只显示前 {count} 个：缩小筛选范围以查看其余的。",
+    "noMatch": "没有符合这些筛选条件的服务器。",
+    "facts": "{players}/{max} 名玩家 · {ping} 毫秒",
+    "mapLine": "地图：{map}",
+    "noAnswer": "服务器没有响应（{error}）。你仍然可以尝试加入。",
+    "buildMismatch": "这个服务器运行 {server}；你玩的是 Build {mine}。在版本一致之前无法加入。",
+    "detailsLabel": "服务器详情",
+    "tabs": {
+      "mods": "模组",
+      "rules": "规则",
+      "players": "玩家",
+      "history": "你的加入记录"
+    },
+    "modsUnknown": "服务器响应后会显示它的模组。",
+    "noMods": "没有模组：运行原版 Project Zomboid。",
+    "resolving": "正在查找这些模组：先查已安装的，再查地图索引，最后查创意工坊…",
+    "status": {
+      "installed": "已安装",
+      "found": "在创意工坊",
+      "likely": "可能是",
+      "unknown": "未找到"
+    },
+    "updated": "{ago}更新",
+    "andMore": {
+      "other": "还有 {count} 个：服务器运行 {total} 个模组，但在游戏外只显示前几个"
+    },
+    "mapsUnlisted": {
+      "other": "服务器的地图需要其列表中没有的模组：{mods}（{maps}）"
+    },
+    "mapOverlap": "{a} 和 {b} 覆盖了部分相同的单元格：重叠处以服务器 Map= 中排在前面的为准",
+    "keywords": "关键词",
+    "wipeHint": "“上次清档”是它的世界创建的时间：服务器重启时不会改变。",
+    "asking1": "正在询问服务器…",
+    "nobody": "没有人在线。",
+    "historyHint": "你加入时使用的模组、加载顺序和地图。再次使用会下载缺少的内容；创意工坊只提供每个物品的最新版本。",
+    "joinMods": {
+      "other": "{count} 个模组，{items} 个创意工坊物品"
+    },
+    "useSetup": "使用 {date} 的配置",
+    "preflightSure": "服务器已运行至少 {up}（有人已在线这么久），而 {mod} 在{ago}更新：服务器仍在运行旧版本，所以在它重启之前加入很可能失败。",
+    "preflight": "它在创意工坊上最新的模组更新：{mod}，{time}。如果服务器此后没有重启，在它重启之前加入可能会失败。",
+    "planDownload": {
+      "other": "下载 {count} 个创意工坊物品（{size}）"
+    },
+    "planNothing": "无需下载",
+    "planProfile": "使用专属配置方案；你的其他配置方案保持不变",
+    "planMissing": {
+      "other": "列表中有 {count} 个模组未找到，不会加入"
+    },
+    "setUpJoin": "准备并加入",
+    "joinAsIs": "直接加入",
+    "join": "加入",
+    "forgetPassword": "忘记已保存的密码",
+    "started": "正在启动游戏并加入服务器（如果通过 Steam 启动，Steam 会在传递地址前询问一次）。",
+    "restored": "已恢复 {date} 的配置。直接加入会使用它。",
+    "passwordTitle": "{name} 的密码",
+    "remember": "记住它（保存在系统凭据存储中）",
+    "minutes": "{count} 分钟",
+    "hours": "{h} 小时 {m} 分钟",
+    "exactList": "服务器的确切模组列表",
+    "exactItems": "服务器的确切创意工坊物品；它的模组列表太长，放不进描述，所以模组按 ID 匹配",
+    "tagError": {
+      "cut": "服务器的 PZMM 模组列表被截断了，所以模组按 ID 匹配",
+      "damaged": "服务器的 PZMM 模组列表已损坏，所以模组按 ID 匹配",
+      "newer": "服务器的 PZMM 模组列表需要更新版本的 PZMM，所以模组按 ID 匹配"
+    },
+    "days": {
+      "other": "{count} 天"
+    },
+    "movedOn": "{mod} 在此服务器的列表生成 {gap} 后于创意工坊更新；服务器重启前加入可能会失败",
+    "gameList": "Steam 的服务器列表没有加载，所以这里是游戏自己的列表：你在游戏的“加入”界面添加的服务器。",
+    "friendsHint": "你的 Steam 好友正在玩的服务器。只有好友的游戏详情公开时，Steam 才会显示其所在的服务器。",
+    "friendsOn": "· 好友：{names}",
+    "useMod": "获取并使用 {id}",
+    "skipped": {
+      "other": "已取消勾选 {count} 个模组：不会下载，也不会放进配置方案。服务器可能拒绝你进入，或者缺少它们的内容。"
+    },
+    "battlemetrics": "BattleMetrics",
+    "battlemetricsTip": "在 BattleMetrics 上查这个服务器：玩家记录、在线时间和排名",
+    "serverOnly": "仅服务器",
+    "serverOnlyTip": "服务器表示只有它需要这个模组，所以除非你勾选，否则不会启用。",
+    "optional": "可选",
+    "optionalTip": "服务器表示你可以不装这个模组：勾选即可使用。",
+    "country": "国家/地区",
+    "anyCountry": "任何国家/地区",
+    "countries": "国家/地区（查询 country.is）",
+    "countriesTip": "显示每个服务器的国家/地区。PZMM 通过 HTTPS 只把服务器的地址发送给 api.country.is（不含任何关于你的信息），并将结果保留 30 天。",
+    "countriesHint": "国家/地区信息来自 api.country.is：PZMM 只发送服务器的地址，不含任何关于你的信息，并将结果保留 30 天。",
+    "needKey": "在这里只有 Steam Web API 密钥才能列出所有服务器：请在设置中添加。",
+    "modsShownHave": {
+      "other": "显示的 {count} 个都已有"
+    },
+    "modsCount": {
+      "other": "{count} 个模组"
+    },
+    "notShown": {
+      "other": "{count} 个未显示"
+    },
+    "passwordFirst": "此服务器需要密码：加入时输入即可。",
+    "passwordFromLink": "已从链接填入：加入前请核对。",
+    "rule": {
+      "open": "对所有人开放",
+      "public": "公开列出",
+      "pvp": "PvP",
+      "version": "版本",
+      "modCount": "模组",
+      "lastWipe": "上次清档"
+    },
+    "yes": "是",
+    "no": "否",
+    "linkWaiting": "从 pzmm:// 链接打开。在你点击查找之前，不会向此地址发送任何内容。"
+  },
+  "hosting": {
+    "title": "你的服务器",
+    "lede": "设置专用服务器、运行它，并管理其玩家和模组。PZMM 会用你的设置自行启动 Java，在你开启之前保持 UPnP 关闭，并在写入前检查每个创意工坊 ID。",
+    "new": "新建服务器…",
+    "none": "还没有服务器。“新建服务器…”会安装一个并启动它。",
+    "listLabel": "服务器",
+    "unmanaged": "未在 PZMM 中设置：接管后即可在这里启动和停止",
+    "adopt": "接管",
+    "adoptTip": "用 PZMM 管理此配置，从已安装的专用服务器运行",
+    "adoptTitle": "用 PZMM 管理 {name}？",
+    "adoptLine": "它从 {dir} 中的专用服务器运行，数据在 Zomboid 文件夹中。",
+    "forget": "从 PZMM 移除",
+    "forgetTitle": "从 PZMM 移除 {name}？",
+    "forgetLine": "它的文件保持原位（{dir}）；PZMM 会忘记该服务器及其已保存的管理员密码。",
+    "start": "启动",
+    "stop": "停止",
+    "restart": "重启",
+    "join": "加入",
+    "joinTip": "在此服务器上游玩：在“直接连接”中打开它、准备模组并加入",
+    "stopTitle": "停止 {name}？",
+    "restartTitle": "重启 {name}？",
+    "stopLine": "PZMM 会先保存世界，再退出 {name}。玩家会被断开连接；如果 90 秒内没有停止，PZMM 会结束 Java。",
+    "stopRcon": "这次不是 PZMM 启动的，所以通过 RCON 发送命令。",
+    "minutes": {
+      "other": "已运行 {count} 分钟"
+    },
+    "hours": "已运行 {h} 小时 {m} 分钟",
+    "playerCount": {
+      "other": "{count} 名玩家"
+    },
+    "memory": "{used} / {max}",
+    "pageLabel": "服务器分区",
+    "status": {
+      "stopped": "已停止",
+      "starting": "正在启动…",
+      "running": "运行中",
+      "stopping": "正在停止…",
+      "crashed": "已崩溃"
+    },
+    "tabs": {
+      "console": "控制台",
+      "players": "玩家",
+      "mods": "模组",
+      "settings": "设置",
+      "backups": "备份",
+      "auto": "自动化",
+      "world": "世界",
+      "files": "文件"
+    },
+    "note": {
+      "started": "服务器已启动：玩家可以加入。",
+      "terminated": "服务器因无法恢复的错误而停止（通常是某个模组的脚本，错误见它的控制台），之后 Java 会卡住：PZMM 会结束 Java。",
+      "scriptErrors": "某个模组的脚本加载失败：紧挨着上方的错误会指出文件。",
+      "badItem": "创意工坊物品 {id} 不存在（创意工坊 ID 有误）：请将其从 WorkshopItems 中移除。",
+      "itemFailed": "无法下载创意工坊物品 {id}（Steam 结果 {result}）。",
+      "modMissing": "mod ID {id} 不在服务器的任何创意工坊物品中：请检查 Mods 和 WorkshopItems。",
+      "outdated": "自上次启动后有创意工坊模组发生了变化：服务器会下载新版本。",
+      "needUpdate": "有创意工坊模组出现更新：请重启服务器，玩家才能加入。",
+      "upToDate": "所有创意工坊模组都是最新的。",
+      "rconRefused": "有人用错误的密码尝试了 RCON。",
+      "adminPrompt": "服务器正在等待管理员密码：请在控制台中输入一个。",
+      "exited": "服务器自行停止了（退出代码 {code}）。"
+    },
+    "check": {
+      "badId": "{id} 不是创意工坊 ID（只能是数字）",
+      "notOnWorkshop": "创意工坊物品 {id} 不存在或未公开：服务器下载它时会崩溃",
+      "unchecked": "无法连接创意工坊，未能检查这些 ID 是否存在",
+      "itemMissing": "{id} 来自创意工坊物品 {item}，但它不在 WorkshopItems 中",
+      "notWorkshop": "{id} 不是创意工坊模组：请自行将其文件夹复制到服务器的 mods 文件夹",
+      "unknownMod": "{id} 未安装在这里，列表中的创意工坊物品也都不包含它：请检查 mod ID",
+      "needs": "{id} 需要 {item}，但 Mods 中没有它",
+      "needsLater": "{id} 需要 {item}，但它在 Mods 中排在后面",
+      "incompatible": "{id} 与 {item} 不兼容，而它也在 Mods 中",
+      "requiredItem": "创意工坊物品 {id} 需要 {item}，但它不在 WorkshopItems 中"
+    },
+    "console": {
+      "filter": "筛选日志",
+      "errorsOnly": "仅错误和提示",
+      "live": "实时输出",
+      "file": "来自 server-console.txt",
+      "copy": "复制日志",
+      "copied": "已复制",
+      "logLabel": "服务器日志",
+      "empty": "日志里还没有内容。",
+      "commands": "命令",
+      "command": "服务器命令",
+      "send": "发送",
+      "offline": "启动服务器后才能发送命令。",
+      "viaRcon": "这个服务器不是 PZMM 启动的，所以命令通过 RCON 发送。",
+      "source": "日志",
+      "sources": {
+        "console": "控制台",
+        "chat": "聊天",
+        "perk": "技能"
+      },
+      "noChat": "还没有聊天日志：服务器运行后会写在 Logs 中。",
+      "noPerks": "还没有技能日志：开启 PerkLogs 并有人游玩时服务器会写入。",
+      "kinds": "行类型",
+      "kind": {
+        "error": "错误",
+        "warn": "警告",
+        "chat": "聊天",
+        "admin": "管理",
+        "mods": "模组"
+      }
+    },
+    "cmd": {
+      "players": "列出在线玩家",
+      "servermsg": "向所有人发送消息",
+      "save": "立即保存世界",
+      "quit": "保存并关闭服务器",
+      "kickuser": "踢出玩家",
+      "banuser": "封禁玩家（-ip 同时封禁其 IP）",
+      "unbanuser": "解除封禁",
+      "setaccesslevel": "给玩家分配角色",
+      "adduser": "添加账号（白名单服务器）",
+      "addusertowhitelist": "将已连接的玩家加入白名单",
+      "checkModsNeedUpdate": "询问创意工坊模组是否有更新（结果显示在日志中）",
+      "reloadoptions": "重新加载服务器的 ini",
+      "showoptions": "列出服务器的设置",
+      "changeoption": "更改某项设置",
+      "chopper": "触发直升机事件",
+      "thunder": "在玩家附近打雷",
+      "gunshot": "在随机玩家附近响起枪声",
+      "startrain": "开始下雨",
+      "stoprain": "停止下雨",
+      "help": "列出服务器认识的所有命令",
+      "banid": "封禁 SteamID",
+      "unbanid": "解除 SteamID 的封禁",
+      "removeuserfromwhitelist": "将账号移出白名单",
+      "teleport": "将玩家传送到另一名玩家身边",
+      "additem": "给玩家物品",
+      "addxp": "给玩家技能 XP",
+      "addvehicle": "在玩家身边生成载具",
+      "godmod": "让玩家无敌",
+      "invisible": "让玩家对僵尸隐身",
+      "noclip": "让玩家穿墙行走",
+      "createhorde": "在玩家附近生成尸潮",
+      "banip": "封禁一个 IP 地址",
+      "unbanip": "解除 IP 封禁",
+      "voiceban": "将玩家的语音聊天静音或解除静音",
+      "teleportto": "把玩家送到某个位置",
+      "lightning": "在玩家附近打闪电",
+      "startstorm": "开始雷暴",
+      "stopweather": "让天气放晴",
+      "setTimeSpeed": "加快或放慢时间"
+    },
+    "players": {
+      "offline": "启动服务器后才能看到谁在线。",
+      "messagePlaceholder": "每行一条消息",
+      "message": "给所有人的消息",
+      "online": {
+        "other": "{count} 人在线"
+      },
+      "nobody": "没有人在线。",
+      "level": "{name} 的权限等级",
+      "setLevel": "设置",
+      "kick": "踢出",
+      "ban": "封禁",
+      "kickTitle": "踢出 {name}？",
+      "kickLine": "对方会被断开连接，之后仍可再次加入。",
+      "banTitle": "封禁 {name}？",
+      "banLine": "对方会被断开连接，解除封禁前无法再加入（在控制台使用 unbanuser）。",
+      "kicked": "已踢出 {name}。",
+      "banned": "已封禁 {name}。",
+      "levelSet": "{name} 现在是 {level}。",
+      "sent": {
+        "other": "已发送 {count} 条消息。"
+      },
+      "send": "发送",
+      "preview": "玩家看到的样子：最后一行在屏幕上显示为大字，每一行都会出现在聊天中",
+      "lines": {
+        "other": "{count} 行，每行作为单独一条消息发送"
+      },
+      "tooMany": "一次最多 {count} 行。",
+      "views": "玩家",
+      "view": {
+        "online": "在线",
+        "characters": "角色",
+        "whitelist": "白名单",
+        "bans": "封禁",
+        "map": "地图",
+        "history": "历史"
+      },
+      "commands": "命令",
+      "done": "完成。",
+      "charactersHint": "世界 players.db 中的所有角色（无论是否在线）及其所在位置。",
+      "noCharacters": "还没有角色（或无法读取世界的 players.db）。",
+      "dead": "已死亡",
+      "isOnline": "在线",
+      "username": "用户名",
+      "passwordOptional": "密码（用于新账号）",
+      "add": "添加",
+      "addTip": "填写密码：创建新账号。不填：将已连接的玩家加入白名单。",
+      "added": "已添加 {name}。",
+      "noAccounts": "还没有账号。",
+      "lastSeen": "上次在线：{when}",
+      "remove": "移除",
+      "removeTitle": "将 {name} 移出白名单？",
+      "removeLine": "在启用白名单的服务器上，重新添加之前对方无法再加入。",
+      "removed": "已将 {name} 移出白名单。",
+      "steamId": "SteamID（17 位数字）",
+      "banId": "封禁 SteamID",
+      "bannedId": "已封禁 {id}。",
+      "noBans": "没有被封禁的人。",
+      "bannedAccount": "被封禁的账号",
+      "bannedSteam": "被封禁的 SteamID",
+      "bannedIp": "被封禁的 IP",
+      "unban": "解除封禁",
+      "unbanned": "已解除对 {name} 的封禁。",
+      "mute": "语音聊天静音",
+      "muted": "已将 {name} 的语音聊天静音。",
+      "unmute": "解除语音聊天静音",
+      "unmuted": "已解除 {name} 的语音聊天静音。",
+      "messageAbout": "向所有人发送关于此玩家的消息",
+      "notes": "备注",
+      "banIpLine": "连 IP 一起封禁会同时封禁其连接所用的地址。",
+      "banWithIp": "连 IP 一起封禁",
+      "bannedIpDone": "已封禁 {ip}。",
+      "mapHint": "服务器上次保存时每个角色的位置（每 30 秒重新读取）。点击玩家查看命令，点击格子可把某人送到那里。",
+      "mapLabel": "显示角色的世界地图（{count}）",
+      "historyHint": "PZMM 运行服务器期间，从其日志中看到的加入和离开。",
+      "noHistory": "还没有看到加入或离开。",
+      "joined": "加入",
+      "left": "离开",
+      "eventBan": "封禁",
+      "eventUnban": "解除封禁",
+      "eventKick": "踢出",
+      "ipAddress": "IP 地址",
+      "banIp": "封禁 IP",
+      "noteFor": "关于 {name} 的备注",
+      "tags": "标签",
+      "tagsPlaceholder": "用逗号分隔，例如 帮手, 已警告",
+      "saveNote": "保存"
+    },
+    "mods": {
+      "fromProfile": "来自配置方案的模组",
+      "useProfile": "使用其模组",
+      "hint": "拖动模组调整加载顺序（或使用 Alt+方向键），也可勾选“以文本编辑”直接输入各行。写入会检查每个 ID 并先显示更改；PZMM 首次更改前的文件会保留为 .ini.bak。",
+      "readOnly": "PZMM 不管理这个服务器：接管后才能在这里更改它的模组。",
+      "modsHint": {
+        "other": "{count} 个 mod ID"
+      },
+      "itemsHint": {
+        "other": "{count} 个创意工坊物品"
+      },
+      "allGood": "所有创意工坊 ID 都存在，每个 mod ID 都有对应的物品。",
+      "write": "写入…",
+      "check": "检查 ID",
+      "checking": "正在检查…",
+      "reload": "从文件重新加载",
+      "blocked": {
+        "other": "请先修复上方的 {count} 个错误：有误的创意工坊 ID 会使服务器崩溃。"
+      },
+      "written": "已写入。服务器会在下次启动时加载。",
+      "writtenRestart": "已写入。重启服务器即可加载。",
+      "writeTitle": "写入 {name} 的模组？",
+      "itemsAdded": {
+        "other": "已添加 {count} 个创意工坊物品：{ids}"
+      },
+      "itemsRemoved": {
+        "other": "已移除 {count} 个创意工坊物品：{ids}"
+      },
+      "fromCollection": "来自创意工坊合集的模组",
+      "collectionPlaceholder": "合集或物品的链接或 ID，可一次多个",
+      "fromPreset": "来自 Mod Manager: Server 预设的模组",
+      "savePreset": "保存为预设",
+      "savePresetTip": "以服务器名称将这些行保存到 Mod Manager: Server 的预设中",
+      "presetSaved": "已保存为 Mod Manager: Server 预设“{name}”。",
+      "copy": "复制这些行",
+      "copyTip": "按 ini 中的格式复制 Mods=、WorkshopItems= 和 Map=，用于租用服务器的控制面板",
+      "copied": "已复制。",
+      "spawnTitle": "要添加新地图的出生点吗？",
+      "spawnLine": "这些地图模组有自己的出生点：{names}。把它们加入服务器的出生区域，玩家就能从那里开始。",
+      "spawnAdd": "添加",
+      "spawnAdded": {
+        "other": "已添加 {count} 个出生区域。"
+      },
+      "replaceTip": "用它们包含的内容替换列表",
+      "addTip": "将这些物品及其所需的物品添加到列表",
+      "add": "添加",
+      "requiredMissing": {
+        "other": "列表中的物品需要 {count} 个列表里没有的创意工坊物品：{items}"
+      },
+      "addRequired": {
+        "other": "添加 {count} 个所需物品"
+      },
+      "search": "查找模组或物品",
+      "autosort": "自动排序",
+      "autosortTip": "框架在前，翻译在后，并遵循已安装模组的所有依赖和加载规则（其他模组位置不变）",
+      "sorted": "已排序。点击写入以保存新顺序。",
+      "raw": "以文本编辑",
+      "shown": {
+        "other": "显示 {count} 个"
+      },
+      "noDragFiltered": "清除搜索后才能调整顺序。",
+      "modsLabel": "模组（按加载顺序）",
+      "itemsLabel": "创意工坊物品",
+      "remove": "移除",
+      "removeLabel": "移除 {name}",
+      "removeItemTip": "移除该物品及其加入列表的模组",
+      "itemMods": {
+        "other": "列表中有 {count} 个模组"
+      },
+      "sideTip": "仅服务器：只有服务器需要。可选：玩家可以不装。加入的 PZMM 玩家会跳过这两类，除非勾选；游戏本身仍会加载此列表中的每个模组。",
+      "sideLabel": "谁需要 {name}",
+      "side": {
+        "both": "服务器和玩家",
+        "server": "仅服务器",
+        "optional": "可选"
+      }
+    },
+    "wizard": {
+      "title": "新建专用服务器",
+      "step": "第 {n} 步，共 {count} 步：{name}",
+      "steps": {
+        "server": "服务器",
+        "network": "网络",
+        "admin": "管理员与内存",
+        "mods": "模组"
+      },
+      "name": "名称",
+      "nameHint": "同时也是配置文件的名称。",
+      "nameBad": "名称中有 Windows 或服务器不接受的字符。",
+      "nameTaken": "已经有同名的服务器了。",
+      "build": "版本",
+      "b42": "Build 42",
+      "b41": "Build 41（legacy41）",
+      "install": "安装文件夹",
+      "browse": "浏览…",
+      "data": "数据文件夹",
+      "dataZomboid": "Zomboid 文件夹（{dir}），玩家和其他工具默认在这里查找",
+      "dataOwn": "单独的文件夹",
+      "dataHint": "它的配置、世界存档、数据库和备份都放在这里。",
+      "gamePort": "游戏端口",
+      "directPort": "直连端口",
+      "checkPorts": "检查端口",
+      "portRange": "端口范围为 1024 到 65535。",
+      "portSame": "两个端口不能相同。",
+      "portsFree": "两个端口都未被占用。",
+      "portsBusy": "已被占用：{ports}。请换其他端口，或停止占用它们的程序。",
+      "firewall": "你网络之外的玩家需要在路由器上转发这两个 UDP 端口。服务器首次启动时 Windows 防火墙会询问；若想自己放行，请在管理员终端中运行：",
+      "copy": "复制",
+      "copied": "已复制",
+      "maxPlayers": "最大玩家数",
+      "joinPassword": "加入密码",
+      "joinHint": "可选：玩家加入时需要输入。",
+      "options": "选项",
+      "public": "在游戏内服务器列表中显示",
+      "upnp": "用 UPnP 在路由器上开放端口",
+      "upnpHint": "默认关闭：UPnP 会在不询问的情况下开放路由器的端口。",
+      "adminUser": "管理员用户",
+      "adminPassword": "管理员密码",
+      "newPassword": "新密码",
+      "passwordHint": "只显示一次：请现在复制。PZMM 把它保存在系统凭据存储中，在服务器启动时传入。",
+      "memory": "内存",
+      "gb": "{n} GB",
+      "memoryOf": "这台电脑有 {ram} GB。",
+      "memSmall": "几个朋友、模组不多：3-4 GB",
+      "memMedium": "10-20 名玩家或模组很多：6-8 GB",
+      "memLarge": "30 名以上玩家、地图模组或长期运行的世界：10-16 GB；为 Windows 留出 4 GB（如果你在这台电脑上玩，就多留一些）",
+      "mods": "模组",
+      "modsEmpty": "暂时没有",
+      "modsProfile": "配置方案中的模组",
+      "modsCollection": "创意工坊合集",
+      "load": "加载",
+      "loading": "正在加载…",
+      "loadAgain": "这些模组是按另一个选择加载的：请再次点击加载以使用当前选择。",
+      "modsLoaded": "{mods}、{items}、{maps}。",
+      "modsHint": "之后可以在服务器的“模组”分区中更改。",
+      "summary": "摘要",
+      "sumInstall": "将服务器安装到 {dir}（Steam 应用 380870，需下载约 2 GB），已有则跳过",
+      "sumConfig": "写入 {file}",
+      "sumPorts": "UDP 端口 {game} 和 {direct}",
+      "installing": "正在安装：{n}%",
+      "stopInstall": "停止",
+      "starting": "正在首次启动服务器（它会创建世界及其设置）…",
+      "next": "下一步",
+      "back": "上一步",
+      "create": "设置并启动",
+      "tunnelTitle": "无法端口转发？",
+      "tunnelHint": "如果无法开放端口（路由器不归你管，或运营商让多户共用一个地址），可以用 playit.gg 等隧道为服务器提供公网地址。从其官网安装他们的程序，添加一个 Project Zomboid 隧道（UDP 端口 {game} 和 {direct}），再把得到的地址粘贴到下方。PZMM 不会安装或运行它。",
+      "tunnelDownload": "获取 playit.gg",
+      "tunnelDocs": "playit.gg 帮助",
+      "tunnelAddress": "玩家加入的地址",
+      "tunnelAddressHint": "可选。显示在服务器页面和 Discord 状态中。",
+      "sumAddress": "玩家通过 {address} 加入",
+      "modIds": {
+        "one": "{count} 个 mod ID",
+        "other": "{count} 个 mod ID"
+      },
+      "items": {
+        "one": "{count} 个创意工坊物品",
+        "other": "{count} 个创意工坊物品"
+      },
+      "maps": {
+        "one": "{count} 张地图",
+        "other": "{count} 张地图"
+      },
+      "portUsed": "{name} 已在使用其中一个端口。",
+      "discardAsk": "放弃这个新服务器？",
+      "discard": "放弃",
+      "createdHint": "{name} 已设置好，但首次启动失败。打开它的页面来解决问题并启动它。",
+      "openServer": "打开它的页面"
+    },
+    "quit": {
+      "title": {
+        "other": "PZMM 运行的 {count} 个服务器仍在运行"
+      },
+      "line": {
+        "other": "运行中：{names}。保持运行的话它会继续运行；PZMM 下次会重新找到它，并通过 RCON 连接。"
+      },
+      "stop": "停止并退出",
+      "leave": "保持运行并退出",
+      "stopping": "正在停止服务器…",
+      "leaving": "正在退出…"
+    },
+    "updatesPending": {
+      "other": "{count} 个模组已更新，等待重启"
+    },
+    "restartIn": {
+      "other": "{count} 分钟后重启"
+    },
+    "restartNow": "立即重启",
+    "external": {
+      "linuxgsm": "LinuxGSM",
+      "docker": "Docker",
+      "runBy": "由 {kind} 运行",
+      "how": "{kind} 从 {folder} 运行此服务器。PZMM 会编辑它的设置、模组和备份，但从不启动或停止它。请在那里这样运行：",
+      "find": "查找现有服务器",
+      "findTip": "选择包含 LinuxGSM 安装或 Docker Compose 配置的文件夹",
+      "foundLabel": "找到的服务器",
+      "none": "该文件夹中没有 LinuxGSM 或 Docker 服务器（PZMM 会查找该文件夹及其下一级文件夹）。",
+      "add": "在 PZMM 中管理",
+      "copyCmd": "复制命令",
+      "checkWorkshop": "检查创意工坊更新",
+      "wsUnknown": {
+        "other": "已检查 {count} 个创意工坊物品，但 PZMM 看不到此服务器下载了哪些版本（它的安装文件夹不在这里）。"
+      },
+      "wsOutdated": {
+        "other": "{count} 个模组有服务器尚未下载的更新：{titles}。在那边重启服务器即可获取。"
+      },
+      "wsCurrent": {
+        "other": "服务器的全部 {count} 个创意工坊物品都是最新版本。"
+      },
+      "upkeep": {
+        "checkUpdate": "检查服务器更新",
+        "update": "更新服务器",
+        "validate": "检查每个服务器文件",
+        "pull": "获取最新镜像",
+        "recreate": "用新镜像重新启动"
+      }
+    },
+    "auto": {
+      "whileOpen": "这些在 PZMM 打开时运行（或 pzmm server start 运行时）。可在设置中让 PZMM 登录时在托盘中启动。",
+      "updatesTitle": "当模组在创意工坊更新时",
+      "updates": {
+        "always": "警告后重启",
+        "empty": "没有人在线时重启",
+        "scheduled": "在下一个重启时间重启",
+        "notify": "仅通知我"
+      },
+      "noTimes": "请在下方添加重启时间，否则更新会等到你重启时才应用。",
+      "checkEvery": "每隔",
+      "minutesOff": "分钟检查一次（0：从不）",
+      "checkNow": "立即检查",
+      "updatedNow": {
+        "other": "服务器启动后有 {count} 个模组已更新：{titles}"
+      },
+      "allCurrent": "所有创意工坊模组都是服务器启动时的版本。",
+      "warnAt": "提醒玩家",
+      "warnHint": "分钟，重启前在游戏内提醒（例如 15、5、1）",
+      "scheduleTitle": "计划",
+      "restartsAt": "每天重启时间",
+      "restartTime": "重启时间",
+      "restartHour": "重启小时",
+      "restartMinute": "重启分钟",
+      "addTime": "添加时间",
+      "backupEvery": "每隔",
+      "hoursOff": "小时备份一次（0：从不）",
+      "keep": "保留",
+      "maxMb": "份备份，最多",
+      "mbOff": "MB（0：不限制）",
+      "backupOnStart": "每次启动前备份（服务器启动时也会自行备份，见备份）",
+      "crashTitle": "崩溃监控",
+      "crashRestarts": "崩溃后重启，每小时最多",
+      "crashHint": "次（0：关闭）。之后 PZMM 会停止尝试并提醒你。",
+      "discordTitle": "Discord",
+      "webhook": "Discord Webhook 链接",
+      "webhookPlaceholder": "https://discord.com/api/webhooks/…",
+      "webhookSavedPlaceholder": "已保存。粘贴新链接可替换",
+      "webhookSave": "保存链接",
+      "webhookHint": "保存在 系统凭据存储中，不会写入 PZMM 的文件。可在频道设置的“集成”、“Webhooks”中创建。",
+      "webhookSaved": "已保存 Webhook。",
+      "webhookForgotten": "已清除 Webhook。",
+      "webhookForget": "清除",
+      "test": "发送测试",
+      "testSent": "测试消息已发送。",
+      "event": {
+        "started": "已启动",
+        "stopped": "已停止",
+        "crashed": "已崩溃（附最后几行日志）",
+        "restarting": "即将重启",
+        "updated": "模组已更新",
+        "joined": "玩家加入",
+        "left": "玩家离开",
+        "status": "持续更新的状态消息（玩家、运行时间）"
+      },
+      "save": "保存自动化",
+      "saved": "已保存。",
+      "trayHint": "要在关闭窗口后继续运行，请在设置中打开“关闭窗口时把 PZMM 留在托盘”。",
+      "restartEvery": "每运行",
+      "everyHint": "小时重启一次（0：关闭），使用同样的警告",
+      "saveEvery": "每隔",
+      "saveHint": "分钟保存一次世界（0：只用服务器自己的保存）",
+      "messagesTitle": "给玩家的消息",
+      "messageText": "消息，例如：加入我们的 Discord",
+      "messageEvery": "间隔（分钟）",
+      "addMessage": "添加消息",
+      "messageHint": "服务器运行时在游戏中发布。单行，不含双引号。",
+      "historyTitle": "最近 24 小时",
+      "historyNone": "最近 24 小时内没有发生什么。",
+      "history": {
+        "mods": "创意工坊更新：{text}",
+        "restart": "已重启",
+        "restartTook": "为载入更新而重启：{text}",
+        "aborted": "重启已取消",
+        "crash": "崩溃",
+        "server": "服务器文件已更新（Build {text}）"
+      },
+      "botTitle": "机器人命令",
+      "botIntro": "拥有你所选身份组的成员可以在 Discord 频道中管理服务器：!status、!players、!restart（加分钟数，0 为立即）、!save、!msg 加上发给游戏内所有人的文字、!update-check 和 !help。PZMM 运行时每 5 秒读取一次频道（Discord 要求时会更久），并在那里回复。",
+      "botToken": "机器人令牌",
+      "botSavedPlaceholder": "已保存。粘贴新令牌以替换",
+      "botSave": "保存令牌",
+      "botSaveFirst": "请先保存自动化设置",
+      "botChannel": "频道 ID",
+      "botRole": "身份组 ID",
+      "botHint": "在 discord.com/developers 创建应用，添加机器人，打开 Message Content Intent，并以“查看频道”“发送消息”“阅读消息历史”权限邀请机器人。要获取 ID，请在 Discord 中打开开发者模式，然后右键点击频道或身份组并选择“复制 ID”。令牌保存在 系统凭据存储中。",
+      "botSaved": "机器人令牌已保存。",
+      "botForgotten": "已忘记机器人令牌。",
+      "botRelay": "转发聊天",
+      "botRelayShared": "另一个服务器也在使用此服务器的数据文件夹，因此它们的聊天日志会混在一起。请为每个服务器设置单独的数据文件夹以转发聊天。",
+      "botRelayHint": "游戏中的公共聊天会发到频道，拥有该角色的成员在频道中发的普通消息会以 [Discord] 消息显示在游戏中（单行，不含双引号）。"
+    },
+    "backups": {
+      "now": "立即备份",
+      "what": "存档、其数据库以及服务器的设置文件。",
+      "done": "已备份。",
+      "none": "还没有备份。",
+      "listLabel": "备份",
+      "gameOn": "服务器每次启动时也会自行备份（保留 {count} 份），位置：",
+      "gameOff": "服务器自带的启动备份已关闭（设置中的 BackupsOnStart）。它的备份存放在",
+      "emptyCells": {
+        "other": "存档中有 {count} 个地图文件为空（0 字节），这通常意味着保存时发生了崩溃。请恢复在此之前的备份："
+      },
+      "restore": "恢复",
+      "restoreTitle": "将 {name} 恢复到 {when}？",
+      "restoreStops": "会先停止服务器（停止前会先保存）。",
+      "restoreExternal": "请先在 {kind} 中停止服务器：PZMM 无法停止它。",
+      "restoreKeeps": "PZMM 会先备份当前的存档和设置，以便你随时回退。",
+      "restored": "已恢复 {when} 的备份。准备好后启动服务器。",
+      "reason": {
+        "manual": "手动",
+        "start": "启动前",
+        "update": "模组更新前",
+        "scheduled": "计划",
+        "restore": "恢复前",
+        "wipe": "清档前",
+        "chunks": "重置地图前",
+        "migrate": "迁入合作世界前",
+        "import": "导入"
+      },
+      "export": "导出",
+      "exportTip": "把这个备份复制到你选的文件夹（另一个磁盘、另一台电脑）",
+      "exported": "已保存 {file}",
+      "import": "导入",
+      "importTip": "导入一个备份 zip（本服务器或其他服务器的）：它会加入列表，可直接恢复",
+      "imported": "已导入备份：准备好后从列表中恢复。"
+    },
+    "settings": {
+      "label": "设置文件",
+      "remoteCopy": "你正在编辑 PZMM 保存的该服务器文件副本。完成后把它们发送到主机；发送前请先在主机面板中停止服务器。",
+      "part": {
+        "ini": "服务器",
+        "sandbox": "沙盒",
+        "spawn": "出生区域",
+        "files": "文件"
+      },
+      "filter": "筛选设置",
+      "iniHint": "从服务器自己的 .ini 读取，包含它写入的说明和限制。模组、创意工坊项目和地图在“模组”标签页。",
+      "section": {
+        "network": "网络与 RCON",
+        "anticheat": "反作弊",
+        "access": "加入与列表",
+        "pvp": "PvP",
+        "safehouses": "安全屋",
+        "factions": "派系",
+        "chat": "聊天、语音与 Discord",
+        "backups": "保存与备份",
+        "players": "玩家",
+        "other": "其他"
+      },
+      "general": "常规",
+      "default": "默认：{value}",
+      "save": {
+        "other": "保存 {count} 项更改"
+      },
+      "discard": "放弃",
+      "backupNote": "PZMM 首次更改前的文件保留为 .bak，最后一次更改前的保留为 .prev。",
+      "saved": "已保存。",
+      "savedRestart": "已保存。服务器会在下次重启后使用。",
+      "unreadable": "PZMM 无法将其显示为表单：{error}。服务器会在首次启动时写入该文件；PZMM 绝不会写入它无法读取的文件。",
+      "preset": "预设",
+      "ownPreset": "{name}（我的）",
+      "applyPreset": "应用",
+      "presetHint": "预设只会填写表单；保存之前不会写入任何内容。",
+      "presetApplied": {
+        "other": "已从预设填入 {count} 项设置。保存以保留。"
+      },
+      "presetName": "预设名称",
+      "savePreset": "另存为预设",
+      "presetSaved": "已保存预设 {name}。",
+      "spawnHint": "新玩家可以选择的起始位置。地图模组的区域使用其 spawnpoints.lua（media/maps/<map>/spawnpoints.lua）。",
+      "regionName": "区域名称",
+      "regionFile": "spawnpoints.lua 路径",
+      "addRegion": "添加",
+      "saveRegions": "保存出生区域",
+      "presetWhere": "你保存的预设会放进游戏的 Sandbox Presets 文件夹，游戏的新游戏界面也会列出它们；在游戏里保存的预设也会显示在这里。",
+      "restore": "恢复上一版",
+      "restoreTip": "把此文件恢复到最近一次修改前的样子（再恢复一次即撤销）",
+      "restored": "已恢复上一版。",
+      "origin": "哪些设置",
+      "base": "原版游戏",
+      "fromMods": "模组（{count}）",
+      "offersLabel": "地图模组的出生点",
+      "offers": "此服务器上的地图模组有自己的出生点：",
+      "file": "文件",
+      "textHint": "以文本方式编辑文件。每次保存前的版本都会保留，可以随时回退。",
+      "saveText": "保存文件"
+    },
+    "tag": {
+      "title": "描述中的模组列表",
+      "on": "每次启动时把确切的模组列表写入服务器描述",
+      "hint": "PZMM 玩家会从中获得完全相同的模组、加载顺序和地图。描述修改后要重启，游戏里才会显示。",
+      "full": "放得下：描述为 {length} / {limit} 个字符。",
+      "items": "整个列表放不下，所以描述里只有创意工坊物品及其更新时间（{length} / {limit} 个字符）。",
+      "none": "列表太长，放不进描述（{limit} 个字符），所以 PZMM 玩家按 ID 匹配模组。",
+      "copy": "复制标签到我的主机面板",
+      "copied": "已复制。在主机面板中把它粘贴到服务器描述的末尾，然后重启服务器。"
+    },
+    "startCheckTitle": "按当前设置，{name} 可能无法启动：",
+    "startAnyway": "仍然启动",
+    "cpu": "CPU {pct}%",
+    "inGame": "游戏内 {date}",
+    "nextRestart": "下次重启 {time}",
+    "sparkLabel": "最近 15 分钟的 CPU 和内存",
+    "abort": "取消重启",
+    "abortTip": "取消这次重启：会通知玩家，服务器继续运行",
+    "warnStop": "提醒玩家，一分钟后停止",
+    "warnRestart": "提醒玩家，一分钟后重启",
+    "warnStopMsg": "服务器将在 1 分钟后停止。请找个安全的地方。",
+    "warnRestartMsg": "服务器将在 1 分钟后重启。请找个安全的地方。",
+    "warnOffMsg": "取消了：服务器继续运行。",
+    "warnedTip": "已提醒玩家。取消：会通知他们，服务器继续运行",
+    "leaveTitle": "不保存就离开？",
+    "leaveLine": "你在这里做的更改还没有保存。离开会丢弃它们。",
+    "leave": "丢弃更改",
+    "diagnostics": "复制诊断信息",
+    "diagnosticsTip": "复制此服务器的信息、设置（隐藏密码）和日志末尾，用于报告问题",
+    "update": {
+      "button": "更新服务器",
+      "tip": "用 SteamCMD 更新专用服务器的文件（会检查每个文件）",
+      "title": "要更新 {name} 的服务器文件吗？",
+      "line": "SteamCMD 会把有变化的内容下载到 {dir} 并检查每个文件。",
+      "switchLine": "切换版本会改变此安装的分支，并按该版本重写模组行。一个版本的世界无法在另一个版本中加载。",
+      "same": "更新（{build}）",
+      "switch": "切换到 {build}",
+      "b42": "Build 42",
+      "b41": "Build 41"
+    },
+    "world": {
+      "stopFirst": "要清档、重置地图区域或迁入世界，请先停止服务器。",
+      "copyTitle": "复制一份",
+      "copyName": "副本名称",
+      "copy": "复制设置",
+      "copyHint": "一个新服务器，带有此服务器的设置、沙盒、出生点、自动化和管理员密码，以及一个全新的世界。端口相同：同时运行两个之前请先修改。",
+      "copied": "已创建 {name}。",
+      "wipeTitleShort": "清档",
+      "keepCharacters": "保留角色（玩家保留他们的幸存者和随身物品）",
+      "keepZones": "保留安全屋、安全区、非 PvP 区和派系",
+      "keepZonesHint": "开启后只重置地图（建筑、物资、车辆、僵尸），存档的其余部分保留。账号、白名单和设置始终保留。",
+      "wipeButton": "清档…",
+      "wipeTitle": "要清空 {name} 的世界吗？",
+      "wipeBackup": "PZMM 会先备份世界：可以在“备份”中恢复。",
+      "wipeKeepsCharacters": "角色保留。",
+      "wipeResetsCharacters": "角色会被删除：玩家从头开始。",
+      "wipeKeepsZones": "安全屋、安全区、非 PvP 区和派系保留；地图重置。",
+      "wipeResetsZones": "世界中的一切都会重置。",
+      "wipe": "清档",
+      "wiped": {
+        "other": "清档完成：删除了 {count} 个文件。服务器启动时会创建新世界。"
+      },
+      "chunksHeading": "重置地图区域",
+      "chunksHint": "被重置的区块下次加载时会按地图重新生成（建筑、物资、僵尸）。请用游戏显示的格子坐标（ShowCoordinates 或地图）从一个角到对角填写每个区域。",
+      "from": "从",
+      "to": "到",
+      "x1": "起点 x",
+      "y1": "起点 y",
+      "x2": "终点 x",
+      "y2": "终点 y",
+      "addArea": "添加区域",
+      "outside": "重置这些区域以外的一切（保留基地）",
+      "inside": "只重置这些区域",
+      "chunksButton": {
+        "other": "重置 {count} 个区块…"
+      },
+      "chunksOf": {
+        "other": "（世界共 {count} 个）"
+      },
+      "chunksTitle": {
+        "other": "要重置 {count} 个地图区块吗？"
+      },
+      "chunksInsideLine": "这些区域里的区块会按地图重新生成。",
+      "chunksOutsideLine": "这些区域以外的每个区块都会按地图重新生成；区域本身保持不变。",
+      "chunksReset": "重置",
+      "chunksDone": {
+        "other": "已重置 {count} 个区块。"
+      },
+      "migrateHeading": "迁入合作世界",
+      "noCoop": "这台电脑上没有合作世界（Zomboid/Saves/Multiplayer）。",
+      "migrate": "使用这个世界",
+      "migrateTitle": "要把 {world} 设为 {name} 的世界吗？",
+      "migrateLine": "合作世界、它的账号，以及游玩时用的模组和沙盒，会替换服务器的。端口和密码保持不变。",
+      "migrateHint": "你在游戏里主持过的世界。其中的角色会一起迁入。",
+      "migrated": "{world} 现在是这个服务器的世界。准备好后启动即可。",
+      "scriptHeading": "启动脚本",
+      "script": "保存启动脚本…",
+      "scriptHint": "用与 PZMM 相同的命令启动此服务器，便于不开 PZMM 运行（脚本里不含管理员密码）。",
+      "scriptSaved": "已保存 {file}",
+      "zonesHeading": "安全屋、区域和派系",
+      "zonesHint": "只备份和恢复世界的 map_meta.bin（其中保存安全屋、安全区、非 PvP 区和派系），不动世界的其余部分。",
+      "zonesFlags": "同一个文件还保存每栋建筑的标记（警报、已探索和已搜刮的房间、灯光）：恢复时这些也会回到原来的状态。",
+      "zonesKeeps": "会先备份当前文件，方便你恢复回来。",
+      "zonesSave": "立即备份",
+      "zonesSaved": "已备份安全屋、区域和派系。",
+      "zonesRestoreTitle": "恢复 {when} 的安全屋、区域和派系？",
+      "zonesRestored": "已恢复 {when} 的安全屋、区域和派系。",
+      "zonesManual": "备份",
+      "zonesBeforeRestore": "恢复之前"
+    },
+    "remote": {
+      "add": "添加远程服务器…",
+      "addTip": "通过 RCON 连接另一台机器或租用主机上的服务器：控制台和玩家",
+      "intro": "运行在别处的服务器：PZMM 会登录它的 RCON（其 ini 中的 RCONPort 和 RCONPassword），以显示控制台和玩家。",
+      "name": "名称",
+      "host": "地址",
+      "port": "RCON 端口",
+      "password": "RCON 密码",
+      "build": "游戏版本",
+      "b42": "Build 42",
+      "b41": "Build 41",
+      "plain": "RCON 不加密：请只在你信任的网络中使用。密码保存在 系统凭据存储中。",
+      "connect": "连接",
+      "connecting": "正在连接…",
+      "at": "远程服务器 · {addr}",
+      "forgetLine": "PZMM 会忘记 {addr} 及其已保存的 RCON 密码。服务器本身不受影响。"
+    },
+    "form": {
+      "player": "玩家",
+      "move": "要传送的玩家",
+      "to": "传送到玩家",
+      "near": "靠近玩家",
+      "item": "物品",
+      "vehicle": "载具",
+      "search": "输入以搜索游戏列表",
+      "count": "数量",
+      "zombies": "僵尸数量",
+      "skill": "技能",
+      "xp": "XP",
+      "on": "开启（取消勾选即关闭）",
+      "noCatalog": "无法读取游戏的物品列表（{error}）：请输入完整 ID，例如 Base.Axe。",
+      "unknown": "不在游戏列表中：只要服务器装有该模组，模组物品就能使用。",
+      "x": "X",
+      "y": "Y",
+      "floor": "楼层",
+      "intensity": "强度：{value}",
+      "hours": "游戏小时",
+      "speed": "时间倍率",
+      "speedHint": "仅限 Build 42，且只有服务器允许使用调试工具的角色可用。1 为正常速度。"
+    },
+    "files": {
+      "title": "文件访问（FTP）",
+      "intro": "大多数主机都可以通过 FTP 访问服务器文件。PZMM 用它在编辑器中打开设置并备份世界。除非你关闭，否则会使用 TLS 连接；密码保存在 系统凭据存储中。",
+      "host": "FTP 地址",
+      "port": "端口",
+      "user": "用户名",
+      "password": "密码",
+      "passwordSaved": "已保存",
+      "server": "主机上的服务器名称",
+      "serverHint": "它在 Server 文件夹中的 .ini 文件名，通常是 servertest。",
+      "plain": "普通 FTP，不使用 TLS",
+      "plainWarn": "仅在主机没有其他方式时使用：密码和文件会以明文经过互联网。",
+      "trust": "信任此证书",
+      "trustNew": "信任新证书…",
+      "trustNewTitle": "{host} 的证书已更改",
+      "trustNewDo": "信任新证书",
+      "trustOld": "PZMM 信任的指纹：{fingerprint}",
+      "trustShown": "主机现在显示的指纹：{fingerprint}",
+      "trustOnlyIf": "仅在你的主机商确认已更换证书时才信任它。否则可能有人在中间拦截连接。",
+      "connect": "连接",
+      "connecting": "正在连接…",
+      "forget": "忘记",
+      "folderTitle": "服务器文件夹",
+      "folderHint": "打开包含 Server 和 Saves 的文件夹（通常是 Zomboid），然后选择“使用此文件夹”。",
+      "up": "上一级",
+      "useFolder": "使用此文件夹",
+      "emptyFolder": "此文件夹为空。",
+      "folderSet": "已设置服务器文件夹：{folder}",
+      "settingsTitle": "设置文件",
+      "settingsHint": "“获取”会把 {folder}/Server 中的 ini、沙盒和出生点文件复制到 PZMM（替换其副本），并添加“设置”标签页。“发送”会先备份主机上的文件，再发送 PZMM 的文件。",
+      "pull": "获取设置文件",
+      "push": "发送设置文件",
+      "lastPulled": "上次获取：{time}",
+      "pulled": {
+        "one": "已获取 {count} 个文件。在“设置”标签页中编辑后再发送。",
+        "other": "已获取 {count} 个文件。在“设置”标签页中编辑后再发送。"
+      },
+      "pushed": "已发送。",
+      "pushedBackup": "已发送。主机上原来的文件已先行备份。",
+      "stopFirst": "发送前请在主机面板中停止服务器：运行中的服务器关闭时可能会覆盖其设置。",
+      "worldTitle": "世界备份",
+      "worldHint": "将存档、其数据库和设置文件复制到 PZMM 数据文件夹中的备份。下次只获取有变化的内容，因此更快，中断后也能继续。",
+      "world": "备份世界",
+      "stop": "停止",
+      "progress": "{total} 个文件中的 {done} 个",
+      "worldDone": "已备份（{size}）。",
+      "openFolder": "打开文件夹",
+      "pullAsk": "从主机获取设置文件？",
+      "pullLine": "这会替换 PZMM 的副本，包括你尚未发送的更改。"
+    },
+    "address": {
+      "label": "玩家加入的地址",
+      "save": "保存",
+      "at": "玩家通过 {address} 加入",
+      "copy": "复制",
+      "change": "更改",
+      "set": "设置玩家加入的地址",
+      "tip": "用于 playit.gg 等隧道或域名：PZMM 会在这里和 Discord 状态中显示它。"
     }
   },
   "zb": {
@@ -857,7 +2255,61 @@
     "fine": "游戏更新和 Steam 的“验证游戏文件的完整性”会移除启动标志。如果发生这种情况，此页面会显示<em>修复</em>。PZMM 只修改普通启动器。",
     "useInstallerBefore": "如果你使用备用启动器或 Steam 启动选项，请改用",
     "installer": "官方安装程序",
-    "useInstallerAfter": "。"
+    "useInstallerAfter": "。",
+    "removeNeeded": {
+      "other": "{count} 个已启用的模组需要它，没有它就无法加载。"
+    },
+    "enableHere": "在此配置中启用",
+    "setGameFolder": "设置游戏文件夹"
+  },
+  "vp": {
+    "lede": "面向 Build 42 的 3D 渲染器：以第一或第三人称游玩。它通过 ZombieBuddy 加载，PZMM 把它的模组列表放在单独的配置中，方便你在 2D 和 3D 游戏之间切换。",
+    "installed": "已安装，版本 {version}",
+    "notInstalled": "未安装",
+    "notInstalledHint": "“安装并设置”会下载 Viewpoint 和 ZombieBuddy，设置 ZombieBuddy，并以当前配置为基础创建 Viewpoint 配置。每项更改都会先给你看。",
+    "updateReady": "有一个创意工坊更新可以安装。",
+    "zbReady": "ZombieBuddy 已为它准备好",
+    "zbNotReady": "ZombieBuddy 尚未为它准备好",
+    "zbNotReadyHint": "Viewpoint 通过 ZombieBuddy 加载。切换到 Viewpoint 时会一并设置，你也可以现在设置。",
+    "build": "需要 Build 42",
+    "build41": "你正在使用 Build 41。Viewpoint 只能在 Build 42 上运行：请在设置中更改游戏版本。",
+    "gameVersion": "适用于游戏版本 {version}",
+    "profiles": "Viewpoint 配置：{names}",
+    "noProfile": "还没有 Viewpoint 配置",
+    "noProfileHint": "第一次切换时会以当前配置为基础创建一个，并把 ZombieBuddy 和 Viewpoint 启用在最上方。",
+    "active": "你正在用“{profile}”配置游玩。",
+    "install": "安装并设置",
+    "switch": "切换到 Viewpoint",
+    "update": "更新 Viewpoint",
+    "changeBuild": "游戏版本设置",
+    "workshopPage": "创意工坊页面",
+    "settings": "Viewpoint 的设置（画面、着色器包、鼠标、视野）在游戏内：游玩时按 Delete。按键设置在“选项 > 模组”中。"
+  },
+  "java": {
+    "title": "Java 模组",
+    "lede": "你已启用的模组所带的 Java 代码，在 ZombieBuddy 加载前先检查一遍。签名只能说明文件是谁做的，不代表安全；扫描会指出游戏模组很少需要的代码。",
+    "sig": {
+      "unsigned": "未签名。",
+      "valid": "由 {signer} 签名，之后未被改动。",
+      "invalid": "签名后被改动过：ZombieBuddy 不会加载它。",
+      "unknown_key": "由 {signer} 签名；ZombieBuddy 会在其 Steam 个人资料中核对密钥。",
+      "missing": "Java 文件不存在。"
+    },
+    "allowed": "ZombieBuddy 会加载它：你已允许这个版本。",
+    "blocked": "ZombieBuddy 会阻止它：你拒绝过这个版本。",
+    "willAsk": "ZombieBuddy 会在加载前询问你。",
+    "copyHash": "复制 SHA-256",
+    "clean": "扫描没有发现游戏模组很少需要的代码。",
+    "none": "你启用的模组都不包含 Java 代码。",
+    "loaderFound": "{name} {version} 已安装在游戏文件夹中。",
+    "loaderSteam": "你的 Steam 启动选项会随游戏启动它。",
+    "loaderBy": "游戏文件夹中的 {file} 会启动它。",
+    "loaderNotStarted": "游戏文件夹和 Steam 启动选项中都没有启动它的设置，只有你手动启动时才会加载。",
+    "loadsWith": "由 {name} 加载，它不检查签名。",
+    "warnings": {
+      "other": "Java 模组标签页中有 {count} 条警告。"
+    },
+    "hashCopied": "已复制"
   },
   "profile": {
     "tip": "配置方案：你正在游玩的模组列表",
@@ -866,7 +2318,17 @@
     "setUpViewpoint": "设置 Project Viewpoint…",
     "rename": "重命名…",
     "duplicate": "复制…",
-    "snapshots": "快照…"
+    "snapshots": "快照…",
+    "servers": "服务器配置文件",
+    "label": "配置文件：",
+    "games": {
+      "zomboid": "Project Zomboid 配置文件",
+      "viewpoint": "Project Viewpoint 配置文件"
+    },
+    "use": "切换到此配置文件",
+    "delete": "删除…",
+    "prune": "移除未使用的服务器配置文件…",
+    "pruneNone": "没有未使用的服务器配置文件：每个配置文件的服务器都在你的加入记录、收藏或你托管的服务器中。"
   },
   "activity": {
     "title": "活动",
@@ -887,7 +2349,8 @@
   "window": {
     "minimise": "最小化",
     "maximise": "最大化",
-    "restore": "还原"
+    "restore": "还原",
+    "skip": "跳到内容"
   },
   "workshop": {
     "sorts": {
@@ -1053,7 +2516,7 @@
     "youtubeTip": "在 YouTube 上观看",
     "youtubeLabel": "在 YouTube 上观看视频",
     "installAll": {
-      "other": "安装全部 {count} 个模组"
+      "other": "安装全部 {count} 个模组…"
     },
     "workshopPage": "创意工坊页面",
     "rating": "评分",
@@ -1084,14 +2547,22 @@
     "older": "较旧",
     "noComments": "还没有评论。",
     "commentsRange": "第 {from}–{to} 条，共 {total} 条",
-    "postHint": "要发表评论，请前往创意工坊页面。"
+    "postHint": "要发表评论，请前往创意工坊页面。",
+    "addToServer": "添加到服务器",
+    "addToServerTip": "将其连同所需的创意工坊物品一起添加到 PZMM 托管的服务器的模组行中",
+    "addingToServer": "正在添加…",
+    "noServers": "PZMM 还没有托管任何服务器：请在“服务器”的“新建服务器…”中创建。",
+    "onServerAlready": "{name} 已经有它了。",
+    "addToServerAsk": "将这些更改写入 {name} 的模组？",
+    "addedToServer": "已添加到 {name}。服务器会在下次启动时加载。",
+    "addedToServerRestart": "已添加到 {name}。重启服务器即可加载。"
   },
   "installButton": {
-    "installAll": "全部安装"
+    "installAll": "全部安装…"
   },
   "snapshots": {
     "title": "“{profile}”的快照",
-    "intro": "PZMM 会保留最近 10 份在更新、自动排序、分组、移除模组和导入之前的列表。",
+    "intro": "PZMM 会保留最近 10 份在安装、更新、自动排序、分组、移除模组、导入和查找出问题的模组之前的列表。",
     "counts": {
       "other": "已启用 {enabled}/{count} 个模组"
     },
@@ -1103,7 +2574,12 @@
       "group": "按类别分组之前",
       "remove": "移除模组之前",
       "import": "导入之前",
-      "restore": "恢复之前"
+      "restore": "恢复之前",
+      "maps": "调整地图顺序之前",
+      "sortAz": "A-Z 排序前",
+      "adopt": "游戏模组菜单中更改之前",
+      "install": "安装多个模组之前",
+      "bisect": "查找出错模组之前"
     }
   },
   "preview": {
@@ -1121,7 +2597,14 @@
     "newFile": "创建 {file}。",
     "map": "Map= 从 {from} 改为 {to}",
     "serverTitle": "将此配置方案写入 {file}？",
-    "write": "写入"
+    "write": "写入",
+    "shareTitle": "导入配置方案“{name}”？",
+    "shareMods": {
+      "other": "{count} 个已启用的模组"
+    },
+    "shareDownloads": {
+      "other": "其中 {count} 个将从创意工坊下载"
+    }
   },
   "launch": {
     "title": {
@@ -1129,24 +2612,43 @@
     },
     "notInstalled": "{id}：已启用但未安装",
     "fix": "修复",
-    "anyway": "仍然启动"
+    "anyway": "仍然启动",
+    "javaTitle": {
+      "other": "ZombieBuddy 会就 {count} 个新的或改动过的 Java 文件询问你。PZMM 的发现："
+    },
+    "review": "查看 Java 模组",
+    "joinAnyway": "仍然加入",
+    "arrangeMaps": "调整地图",
+    "warnTitle": {
+      "other": "开始游戏前有 {count} 件事需要了解。游戏仍会启动。"
+    },
+    "stopAsking": "启动，不再询问这些",
+    "joinStopAsking": "加入，不再询问这些"
   },
   "menu": {
     "label": "{name}：操作",
     "toTop": "移到加载顺序的最前面",
     "toBottom": "移到加载顺序的最后面",
     "copyId": "复制模组 ID",
-    "showInMaps": "在地图中显示"
+    "showInMaps": "在地图中显示",
+    "pin": "固定其在加载顺序中的位置",
+    "unpin": "取消固定加载顺序位置",
+    "favourite": "加入收藏",
+    "unfavourite": "取消收藏",
+    "hide": "从列表中隐藏",
+    "unhide": "重新在列表中显示"
   },
   "backend": {
-    "stateDamaged": "{file} 已损坏（{error}）；已将副本保留为 state.json.bad，并重新开始",
     "mapsNotUpdated": "无法读取你的模组，因此游戏的地图列表未更新：{error}",
-    "settingsDamaged": "{file} 已损坏（{error}）；已将副本保留为 {copy}，并使用默认设置",
+    "gameReset": "游戏清空了它的模组列表（某些更新后会发生一次），PZMM 保留了你的列表：从 PZMM 启动即可恢复",
     "duplicateId": "{source}：已跳过第二个 ID 为 {id} 的模组",
     "notOursInMods": "{id} 已在 {dir} 中，且不是由 PZMM 安装的，已保持原样。如需安装此副本，请删除该文件夹。",
     "alreadyCurrent": "{id} 已是最新（{source}）",
     "installed": "已安装 {id}（{source}）",
-    "backupsPruned": "已删除最旧的备份（数量：{count}），使备份保持在 {mb} MB 以内",
+    "updated": "已更新 {id}（{source}）",
+    "backupsPruned": {
+      "other": "已删除最旧的 {count} 个备份，使备份保持在 {mb} MB 以内"
+    },
     "tagsFailed": "无法读取创意工坊标签：{error}",
     "dataCopied": "已将 PZMM 的数据复制到 {to}，但无法删除旧文件夹 {from}（{error}）。请自行删除。",
     "dataMoved": "已将 PZMM 的数据移动到 {to}",
@@ -1161,12 +2663,20 @@
     "oldCopyNotRemoved": "无法移除 PZMM 为 {ids} 保留的旧副本：{error}",
     "pruneFailed": "无法清理备份：{error}",
     "collectionsFailed": "无法检查创意工坊合集：{error}",
-    "collection": "合集 {id}：物品数：{count}",
+    "collection": {
+      "other": "合集 {id}：{count} 个物品"
+    },
     "requiresAdding": "workshop:{id} 需要 workshop:{req}，正在添加",
-    "requiresFailed": "无法检查 workshop:{id} 需要什么：{error}",
+    "requiresUnchecked": {
+      "other": "无法通过创意工坊页面检查 {count} 个物品需要什么（{error}）：{ids}"
+    },
+    "requiresFromInfo": "{id} 需要 {req}：正在添加 workshop:{item}（依据其 mod.info，因为 Steam 没有显示该物品的页面）",
+    "requiresUnknown": "{id} 需要 {req}，但 PZMM 已知的创意工坊物品中没有提供它的：请自行查找并安装",
     "requiredItemsFailed": "无法读取 workshop:{item} 所需的物品：{error}",
     "downloadingSteamcmd": "正在下载 steamcmd...",
-    "downloadingItems": "正在下载创意工坊物品，数量：{count}...",
+    "downloadingItems": {
+      "other": "正在下载 {count} 个创意工坊物品..."
+    },
     "steamcmdStopped": "SteamCMD 已停止（由你停止）；未下载：{ids}",
     "steamcmdTimedOut": "SteamCMD 已停止（一小时内没有任何下载完成）；未下载：{ids}",
     "leftOff": "{id} 已保持禁用：它与 {other} 不兼容。如果更喜欢它，请启用它来代替 {other}。",
@@ -1177,17 +2687,95 @@
     "found": "{id}：在创意工坊中找到，名称为“{title}”（{item}）",
     "lookupFailed": "查找 {id} 失败：{error}",
     "noClearMatch": "{id}：没有创意工坊物品能明确提供它。请在模组详情中使用“下载”来选择一个。",
-    "serverItems": "正在安装服务器使用的创意工坊物品，数量：{count}",
-    "serverStarted": "已启动 {name} 服务器（{script}）。",
+    "serverItems": {
+      "other": "正在安装服务器使用的 {count} 个创意工坊物品"
+    },
     "noMaps": "workshop:{id} 没有为 Build {build} 添加地图",
-    "sharedItems": "正在安装共享配置方案使用的创意工坊物品，数量：{count}",
+    "sharedItems": {
+      "other": "正在安装共享配置方案使用的 {count} 个创意工坊物品"
+    },
     "imported": "已将配置方案导入为“{name}”。",
     "notAFolder": "不是文件夹：{path}",
     "openFailed": "无法打开 {path}：{error}",
     "httpsOnly": "PZMM 只打开 https 链接：{url}",
     "openUrlFailed": "无法打开 {url}：{error}（是否已安装 Steam？）",
     "launchFailed": "无法启动游戏（{url}）：{error}（是否已安装 Steam？）",
-    "backupsDeleted": "已删除所有备份。"
+    "backupsDeleted": "已删除所有备份。",
+    "serverInstalling": "正在将专用服务器安装到 {dir}（需下载约 2 GB）...",
+    "serverStarting": "正在启动 {name}：{command}",
+    "serverKilled": "{name} 没有及时停止：PZMM 已结束 Java",
+    "serverCreated": "已设置 {name}：{file}",
+    "serverWritten": "已将 {mods} 个模组和 {items} 个创意工坊物品写入 {file}",
+    "serverModsUpdated": {
+      "other": "{name}：{count} 个创意工坊模组已更新（{titles}）；服务器会在重启时应用"
+    },
+    "serverCrashRestart": "{name} 已崩溃：PZMM 正在重启它",
+    "serverCrashGaveUp": "{name} 在一小时内崩溃了 {count} 次：PZMM 已停止重启它",
+    "serverCrashed": "{name} 已崩溃",
+    "serverAutoRestart": "{name}：正在重启（先保存）",
+    "serverRestartBroken": "{name}：检查设置在其配置中发现错误，因此不重启（服务器继续运行）：{errors}",
+    "serverBackedUp": "已备份 {name}（{size} MB）",
+    "serverRestored": "已从 {file} 恢复 {name}",
+    "detailsFailed": "无法读取服务器模组的创意工坊详情：{error}",
+    "serverProfile": {
+      "other": "已切换到“{name}”，为 {server} 启用 {count} 个模组。"
+    },
+    "serverMissing": "未安装，因此不在配置方案中：{ids}",
+    "tagTooBig": "{name} 的模组列表太长，放不进描述，所以 PZMM 玩家按 ID 匹配它的模组",
+    "tagFailed": "无法更新 {name} 描述中的模组列表：{error}",
+    "modIndexRead": {
+      "other": "已读取自上次以来更新的 {count} 个创意工坊物品的模组 ID"
+    },
+    "modIndexFailed": "无法更新模组 ID 索引：{error}",
+    "saveBackedUp": "已备份存档 {name}（{size} MB）",
+    "saveRestored": "已从 {file} 恢复存档 {name}",
+    "saveBackupFailed": "无法备份存档 {name}：{error}",
+    "profileUsed": "已切换到配置方案“{name}”。",
+    "profileRenamed": "已将配置方案“{from}”重命名为“{to}”。",
+    "profileDeleted": "已删除配置方案“{name}”。",
+    "serverStopped": "已停止 {name}。",
+    "serverAdopted": "PZMM 现在管理 {name}。",
+    "serverForgotten": "PZMM 不再管理 {name}；它的文件保留。",
+    "serverAutoSaved": "已保存 {name} 的自动化设置。",
+    "serverSettingsSaved": "已保存 {name} 的设置：{file}",
+    "serverDiscordSaved": "已保存 {name} 的 Discord Webhook。",
+    "serverDiscordForgot": "已移除 {name} 的 Discord Webhook。",
+    "joining": "正在启动游戏，以配置方案“{profile}”加入 {server}。",
+    "serverRestartAborted": "{name}：重启已取消",
+    "serverUpdated": "已更新 {name} 的服务器文件",
+    "serverCloned": "已用 {from} 的设置创建 {name}",
+    "serverMigrated": "{name} 现在运行合作世界 {world}",
+    "serverBackupImported": "已从 {file} 为 {name} 导入备份",
+    "serverWiped": {
+      "other": "已清空 {name} 的世界（{count} 个文件）"
+    },
+    "serverChunksReset": "已重置 {name} 的 {count} 个地图区块",
+    "remoteAdded": "已添加 {name}：{host}:{port}",
+    "marksOn": {
+      "other": "“{name}”：按设置启用了 {count} 个收藏。"
+    },
+    "marksOff": {
+      "other": "“{name}”：按设置禁用了 {count} 个隐藏模组。"
+    },
+    "serverZonesRestored": "已从 {file} 恢复 {name} 的安全屋、区域和派系",
+    "discordCommand": "{name}：{user} 在 Discord 上发送了 {command}",
+    "discordRelayShared": "{name}：聊天转发已关闭，因为另一个服务器使用相同的数据文件夹，它们的聊天会混在一起",
+    "serverBotSaved": "已保存 {name} 的 Discord 机器人令牌。",
+    "serverBotForgot": "已移除 {name} 的 Discord 机器人令牌。",
+    "ftpSent": "已将 {name} 的设置文件发送到主机",
+    "ftpWorld": "正在从主机获取 {name} 的世界：{count} 个文件",
+    "ftpGot": "已从主机获取 {name} 的设置文件",
+    "favouriteUp": "已上线且有空位：{names}",
+    "serverSourceFailed": "无法从 {source} 列出服务器：{error}",
+    "listRestored": {
+      "other": "启动游戏前，已将“{name}”的 {count} 个模组放回游戏的模组列表。"
+    },
+    "uploadCopyRecycled": "已将 {folder} 中的旧副本移到回收站。",
+    "dataRepointFailed": "无法将服务器和配置文件指向 {to}（{error}）：请在“服务器”中检查它们的文件夹，并检查配置文件的启动选项",
+    "secretsFile": "系统凭据存储不可用（{error}），因此 PZMM 将密码和密钥保存在 {file} 中",
+    "badModId": "已将 {id} 排除在游戏的模组列表之外：模组 ID 不能包含花括号、逗号、= 或换行",
+    "leavingViewpoint": "此服务器不使用 Project Viewpoint",
+    "profileNew": "已创建空配置方案“{name}”并切换到它。"
   },
   "doctor": {
     "notInstalled": "已启用但未安装：游戏会跳过它",
@@ -1212,6 +2800,512 @@
     "itemUnused": "WorkshopItems= 中有 {item}，但它的模组都不在 Mods= 中",
     "backslash": "在 Build 42 上，Mods= 中的条目需要以反斜杠开头（\\ModId）",
     "mapNotListed": "有模组添加了地图 {map}，但 Map= 中没有列出它",
-    "mapsAfterBase": "Map= 把模组地图列在 Muldraugh, KY 之后：模组地图必须排在前面"
+    "mapsAfterBase": "Map= 把模组地图列在 Muldraugh, KY 之后：模组地图必须排在前面",
+    "sameId": "创意工坊物品 {items} 都使用这个模组 ID：游戏只会加载其中一个",
+    "noId": "它的 mod.info 没有 id=，游戏可能不会列出它（PZMM 使用文件夹名）",
+    "noName": "它的 mod.info 没有 name=，在游戏的模组列表中显示为空白",
+    "idMismatch": "它的 Build 41 mod.info 写的是 id={other}：另一个版本的玩家看到的是不同的模组 ID",
+    "versionMin": "需要游戏版本 {version} 或更新（你的是 {game}）：游戏不会加载它",
+    "versionMax": "适用于游戏版本 {version} 或更旧（你的是 {game}）：游戏不会加载它",
+    "requireDisabled": "它的 Lua 需要 {other} 中的 {file}，但 {other} 已停用",
+    "requireMissing": "它的 Lua 需要 {file}，但已启用的模组和游戏中都没有",
+    "idCase": "Mods= 中写的是 {id}，但模组 ID 是 {real}：ID 必须完全一致",
+    "javaNoJar": "mod.info 指定的 Java 文件 {file} 不存在：它的 Java 部分不会加载",
+    "javaBadSignature": "它的 Java 文件在作者签名后被改动过：ZombieBuddy 不会加载它",
+    "javaBlocked": "ZombieBuddy 会阻止它这个版本的 Java 文件（你之前拒绝过），所以它可能无法正常工作",
+    "javaProcess": "它的 Java 代码可以启动其他程序（{what}）",
+    "javaShell": "它的 Java 代码提到了命令行或下载工具（{what}）",
+    "javaEndpoint": "它的 Java 代码提到了 {what}，这是常见的被盗数据投放地址",
+    "javaPrivate": "它的 Java 代码提到了 {what}，那是浏览器、Steam、Discord 或 Windows 存放私人数据的地方",
+    "javaNoLeaf": "它的 Java 代码通过 Leaf 加载，但游戏未安装 Leaf，因此这部分不会运行",
+    "javaLeafOff": "它的 Java 代码通过 Leaf 加载，Leaf 已安装，但没有任何设置让 Leaf 随游戏启动（Steam 启动选项或启动器配置）",
+    "javaLoadsCode": "它的 Java 代码可以在游戏运行时加载更多代码（{what}）",
+    "javaLaunchFlags": "它的 Java 代码提到了 Java 启动参数（{what}）",
+    "javaNativeFile": "它的 Java 文件里带有程序或原生库（{what}）",
+    "javaBadClass": "它的 Java 文件里有 PZMM 无法读取的代码（{what}）：可能是故意隐藏的",
+    "javaNetwork": "它的 Java 代码会使用网络（{what}）",
+    "javaFiles": "它的 Java 代码会写入、移动或删除文件（{what}）",
+    "javaNative": "它的 Java 代码会加载原生库（{what}）",
+    "javaCrypto": "它的 Java 代码会加密或解密数据（{what}）",
+    "javaNestedJar": "它的 Java 文件里还包含另一个（{what}），也已一并扫描",
+    "zbAgent": "需要 ZombieBuddy 的 Java 代理，但游戏文件夹中尚未设置：请在 Java 模组标签页中设置",
+    "zbBroken": "会加载 ZombieBuddy 的 Java 代理，但其文件不在游戏文件夹中，因此游戏无法启动：请在 Java 模组标签页中设置或移除它",
+    "viewpoint41": "需要 Build 42：无法在 Build 41 上运行",
+    "mapFolderTwice": "添加了地图文件夹 {map}，{other} 也添加了它：游戏只会加载其中一个",
+    "mapOverlap": "它的地图与 {other} 的地图占用了部分相同的格子：重叠处以 Map= 中排在前面的为准",
+    "serverBuild": "适用于 Build {theirs} 的服务器，但你玩的是 Build {mine}：服务器不会让你进入",
+    "serverNeeds": "Mods= 中有 {id}，它需要 {req}，但 Mods= 中没有：{id} 不会加载",
+    "serverNeedsLater": "Mods= 中 {req} 排在需要它的 {id} 之后：{req} 必须排在前面",
+    "serverIncompatible": "Mods= 中同时有 {id} 和 {other}，它们不能一起使用",
+    "workshopGone": "它的创意工坊物品 {item} 已不存在（被删除或设为私密）：不会再有更新，服务器也无法下载",
+    "workshopBanned": "它的创意工坊物品 {item} 已被 Steam 下架：不会再有更新，服务器也无法下载",
+    "workshopHidden": "它的创意工坊物品 {item} 已隐藏（仅好友或私密）：服务器和其他玩家无法下载",
+    "workshopUnlisted": "它的创意工坊物品 {item} 已不公开列出：仍然可用，但作者可能已停止更新",
+    "notOriginal": "来自创意工坊物品 {mine}，但此模组 ID 的原版是创意工坊物品 {item}（{title}）：你的可能是旧副本或重新打包的版本",
+    "luaSyntax": "它的 Lua 文件 {file} 在第 {line} 行附近有语法错误：游戏不会运行该文件",
+    "modCodeFile": "它的文件夹带有 {what}，这是 mod.info 未声明的 Java 或原生代码：游戏不会加载它，但其他代码可以",
+    "luaEndpoint": "它的 Lua（{file}）提到 {what}，这是常见的被盗数据投放地址",
+    "luaShell": "它的 Lua（{file}）提到命令行或下载工具（{what}）",
+    "luaPrivate": "它的 Lua（{file}）提到 {what}，那是浏览器、Steam、Discord 或 Windows 存放私人数据的地方",
+    "luaProcess": "它的 Lua（{file}）试图运行程序（{what}）",
+    "luaDownload": "它的 Lua（{file}）从互联网下载内容（{what}）",
+    "luaFileEscape": "它的 Lua（{file}）访问游戏文件夹以外的文件（{what}）",
+    "javaEnvOptions": "已设置（{what}）：这台电脑上的每个 Java 程序启动时都会带上它，包括游戏",
+    "launcherAgent": "用 Java 代理 {what} 启动游戏：应该只有 ZombieBuddy 的代理",
+    "launcherBootPath": "用 {what} 启动游戏，它会把代码放在 Java 自身代码之前",
+    "launcherClasspath": "把不属于游戏的 {what} 放进了游戏的类路径",
+    "gameJar": "有 {what}，这不是游戏自带的 Java 文件",
+    "gameClass": "有一个零散的 Java 类 {what}：游戏会运行它而不是自己的代码",
+    "zbChanged": "其中的 ZombieBuddy 文件与 ZombieBuddy 模组的不一致（已过时或被替换）：请在 Java 模组标签页重新设置"
+  },
+  "saves": {
+    "tools": "工具",
+    "toolsLabel": "存档工具",
+    "part": {
+      "backups": "备份",
+      "mods": "模组",
+      "players": "角色",
+      "sandbox": "沙盒",
+      "recovery": "救援",
+      "data": "数据"
+    },
+    "reason": {
+      "manual": "手动",
+      "launch": "游戏启动",
+      "exit": "游戏关闭",
+      "restore": "恢复前",
+      "repair": "修复前",
+      "interval": "游戏中",
+      "crash": "崩溃后",
+      "reset": "重置前"
+    },
+    "slotName": "槽位名称（可选）",
+    "saveSlot": "保存槽位",
+    "backUpNow": "立即备份",
+    "backupHint": "有名称的备份就是槽位：它会一直保留，直到你删除。没有名称的备份只保留设置中指定的数量。",
+    "noBackups": "此存档还没有备份。",
+    "backupsLabel": "此存档的备份",
+    "backedUp": "已备份。",
+    "slotSaved": "已保存槽位“{slot}”。",
+    "restore": "恢复",
+    "restoreTitle": "将 {name} 恢复到 {when} 的状态？",
+    "restoreKeeps": "会先备份存档当前的状态，你可以随时回来。",
+    "closeGame": "必须先关闭游戏。",
+    "restored": "已恢复 {when} 的备份。",
+    "deleteTitle": "删除备份 {what}？",
+    "deleteWhat": "删除后无法找回。",
+    "deleted": "已删除。",
+    "brokenCells": {
+      "other": "有 {count} 个地图文件为空：保存时崩溃会留下这样的文件，游戏无法加载它们。"
+    },
+    "brokenOther": {
+      "other": "有 {count} 个世界文件为空，只能用备份找回："
+    },
+    "repair": "修复",
+    "repairTitle": {
+      "other": "删除 {count} 个空的地图文件？"
+    },
+    "repairWhat": "会先备份存档。游戏会根据地图重建这些区域，你在那里建造或放置的东西会消失。",
+    "repaired": {
+      "other": "已删除 {count} 个空的地图文件。"
+    },
+    "modsHint": "让此存档使用 {profile} 的模组。写入前会先显示变化，旧的列表会以 mods.txt.prev 保留在旁边。",
+    "giveMods": "换成我的模组",
+    "giveModsTitle": "让 {save} 使用 {profile} 的模组？",
+    "removedWarning": "被移除模组的物品、建筑和配方会在加载时从世界中消失。",
+    "mapsKept": "存档保留原有地图；你的模组添加的地图会加入它的地图列表。",
+    "modsGiven": "存档现在使用你的模组。",
+    "players": {
+      "name": "角色",
+      "where": "位置（x，y，楼层）",
+      "state": "状态",
+      "data": "保存的数据",
+      "alive": "存活",
+      "dead": "死亡",
+      "none": "此存档还没有角色。",
+      "hint": "读取自存档的 players.db，不会做任何修改。"
+    },
+    "deletedTitle": "有备份的已删除存档",
+    "deletedHint": "这些存档已不在游戏中，但 PZMM 仍保留着它们的备份。恢复其中一个即可找回存档。",
+    "backupsButton": "备份",
+    "autoHint": "游戏启动或关闭时的备份：",
+    "autoSettings": "在设置中调整",
+    "sandboxSaved": "已保存。下次加载此存档时游戏会使用它。",
+    "sandboxHint": "此存档的设置，读取自它的 map_sand.bin。更改会在下次加载时生效，且必须先关闭游戏。模组的选项只显示原始值。",
+    "thumbAlt": "{name} 的最后一张截图",
+    "name": "命名",
+    "rename": "重命名",
+    "keepAs": "保留为槽位",
+    "copyAs": "复制为槽位",
+    "renamed": "已命名为“{slot}”。",
+    "copiedAs": "已复制为“{slot}”。",
+    "clone": "用我的模组复制",
+    "cloneHint": "“用我的模组复制”会在旁边新建一个名称以 _modded 结尾的存档，并换上你的模组。这个存档保持不变。",
+    "cloneTitle": "用 {profile} 的模组复制 {save}？",
+    "cloneKeeps": "副本是一个名称以 _modded 结尾的新存档；这个存档保持不变。",
+    "cloned": "已用你的模组创建 {copy}。{save} 没有变化。",
+    "reset": {
+      "hint": "修复出问题的世界：PZMM 先备份存档，再删除游戏下次读取时会重建的文件。",
+      "do": "重置",
+      "nothing": "这个存档没有这些文件。",
+      "backupFirst": "会先备份存档，所以可以恢复。",
+      "done": {
+        "other": "已删除 {count} 个文件。读取存档后游戏会重建它们。"
+      },
+      "noHeal": "这里不能治疗角色：游戏把生命值存在 players.db 里，格式只有游戏自己会写。",
+      "zombies": {
+        "label": "僵尸数量",
+        "short": "按地图重新分布",
+        "title": "重置僵尸数量？",
+        "what": "僵尸会像新世界一样，按地图和沙盒设置重新分布。清理过的区域可能会再次挤满僵尸。"
+      },
+      "time": {
+        "label": "时钟、日历和天气",
+        "short": "回到存档开始时",
+        "title": "重置时钟、日历和天气？",
+        "what": "会删除 map_t.bin：日期和时间回到存档开始时，天气重新开始。从世界开始计算的事情，比如断水断电和物资刷新，也会从那时重新计算。"
+      },
+      "animals": {
+        "label": "动物（Build 42）",
+        "short": "按地图重新分布",
+        "title": "重置动物？",
+        "what": "动物和它们的区域会按地图重建。任何动物，包括驯服的，都可能丢失。"
+      }
+    },
+    "data": {
+      "hint": "游戏写入的存档数据库，从副本读取：不会做任何更改。保存的数据以大小显示。",
+      "none": "这个存档没有数据库。",
+      "pick": "选择一个表",
+      "table": {
+        "other": "{table}（{count} 行）"
+      },
+      "prev": "上一页",
+      "next": "下一页",
+      "range": "第 {from} 到 {to} 行，共 {total} 行",
+      "bytes": "[{size} 数据]"
+    },
+    "mode": {
+      "Apocalypse": "天启",
+      "Survivor": "幸存者",
+      "Builder": "建造者",
+      "Sandbox": "沙盒",
+      "Multiplayer": "多人游戏",
+      "Beginner": "新手"
+    },
+    "backupWhilePlaying": "请先退出到主菜单：游戏保存时备份，可能只备份到写了一半的存档。",
+    "reading": "正在读取…"
+  },
+  "perf": {
+    "title": "性能",
+    "lede": "游戏可用的内存、PZ_Optimization，以及模组在加载时的开销。",
+    "reading": "正在读取…",
+    "gameNotFound": "找不到游戏：请在“文件夹”中设置它的文件夹。",
+    "closeGame": "请先退出游戏。",
+    "memory": {
+      "title": "游戏内存",
+      "now": "游戏最多可使用这台电脑 {ram} 中的 {size}。",
+      "unset": "游戏内存未设置，由 Java 自行决定。",
+      "tooHigh": "留给 Windows 和显卡驱动的内存太少了：请调低。",
+      "raise": {
+        "other": "有 {count} 个模组时，{size} 加载更快、卡顿更少。"
+      },
+      "fine": "这对你的模组足够了。",
+      "pzopt": "这个大小是 PZ_Optimization 的内存设置选的，在那里修改会再次设定它。",
+      "suggested": "推荐",
+      "noRoom": "这台电脑只有 {ram} 内存，不足以推荐大小：无论设多少，留给 Windows 的都不到 2 GB。",
+      "apply": "设置",
+      "set": "游戏现在可用 {size}。",
+      "hint": "PZMM 会修改 ProjectZomboid64.json 中的 -Xmx；首次修改前的文件保留为 ProjectZomboid64.json.pzmm-backup。在 Steam 中验证游戏文件会恢复默认值。"
+    },
+    "pzopt": {
+      "title": "PZ_Optimization",
+      "what": "社区为 Build 42 制作的性能补丁：把类文件放在游戏文件旁边，每个版本只适用于一个游戏版本。",
+      "github": "它的 GitHub 页面",
+      "notInstalled": "未安装。",
+      "ok": "已安装，适用于此游戏版本（{rev}）。",
+      "mismatch": "已安装，但适用于游戏版本 {built}，而你的是 {game}：它会自行关闭。请更新。",
+      "noCopy": "在创意工坊订阅它；之后 PZMM 会运行它自带的安装程序。",
+      "workshop": "在创意工坊中打开",
+      "copyOld": "创意工坊中的副本适用于游戏版本 {rev}，而你的是 {game}：请等待它更新。",
+      "install": "安装",
+      "update": "更新",
+      "uninstall": "卸载",
+      "confirmInstall": "运行 PZ_Optimization 创意工坊物品中的安装程序？它会把类文件复制到游戏文件夹；不会修改 projectzomboid.jar。",
+      "confirmRemove": "从游戏文件夹中移除 PZ_Optimization？它的安装程序会恢复游戏的启动设置。",
+      "installedNow": "PZ_Optimization 已安装。",
+      "removed": "PZ_Optimization 已移除。"
+    },
+    "mods": {
+      "title": "模组与加载时间",
+      "count": {
+        "other": "已启用 {count} 个模组，占用 {size}。"
+      },
+      "many": "模组这么多，首次加载会很久，游戏也需要更多内存。",
+      "largest": "最大的几个：",
+      "hint": "修改模组列表后的首次加载最慢，因为游戏要读取每个模组的文件。地图和材质包最占空间；关闭不用的模组最有效。"
+    },
+    "jvm": {
+      "title": "Java 选项",
+      "gc": "垃圾回收器",
+      "gcs": {
+        "Z": "ZGC（游戏的选择）",
+        "G1": "G1（内存少时更平稳）",
+        "Shenandoah": "Shenandoah（停顿短）",
+        "other": "{name}（手动设置）"
+      },
+      "args": "其他 Java 选项，每行一个",
+      "saved": "已保存。游戏下次启动时生效。",
+      "hint": "写入 ProjectZomboid64.json；PZMM 首次修改前的文件会留在旁边，名为 ProjectZomboid64.json.pzmm-backup。内存在上方有单独的设置。错误的选项会让游戏无法启动：在这里删掉它，或在 Steam 中验证游戏文件完整性以恢复默认值。"
+    }
+  },
+  "feed": {
+    "title": "最新动态",
+    "latest": "最新更新",
+    "history": "全部更新说明",
+    "readAll": "阅读全部说明",
+    "since": {
+      "launch": "自你上次游玩（{time}）以来更新的创意工坊模组。",
+      "save": "自你上次存档（{time}）以来更新的创意工坊模组。",
+      "week": "过去一周更新的创意工坊模组（还没有游玩记录）。"
+    },
+    "enabledOnly": "仅已启用",
+    "refresh": "刷新",
+    "loading": "加载中…",
+    "riskyCount": {
+      "other": "{count} 个已启用的模组发生了可能损坏进行中存档的变化。载入存档前请先阅读更新说明。"
+    },
+    "notesFailed": "部分更新说明未能加载：{error}",
+    "none": "自你上次游玩以来，没有模组更新。",
+    "noneEnabled": "自你上次游玩以来，没有已启用的模组更新。",
+    "showTip": "在“我的模组”中显示",
+    "mayBreak": "可能损坏存档",
+    "risk": {
+      "map": "添加了地图。",
+      "version": "新的主版本。",
+      "notes": "更新说明提到了新游戏或存档。"
+    },
+    "update": "更新",
+    "changelog": "更新说明",
+    "changelogTip": "在创意工坊查看全部更新说明",
+    "notLoaded": "更新说明尚未加载。",
+    "emptyNote": "（无内容）",
+    "fewer": "收起",
+    "more": {
+      "other": "显示 {count} 条更早的说明"
+    },
+    "bundled": "创意工坊上没有更新说明。模组自带的更新日志（最新的在前）：",
+    "noNotes": "作者没有为这次更新写说明。",
+    "loadRest": {
+      "other": "再加载 {count} 个模组的说明"
+    },
+    "fine": "“可能损坏存档”只是提示：PZMM 会标记地图模组、新的主版本，以及提到新游戏或存档的更新说明。用它们载入存档前请先备份。",
+    "countLabel": {
+      "other": "自上次游玩以来更新了 {count} 个模组"
+    }
+  },
+  "authoring": {
+    "title": "制作模组",
+    "lede": "按游戏和创意工坊上传器的方式检查你正在制作的模组，然后生成上传器需要的文件夹。游戏自带的上传器常常失败却不说原因：这里会告诉你。",
+    "modPlaceholder": "你的模组文件夹，或上传文件夹",
+    "modLabel": "要检查的文件夹",
+    "chooseMod": "选择文件夹…",
+    "checkAgain": "重新检查",
+    "uploadCheck": "上传文件夹检查",
+    "modCheck": "模组检查",
+    "noProblems": "没有发现问题。",
+    "uploadTitle": "创意工坊上传文件夹",
+    "uploadIntro": "PZMM 会在你选择的文件夹中写入 workshop.txt、256×256 的 preview.png，以及 Contents/mods/ 里模组的干净副本（不含隐藏文件和上传器拒收的文件类型）。",
+    "itemTitle": "标题",
+    "description": "描述",
+    "tags": "标签",
+    "tagsPlaceholder": "用 ; 分隔，例如 Build 42; Items",
+    "visibility": "可见性",
+    "vis": {
+      "public": "公开",
+      "friendsOnly": "仅好友",
+      "private": "私密",
+      "unlisted": "不公开列出"
+    },
+    "itemId": "创意工坊物品 ID",
+    "itemIdHint": "新物品请留空。游戏会在首次上传后写入，重新生成时 PZMM 会保留它。",
+    "preview": "预览图",
+    "previewAlt": "创意工坊预览图",
+    "previewFromPoster": "由 mod.info 中的海报裁成 256×256 正方形生成。",
+    "noPoster": "mod.info 中没有海报：请自行在上传文件夹中放一个 256×256 的 preview.png。",
+    "saveIn": "保存到",
+    "saveInPlaceholder": "选择一个文件夹（游戏的上传器会在 Zomboid/Workshop 中查找）",
+    "choose": "选择…",
+    "build": "生成上传文件夹",
+    "built": "已生成于 {folder}。",
+    "showFolder": "显示文件夹",
+    "skipped": {
+      "other": "已略过 {count} 个文件：{files}"
+    },
+    "notInWorkshop": "此文件夹不在游戏上传器查找的 {workshop} 中：上传前请在那里生成。",
+    "nextStep": "上传方法：在游戏主菜单选择创意工坊，再选“创建和更新物品”，然后选择这个文件夹。",
+    "check": {
+      "versionFolderName": "{folder}/ 看起来像版本文件夹，但游戏只读取 42、42.x 和 common/",
+      "noModInfo": "没有 mod.info：游戏不会把这个文件夹当作模组",
+      "noFolder": "没有这个文件夹",
+      "b41Only": "只有 Build 41 结构，所以 Build 42 不会列出它：添加 common/ 和带有自己 mod.info 的 42/ 文件夹，并把 media/ 移到其中之一",
+      "noCommon": "没有 common/ 文件夹：Build 42 结构在版本文件夹旁边有一个（可以为空），部分游戏版本会跳过没有它的模组",
+      "noVersionFolder": "只有 common/：Build 42 通常从 42/ 这样的版本文件夹读取 mod.info",
+      "versionBelow42": "版本文件夹是 Build 42 的功能：Build 41 从不读取这个文件夹",
+      "versionNoInfo": "这里没有 mod.info：Build 42 不会加载这个版本文件夹",
+      "infoInCommon": "游戏会忽略 common/ 中的 mod.info：每个版本文件夹都需要自己的",
+      "rootMedia": "Build 42 会忽略模组顶层的 media/：把它移到 common/ 或某个版本文件夹",
+      "outsideMedia": "{folder}/ 应放在 media/ 里：游戏不会在这里找它",
+      "fileType": "创意工坊上传器拒收 .exe、.dll、.bat、.sh、.so、.dylib、.app 和 .zip 文件（pyramid.zip 除外）",
+      "badLine": "第 {line} 行不是 键=值 格式：游戏会跳过它",
+      "spaceBeforeEquals": "“{key} =”：游戏只读取 = 前没有空格的 {key}=",
+      "wrongCase": "{key}= 会被忽略：键区分大小写，请写成 {right}=",
+      "unknownKey": "游戏会忽略 {key}=",
+      "duplicateKey": "{key}= 设置了不止一次：只有一个生效",
+      "idChars": "id={id} 含有会破坏模组列表的字符（\\ / , ; \"）",
+      "missingFile": "{key}={path}：此 mod.info 旁边（以及 common/ 中）没有这个文件",
+      "notPng": "{key}={path}：海报和图标应为 PNG",
+      "separator": "{key}=：请用逗号分隔模组 ID，游戏不按 ; 拆分",
+      "needsBackslash": "{key}={item}：Build 42 把模组 ID 写成 \\{item}",
+      "noBackslash41": "{key}={item}：Build 41 不在模组 ID 前加 \\",
+      "badVersion": "{key}={value} 不是游戏能读取的版本（如 42.0 或 41.78.16）",
+      "packFormat": "pack= 需要一个文件名",
+      "tiledefFormat": "tiledef= 需要一个文件名和一个数字",
+      "badUrl": "url= 应以 https:// 开头",
+      "noName": "没有 name=：模组显示时没有名称",
+      "noId": "没有 id=：游戏无法加载它，其他模组也无法依赖它",
+      "listsItself": "它在 {key}= 中列出了自己",
+      "noDescription": "没有 description=：游戏内模组列表不显示描述",
+      "minAboveMax": "versionMin 高于 versionMax：没有任何游戏版本能加载它",
+      "maxBelow42": "Build 42 文件夹中的 versionMax 低于 42：Build 42 不会加载它",
+      "noTitle": "没有 title=：没有标题上传器不会继续",
+      "titleLong": "标题超过 128 个字符：Steam 会截断",
+      "descriptionLong": "描述超过 8000 个字符：Steam 会拒收",
+      "badVisibility": "visibility={value} 不是游戏认识的值（public、friendsOnly、private、unlisted）",
+      "badId": "id={value} 不是创意工坊物品编号",
+      "unknownTag": "{tag} 不是游戏的创意工坊标签",
+      "noPreview": "没有 preview.png：创意工坊需要一张 256×256 的 PNG",
+      "previewFormat": "不是上传器能读取的 PNG",
+      "previewSize": "{size} 像素：必须正好是 256×256",
+      "previewBig": "超过 1000 KB：上传器会拒收",
+      "noContents": "没有 Contents/ 文件夹：上传器需要你的模组放在 Contents/mods/ 中",
+      "emptyContents": "Contents/ 是空的",
+      "fileInContents": "Contents/ 中只能有文件夹",
+      "folderInContents": "Contents/ 中只能有 buildings/、creative/ 和 mods/",
+      "emptyMods": "Contents/mods/ 中没有模组文件夹",
+      "fileInMods": "Contents/mods/ 中只能有模组文件夹"
+    },
+    "posterUnreadable": "海报无法作为图片读取，因此没有预览：请重新保存为 PNG 或 JPEG。",
+    "notAbsolute": "请填写以盘符开头的完整路径（C:\\…）：只写相对路径会在 PZMM 自己的文件夹中查找。"
+  },
+  "presets": {
+    "modManager": "{name}（{count} 个模组，Mod Manager）",
+    "game": "{name}（{count} 个模组，游戏模组菜单）",
+    "server": "{name}（{count} 个模组，Mod Manager: Server）"
+  },
+  "kinds": {
+    "framework": "框架",
+    "patch": "补丁",
+    "map": "地图",
+    "ui": "界面",
+    "translation": "翻译"
+  },
+  "gameLog": {
+    "title": "游戏日志",
+    "open": "查看日志",
+    "openTip": "游戏和服务器的日志：每个错误只列一次，附带堆栈和它指向的模组",
+    "file": "日志文件",
+    "follow": "跟随",
+    "followTip": "游戏写入日志时持续读取",
+    "none": "还没有日志：先启动一次游戏。",
+    "errors": {
+      "other": "{count} 种不同的错误"
+    },
+    "noErrors": "此日志中没有错误。",
+    "once": "一次，在第 {line} 行",
+    "times": "首次在第 {line} 行，最后在第 {last} 行",
+    "timesTip": "发生的次数",
+    "noMod": "未指明模组（游戏自身的代码，或无法识别的模组）。",
+    "showInLog": "在日志中显示",
+    "byMod": "按模组统计的错误：",
+    "older": "最后 {count} 行（上面的错误涵盖整个日志）"
+  },
+  "tray": {
+    "open": "打开 PZMM",
+    "quit": "退出 PZMM",
+    "hidden": "PZMM 仍在托盘中运行。可从托盘图标打开或退出。"
+  },
+  "collection": {
+    "title": "导入 {title}",
+    "untitled": "创意工坊物品",
+    "summary": "{items} 个创意工坊物品，含 {mods} 个模组；已安装 {have} 个。",
+    "onlyHave": {
+      "other": "仅保留我已有的物品（{count} 个）：不安装任何内容"
+    },
+    "delisted": {
+      "other": "有 {count} 个物品已不在创意工坊，无法安装：{items}"
+    },
+    "choose": "这些物品包含不止一个模组（替代版本、可选部分）。请选择要启用的模组：",
+    "notes": {
+      "other": "{count} 条说明"
+    },
+    "import": {
+      "other": "用 {count} 个模组新建配置"
+    },
+    "add": {
+      "other": "将 {count} 个模组添加到此配置"
+    }
+  },
+  "notify": {
+    "done": "已完成：{job}",
+    "failed": "未完成：{job}（原因见活动日志）"
+  },
+  "serverSetup": {
+    "title": {
+      "other": "此服务器需要 {count} 个创意工坊物品。要创建新配置文件并下载吗？"
+    },
+    "go": "创建配置文件并下载",
+    "goSize": "创建配置文件并下载（{size}）",
+    "heading": "设置 {name}",
+    "note": "PZMM 会为此服务器新建一个配置文件并切换过去。你的其他配置文件保持不变。",
+    "unlisted": {
+      "other": "它还运行 {count} 个在游戏外不显示的模组：PZMM 无法在你加入前获取它们。"
+    },
+    "guess": "推测",
+    "guessTip": "可能的匹配：它的创意工坊页面没有写出服务器的模组 ID。取消勾选即可不下载。"
+  },
+  "errors": {
+    "busy": "PZMM 正在安装或更改模组：完成后请重试",
+    "reloaded": "模组列表已在游戏的模组菜单中更改，PZMM 已重新载入。请再次进行更改。",
+    "profileChanged": "当前配置现在是“{now}”，因此对“{profile}”的这项更改未保存。",
+    "stopFirst": "请先停止 {name}。",
+    "stopForUpdate": "请先停止 {name}：SteamCMD 无法替换正在运行的服务器的文件。",
+    "runningOutside": "{name} 正在这台电脑上运行（在 PZMM 之外启动）：请先停止它。",
+    "closeGameFirst": "游戏正在运行，可能正在托管 {name}：请先关闭游戏。",
+    "ftpUntrusted": "此电脑无法验证 {host} 的证书（通常是自签名证书）。其 SHA-256 指纹为 {fingerprint}：如果主机显示的相同，请信任此证书。",
+    "ftpCertChanged": "{host} 的证书已更改：PZMM 信任的是 {old}，但主机现在显示 {fingerprint}。只有在主机商确认已更换证书时，才信任新证书。",
+    "runningUnknown": "无法检查 {name} 是否在运行：请先停止它。",
+    "notFullPath": "{path} 不是完整路径（例如 D:\\Games\\Zomboid）",
+    "dataDriveRoot": "驱动器根目录不能存放 PZMM 的数据：请选择其中的一个文件夹。",
+    "dataInGame": "PZMM 的数据不能放在游戏文件夹中：Steam 验证或重新安装游戏时会将其删除。",
+    "dataServerRuns": "请先停止 {name}：PZMM 管理的服务器运行时，无法移动 PZMM 的数据。",
+    "zbCopy": "将 {file} 复制到 {dir}",
+    "zbCopied": "已将 {file} 复制到 {dir}",
+    "zbStaged": "已准备 ZombieBuddy.jar.new（游戏正在运行，下次启动时生效）",
+    "zbAddFlag": "将 {arg} 添加到 {file}",
+    "zbRemoveFlag": "从 {file} 移除 ZombieBuddy 参数",
+    "zbDelete": "删除 {path}",
+    "zbDownload": "将 ZombieBuddy（创意工坊物品 {item}）下载到 Zomboid/mods",
+    "zbCopyAgent": "将 ZombieBuddy 的 Java 代理文件复制到 {dir}",
+    "zbEnable": "在当前配置方案中启用 ZombieBuddy",
+    "vpToProfile": "切换到你的配置方案“{name}”",
+    "vpMakePlain": "从“{current}”创建不含 Viewpoint 的配置方案“{name}”并切换到它",
+    "vpDownload": "从 Steam 创意工坊下载 {id}（物品 {item}）",
+    "vpToVpProfile": "切换到你的配置方案“{name}”，并在顶部启用 ZombieBuddy 和 Viewpoint",
+    "vpMakeVp": "从“{current}”创建配置方案“{name}”，在顶部启用 ZombieBuddy 和 Viewpoint，并切换到它",
+    "profileInvalidName": "无效的配置方案名称：“{name}”",
+    "profileMissing": "没有名为“{name}”的配置方案",
+    "profileExists": "名为“{name}”的配置方案已存在",
+    "linkPercent": "无法链接 {path}：路径中含有 %。请重命名或移动该文件夹。",
+    "profileActive": "“{name}”是当前配置方案，请先切换到其他配置方案"
   }
 }

@@ -23,7 +23,7 @@ impl Source {
     /// Workshop id or URL, an existing local path, else GitHub `owner/repo[@ref]` or URL.
     pub fn parse(s: &str) -> Source {
         let s = s.trim();
-        if !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) {
+        if steam_workshop::valid_id(s) {
             return Source::Workshop(s.into());
         }
         if s.contains("steamcommunity.com/") {
@@ -49,13 +49,29 @@ impl Source {
     }
 }
 
+/// Hosts that still answered HTTP 429 after the backoffs, and when: for a minute their requests
+/// fail at once, so a batch (a collection's pages) doesn't wait out the backoffs item by item.
+static REFUSED: std::sync::Mutex<Vec<(String, std::time::Instant)>> = std::sync::Mutex::new(vec![]);
+
+fn host(url: &str) -> &str {
+    url.split('/').nth(2).unwrap_or(url)
+}
+
 /// Run an HTTP request with Steam etiquette: at most one Steam request every 350 ms
 /// (shared across threads), and on HTTP 429 back off (2 s, then 5 s) before giving up.
 pub(crate) fn polite<T>(url: &str, mut send: impl FnMut() -> Result<T, ureq::Error>) -> Result<T> {
     use std::sync::Mutex;
     use std::time::{Duration, Instant};
     static LAST_STEAM: Mutex<Option<Instant>> = Mutex::new(None);
+    const LIMITED: &str = "Steam is limiting requests right now (HTTP 429). Wait a minute and try again.";
     let steam = url.contains("steamcommunity.com") || url.contains("steampowered.com");
+    {
+        let mut refused = REFUSED.lock().unwrap_or_else(|e| e.into_inner());
+        refused.retain(|(_, at)| at.elapsed() < Duration::from_secs(60));
+        if refused.iter().any(|(h, _)| h == host(url)) {
+            bail!("{LIMITED}");
+        }
+    }
     for wait in [2, 5, 0] {
         if steam {
             let mut last = LAST_STEAM.lock().unwrap_or_else(|e| e.into_inner());
@@ -67,7 +83,10 @@ pub(crate) fn polite<T>(url: &str, mut send: impl FnMut() -> Result<T, ureq::Err
         match send() {
             Ok(v) => return Ok(v),
             Err(ureq::Error::StatusCode(429)) if wait > 0 => std::thread::sleep(Duration::from_secs(wait)),
-            Err(ureq::Error::StatusCode(429)) => bail!("Steam is limiting requests right now (HTTP 429). Wait a minute and try again."),
+            Err(ureq::Error::StatusCode(429)) => {
+                REFUSED.lock().unwrap_or_else(|e| e.into_inner()).push((host(url).into(), Instant::now()));
+                bail!("{LIMITED}")
+            }
             Err(e) => return Err(e).with_context(|| format!("requesting {url}")),
         }
     }
@@ -98,7 +117,7 @@ pub(crate) fn download(url: &str) -> Result<Vec<u8>> {
 
 fn get(url: &str, limit: std::time::Duration) -> Result<Vec<u8>> {
     polite(url, || {
-        let mut req = agent().get(url).config().timeout_global(Some(limit)).build().header("User-Agent", "pzmm");
+        let mut req = agent().get(url).config().timeout_global(Some(limit)).build().header("User-Agent", crate::USER_AGENT);
         if url.starts_with("https://api.github.com/")
             && let Some(token) = crate::settings::github_token()
         {
@@ -133,45 +152,47 @@ pub static STOP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::
 pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
     STOP.store(false, std::sync::atomic::Ordering::SeqCst);
     let mut out = vec![];
+    let mut workshop: Vec<String> = sources.iter().filter_map(|s| if let Source::Workshop(i) = s { Some(i.clone()) } else { None }).collect();
+    let mut unchecked = vec![];
+    if resolve && !workshop.is_empty() {
+        (workshop, unchecked) = expand_workshop(paths, workshop);
+    }
+    let mut tried: HashSet<String> = workshop.iter().cloned().collect();
+    loop {
+        fetch_workshop(paths, std::mem::take(&mut workshop), &mut out);
+        if unchecked.is_empty() {
+            break;
+        }
+        // Steam wouldn't show these items' pages: what their mod.info files require comes from
+        // the mod ID index instead, and so on for what that adds
+        let mut provided: HashSet<String> = store::scan(paths).unwrap_or_default().into_keys().collect();
+        let mut needs = vec![];
+        for f in &out {
+            let page_unread = workshop_item(&f.source).is_some_and(|i| unchecked.iter().any(|u| u == i));
+            for m in pz::find_mods(&f.root, 8) {
+                if page_unread {
+                    needs.extend(m.requires.iter().map(|r| (m.id.clone(), r.clone())));
+                }
+                provided.insert(m.id);
+            }
+        }
+        let (items, unresolved) = from_index(&needs, &provided, &pz::mod_index::kept_by_id(paths), &tried);
+        for (id, req, item) in &items {
+            crate::say!("requiresFromInfo", "{id} requires {req}: adding workshop:{item} (from its mod.info, as Steam didn't show the item's page)", id = id, req = req, item = item);
+        }
+        for (id, req) in unresolved {
+            crate::say!("requiresUnknown", "error: {id} requires {req}, and no Workshop item PZMM knows of provides it: find and install it yourself", id = id, req = req);
+        }
+        workshop = items.into_iter().map(|(.., item)| item).filter(|i| tried.insert(i.clone())).collect();
+        if workshop.is_empty() {
+            break;
+        }
+        unchecked = workshop.clone();
+    }
     let mut report = |r: Result<Fetched>| match r {
         Ok(f) => out.push(f),
         Err(e) => crate::log!("error: {e:#}"),
     };
-    let mut workshop: Vec<String> = sources.iter().filter_map(|s| if let Source::Workshop(i) = s { Some(i.clone()) } else { None }).collect();
-    if resolve && !workshop.is_empty() {
-        workshop = expand_workshop(paths, workshop);
-    }
-    if let Some(ws) = pz::workshop_dir() {
-        workshop.retain(|id| {
-            let root = ws.join(id);
-            if !steam_workshop::valid_id(id) || !root.is_dir() {
-                return true;
-            }
-            report(Ok(Fetched { source: format!("steam:{id}"), root, _temp: None, subscribed: true }));
-            false
-        });
-    }
-    workshop.retain(|id| {
-        let ok = steam_workshop::valid_id(id);
-        if !ok {
-            report(Err(anyhow::anyhow!("workshop:{id}: not a Workshop item id (a link needs ?id=…)")));
-        }
-        ok
-    });
-    if !workshop.is_empty() {
-        let refs: Vec<&str> = workshop.iter().map(String::as_str).collect();
-        match steam_workshop::download(paths, pz::STEAM_APP, &refs, &STOP) {
-            Ok(got) => {
-                for (id, dir) in got {
-                    report(
-                        dir.with_context(|| format!("workshop:{id}: download failed"))
-                            .map(|root| Fetched { source: format!("workshop:{id}"), root, _temp: None, subscribed: false }),
-                    );
-                }
-            }
-            Err(e) => crate::log!("error: {e:#}"),
-        }
-    }
     for s in sources {
         match s {
             Source::Workshop(_) => {}
@@ -185,6 +206,66 @@ pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
         }
     }
     out
+}
+
+/// Workshop `items` through Steam's own folder (subscriptions) or one SteamCMD session.
+fn fetch_workshop(paths: &Paths, mut items: Vec<String>, out: &mut Vec<Fetched>) {
+    let mut report = |r: Result<Fetched>| match r {
+        Ok(f) => out.push(f),
+        Err(e) => crate::log!("error: {e:#}"),
+    };
+    if let Some(ws) = pz::workshop_dir() {
+        items.retain(|id| {
+            let root = ws.join(id);
+            if !steam_workshop::valid_id(id) || !root.is_dir() {
+                return true;
+            }
+            report(Ok(Fetched { source: format!("steam:{id}"), root, _temp: None, subscribed: true }));
+            false
+        });
+    }
+    items.retain(|id| {
+        let ok = steam_workshop::valid_id(id);
+        if !ok {
+            report(Err(anyhow::anyhow!("workshop:{id}: not a Workshop item id (a link needs ?id=…)")));
+        }
+        ok
+    });
+    if items.is_empty() {
+        return;
+    }
+    let refs: Vec<&str> = items.iter().map(String::as_str).collect();
+    match steam_workshop::download(paths, pz::STEAM_APP, &refs, &STOP) {
+        Ok(got) => {
+            for (id, dir) in got {
+                report(
+                    dir.with_context(|| format!("workshop:{id}: download failed"))
+                        .map(|root| Fetched { source: format!("workshop:{id}"), root, _temp: None, subscribed: false }),
+                );
+            }
+        }
+        Err(e) => crate::log!("error: {e:#}"),
+    }
+}
+
+/// For each (mod, required mod id) in `needs` that nothing `provided` has: the most subscribed
+/// Workshop item holding it in the mod ID index `by_id` (one per required id, not one of
+/// `tried`), as (mod, required id, item); and those no known item provides.
+type Found = (Vec<(String, String, String)>, Vec<(String, String)>);
+fn from_index(needs: &[(String, String)], provided: &HashSet<String>, by_id: &std::collections::HashMap<String, Vec<String>>, tried: &HashSet<String>) -> Found {
+    let (mut found, mut unknown) = (vec![], vec![]);
+    let mut seen = HashSet::new();
+    for (id, req) in needs {
+        if provided.contains(req) || !seen.insert(req) {
+            continue;
+        }
+        match by_id.get(req).and_then(|items| items.first()) {
+            Some(item) if !tried.contains(item) => found.push((id.clone(), req.clone(), item.clone())),
+            Some(_) => {} // that item came already and doesn't hold it (or failed, which was said)
+            None => unknown.push((id.clone(), req.clone())),
+        }
+    }
+    (found, unknown)
 }
 
 /// Copy fetched mods into Zomboid/mods. Returns the installed mod ids.
@@ -239,8 +320,9 @@ pub fn workshop_available(paths: &Paths) -> HashSet<String> {
 }
 
 /// Replace collections with their items, then add required items (recursively) that the
-/// game can't already load. Network failures are logged and skipped.
-fn expand_workshop(paths: &Paths, ids: Vec<String>) -> Vec<String> {
+/// game can't already load. Also returns the items whose pages Steam didn't show (said once in
+/// the log), whose requirements weren't checked.
+pub fn expand_workshop(paths: &Paths, ids: Vec<String>) -> (Vec<String>, Vec<String>) {
     let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
     let collections = steam_workshop::collections(&refs).unwrap_or_else(|e| {
         crate::say!("collectionsFailed", "error: couldn't check for Workshop collections: {error}", error = format!("{e:#}"));
@@ -258,11 +340,16 @@ fn expand_workshop(paths: &Paths, ids: Vec<String>) -> Vec<String> {
     }
     let have = workshop_available(paths);
     let mut seen = HashSet::new();
-    let mut out = vec![];
+    let (mut out, mut unchecked, mut error) = (vec![], vec![], None);
     while let Some(id) = queue.pop_front() {
+        // a big collection reads hundreds of pages: Stop ends it with nothing to download
+        if STOP.load(std::sync::atomic::Ordering::SeqCst) {
+            return (vec![], vec![]);
+        }
         if !seen.insert(id.clone()) || out.len() >= 500 {
             continue;
         }
+        crate::progress(seen.len() - 1, seen.len() + queue.len());
         out.push(id.clone());
         match steam_workshop::required_items(&id) {
             Ok(req) => {
@@ -271,10 +358,16 @@ fn expand_workshop(paths: &Paths, ids: Vec<String>) -> Vec<String> {
                     queue.push_back(r);
                 }
             }
-            Err(e) => crate::say!("requiresFailed", "error: couldn't check what workshop:{id} requires: {error}", id = id, error = format!("{e:#}")),
+            Err(e) => {
+                error.get_or_insert(format!("{e:#}"));
+                unchecked.push(id);
+            }
         }
     }
-    out
+    if let Some(error) = error {
+        crate::say!("requiresUnchecked", "error: couldn't check the Workshop pages of {count} item(s) for what they require ({error}): {ids}", count = unchecked.len(), error = error, ids = unchecked.join(", "));
+    }
+    (out, unchecked)
 }
 
 /// When PZMM installed mod `id` (Unix seconds); v0.1 imports have no time, so their folder's age.
@@ -377,6 +470,47 @@ fn fetch_local(p: &Path) -> Result<Fetched> {
     bail!("{}: not a folder or .zip", abs.display())
 }
 
+/// A local HTTP server for tests: answers each request with the first route whose prefix matches
+/// its request line (`"GET /x"`), and keeps every request line and body it got.
+#[cfg(test)]
+pub(crate) type Seen = std::sync::Arc<std::sync::Mutex<Vec<(String, String)>>>;
+
+#[cfg(test)]
+pub(crate) fn fake_http(routes: Vec<(&'static str, u16, String)>) -> (String, Seen) {
+    use std::io::{BufRead, BufReader, Read, Write};
+    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let base = format!("http://127.0.0.1:{}", l.local_addr().unwrap().port());
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(vec![]));
+    let log = seen.clone();
+    std::thread::spawn(move || {
+        for s in l.incoming().flatten() {
+            let mut r = BufReader::new(s.try_clone().unwrap());
+            let (mut first, mut len) = (String::new(), 0);
+            if r.read_line(&mut first).is_err() || first.is_empty() {
+                continue;
+            }
+            loop {
+                let mut h = String::new();
+                r.read_line(&mut h).unwrap();
+                if h.trim().is_empty() {
+                    break;
+                }
+                if let Some(v) = h.to_ascii_lowercase().strip_prefix("content-length:") {
+                    len = v.trim().parse().unwrap();
+                }
+            }
+            let mut body = vec![0; len];
+            r.read_exact(&mut body).unwrap();
+            let first = first.trim().to_string();
+            let (status, reply) = routes.iter().find(|(p, ..)| first.starts_with(p)).map_or((404, "{}".to_string()), |(_, st, b)| (*st, b.clone()));
+            log.lock().unwrap().push((first, String::from_utf8(body).unwrap()));
+            let mut s = s;
+            let _ = write!(s, "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{reply}", reply.len());
+        }
+    });
+    (base, seen)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -391,6 +525,26 @@ mod tests {
         let start = std::time::Instant::now();
         assert!(get(&url, std::time::Duration::from_millis(300)).is_err());
         assert!(start.elapsed() < std::time::Duration::from_secs(5), "gave up after the limit, not never");
+    }
+
+    #[test]
+    fn a_host_refusing_requests_fails_fast() {
+        let (base, seen) = fake_http(vec![]);
+        REFUSED.lock().unwrap().push((host(&base).into(), std::time::Instant::now()));
+        let e = http_get(&format!("{base}/page")).unwrap_err().to_string();
+        assert!(e.contains("HTTP 429") && seen.lock().unwrap().is_empty(), "{e}");
+    }
+
+    #[test]
+    fn requirements_found_through_the_mod_index() {
+        let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let by_id = [("tsarslib".to_string(), s(&["2392709985", "111"])), ("Taken".to_string(), s(&["222"]))].into();
+        let needs = [("TMC_Trolley", "tsarslib"), ("Other", "tsarslib"), ("TMC_Trolley", "Have"), ("A", "Taken"), ("A", "Nowhere")].map(|(a, b)| (a.to_string(), b.to_string()));
+        let provided = HashSet::from(["Have".to_string()]);
+        let tried = HashSet::from(["222".to_string()]);
+        let (found, unknown) = from_index(&needs, &provided, &by_id, &tried);
+        assert_eq!(found, [("TMC_Trolley".to_string(), "tsarslib".to_string(), "2392709985".to_string())]);
+        assert_eq!(unknown, [("A".to_string(), "Nowhere".to_string())]);
     }
 
     #[test]

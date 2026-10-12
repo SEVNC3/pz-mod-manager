@@ -6,9 +6,11 @@ import { readFileSync, readdirSync } from "node:fs";
 
 const dir = new URL("../src/lib/locales/", import.meta.url);
 type Dict = { [k: string]: string | Dict };
+const PLURAL = new Set(["zero", "one", "two", "few", "many", "other"]);
 const flat = (d: Dict, pre = "", out: Record<string, string | Dict> = {}) => {
   for (const [k, v] of Object.entries(d)) {
-    const isPlural = typeof v === "object" && "other" in v;
+    // a plural leaf has only plural categories (a group that merely has an "other" key isn't one)
+    const isPlural = typeof v === "object" && "other" in v && Object.entries(v).every(([c, s]) => PLURAL.has(c) && typeof s === "string");
     if (typeof v === "string" || isPlural) out[pre + k] = v;
     else flat(v, `${pre}${k}.`, out);
   }
@@ -45,9 +47,11 @@ const sources = readdirSync(src, { recursive: true, encoding: "utf8" })
 const blank = (m: string) => m.replace(/[^\n]/g, " ");
 const IGNORE = "i18n-ignore";
 const KEYS = /^(Escape|Enter|Delete|Backspace|Tab|Home|End|Arrow[A-Z]\w+|Page[A-Z]\w+)$/; // e.key names
+let code = ""; // every source, for the unused-key check below
 
 for (const f of sources) {
   const text = readFileSync(new URL(f, src), "utf8");
+  code += text;
   const lines = text.split("\n");
   const flag = (i: number, what: string) => {
     if (!lines[i]?.includes(IGNORE) && !lines[i - 1]?.includes(IGNORE)) errors.push(`${f}:${i + 1}: ${what}`);
@@ -79,20 +83,38 @@ for (const f of sources) {
   }
 }
 
-// the backend's own wording: say!("key", "English") lines are backend.<key>, Check setup findings doctor.<key>;
+// the backend's own wording: say!("key", "English") lines are backend.<key>, keyed!("key", "English") errors errors.<key>, Check setup findings doctor.<key>, mod checks authoring.check.<key>;
 // en.json has the same English (an "error: " prefix only marks an error line), so the CLI and the app agree
 const rustDirs = ["../../crates/core/src/", "../src-tauri/src/"].map((d) => new URL(d, import.meta.url));
 const lit = String.raw`"((?:\\.|[^"\\])*)"`;
+const used = new Set<string>(); // keys the backend sends
+const prefixes: string[] = [];
 const english = (k: string, text: string, where: string) => {
+  used.add(k);
   if (!(k in en)) errors.push(`${where}: en.json has no ${k} ("${text}")`);
-  else if (en[k] !== text) errors.push(`${where}: en.json's ${k} "${en[k]}" isn't the backend's "${text}"`);
+  else {
+    // a plural object (by {count}) has the backend's English as its "other", with "item(s)" as "items"
+    const [ours, theirs] = typeof en[k] === "string" ? [en[k], text] : [(en[k] as Dict).other, text.replaceAll("(s)", "s")];
+    if (ours !== theirs) errors.push(`${where}: en.json's ${k} "${ours}" isn't the backend's "${theirs}"`);
+  }
 };
 for (const dir of rustDirs)
   for (const f of readdirSync(dir, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".rs"))) {
     const text = readFileSync(new URL(f.replaceAll("\\", "/"), dir), "utf8");
+    for (const m of text.matchAll(/format!\("([\w.]+\.)\{/g)) prefixes.push(m[1]); // format!("maps.err.{}", ..)
     for (const m of text.matchAll(new RegExp(String.raw`say!\(\s*"(\w+)",\s*` + lit, "g"))) english(`backend.${m[1]}`, JSON.parse(`"${m[2]}"`).replace(/^error: /, ""), f);
-    for (const m of text.matchAll(new RegExp(String.raw`\b(?:err|warn)\([^,()]+,\s*"(\w+)",\s*` + lit, "g"))) english(`doctor.${m[1]}`, JSON.parse(`"${m[2]}"`), f);
+    for (const m of text.matchAll(new RegExp(String.raw`keyed!\(\s*"(\w+)",\s*` + lit, "g"))) english(`errors.${m[1]}`, JSON.parse(`"${m[2]}"`), f);
+    for (const m of text.matchAll(new RegExp(String.raw`\b(?:err|warn|note)\([^,()]+,\s*"(\w+)",\s*` + lit, "g"))) english(`doctor.${m[1]}`, JSON.parse(`"${m[2]}"`), f);
+    for (const m of text.matchAll(new RegExp(String.raw`\b(?:bad|iffy)\(.*?,\s*"(\w+)",\s*` + lit, "g"))) english(`authoring.check.${m[1]}`, JSON.parse(`"${m[2]}"`), f);
   }
+
+// every en.json key is used: quoted whole somewhere, under a dynamic prefix (`kinds.${k}`, format!("maps.err.{}")),
+// or a quoted key with a dynamic suffix (`${key}For`)
+prefixes.push(...[...code.matchAll(/`([\w.]+)\$\{/g)].map((m) => m[1]));
+const suffixes = [...new Set([...code.matchAll(/\}(\w+)`/g)].map((m) => m[1]))];
+const quoted = (k: string) => ['"', "'", "`"].some((q) => code.includes(q + k + q));
+for (const k of Object.keys(en))
+  if (!used.has(k) && !quoted(k) && !prefixes.some((p) => k.startsWith(p)) && !suffixes.some((s) => k.endsWith(s) && quoted(k.slice(0, -s.length)))) errors.push(`en.json: ${k} is never used`);
 
 if (errors.length) {
   console.error(errors.join("\n"));

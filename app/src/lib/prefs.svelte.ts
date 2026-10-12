@@ -37,8 +37,19 @@ export const prefs = $state({
   mapsTab: read("pzmm.mapsTab", "mods"),
   mapsPanel: panelBox(),
   mapsMin: read("pzmm.mapsMin", "0") === "1",
+  /** The Maps tab draws the game's world map (water, roads, buildings) under the grid. */
+  mapsWorld: read("pzmm.mapsWorld", "1") === "1",
   /** The Workshop tab leaves out what's already installed or subscribed. */
   hideInstalled: read("pzmm.hideInstalled", "0") === "1",
+  /** My mods' search, filter, kind, tag, language filter and sort, as last left. */
+  modsSearch: read("pzmm.modsSearch", ""),
+  modsFilter: read("pzmm.modsFilter", "all"),
+  modsKind: read("pzmm.modsKind", ""),
+  modsTag: read("pzmm.modsTag", ""),
+  modsLang: read("pzmm.modsLang", "0") === "1",
+  modsSort: read("pzmm.modsSort", "order"),
+  /** Favourites go to the top of sorted and filtered lists. */
+  favFirst: read("pzmm.favFirst", "0") === "1",
 });
 
 /** Text colour on an accent fill: dark on light accents, white on dark ones. */
@@ -67,7 +78,15 @@ export function applyPrefs() {
     localStorage.setItem("pzmm.mapsTab", prefs.mapsTab);
     localStorage.setItem("pzmm.mapsPanel", JSON.stringify(prefs.mapsPanel));
     localStorage.setItem("pzmm.mapsMin", prefs.mapsMin ? "1" : "0");
+    localStorage.setItem("pzmm.mapsWorld", prefs.mapsWorld ? "1" : "0");
     localStorage.setItem("pzmm.perPage", String(prefs.perPage));
     localStorage.setItem("pzmm.hideInstalled", prefs.hideInstalled ? "1" : "0");
+    localStorage.setItem("pzmm.modsSearch", prefs.modsSearch);
+    localStorage.setItem("pzmm.modsFilter", prefs.modsFilter);
+    localStorage.setItem("pzmm.modsKind", prefs.modsKind);
+    localStorage.setItem("pzmm.modsTag", prefs.modsTag);
+    localStorage.setItem("pzmm.modsLang", prefs.modsLang ? "1" : "0");
+    localStorage.setItem("pzmm.modsSort", prefs.modsSort);
+    localStorage.setItem("pzmm.favFirst", prefs.favFirst ? "1" : "0");
   } catch {}
 }

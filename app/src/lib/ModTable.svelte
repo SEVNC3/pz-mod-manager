@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { describeSource, type ModRow, type Overlap, type Row, type Stats } from "./api";
-  import { fmtDate, fmtSize } from "./format";
+  import { api, describeSource, type ModRow, type Overlap, type Row, type Stats } from "./api";
+  import { fmtDate, fmtNum, fmtSize } from "./format";
   import { t } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
   import LayerIcon, { overlapLabel } from "./LayerIcon.svelte";
@@ -20,6 +20,11 @@
     overlaps,
     problems,
     updates,
+    favourites,
+    hidden,
+    kinds,
+    neededBy,
+    tags,
     collapsed,
     picked,
     selected,
@@ -48,6 +53,15 @@
     overlaps: Record<string, Overlap>;
     problems: Map<string, Problem>;
     updates: Set<string>;
+    /** Mods starred or hidden in the game's mod menu or a Workshop mod manager (see Lists). */
+    favourites: Set<string>;
+    hidden: Set<string>;
+    /** Each mod's kinds (framework, patch, ...), once read. */
+    kinds: Record<string, string[]>;
+    /** For each mod, the enabled mods that require it. */
+    neededBy: Map<string, string[]>;
+    /** The player's own tags, by mod id. */
+    tags: Record<string, string[]>;
     collapsed: Set<string>;
     picked: Set<string>;
     selected: string | null;
@@ -75,6 +89,9 @@
   };
 
   const place = $derived(new Map(order.map((id, i) => [id, i + 1])));
+  const names = $derived(new Map(rows.flatMap((r) => (r.kind === "mod" ? [[r.id, r.name || r.id]] : []))));
+  /** A translation's languages: a translation kind, or texts only in languages other than English. */
+  const langsOf = (r: ModRow) => (kinds[r.id]?.includes("translation") || (r.languages.length && !r.languages.includes("EN")) ? r.languages : []);
   /** Mods / enabled mods under each separator. */
   const sectionCounts = $derived.by(() => {
     const out = new Map<string, { total: number; on: number }>();
@@ -140,7 +157,7 @@
               <span class="tape" title={t("modTable.renameTip")}>{r.name}</span>
               {#if sectionCounts.get(r.name)}
                 {@const c = sectionCounts.get(r.name)!}
-                <span class="sec-count">{t("modTable.sectionCount", { on: c.on, total: c.total })}</span>
+                <span class="sec-count">{t("modTable.sectionCount", { on: fmtNum(c.on), total: fmtNum(c.total) })}</span>
               {/if}
               <button class="quiet icon sep-remove" disabled={busy || filtering} title={t("modTable.removeSepTip")}
                 aria-label={t("modTable.removeSepLabel", { name: r.name })} onclick={(e) => { e.stopPropagation(); onRemoveSep(i); }}><Icon name="trash" size={14} /></button>
@@ -149,9 +166,9 @@
         </tr>
       {:else}
         {@const src = describeSource(r.source)}
-        <tr class="mod" class:start class:end class:off={!r.on} class:selected={selected === r.id} class:picked={picked.size >= 2 && picked.has(r.id)} class:drop={dropShown === i} class:dragging={dragFrom === i || (sectionDrag && dragFrom !== null && i > dragFrom && i < dragEnd)}
+        <tr class="mod" class:start class:end class:off={!r.on} class:hidden-mod={hidden.has(r.id)} class:selected={selected === r.id} class:picked={picked.size >= 2 && picked.has(r.id)} class:drop={dropShown === i} class:dragging={dragFrom === i || (sectionDrag && dragFrom !== null && i > dragFrom && i < dragEnd)}
           data-index={i} tabindex="0" draggable={!filtering}
-          aria-selected={selected === r.id}
+          aria-current={selected === r.id || undefined}
           onclick={(e) => onRowClick(e, r.id)} onkeydown={(e) => onRowKey(e, i, r)}
           oncontextmenu={(e) => { e.preventDefault(); onMenu(r.id, e.clientX, e.clientY); }}
           ondragstart={() => (dragFrom = i)} ondragend={() => { dragFrom = dropAt = null; }}
@@ -164,8 +181,19 @@
           </td>
           <td class="num mono">{place.get(r.id) ?? ""}</td>
           <td class="name">
-            <span class="title" title={r.name || r.id}>{r.name || r.id}</span>
+            {#if favourites.has(r.id)}<span class="fav" title={t("modTable.favourite")}><Icon name="star" size={12} /></span>{/if}
+            <span class="title" title={r.author ? t("modTable.byAuthor", { name: r.name || r.id, author: r.author }) : r.name || r.id}>{r.name || r.id}</span>
             {#if prefs.showIds && r.name && r.name !== r.id}<span class="id mono">{r.id}</span>{/if}
+            {#each kinds[r.id] ?? [] as k}<span class="build-badge kind">{t(`kinds.${k}`)}</span>{/each}
+            {#if langsOf(r).length}
+              <!-- i18n-ignore: language codes as the game's Translate folders name them -->
+              <span class="build-badge kind mono" title={t("modTable.languagesTip", { languages: r.languages.join(", ") })}>{langsOf(r).slice(0, 3).join(" ")}{langsOf(r).length > 3 ? " …" : ""}</span>
+            {/if}
+            {#if neededBy.get(r.id)?.length}
+              {@const by = neededBy.get(r.id)!}
+              <span class="build-badge need" title={t("modTable.neededByTip", { names: by.map((x) => names.get(x) ?? x).join(", ") })}>{t("modTable.neededBy", { count: by.length })}</span>
+            {/if}
+            {#each tags[r.id] ?? [] as x}<span class="build-badge tag">{x}</span>{/each}
             {#if r.only41 && (build ?? 42) !== 41}
               <span class="build-badge" title={t("modTable.b41OnlyTip")}>{t("modTable.b41Only")}</span>
             {:else if r.only42 && build === 41}
@@ -189,7 +217,14 @@
             {:else if updates.has(r.id)}
               <span class="update"><Icon name="update" size={12} />{t("modTable.updateAvailable")}</span>
             {:else}
-              <span class="badge" data-kind={r.source.split(":")[0]} title={t(SOURCE_HINTS[r.source.split(":")[0]] ?? "modTable.sourceHint.manual")}>{src.label}</span>
+              {@const kind = r.source.split(":")[0]}
+              {@const hint = t(SOURCE_HINTS[kind] ?? "modTable.sourceHint.manual")}
+              {#if (kind === "workshop" || kind === "steam") && src.url}
+                <button class="badge go" data-kind={kind} title="{hint} · {t('modTable.openWorkshop')}"
+                  onclick={(e) => { e.stopPropagation(); api.openUrl(src.url!); }}><Icon name={kind === "steam" ? "check" : "steam"} size={12} />{kind === "steam" ? t("source.steam") : t("source.workshop")}</button>
+              {:else}
+                <span class="badge" data-kind="local" title={src.url ? `${hint} · ${src.url}` : hint}><Icon name="folder" size={12} />{t("source.localShort")}</span>
+              {/if}
             {/if}
           </td>
         </tr>
@@ -252,21 +287,27 @@
   tr.mod {
     cursor: default;
   }
-  /* hovered, picked and selected rows look like a selected tab: blood red under white text,
-     with a white bar on the left */
+  /* hovered, picked and selected rows look like a selected tab: the hover / selected overlay on the card
+     under on-selected text, with a chevron on the left */
   tr.mod:hover td {
-    background: color-mix(in oklab, var(--accent) 24%, var(--panel));
+    background: linear-gradient(var(--hover), var(--hover)), var(--panel);
   }
-  tr.mod.picked td {
-    background: color-mix(in oklab, var(--accent) 22%, var(--panel));
-  }
+  tr.mod.picked td,
   tr.mod.selected td {
-    background: color-mix(in oklab, var(--accent) 32%, var(--panel));
+    background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--panel);
   }
   tr.mod:hover td,
   tr.mod.picked td,
   tr.mod.selected td {
     color: var(--on-selected);
+    /* the highlight's 1px hover-line edge: top and bottom on every cell, the sides on the end ones */
+    box-shadow: inset 0 1px 0 var(--hover-line), inset 0 -1px 0 var(--hover-line);
+  }
+  :is(tr.mod:hover, tr.mod.picked, tr.mod.selected) td:first-child {
+    box-shadow: inset 0 1px 0 var(--hover-line), inset 0 -1px 0 var(--hover-line), inset 1px 0 0 var(--hover-line);
+  }
+  :is(tr.mod:hover, tr.mod.picked, tr.mod.selected) td:last-child {
+    box-shadow: inset 0 1px 0 var(--hover-line), inset 0 -1px 0 var(--hover-line), inset -1px 0 0 var(--hover-line);
   }
   tr.mod:hover .num,
   tr.mod.picked .num,
@@ -282,7 +323,24 @@
   tr.mod.picked .meta,
   tr.mod.selected .id,
   tr.mod.selected .meta {
-    color: rgb(255 255 255 / 0.72);
+    color: color-mix(in oklab, var(--on-selected) 80%, transparent);
+  }
+  /* pills and problems on a highlighted row take its text colour: muted grey and warning red fall under 4.5:1
+     on Daylight's pale red */
+  tr.mod:hover :is(.build-badge, .badge, .missing, .fav),
+  tr.mod.picked :is(.build-badge, .badge, .missing, .fav),
+  tr.mod.selected :is(.build-badge, .badge, .missing, .fav) {
+    color: var(--on-selected);
+  }
+  /* the row the details show, among picked ones: a solid on-selected edge where the others have the hover line */
+  tr.mod.selected td {
+    box-shadow: inset 0 2px 0 var(--on-selected), inset 0 -2px 0 var(--on-selected);
+  }
+  tr.mod.selected td:first-child {
+    box-shadow: inset 0 2px 0 var(--on-selected), inset 0 -2px 0 var(--on-selected), inset 2px 0 0 var(--on-selected);
+  }
+  tr.mod.selected td:last-child {
+    box-shadow: inset 0 2px 0 var(--on-selected), inset 0 -2px 0 var(--on-selected), inset -2px 0 0 var(--on-selected);
   }
   /* the hover/selection marker: a solid white chevron sitting on the card's left edge, half over it */
   tr.mod td:first-child {
@@ -321,7 +379,7 @@
   }
   /* where a drag will land: blood red feathering down from the row's top edge */
   tr.drop td {
-    background-image: linear-gradient(to bottom, color-mix(in oklab, var(--accent) 85%, white) 0, color-mix(in oklab, var(--accent) 55%, transparent) 3px, transparent 20px);
+    background-image: linear-gradient(to bottom, color-mix(in oklab, var(--accent) 85%, var(--on-accent)) 0, color-mix(in oklab, var(--accent) 55%, transparent) 3px, transparent 20px);
   }
   tr:focus-visible {
     outline: 2px solid var(--focus);
@@ -374,6 +432,34 @@
     border-radius: 4px;
     padding: 0 5px;
   }
+  /* a mod's kinds: quieter than the build warnings */
+  .build-badge.kind {
+    font-weight: 600;
+    color: var(--muted);
+    border-color: var(--line);
+  }
+  /* needed by an enabled mod: a fact, not a problem, so plain text rather than the warning red */
+  .build-badge.need {
+    color: var(--text);
+    border-color: var(--line);
+  }
+  /* the player's own tags: pills */
+  .build-badge.tag {
+    font-weight: 600;
+    color: var(--text);
+    border-color: var(--line);
+    border-radius: 999px;
+    background: var(--raised);
+  }
+  .fav {
+    color: var(--accent-text);
+    margin-right: 4px;
+    vertical-align: -1px;
+  }
+  tr.hidden-mod .title {
+    font-style: italic;
+    opacity: 0.7;
+  }
   .meta {
     width: 78px;
     text-align: right;
@@ -393,28 +479,51 @@
     text-align: right;
   }
   .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-size: 12px;
     color: var(--muted);
     border: 1px solid var(--line);
     border-radius: 999px;
     padding: 1px 8px;
   }
-  .badge[data-kind="github"],
-  .badge[data-kind="workshop"],
-  .badge[data-kind="local"] {
+  /* Subscribed: Steam keeps it; Workshop: PZMM's copy of a Workshop item; both open its page.
+     Local: anything from outside Steam (GitHub, a file, a folder) */
+  .badge.go {
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    background: none;
+  }
+  .badge[data-kind="workshop"] {
     color: var(--text);
+    border-color: currentColor;
+  }
+  .badge[data-kind="steam"] {
+    color: var(--ok);
+    border-color: color-mix(in oklab, var(--ok) 45%, transparent);
+  }
+  .badge.go:hover,
+  .badge.go:focus-visible {
+    color: var(--on-selected);
+    background: var(--hover);
+    border-color: var(--hover-line);
   }
   .update {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    color: var(--accent-text);
+    gap: 4px;
+    padding: 1px 8px;
+    border: 1px solid color-mix(in oklab, var(--warn) 45%, transparent);
+    border-radius: 999px;
+    color: var(--warn);
     font-weight: 700;
     font-size: 12px;
   }
   .missing {
     display: inline-block;
-    max-width: 320px;
+    max-width: 220px; /* the full text is its tooltip: the name keeps the room */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -429,6 +538,15 @@
   tr.tail td {
     height: 48px;
     border: 0;
+  }
+  /* a narrow list (a side panel open, long translations): size and date go before the name has to */
+  @container (max-width: 760px) {
+    .meta {
+      display: none;
+    }
+    .missing {
+      max-width: 140px;
+    }
   }
 
   /* signature: separators are masking-tape labels, like crates in a safehouse */

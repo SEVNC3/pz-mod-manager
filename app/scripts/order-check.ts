@@ -1,11 +1,11 @@
 // Self-check for src/lib/order.ts. Run: node scripts/order-check.ts
 import assert from "node:assert/strict";
-import { autosort, bisectRound, findProblems, groupByCategory, loadList, moveSection, orderOf, orphanedRequirements, placeInOrder, placeInSections, sortLoadOrder, sortMaps, autosortMaps, syncOrder } from "../src/lib/order.ts";
-import type { ModRow, Row } from "../src/lib/api.ts";
+import { modNeed, keptServers, autosort, bisectRound, dependants, findProblems, neededBy, sortByName, groupByCategory, loadList, moveSection, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortLoadOrder, sortMaps, autosortMaps, solveBackground, syncOrder } from "../src/lib/order.ts";
+import type { GameServer, ModRow, Row, ServerMods } from "../src/lib/api.ts";
 
-const mod = (id: string, on = true, extra: Partial<Record<"requires" | "incompatible" | "load_after" | "load_before", string[]>> = {}): Row => ({
+const mod = (id: string, on = true, extra: Partial<ModRow> = {}): Row => ({
   kind: "mod", id, name: id, source: "", on, missing: false,
-  requires: [], incompatible: [], load_after: [], load_before: [], only41: false, only42: false, ...extra,
+  requires: [], incompatible: [], load_after: [], load_before: [], load_first: "", load_last: "", pinned: false, author: "", only41: false, only42: false, ...extra,
 });
 const ids = (rows: Row[]) => rows.map((r) => (r.kind === "mod" ? `${r.on ? "+" : "-"}${r.id}` : `#${r.name}`)).join(" ");
 
@@ -43,6 +43,10 @@ const req = (id: string) => (id === "S1" ? ["Lib"] : []);
 const r1 = bisectRound(list, ["S1", "S2", "S3", "Lib"], req);
 assert.deepEqual(r1.testing, ["S1", "S2"]);
 assert.deepEqual([...r1.on].sort(), ["Keep", "Lib", "S1", "S2"]);
+// the logs' suspects go first: the first round tests just them
+const r0 = bisectRound(list, ["S3", "S1", "S2", "Lib"], req, 1);
+assert.deepEqual(r0.testing, ["S3"]);
+assert.deepEqual([...r0.on].sort(), ["Keep", "S3"]);
 
 // the library and the load order: the order follows the library's on/off, never its positions
 const lib: Row[] = [{ kind: "sep", name: "S" }, mod("A"), mod("B", false), mod("C"), mod("D")];
@@ -76,6 +80,11 @@ assert.equal(ids(auto), "+Ui +Core +Dep +App +Tr -Off");
 assert.deepEqual(orderOf(auto), ["Ui", "Core", "Dep", "App", "Tr"]);
 assert.equal(findProblems(auto).size, 0);
 
+// Mod Load Order Sorter's loadFirst / loadLast: "on" beats the tiers, "category" works within one; requirements still win
+const edges = autosort([mod("Tr"), mod("Last", true, { load_last: "on" }), mod("Core"), mod("App"), mod("First", true, { load_first: "on", requires: ["Dep"] }), mod("Dep"), mod("Top", true, { load_first: "category" })],
+  { Tr: "Translations", Last: "Gameplay", Core: "Libs", App: "Gameplay", First: "Gameplay", Dep: "Gameplay", Top: "Gameplay" }, order);
+assert.equal(ids(edges), "+Dep +First +Core +Top +App +Tr +Last");
+
 // the server's maps: mod maps before Muldraugh, otherwise as arranged
 assert.deepEqual(sortMaps(["B", "Muldraugh, KY", "A"]), ["B", "A", "Muldraugh, KY"]);
 // autosort: a map that builds on another (its lots= lists it) goes before it; the rest keep their order
@@ -100,5 +109,58 @@ const deps = [mod("A", true, { requires: ["Lib", "Patch"] }), mod("Patch", true,
 assert.deepEqual(orphanedRequirements(["A"], deps), ["Patch", "Lib", "Core"]);
 assert.deepEqual(orphanedRequirements(["B"], deps), [], "Shared is still needed by C; Gone isn't installed");
 assert.deepEqual(orphanedRequirements(["B", "C"], deps), ["Shared"]);
+
+// Import: the game's preset text, not just anything with a colon
+assert.deepEqual(parsePreset("My run:\\Brita;\\tsarslib,Authentic Z - Current"), { name: "My run", mods: ["Brita", "tsarslib", "Authentic Z - Current"] });
+assert.equal(parsePreset("https://github.com/x/y"), null, "a link isn't a preset");
+assert.equal(parsePreset(":A;B"), null);
+assert.equal(parsePreset("no colon here"), null);
+assert.equal(parsePreset("Server IP: 192.168.1.5"), null, "an address isn't a mod list");
+assert.equal(parsePreset("Note: back up first"), null, "a sentence uses neither ; nor \\");
+assert.equal(parsePreset("IPs: 10.0.0.1;10.0.0.2"), null, "mod ids have a letter in them");
+assert.deepEqual(parsePreset("Solo:\\Brita"), { name: "Solo", mods: ["Brita"] }, "one Build 42 id");
+assert.deepEqual(parsePreset("Run: A;B"), { name: "Run", mods: ["A", "B"] });
+
+// Needed by: enabled dependants only; disabling one asks about the whole chain
+const needs = [mod("Core"), mod("Lib", true, { requires: ["Core"] }), mod("App", true, { requires: ["Lib"] }), mod("Old", false, { requires: ["Core"] })];
+const nb = neededBy(needs);
+assert.deepEqual([...nb], [["Core", ["Lib"]], ["Lib", ["App"]]]);
+assert.deepEqual(dependants(["Core"], nb), ["Lib", "App"]);
+assert.deepEqual(dependants(["Core", "Lib"], nb), ["App"], "picked mods aren't listed again");
+
+// Sort A-Z: by name, loadFirst/loadLast kept at the ends, requirements still first
+const az = sortByName([mod("zeta", true, { name: "Zeta" }), mod("b", true, { name: "beta", requires: ["z2"] }), mod("z2", true, { name: "Zulu" }),
+  mod("last", true, { name: "Aaa", load_last: "on" }), mod("first", true, { name: "Yyy", load_first: "on" }), mod("off", false)] as ModRow[]);
+assert.equal(ids(az), "+first +zeta +z2 +b +last -off", "beta waits for Zulu, which it needs");
+
+
+// a server's mods to get: listed ones not installed; the ones it doesn't list counted apart, never as "ready"
+{
+  const srv = { mods: ["A", "B"], mod_count: 60 } as unknown as GameServer;
+  assert.deepEqual(modNeed(srv, new Set(["A", "B"])), { get: 0, total: 60, unlisted: 58 });
+  assert.deepEqual(modNeed(srv, new Set(["A"])), { get: 1, total: 60, unlisted: 58 });
+  const m = (id: string) => ({ id, status: "found", item: "", title: "", size: 0, updated: 0, preview: "" });
+  const full = { list: "full", mods: [m("A"), m("B"), m("C"), m("S")], server_only: ["S"], optional: [] } as unknown as ServerMods;
+  assert.deepEqual(modNeed(srv, new Set(["A"]), full), { get: 2, total: 3, unlisted: 0 }, "a full list counts exactly, server-only left out");
+}
+
+// Home's kept Popular list: anything not in its shape is dropped, never drawn
+{
+  for (const bad of [null, "", "{", "{}", "[1,2]", '{"at":1,"list":{}}', '{"at":"1","list":[]}', '{"at":1,"list":[1]}', '{"at":1,"list":[{"addr":"a:1","name":"x"}]}'])
+    assert.equal(keptServers(bad), null, `kept ${bad} is dropped`);
+  const s = { addr: "a:1", name: "x", mods: [] };
+  assert.deepEqual(keptServers(JSON.stringify({ at: 5, steam: true, list: [s], error: "e" })), { at: 5, steam: true, list: [s] }, "a kept list reads back");
+}
+
+// a background picture lined up from two spots: scale and offset per axis, refused when it can't be
+{
+  const bg = solveBackground({ img: [100, 50], world: [3000, 9000] }, { img: [500, 450], world: [5000, 10000] })!;
+  assert.deepEqual(bg, { scale: [5, 2.5], offset: [2500, 8875] });
+  const at = (p: number[]) => [p[0] * bg.scale[0] + bg.offset[0], p[1] * bg.scale[1] + bg.offset[1]];
+  assert.deepEqual([at([100, 50]), at([500, 450])], [[3000, 9000], [5000, 10000]], "both spots land where they were put");
+  assert.equal(solveBackground({ img: [10, 10], world: [0, 0] }, { img: [10.5, 90], world: [300, 300] }), null, "spots in one column");
+  assert.equal(solveBackground({ img: [10, 10], world: [300, 0] }, { img: [90, 90], world: [0, 300] }), null, "mirrored across");
+  assert.equal(solveBackground({ img: [10, 10], world: [0, 0] }, { img: [90, 90], world: [0, 300] }), null, "flat across");
+}
 
 console.log("order-check: ok");

@@ -31,6 +31,27 @@ pub struct Settings {
     pub launch_args: String,
     /// Autosort a new profile's library the first time it's used.
     pub autosort_new: bool,
+    /// Favourites go on and hidden mods off in every profile made or switched to.
+    pub keep_marks: bool,
+    /// Back up the last played save when PZMM starts the game.
+    pub save_backup_launch: bool,
+    /// Back up the saves played when a game PZMM started closes.
+    pub save_backup_exit: bool,
+    /// Automatic backups kept per save (named slots are never removed).
+    pub save_backup_keep: u32,
+    /// Closing the window keeps PZMM running in the tray, so server schedules, update checks and
+    /// crash watch go on; the tray's Quit ends it.
+    pub tray: bool,
+    /// While a game PZMM started runs, back up the saves played every this many minutes (0: off).
+    pub save_backup_every: u32,
+    /// The server browser shows countries, asking api.country.is with the servers' addresses (see `pz::geoip`).
+    pub countries: bool,
+    /// Start PZMM, minimised to the tray, when the player signs in (Windows) or logs in (Linux).
+    pub autostart: bool,
+    /// Desktop notifications while PZMM's window isn't in front: "crash" (a server crashed),
+    /// "restart" (a server's mods updated: it needs a restart), "downloads" (installs and
+    /// updates finished) and "favourites" (a favourite server came online with room).
+    pub notify: Vec<String>,
 }
 
 impl Default for Settings {
@@ -46,6 +67,15 @@ impl Default for Settings {
             backup_cap_mb: 0,
             launch_args: String::new(),
             autosort_new: true,
+            keep_marks: false,
+            save_backup_launch: false,
+            save_backup_exit: true,
+            save_backup_keep: 5,
+            tray: false,
+            save_backup_every: 0,
+            countries: false,
+            autostart: false,
+            notify: ["crash", "restart", "downloads"].map(String::from).to_vec(),
         }
     }
 }
@@ -60,61 +90,120 @@ pub fn load() -> Settings {
     if cfg!(test) { Settings::default() } else { load_from(&path()) }
 }
 
-pub fn load_from(path: &Path) -> Settings {
-    let Ok(text) = fs::read_to_string(path) else { return Settings::default() };
-    serde_json::from_str(&text).unwrap_or_else(|e| {
-        // keep the broken file: the next save would otherwise replace it with defaults unseen
-        let bad = path.with_extension("json.bad");
-        if fs::read(&bad).ok().as_deref() != Some(text.as_bytes()) {
-            let _ = fs::copy(path, &bad);
-            crate::say!("settingsDamaged", "error: {file} is damaged ({error}); kept a copy as {copy} and used the default settings", file = path.display(), error = e, copy = bad.display());
-        }
-        Settings::default()
-    })
+fn load_from(path: &Path) -> Settings {
+    // a damaged file is kept: the next save would otherwise replace it with defaults unseen
+    crate::read_json(path).unwrap_or_default()
 }
 
 pub fn save(s: &Settings) -> Result<()> {
     save_to(&path(), s)
 }
 
-pub fn save_to(path: &Path, s: &Settings) -> Result<()> {
+fn save_to(path: &Path, s: &Settings) -> Result<()> {
     if let Some(d) = path.parent() {
         fs::create_dir_all(d)?;
     }
     crate::write_atomic(path, serde_json::to_string_pretty(s)?).with_context(|| format!("saving {}", path.display()))
 }
 
-// --- GitHub token (raises GitHub's rate limit), kept in the OS credential store ---
+// --- secrets (the GitHub token, the Steam Web API key, server passwords), kept in the OS credential store ---
 
-fn token_entry() -> Result<keyring::Entry> {
-    keyring::Entry::new("pzmm", "github-token").map_err(|e| anyhow::anyhow!("the system's credential store isn't available: {e}"))
+fn entry(name: &str) -> Result<keyring::Entry> {
+    keyring::Entry::new("pzmm", name).map_err(|e| anyhow::anyhow!("the system's credential store isn't available: {e}"))
 }
 
-/// `GITHUB_TOKEN`, else the saved token. Unit tests never read the credential store.
+/// The Steam Web API key (it lists servers).
+pub const STEAM_KEY: &str = "steam-web-api-key";
+
+/// A server's remembered join password, by its `ip:port`.
+pub fn server_password(addr: &str) -> String {
+    format!("server-password:{addr}")
+}
+
+/// A saved secret: the credential store's, else (only when the store has none) the one in
+/// [`secrets_file`]. Unit tests never read the credential store.
+pub fn secret(name: &str) -> Option<String> {
+    if cfg!(test) {
+        return None;
+    }
+    entry(name).ok().and_then(|e| e.get_password().ok()).or_else(|| file_secret(&secrets_file(), name)).filter(|t| !t.trim().is_empty())
+}
+
+/// Save a secret as it is (spaces and all), or forget it when `value` is blank. When the
+/// credential store can't take it (a Linux host with no Secret Service) it goes in [`secrets_file`].
+pub fn set_secret(name: &str, value: &str) -> Result<()> {
+    let value = if value.trim().is_empty() { "" } else { value };
+    let stored = entry(name).and_then(|e| match value {
+        "" => match e.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!("forgetting it in the credential store: {err}")),
+        },
+        v => e.set_password(v).map_err(|err| anyhow::anyhow!("saving it in the credential store: {err}")),
+    });
+    match stored {
+        // in the store: a copy the file kept from when the store failed goes (a forgotten one too)
+        Ok(()) => set_file_secret(&secrets_file(), name, "").context("forgetting it in secrets.json"),
+        Err(e) => {
+            static SAID: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+            if !value.is_empty() && !SAID.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                crate::say!("secretsFile", "The system's credential store isn't available ({error}), so PZMM keeps passwords and keys in {file}", error = format!("{e:#}"), file = secrets_file().display());
+            }
+            set_file_secret(&secrets_file(), name, value).with_context(|| format!("{e:#}"))
+        }
+    }
+}
+
+/// Where secrets go when the credential store isn't there: `<PZMM data>/secrets.json`, readable by
+/// this user only.
+fn secrets_file() -> PathBuf {
+    crate::pz::Paths::detect().data.join("secrets.json")
+}
+
+fn file_secret(file: &Path, name: &str) -> Option<String> {
+    crate::read_json::<BTreeMap<String, String>>(file).ok()?.remove(name)
+}
+
+fn set_file_secret(file: &Path, name: &str, value: &str) -> Result<()> {
+    // nothing to forget: no data lock taken (a caller may hold it)
+    if value.is_empty() && file_secret(file, name).is_none() {
+        return Ok(());
+    }
+    let dir = file.parent().filter(|d| d.is_absolute()).context("PZMM has no data folder")?;
+    let _lock = crate::lock_dir(dir)?;
+    let mut all: BTreeMap<String, String> = crate::read_json(file)?;
+    let changed = if value.is_empty() { all.remove(name).is_some() } else { all.insert(name.into(), value.into()).as_deref() != Some(value) };
+    if !changed {
+        return Ok(());
+    }
+    // made for this user alone before anything is written to it, then swapped in
+    let tmp = file.with_extension("json.pzmm-new");
+    let _ = fs::remove_file(&tmp);
+    let mut o = fs::OpenOptions::new();
+    o.write(true).create_new(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut o, 0o600);
+    std::io::Write::write_all(&mut o.open(&tmp)?, serde_json::to_string_pretty(&all)?.as_bytes())?;
+    fs::rename(&tmp, file)?;
+    Ok(())
+}
+
+/// `GITHUB_TOKEN`, else the saved token (it raises GitHub's rate limit).
 pub fn github_token() -> Option<String> {
-    pick_token(std::env::var("GITHUB_TOKEN").ok(), || if cfg!(test) { None } else { token_entry().ok()?.get_password().ok() })
+    pick_token(std::env::var("GITHUB_TOKEN").ok(), || secret("github-token"))
 }
 
 fn pick_token(env: Option<String>, saved: impl FnOnce() -> Option<String>) -> Option<String> {
     env.filter(|t| !t.trim().is_empty()).or_else(saved).filter(|t| !t.trim().is_empty())
 }
 
-/// Whether a token is saved in the credential store.
+/// Whether a GitHub token is saved in the credential store.
 pub fn token_saved() -> bool {
-    token_entry().is_ok_and(|e| e.get_password().is_ok())
+    secret("github-token").is_some()
 }
 
-/// Save the token, or forget it when `token` is empty.
+/// Save the GitHub token, or forget it when `token` is empty.
 pub fn set_github_token(token: &str) -> Result<()> {
-    let e = token_entry()?;
-    let token = token.trim();
-    if token.is_empty() {
-        return match e.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!("forgetting the GitHub token: {err}")),
-        };
-    }
-    e.set_password(token).map_err(|err| anyhow::anyhow!("saving the GitHub token: {err}"))
+    set_secret("github-token", token.trim()).context("the GitHub token")
 }
 
 #[cfg(test)]
@@ -140,6 +229,22 @@ mod tests {
         assert_eq!(load_from(&p), Settings::default());
         assert_eq!(fs::read_to_string(p.with_extension("json.bad")).unwrap(), "{ not json", "the damaged file is kept");
         assert_eq!(fs::read_to_string(&p).unwrap(), "{ not json", "and not overwritten by reading");
+    }
+
+    #[test]
+    fn secrets_fall_back_to_a_private_file() {
+        let t = tempfile::tempdir().unwrap();
+        let f = t.path().join("secrets.json");
+        assert_eq!(file_secret(&f, "a"), None);
+        set_file_secret(&f, "a", " pw with spaces ").unwrap();
+        set_file_secret(&f, "b", "x").unwrap();
+        assert_eq!(file_secret(&f, "a").as_deref(), Some(" pw with spaces "), "kept as typed");
+        set_file_secret(&f, "a", "").unwrap();
+        assert_eq!((file_secret(&f, "a"), file_secret(&f, "b").as_deref()), (None, Some("x")));
+        #[cfg(unix)]
+        assert_eq!(std::os::unix::fs::PermissionsExt::mode(&fs::metadata(&f).unwrap().permissions()) & 0o777, 0o600);
+        assert!(set_file_secret(Path::new("secrets.json"), "a", "x").is_err(), "never next to wherever PZMM runs");
+        assert!(set_file_secret(Path::new("secrets.json"), "a", "").is_ok(), "nothing to forget: nothing locked or written");
     }
 
     #[test]

@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{Paths, is_version_dir};
 use crate::sources::steam_manifest::Session;
+use crate::read_json;
 use crate::sources::workshop_item;
 use crate::sources::steam_workshop::{self, Item};
 use crate::store;
@@ -113,6 +114,23 @@ impl MapMod {
     }
 }
 
+/// Maps that clash, as (i, j, folder): both add the same map folder (`Some`), or they cover some of
+/// the same cells (`None`) and neither is built on the other (an add-on overlaps the map it requires on purpose).
+pub fn clashes(on: &[&MapMod]) -> Vec<(usize, usize, Option<String>)> {
+    let cells: Vec<HashSet<&Cell>> = on.iter().map(|m| m.cells().collect()).collect();
+    let mut out = vec![];
+    for (i, a) in on.iter().enumerate() {
+        for (j, b) in on.iter().enumerate().skip(i + 1) {
+            if let Some(f) = a.maps.iter().find(|f| b.maps.iter().any(|g| g.folder == f.folder)) {
+                out.push((i, j, Some(f.folder.clone())));
+            } else if !a.requires.contains(&b.id) && !b.requires.contains(&a.id) && !cells[i].is_disjoint(&cells[j]) {
+                out.push((i, j, None));
+            }
+        }
+    }
+    out
+}
+
 /// `world_X_Y.lotpack` or `X_Y.lotheader` -> (X, Y).
 fn cell_of(name: &str) -> Option<Cell> {
     let xy = name.strip_prefix("world_").and_then(|n| n.strip_suffix(".lotpack")).or_else(|| name.strip_suffix(".lotheader"))?;
@@ -197,7 +215,7 @@ impl Cache {
         let entry = match self.old.get(&key) {
             Some(e) if e.stamp == stamp => e.clone(),
             _ => {
-                let cells = fs::read_to_string(&file).map(|t| water_cells(&t, if build == 41 { 300 } else { 256 })).unwrap_or_default();
+                let cells = fs::read(&file).map(|b| water_cells(&WorldMap::from_xml(&super::decode_text(&b)), if build == 41 { 300 } else { 256 })).unwrap_or_default();
                 Entry { stamp, map: MapFolder { folder: "water".into(), cells, ..Default::default() } }
             }
         };
@@ -346,45 +364,179 @@ pub fn vanilla(game: Option<&Path>, build: u8, cache: &mut Cache) -> (Vec<String
     (folders, (game_build == Some(build)).then_some(cells))
 }
 
-/// Cells (`cell_size` tiles: 256 in B42, 300 in B41) that are mostly water on the game's
-/// world map. worldmap.xml draws features as polygons inside 300-tile cells, one `<point>`
-/// per line; a cell counts when at least half of 16 sample points fall in a water polygon.
-pub fn water_cells(xml: &str, cell_size: i32) -> Vec<Cell> {
-    let attr = |l: &str, k: &str| -> i32 { l.split_once(&format!(" {k}=\"")).and_then(|(_, v)| v.split('"').next()?.parse().ok()).unwrap_or(0) };
-    let (mut origin, mut ring, mut rings, mut water) = ((0, 0), vec![], vec![], false);
+/// What the in-game map draws, in world tiles (the same in B41 and B42): polygons per layer,
+/// each a list of rings (`[x0, y0, x1, y1, ...]`, the outline then any holes), and roads drawn
+/// as lines.
+#[derive(Debug, Default, PartialEq, Serialize)]
+pub struct WorldMap {
+    pub water: Vec<Vec<Vec<i32>>>,
+    pub roads: Vec<Vec<Vec<i32>>>,
+    pub buildings: Vec<Vec<Vec<i32>>>,
+    pub road_lines: Vec<Vec<i32>>,
+}
+
+impl WorldMap {
+    /// File one feature by its property names; what the grid doesn't draw (forest, labels) is dropped.
+    fn add(&mut self, line: bool, rings: Vec<Vec<i32>>, keys: &[&str]) {
+        let has = |k: &str| keys.contains(&k);
+        if rings.is_empty() {
+        } else if line {
+            if has("highway") {
+                self.road_lines.extend(rings);
+            }
+        } else if has("water") {
+            self.water.push(rings);
+        } else if has("building") {
+            self.buildings.push(rings);
+        } else if has("highway") || has("railway") {
+            self.roads.push(rings);
+        }
+    }
+
+    fn extend(&mut self, m: WorldMap) {
+        self.water.extend(m.water);
+        self.roads.extend(m.roads);
+        self.buildings.extend(m.buildings);
+        self.road_lines.extend(m.road_lines);
+    }
+
+    /// worldmap.xml: 300-tile cells, one element per line as WorldEd writes it.
+    pub fn from_xml(xml: &str) -> WorldMap {
+        let attr = |l: &str, k: &str| -> i32 { l.split_once(&format!(" {k}=\"")).and_then(|(_, v)| v.split('"').next()?.parse().ok()).unwrap_or(0) };
+        let mut out = WorldMap::default();
+        let (mut origin, mut ring, mut rings, mut keys, mut kind) = ((0, 0), vec![], vec![], vec![], "");
+        for l in xml.lines().map(str::trim) {
+            if l.starts_with("<cell ") {
+                origin = (attr(l, "x") * 300, attr(l, "y") * 300);
+            } else if l.starts_with("<feature") {
+                (rings, keys, kind) = (vec![], vec![], "");
+            } else if let Some(t) = l.strip_prefix("<geometry type=\"") {
+                kind = t.split('"').next().unwrap_or_default();
+            } else if l.starts_with("<point ") {
+                ring.extend([origin.0 + attr(l, "x"), origin.1 + attr(l, "y")]);
+            } else if l.starts_with("</coordinates") {
+                rings.push(std::mem::take(&mut ring));
+            } else if let Some(k) = l.strip_prefix("<property name=\"") {
+                keys.push(k.split('"').next().unwrap_or_default());
+            } else if l.starts_with("</feature") && kind != "Point" {
+                out.add(kind == "LineString", std::mem::take(&mut rings), &keys);
+            }
+        }
+        out
+    }
+
+    /// worldmap.xml.bin version 2 (the file B42 loads): "IGMB", version, cell size, width and
+    /// height in cells, a string table, then per cell either -1 or its x, y and features (geometry
+    /// type as a string index, u8 ring count, per ring a u16 point count and i16 x,y pairs relative
+    /// to the cell, u8 property count and name,value string indexes). None when it isn't one.
+    pub fn from_bin(b: &[u8]) -> Option<WorldMap> {
+        let mut r = Reader { b, at: 0 };
+        if r.bytes(4)? != b"IGMB" {
+            return None;
+        }
+        let (version, size, w, h) = (r.i32()?, r.i32()?, r.i32()?, r.i32()?);
+        if version != 2 || size <= 0 {
+            return None;
+        }
+        let strings: Vec<&str> = (0..r.i32()?).map(|_| r.u16().and_then(|n| r.bytes(n as usize)).map(|s| std::str::from_utf8(s).unwrap_or_default())).collect::<Option<_>>()?;
+        let (mut out, mut seen) = (WorldMap::default(), HashSet::new());
+        for _ in 0..w.checked_mul(h)? {
+            let cx = r.i32()?;
+            if cx == -1 {
+                continue;
+            }
+            let (cy, features) = (r.i32()?, r.i32()?);
+            for _ in 0..features {
+                let kind = *strings.get(r.u16()? as usize)?;
+                let rings: Vec<Vec<i32>> = (0..r.u8()?)
+                    .map(|_| {
+                        let n = r.u16()? as usize;
+                        let pts = r.bytes(n * 4)?;
+                        Some(pts.chunks(2).enumerate().map(|(i, c)| i16::from_le_bytes([c[0], c[1]]) as i32 + if i % 2 == 0 { cx } else { cy } * size).collect())
+                    })
+                    .collect::<Option<_>>()?;
+                let keys: Vec<&str> = (0..r.u8()?).map(|_| r.u16().zip(r.u16()).and_then(|(k, _)| strings.get(k as usize).copied())).collect::<Option<_>>()?;
+                // a feature crossing cells is stored once per cell
+                if kind != "Point" && seen.insert(rings.clone()) {
+                    out.add(kind == "LineString", rings, &keys);
+                }
+            }
+        }
+        Some(out)
+    }
+}
+
+/// Little-endian reads over a byte slice; None past the end.
+struct Reader<'a> {
+    b: &'a [u8],
+    at: usize,
+}
+
+impl<'a> Reader<'a> {
+    fn bytes(&mut self, n: usize) -> Option<&'a [u8]> {
+        let s = self.b.get(self.at..self.at.checked_add(n)?)?;
+        self.at += n;
+        Some(s)
+    }
+    fn u8(&mut self) -> Option<u8> {
+        Some(self.bytes(1)?[0])
+    }
+    fn u16(&mut self) -> Option<u16> {
+        Some(u16::from_le_bytes(self.bytes(2)?.try_into().ok()?))
+    }
+    fn i32(&mut self) -> Option<i32> {
+        Some(i32::from_le_bytes(self.bytes(4)?.try_into().ok()?))
+    }
+}
+
+/// One map folder's world map: worldmap.xml.bin when it's the version B42 reads, else
+/// worldmap.xml. None when the folder has neither (the grid stays plain there).
+pub fn world_map(dir: &Path) -> Option<WorldMap> {
+    fs::read(dir.join("worldmap.xml.bin"))
+        .ok()
+        .and_then(|b| WorldMap::from_bin(&b))
+        .or_else(|| fs::read(dir.join("worldmap.xml")).ok().map(|b| WorldMap::from_xml(&super::decode_text(&b))))
+}
+
+/// The world maps of every map folder under `roots` (the game folder, or a mod's version folders), together.
+pub fn world_maps(roots: &[PathBuf]) -> WorldMap {
+    let mut out = WorldMap::default();
+    for e in roots.iter().flat_map(|r| fs::read_dir(r.join("media/maps")).into_iter().flatten().flatten()) {
+        out.extend(world_map(&e.path()).unwrap_or_default());
+    }
+    out
+}
+
+/// A mod's world maps for `build` (see `pick_roots`).
+pub fn mod_world(mod_dir: &Path, build: u8) -> WorldMap {
+    world_maps(&map_roots(mod_dir, build))
+}
+
+/// Cells (`cell_size` tiles: 256 in B42, 300 in B41) that are mostly water on the world map:
+/// a cell counts when at least half of 16 sample points fall in a water polygon.
+pub fn water_cells(map: &WorldMap, cell_size: i32) -> Vec<Cell> {
     let mut hits: BTreeMap<Cell, u32> = BTreeMap::new();
-    for l in xml.lines().map(str::trim) {
-        if l.starts_with("<cell ") {
-            origin = (attr(l, "x") * 300, attr(l, "y") * 300);
-        } else if l.starts_with("<feature") {
-            (rings, water) = (vec![], false);
-        } else if l.starts_with("<point ") {
-            ring.push(((origin.0 + attr(l, "x")) as f64, (origin.1 + attr(l, "y")) as f64));
-        } else if l.starts_with("</coordinates") {
-            rings.push(std::mem::take(&mut ring));
-        } else if l.starts_with("<property name=\"water\"") {
-            water = true;
-        } else if l.starts_with("</feature") && water {
-            let pts = || rings.iter().flatten();
-            let (x0, x1) = (pts().map(|p| p.0).fold(f64::MAX, f64::min), pts().map(|p| p.0).fold(f64::MIN, f64::max));
-            let (y0, y1) = (pts().map(|p| p.1).fold(f64::MAX, f64::min), pts().map(|p| p.1).fold(f64::MIN, f64::max));
-            let size = cell_size as f64;
-            for cx in (x0 / size).floor() as i32..=(x1 / size).floor() as i32 {
-                for cy in (y0 / size).floor() as i32..=(y1 / size).floor() as i32 {
-                    for i in 0..16 {
-                        let (px, py) = ((cx as f64 + (i % 4) as f64 / 4.0 + 0.125) * size, (cy as f64 + (i / 4) as f64 / 4.0 + 0.125) * size);
-                        // even-odd over every ring (holes included)
-                        let mut inside = false;
-                        for r in &rings {
-                            for (a, b) in r.iter().zip(r.iter().cycle().skip(1)) {
-                                if (a.1 > py) != (b.1 > py) && px < a.0 + (py - a.1) * (b.0 - a.0) / (b.1 - a.1) {
-                                    inside = !inside;
-                                }
+    for rings in &map.water {
+        let rings: Vec<Vec<(f64, f64)>> = rings.iter().map(|r| r.chunks(2).map(|p| (p[0] as f64, p[1] as f64)).collect()).collect();
+        let pts = || rings.iter().flatten();
+        let (x0, x1) = (pts().map(|p| p.0).fold(f64::MAX, f64::min), pts().map(|p| p.0).fold(f64::MIN, f64::max));
+        let (y0, y1) = (pts().map(|p| p.1).fold(f64::MAX, f64::min), pts().map(|p| p.1).fold(f64::MIN, f64::max));
+        let size = cell_size as f64;
+        for cx in (x0 / size).floor() as i32..=(x1 / size).floor() as i32 {
+            for cy in (y0 / size).floor() as i32..=(y1 / size).floor() as i32 {
+                for i in 0..16 {
+                    let (px, py) = ((cx as f64 + (i % 4) as f64 / 4.0 + 0.125) * size, (cy as f64 + (i / 4) as f64 / 4.0 + 0.125) * size);
+                    // even-odd over every ring (holes included)
+                    let mut inside = false;
+                    for r in &rings {
+                        for (a, b) in r.iter().zip(r.iter().cycle().skip(1)) {
+                            if (a.1 > py) != (b.1 > py) && px < a.0 + (py - a.1) * (b.0 - a.0) / (b.1 - a.1) {
+                                inside = !inside;
                             }
                         }
-                        if inside {
-                            *hits.entry((cx, cy)).or_default() += 1;
-                        }
+                    }
+                    if inside {
+                        *hits.entry((cx, cy)).or_default() += 1;
                     }
                 }
             }
@@ -622,25 +774,6 @@ fn merge_seed(all: &mut BTreeMap<String, Checked>, seed: &BTreeMap<String, Check
     }
 }
 
-/// One of PZMM's JSON files: missing is empty; one that doesn't parse (damaged, or an older
-/// format) is kept as `<file>.bad` and starts over empty; one that can't be read is an error
-/// (saving over it would wipe it).
-fn read_json<T: serde::de::DeserializeOwned + Default>(file: &Path) -> Result<T> {
-    let bytes = match fs::read(file) {
-        Ok(b) => b,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(T::default()),
-        Err(e) => return Err(e).with_context(|| format!("reading {}", file.display())),
-    };
-    Ok(serde_json::from_slice(&bytes).unwrap_or_else(|e| {
-        let bad = file.with_extension("json.bad");
-        if fs::read(&bad).ok().as_deref() != Some(bytes.as_slice()) {
-            let _ = fs::copy(file, &bad);
-            crate::say!("fileDamaged", "error: {file} is damaged ({error}); kept a copy as {copy} and started over", file = file.display(), error = e, copy = bad.display());
-        }
-        T::default()
-    }))
-}
-
 /// Workshop items read without installing, by item id, with the seed merged in (see
 /// `merge_seed`; a damaged file starts over from the seed, see `read_json`).
 fn read_checked(paths: &Paths) -> Result<BTreeMap<String, Checked>> {
@@ -660,7 +793,7 @@ pub fn checked(paths: &Paths) -> BTreeMap<String, Checked> {
 /// Add or replace entries in maps-checked.json (the scan and "Check" can both write, in the
 /// app and the CLI at once): under the data lock, re-read and merged per item, the newer
 /// `updated` winning.
-pub fn save_checked(paths: &Paths, new: BTreeMap<String, Checked>) -> Result<()> {
+fn save_checked(paths: &Paths, new: BTreeMap<String, Checked>) -> Result<()> {
     if new.is_empty() {
         return Ok(());
     }
@@ -689,18 +822,12 @@ pub fn write_seed(paths: &Paths, out: &Path) -> Result<usize> {
     Ok(all.len())
 }
 
-/// The map mods in an item's file list (paths with `/`) for `build`, by the rules `mod_maps`
-/// reads folders with, and how many mods it holds on `build`. `read` gives a listed file's
-/// text: mod.info (id, name, require=), map.info (title, lots=) and B42 title files; nothing
-/// else is fetched.
-pub fn from_listing(item: &str, files: &[String], build: u8, read: &mut dyn FnMut(&str) -> Result<String>) -> Result<(Vec<MapMod>, usize)> {
+/// The mods in an item's file list (paths with `/`) on `build`: each mod's folder, the
+/// mod.info the game reads there (the root one in B41, the newest version folder's in B42)
+/// and its version folders.
+pub(crate) fn listing_mods(files: &[String], build: u8) -> Vec<(String, String, Vec<String>)> {
     let lower: Vec<String> = files.iter().map(|f| f.to_ascii_lowercase()).collect();
     let find = |p: &str| lower.iter().position(|l| *l == p.to_ascii_lowercase()).map(|i| files[i].clone());
-    let split = |p: &str| -> (String, String) {
-        let (a, b) = p.rsplit_once('/').unwrap_or(("", p));
-        (a.to_string(), b.to_string())
-    };
-    let join = |a: &str, b: &str| if a.is_empty() || b.is_empty() { format!("{a}{b}") } else { format!("{a}/{b}") };
     // mod folders: where each mod.info sits (a version folder's parent)
     let mut dirs: Vec<String> = vec![];
     for f in files.iter().filter(|f| split(f).1.eq_ignore_ascii_case("mod.info")) {
@@ -710,15 +837,13 @@ pub fn from_listing(item: &str, files: &[String], build: u8, read: &mut dyn FnMu
             dirs.push(dir);
         }
     }
-    let (mut out, mut count) = (vec![], 0);
+    let mut out = vec![];
     for dir in dirs {
         let prefix = if dir.is_empty() { String::new() } else { format!("{dir}/").to_ascii_lowercase() };
-        let under: Vec<usize> = (0..files.len()).filter(|i| lower[*i].starts_with(&prefix)).collect();
         let mut versions: Vec<String> =
-            under.iter().filter_map(|i| files[*i][prefix.len()..].split_once('/').map(|v| v.0.to_string())).filter(|v| is_version_dir(v)).collect();
+            (0..files.len()).filter(|i| lower[*i].starts_with(&prefix)).filter_map(|i| files[i][prefix.len()..].split_once('/').map(|v| v.0.to_string())).filter(|v| is_version_dir(v)).collect();
         versions.sort();
         versions.dedup();
-        // which mod.info the game reads: the root one in B41, the newest version folder's in B42
         let info = if build == 41 {
             find(&join(&dir, "mod.info"))
         } else {
@@ -726,7 +851,33 @@ pub fn from_listing(item: &str, files: &[String], build: u8, read: &mut dyn FnMu
             vs.sort_by_key(|v| v.split('.').filter_map(|p| p.parse().ok()).collect::<Vec<u32>>());
             vs.last().and_then(|v| find(&join(&dir, &join(v, "mod.info"))))
         };
-        let Some(info) = info else { continue }; // not a mod on this build
+        if let Some(info) = info {
+            out.push((dir, info, versions));
+        }
+    }
+    out
+}
+
+fn split(p: &str) -> (String, String) {
+    let (a, b) = p.rsplit_once('/').unwrap_or(("", p));
+    (a.to_string(), b.to_string())
+}
+
+fn join(a: &str, b: &str) -> String {
+    if a.is_empty() || b.is_empty() { format!("{a}{b}") } else { format!("{a}/{b}") }
+}
+
+/// The map mods in an item's file list (paths with `/`) for `build`, by the rules `mod_maps`
+/// reads folders with, and how many mods it holds on `build`. `read` gives a listed file's
+/// text: mod.info (id, name, require=), map.info (title, lots=) and B42 title files; nothing
+/// else is fetched.
+pub fn from_listing(item: &str, files: &[String], build: u8, read: &mut dyn FnMut(&str) -> Result<String>) -> Result<(Vec<MapMod>, usize)> {
+    let lower: Vec<String> = files.iter().map(|f| f.to_ascii_lowercase()).collect();
+    let find = |p: &str| lower.iter().position(|l| *l == p.to_ascii_lowercase()).map(|i| files[i].clone());
+    let (mut out, mut count) = (vec![], 0);
+    for (dir, info, versions) in listing_mods(files, build) {
+        let prefix = if dir.is_empty() { String::new() } else { format!("{dir}/").to_ascii_lowercase() };
+        let under: Vec<usize> = (0..files.len()).filter(|i| lower[*i].starts_with(&prefix)).collect();
         count += 1;
         let mut maps: Vec<MapFolder> = vec![];
         for root in pick_roots(versions.iter().map(String::as_str), build) {
@@ -774,7 +925,7 @@ pub fn from_listing(item: &str, files: &[String], build: u8, read: &mut dyn FnMu
 }
 
 /// Read a Workshop item's maps (both builds) from its manifest on `session`; `stop` ends it.
-pub fn read_listing(session: &Session, item: &Item, stop: &AtomicBool) -> Result<Checked> {
+fn read_listing(session: &Session, item: &Item, stop: &AtomicBool) -> Result<Checked> {
     if item.hcontent == 0 {
         return Err(anyhow::Error::new(Fail::NoFiles).context(format!("workshop:{}", item.id)));
     }
@@ -898,10 +1049,10 @@ pub struct Progress {
 }
 
 /// File lists read at once, on the one Steam session.
-const READERS: usize = 4;
+pub(crate) const READERS: usize = 4;
 
 /// Sleep `secs`, waking early once `done` says so.
-fn pause(secs: u64, done: impl Fn() -> bool) {
+pub(crate) fn pause(secs: u64, done: impl Fn() -> bool) {
     let end = std::time::Instant::now() + std::time::Duration::from_secs(secs);
     while !done() && std::time::Instant::now() < end {
         std::thread::sleep(std::time::Duration::from_millis(100));
@@ -909,14 +1060,17 @@ fn pause(secs: u64, done: impl Fn() -> bool) {
 }
 
 /// `f` on its own thread, given up on (None) once `stop` is set: a web call (and its 429
-/// back-off) can't be interrupted, but it times out, so the thread ends on its own.
-fn unless_stopped<T: Send + 'static>(stop: &AtomicBool, f: impl FnOnce() -> Result<T> + Send + 'static) -> Option<Result<T>> {
+/// back-off) can't be interrupted, but it times out, so the thread ends on its own. One that
+/// hasn't answered in two minutes counts as timed out (a stalled HTTPS read was seen to hang for good).
+pub(crate) fn unless_stopped<T: Send + 'static>(stop: &AtomicBool, f: impl FnOnce() -> Result<T> + Send + 'static) -> Option<Result<T>> {
     use std::sync::mpsc::RecvTimeoutError;
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || tx.send(f()));
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(120);
     loop {
         match rx.recv_timeout(std::time::Duration::from_millis(100)) {
             Ok(v) => return Some(v),
+            Err(RecvTimeoutError::Timeout) if std::time::Instant::now() > end => return Some(Err(Fail::Timeout.into())),
             Err(RecvTimeoutError::Timeout) if !stop.load(Relaxed) => {}
             Err(RecvTimeoutError::Timeout) => return None,
             Err(RecvTimeoutError::Disconnected) => return Some(Err(anyhow::anyhow!("the request failed"))),
@@ -924,9 +1078,28 @@ fn unless_stopped<T: Send + 'static>(stop: &AtomicBool, f: impl FnOnce() -> Resu
     }
 }
 
+/// One Workshop browse page, tried again after 20 and 40 s (Steam's request limit resets within
+/// a minute); None once `stop` is set.
+pub(crate) fn browse_patiently(q: &steam_workshop::Query, stop: &AtomicBool) -> Option<Result<steam_workshop::Page>> {
+    let stopped = || stop.load(Relaxed);
+    let browse = || {
+        let q = q.clone();
+        unless_stopped(stop, move || steam_workshop::browse(super::STEAM_APP, &q))
+    };
+    let mut got = browse();
+    for wait in [20, 40] {
+        if !matches!(got, Some(Err(_))) || stopped() {
+            break;
+        }
+        pause(wait, stopped);
+        got = browse();
+    }
+    got.filter(|_| !stopped())
+}
+
 /// Whether a failed read says Steam (or the connection) is struggling, not that the item can't
 /// be read: only these count towards giving up, and they're read again next scan.
-fn network_error(e: &anyhow::Error) -> bool {
+pub(crate) fn network_error(e: &anyhow::Error) -> bool {
     use steamroom::enums::EResultError as R;
     use steamroom::error::{ConnectionError as C, Error as E};
     e.chain().any(|c| match c.downcast_ref::<E>() {
@@ -957,19 +1130,7 @@ pub fn scan_workshop(paths: &Paths, stop: &AtomicBool, progress: &mut dyn FnMut(
     let mut items: Vec<Item> = vec![];
     for page in 1.. {
         let q = steam_workshop::Query { required: vec!["Map".into()], sort: "mostrecent".into(), per_page: 50, page, ..Default::default() };
-        let browse = || {
-            let q = q.clone();
-            unless_stopped(stop, move || steam_workshop::browse(super::STEAM_APP, &q))
-        };
-        let mut got = browse();
-        for wait in [20, 40] {
-            if !matches!(got, Some(Err(_))) || stopped() {
-                break;
-            }
-            pause(wait, stopped); // Steam's request limit resets within a minute
-            got = browse();
-        }
-        let Some(got) = got.filter(|_| !stopped()) else { return Ok(p) };
+        let Some(got) = browse_patiently(&q, stop) else { return Ok(p) };
         let got = got?;
         let empty = got.items.is_empty();
         for i in got.items {
@@ -1089,27 +1250,45 @@ pub struct Compare {
     pub only_server: Vec<ServerMap>,
     /// Your map folders the server doesn't load.
     pub only_you: Vec<String>,
+    /// The server's maps (folders) whose map mods cover some of the same cells: the one first in its `Map=` wins there.
+    pub overlap: Vec<[String; 2]>,
 }
 
 /// Compare a server config's `Map=` with `yours` (map folders), leaving out the game's own
-/// maps. A missing map's provider is the map mod in `all` (installed first) that adds it,
-/// preferring the server's own mods and Workshop items.
+/// maps. A map's provider is the map mod in `all` (installed first) that adds it, preferring the
+/// server's own mods and Workshop items; the providers that clash on cells are its overlaps.
 pub fn compare(server: &super::server::ServerMods, yours: &[String], vanilla: &[String], all: &[MapMod]) -> Compare {
     let ours = |f: &String| !vanilla.contains(f) && !super::server::is_base_map(f);
-    let only_server = server
+    let theirs: Vec<(&String, Option<&MapMod>)> = server
         .maps
         .iter()
-        .filter(|f| ours(f) && !yours.contains(f))
+        .filter(|f| ours(f))
         .map(|f| {
             let best = all.iter().enumerate().filter(|(_, m)| m.maps.iter().any(|x| x.folder == *f)).min_by_key(|(i, m)| {
                 let item = workshop_item(&m.source);
                 (!server.mods.contains(&m.id), !item.is_some_and(|it| server.workshop.iter().any(|w| w == it)), *i)
             });
-            ServerMap { folder: f.clone(), id: best.map(|(_, m)| m.id.clone()), item: best.and_then(|(_, m)| workshop_item(&m.source)).map(String::from) }
+            (f, best.map(|(_, m)| m))
         })
         .collect();
+    let only_server = theirs
+        .iter()
+        .filter(|(f, _)| !yours.contains(f))
+        .map(|(f, m)| ServerMap { folder: (*f).clone(), id: m.map(|m| m.id.clone()), item: m.and_then(|m| workshop_item(&m.source)).map(String::from) })
+        .collect();
     let only_you = yours.iter().filter(|f| ours(f) && !server.maps.contains(f)).cloned().collect();
-    Compare { only_server, only_you }
+    // each provider once, named by the first of its folders the server loads
+    let mut on: Vec<(&String, &MapMod)> = vec![];
+    for (f, m) in &theirs {
+        if let Some(m) = m
+            && !on.iter().any(|(_, x)| x.id == m.id)
+        {
+            on.push((f, m));
+        }
+    }
+    let mods: Vec<&MapMod> = on.iter().map(|(_, m)| *m).collect();
+    let overlap = clashes(&mods).into_iter().filter(|c| c.2.is_none()).map(|(i, j, _)| [on[i].0.clone(), on[j].0.clone()]).collect();
+    Compare { only_server, only_you, overlap }
 }
 
 // --- presets ---
@@ -1137,6 +1316,42 @@ pub fn set_preset(paths: &Paths, name: &str, ids: Option<Vec<String>>) -> Result
     Ok(crate::write_atomic(&presets_file(paths), serde_json::to_vec_pretty(&all)?)?)
 }
 
+// --- background image ---
+
+/// A picture of the player's own drawn under the grid instead of the world map: the file (left
+/// where it is) and where it lies, image pixel `p` being world tile `p * scale + offset` per axis.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Background {
+    pub path: String,
+    pub scale: [f64; 2],
+    pub offset: [f64; 2],
+}
+
+fn backgrounds_file(paths: &Paths) -> PathBuf {
+    paths.data.join("map-background.json")
+}
+
+/// Build `build`'s background (none while the file can't be read).
+pub fn background(paths: &Paths, build: u8) -> Option<Background> {
+    read_json::<BTreeMap<String, Background>>(&backgrounds_file(paths))
+        .unwrap_or_else(|e| {
+            crate::log!("error: {e:#}");
+            BTreeMap::new()
+        })
+        .remove(&build.to_string())
+}
+
+/// Save build `build`'s background (None forgets it). A file that can't be read is never saved over.
+pub fn set_background(paths: &Paths, build: u8, bg: Option<Background>) -> Result<()> {
+    let mut all: BTreeMap<String, Background> = read_json(&backgrounds_file(paths)).context("nothing was saved")?;
+    match bg {
+        Some(bg) => all.insert(build.to_string(), bg),
+        None => all.remove(&build.to_string()),
+    };
+    fs::create_dir_all(&paths.data)?;
+    Ok(crate::write_atomic(&backgrounds_file(paths), serde_json::to_vec_pretty(&all)?)?)
+}
+
 /// The export's words, in the UI's language: `ids` fills `{id}` and `{folders}`, `missing`
 /// fills `{ids}`. The server lines stay as the game reads them.
 #[derive(Clone, Debug, Deserialize)]
@@ -1158,7 +1373,7 @@ impl Default for ExportLabels {
 }
 
 /// Looks a mod id up on the Workshop (from the item that needs it): its title and item id.
-pub type FindMod<'a> = dyn FnMut(&str, Option<&str>) -> Option<(String, String)> + 'a;
+type FindMod<'a> = dyn FnMut(&str, Option<&str>) -> Option<(String, String)> + 'a;
 
 /// Clipboard text for the shown maps: each map's Workshop link, mod id and folders, the mods
 /// they need (names and links), then the server lines. A requirement is looked up among the
@@ -1203,25 +1418,12 @@ pub fn export(
             }
         }
     }
-    fn visit(id: &str, info: &Info, seen: &mut HashSet<String>, ids: &mut Vec<String>, missing: &mut Vec<String>) {
-        if !seen.insert(id.to_string()) {
-            return;
-        }
-        match info.get(id) {
-            Some((_, requires, _)) => {
-                for r in requires {
-                    visit(r, info, seen, ids, missing);
-                }
-                ids.push(id.to_string());
-            }
-            None => missing.push(id.to_string()),
-        }
-    }
     let url = |item: &str| format!("https://steamcommunity.com/sharedfiles/filedetails/?id={item}");
-    let (mut seen, mut ids, mut missing, mut items) = (HashSet::new(), vec![], vec![], vec![]);
+    let shown_ids: Vec<String> = shown.iter().map(|m| m.id.clone()).collect();
+    let (ids, missing) = super::requirements_first(&shown_ids, |id| info.get(id).map(|i| i.1.clone()));
+    let mut items = vec![];
     let mut text = String::new();
     for m in shown {
-        visit(&m.id, &info, &mut seen, &mut ids, &mut missing);
         let name = if m.name.is_empty() { &m.id } else { &m.name };
         text += &format!("{name}\n");
         if let Some(item) = workshop_item(&m.source) {
@@ -1247,11 +1449,10 @@ pub fn export(
             items.push(item);
         }
     }
-    let prefix = if b41 { "" } else { "\\" };
-    text += &format!("\nMods={}\n", ids.iter().map(|i| format!("{prefix}{i}")).collect::<Vec<_>>().join(";"));
-    text += &format!("WorkshopItems={}\n", items.join(";"));
-    if !map_line.is_empty() {
-        text += &format!("Map={}\n", map_line.join(";"));
+    let items: Vec<String> = items.into_iter().map(String::from).collect();
+    text += "\n";
+    for (key, value) in super::server::line_values(&ids, &items, map_line, b41) {
+        text += &format!("{key}={value}\n");
     }
     text
 }
@@ -1512,6 +1713,17 @@ mod tests {
     }
 
     #[test]
+    fn backgrounds_round_trip_per_build() {
+        let (_t, paths) = store::tests::temp_paths();
+        let bg = Background { path: r"D:\maps\Knox.png".into(), scale: [3.5, 3.25], offset: [-120.0, 6000.5] };
+        set_background(&paths, 41, Some(bg.clone())).unwrap();
+        assert_eq!(background(&paths, 41), Some(bg));
+        assert_eq!(background(&paths, 42), None, "each build has its own");
+        set_background(&paths, 41, None).unwrap();
+        assert_eq!(background(&paths, 41), None);
+    }
+
+    #[test]
     fn concurrent_saves_keep_both_batches() {
         let (_t, paths) = store::tests::temp_paths();
         // two scans (the app's and the CLI's) saving at once; the data lock is per open file, so threads stand in for processes
@@ -1621,6 +1833,47 @@ mod tests {
             "the server's own Workshop item wins"
         );
         assert_eq!(c.only_you, ["Mine"]);
+        assert!(c.overlap.is_empty(), "one provider per folder: the Fort reupload isn't counted against Fort");
+
+        // a public server's list: its maps on the same cells overlap, an add-on on the map it requires doesn't
+        let (town, mut addon, ridge) = (map("Town", &[(1, 1), (1, 2)]), map("TownAddon", &[(1, 2)]), map("Ridge", &[(1, 2), (9, 9)]));
+        addon.requires = vec!["Town".into()];
+        let public = super::super::server::ServerMods { maps: ["TownAddon", "Town", "Ridge", "Muldraugh, KY"].map(String::from).to_vec(), ..Default::default() };
+        let c = compare(&public, &[], &[], &[town, addon, ridge]);
+        assert_eq!(c.only_server.len(), 3, "nothing of yours: every mod map it loads");
+        assert_eq!(c.overlap, [["TownAddon", "Ridge"], ["Town", "Ridge"]].map(|p| p.map(String::from)));
+    }
+
+    #[test]
+    fn reads_the_binary_world_map() {
+        // 256-tile cells, 2x1: cell 0,0 empty; cell 1,0 has a road line and a building with a hole
+        let mut b = b"IGMB".to_vec();
+        let put = |b: &mut Vec<u8>, v: &[i32]| v.iter().for_each(|x| b.extend(x.to_le_bytes()));
+        put(&mut b, &[2, 256, 2, 1, 4]);
+        for s in ["Polygon", "LineString", "building", "highway"] {
+            b.extend((s.len() as u16).to_le_bytes());
+            b.extend(s.as_bytes());
+        }
+        put(&mut b, &[-1, 1, 0, 2]);
+        let ring = |b: &mut Vec<u8>, pts: &[i16]| {
+            b.extend(((pts.len() / 2) as u16).to_le_bytes());
+            pts.iter().for_each(|p| b.extend(p.to_le_bytes()));
+        };
+        b.extend([1, 0, 1]); // LineString, one ring
+        ring(&mut b, &[0, 5, -10, 5]);
+        b.extend([1, 3, 0, 0, 0]); // highway=(index 0)
+        b.extend([0, 0, 2]); // Polygon, outline and hole
+        ring(&mut b, &[0, 0, 10, 0, 10, 10]);
+        ring(&mut b, &[2, 2, 3, 3, 2, 3]);
+        b.extend([1, 2, 0, 0, 0]);
+        let m = WorldMap::from_bin(&b).unwrap();
+        assert_eq!(m.road_lines, [vec![256, 5, 246, 5]]);
+        assert_eq!(m.buildings, [vec![vec![256, 0, 266, 0, 266, 10], vec![258, 2, 259, 3, 258, 3]]]);
+        assert!(m.water.is_empty() && m.roads.is_empty());
+        // cut short, or not a version-2 file: no map
+        assert_eq!(WorldMap::from_bin(&b[..b.len() - 3]), None);
+        b[4] = 1;
+        assert_eq!(WorldMap::from_bin(&b), None);
     }
 
     #[test]
@@ -1652,9 +1905,11 @@ mod tests {
  </cell>
 </world>
 "#;
-        assert_eq!(water_cells(xml, 300), [(1, 0)], "8 of 16 samples in water");
+        let map = WorldMap::from_xml(xml);
+        assert_eq!((map.water.len(), map.buildings.len()), (1, 1));
+        assert_eq!(water_cells(&map, 300), [(1, 0)], "8 of 16 samples in water");
         // the same tiles (300..600 x 140..300) cover at most 6/16 of any 256-tile cell
-        assert_eq!(water_cells(xml, 256), Vec::<Cell>::new());
+        assert_eq!(water_cells(&map, 256), Vec::<Cell>::new());
         let g = grid(&[(1, 0), (2, 0)], &[(1, 0)], &[]);
         assert_eq!(g.iter().map(|c| c.kind).collect::<Vec<_>>(), ["water", "vanilla"]);
     }
@@ -1697,6 +1952,7 @@ mod tests {
             load_before: vec![],
             supports_41: false,
             supports_42: true,
+            ..Default::default()
         };
         let mods: BTreeMap<String, store::Row> = [row("Town", "steam:111", &["Tiles", "Gone"]), row("Tiles", "workshop:222", &["Base"]), row("Base", "steam:111", &[])]
             .into_iter()

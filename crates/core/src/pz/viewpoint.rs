@@ -19,30 +19,35 @@ pub const KIND: &str = "viewpoint";
 pub const WORKSHOP_ID: &str = "3809306528";
 pub const MOD_ID: &str = "Viewpoint";
 /// What Viewpoint needs from the Workshop.
-pub const WORKSHOP: [&str; 2] = [zombiebuddy::WORKSHOP_ID, WORKSHOP_ID];
+const WORKSHOP: [&str; 2] = [zombiebuddy::WORKSHOP_ID, WORKSHOP_ID];
 /// Mods enabled at the top of every Viewpoint profile, in load order.
-pub const MODS: [&str; 2] = [zombiebuddy::MOD_ID, MOD_ID];
+const MODS: [&str; 2] = [zombiebuddy::MOD_ID, MOD_ID];
 /// Name of the profile made on the first switch.
-pub const PROFILE: &str = "Viewpoint";
+const PROFILE: &str = "Viewpoint";
 /// Name of the plain profile made when leaving Viewpoint with no plain profile to return to.
-pub const PLAIN_PROFILE: &str = "Project Zomboid";
+const PLAIN_PROFILE: &str = "Project Zomboid";
 
 /// `base` with ZombieBuddy and Viewpoint enabled first; everything else keeps its place.
-pub fn with_viewpoint(base: &Profile, name: &str) -> Profile {
+fn with_viewpoint(base: &Profile, name: &str) -> Profile {
     let mut lines: Vec<Line> = MODS.iter().map(|id| Line::Mod { id: id.to_string(), on: true }).collect();
     lines.extend(base.lines.iter().filter(|l| !matches!(l, Line::Mod { id, .. } if MODS.contains(&id.as_str()))).cloned());
     let order = MODS.iter().map(|id| id.to_string()).chain(base.enabled()).collect();
     Profile { name: name.into(), lines, order }
 }
 
+/// A new, otherwise empty Viewpoint profile: ZombieBuddy and Viewpoint enabled.
+pub fn fresh(name: &str) -> Profile {
+    with_viewpoint(&Profile::parse(name, ""), name)
+}
+
 /// `base` without Viewpoint (ZombieBuddy stays: other Java mods may need it).
-pub fn without_viewpoint(base: &Profile, name: &str) -> Profile {
+fn without_viewpoint(base: &Profile, name: &str) -> Profile {
     let lines = base.lines.iter().filter(|l| !matches!(l, Line::Mod { id, .. } if id == MOD_ID)).cloned().collect();
     Profile { name: name.into(), lines, order: base.enabled() }
 }
 
 /// `base`, or `base 2`, `base 3`... whichever profile name is free.
-pub fn unique_profile_name(paths: &Paths, base: &str) -> String {
+fn unique_profile_name(paths: &Paths, base: &str) -> String {
     if !profile::exists(paths, base) {
         return base.into();
     }
@@ -69,8 +74,8 @@ pub fn preview(paths: &Paths, kind: &str, mods: &BTreeMap<String, Row>) -> Resul
     let current = profile::sync(paths)?.0.name;
     if kind != KIND {
         return Ok(vec![match profile::last_of_kind(paths, profile::DEFAULT_KIND) {
-            Some(n) => format!("switch to your \"{n}\" profile"),
-            None => format!("make a \"{PLAIN_PROFILE}\" profile from \"{current}\" without Viewpoint, and switch to it"),
+            Some(n) => crate::keyed!("vpToProfile", "switch to your \"{name}\" profile", name = n),
+            None => crate::keyed!("vpMakePlain", "make a \"{name}\" profile from \"{current}\" without Viewpoint, and switch to it", name = PLAIN_PROFILE, current = current),
         }]);
     }
     let mut lines: Vec<String> = needed(paths, mods)?
@@ -78,7 +83,7 @@ pub fn preview(paths: &Paths, kind: &str, mods: &BTreeMap<String, Row>) -> Resul
         .filter_map(|s| if let Source::Workshop(item) = s { Some(item) } else { None })
         .map(|item| {
             let id = MODS[WORKSHOP.iter().position(|w| *w == item).unwrap_or(0)];
-            format!("download {id} from the Steam Workshop (item {item})")
+            crate::keyed!("vpDownload", "download {id} from the Steam Workshop (item {item})", id = id, item = item)
         })
         .collect();
     let (launcher, libs) = zombiebuddy::locate(mods);
@@ -86,23 +91,24 @@ pub fn preview(paths: &Paths, kind: &str, mods: &BTreeMap<String, Row>) -> Resul
     match libs {
         Some(s) => lines.extend(zombiebuddy::install(&l, &s, true)?),
         None => {
-            lines.push(format!("copy ZombieBuddy's Java agent files to {}", l.display()));
-            lines.push(format!("add {} to {}", zombiebuddy::launch_arg(), l.join("ProjectZomboid64.json").display()));
+            lines.push(zombiebuddy::copy_agent(&l));
+            lines.push(zombiebuddy::add_flag(&l));
         }
     }
     lines.push(match profile::last_of_kind(paths, KIND) {
-        Some(n) => format!("switch to your \"{n}\" profile, with ZombieBuddy and Viewpoint enabled at the top"),
-        None => format!(
-            "make a \"{}\" profile from \"{current}\" with ZombieBuddy and Viewpoint enabled at the top, and switch to it",
-            unique_profile_name(paths, PROFILE)
+        Some(n) => crate::keyed!("vpToVpProfile", "switch to your \"{name}\" profile, with ZombieBuddy and Viewpoint enabled at the top", name = n),
+        None => crate::keyed!(
+            "vpMakeVp",
+            "make a \"{name}\" profile from \"{current}\" with ZombieBuddy and Viewpoint enabled at the top, and switch to it",
+            name = unique_profile_name(paths, PROFILE),
+            current = current
         ),
     });
     Ok(lines)
 }
 
-/// After [`needed`] items are installed: set up the ZombieBuddy agent and switch to the
-/// Viewpoint profile (made from the current one the first time). Returns that profile.
-pub fn enter(paths: &Paths, mods: &BTreeMap<String, Row>) -> Result<Profile> {
+/// After [`needed`] items are installed: set up ZombieBuddy's Java agent in the game folder.
+pub fn set_up(mods: &BTreeMap<String, Row>) -> Result<()> {
     if let Some(id) = MODS.iter().find(|id| !mods.contains_key(**id)) {
         bail!("{id} isn't installed; the download may have failed (see the log)");
     }
@@ -110,12 +116,25 @@ pub fn enter(paths: &Paths, mods: &BTreeMap<String, Row>) -> Result<Profile> {
     let Some(l) = launcher else { bail!("Project Zomboid's game folder wasn't found in your Steam libraries (set PZ_GAME_DIR)") };
     let Some(s) = libs else { bail!("ZombieBuddy's Java agent files weren't found in its Workshop item") };
     for change in zombiebuddy::install(&l, &s, false)? {
-        crate::log!("{change}");
+        crate::log!("{}", crate::unkeyed(&change));
     }
+    Ok(())
+}
+
+/// After [`needed`] items are installed: set up the ZombieBuddy agent and switch to the
+/// Viewpoint profile (made from the current one the first time). Returns that profile.
+pub fn enter(paths: &Paths, mods: &BTreeMap<String, Row>) -> Result<Profile> {
+    set_up(mods)?;
     profile::remember_active(paths)?;
     let p = match profile::last_of_kind(paths, KIND) {
         Some(n) => with_viewpoint(&profile::load(paths, &n)?, &n),
-        None => with_viewpoint(&profile::sync(paths)?.0, &unique_profile_name(paths, PROFILE)),
+        None => {
+            // a copy of the current one, its map arrangement included
+            let base = profile::sync(paths)?.0;
+            let p = with_viewpoint(&base, &unique_profile_name(paths, PROFILE));
+            profile::set_map_order(paths, &p.name, &profile::map_order(paths, &base.name))?;
+            p
+        }
     };
     profile::set_kind(paths, &p.name, KIND)?;
     profile::apply(paths, &p, Some(mods))?;

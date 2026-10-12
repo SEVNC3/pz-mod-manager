@@ -56,6 +56,7 @@ jobs:
             target/release/bundle/appimage/*.AppImage
             target/release/bundle/appimage/*.AppImage.sig
             target/release/bundle/deb/*.deb
+            target/release/bundle/deb/*.deb.sig
   publish:
     needs: [cli, app]
     runs-on: ubuntu-latest
@@ -85,17 +86,27 @@ jobs:
           lock = json.load(open("app/package-lock.json"))["version"]
           if {npm, lock} != {version}:
               sys.exit(f"app/package.json ({npm}) and package-lock.json ({lock}) must both be {version}")
+          platforms = {"windows-x86_64": win_entry, "linux-x86_64": entry("*.AppImage")[1]}
+          # .deb installs look for their own entry first; without one they fall back to linux-x86_64 (the AppImage),
+          # which they can't install, so the update fails. tauri-cli 2.2+ signs the .deb (createUpdaterArtifacts).
+          if glob.glob("dist/**/*.deb.sig", recursive=True):
+              platforms["linux-x86_64-deb"] = entry("*.deb")[1]
           json.dump({
               "version": version,
               "notes": f"https://github.com/{repo}/releases/tag/{tag}",
               "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-              "platforms": {"windows-x86_64": win_entry, "linux-x86_64": entry("*.AppImage")[1]},
+              "platforms": platforms,
           }, open("dist/latest.json", "w"), indent=2)
-      # hand-written notes when docs/release-notes/<tag>.md exists, else GitHub's commit list.
-      # Early access: every release is a draft pre-release until publicly launched (publish by hand).
+      # The body: how to install (with this version's file names), the early-access banner, then the hand-written
+      # notes when docs/release-notes/<tag>.md exists, else GitHub's commit list.
+      # Early access: every release is a draft (publish by hand). Not ticked as a GitHub pre-release, because the
+      # in-app updater reads releases/latest, which skips pre-releases; the title and banner say early access.
       - run: |
           notes="docs/release-notes/${{ github.ref_name }}.md"
-          if [ -f "$notes" ]; then how=(--notes-file "$notes"); else how=(--generate-notes); fi
-          find dist -type f && gh release create ${{ github.ref_name }} $(find dist -type f) --repo ${{ github.repository }} --draft --prerelease "${how[@]}"
+          ver="${{ github.ref_name }}"; ver="${ver#v}"
+          { sed "s/{VERSION}/$ver/g" docs/release-notes/install.md; echo; cat docs/release-notes/early-access.md; echo; if [ -f "$notes" ]; then cat "$notes"; fi; } > body.md
+          how=(--notes-file body.md); [ -f "$notes" ] || how+=(--generate-notes)
+          for f in $(find dist -type f); do echo "$(sha256sum < "$f" | cut -d" " -f1)  $(basename "$f")"; done > SHA256SUMS.txt && mv SHA256SUMS.txt dist/
+          find dist -type f && gh release create ${{ github.ref_name }} $(find dist -type f) --repo ${{ github.repository }} --draft --title "${{ github.ref_name }} (early access pre-release)" "${how[@]}"
         env:
           GH_TOKEN: ${{ github.token }}

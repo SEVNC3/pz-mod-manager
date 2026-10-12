@@ -7,14 +7,39 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 
+pub mod a2s;
+pub mod authoring;
+pub mod autopilot;
+pub mod catalog;
 pub mod category;
+pub mod collection;
+pub mod discord;
+pub mod discord_bot;
 pub mod doctor;
+pub mod dossier;
+pub mod feed;
 pub mod files;
 pub mod folders;
+pub mod ftp;
+pub mod geoip;
+pub mod host;
+pub mod javamods;
+pub mod launcher;
 pub mod logs;
+pub mod managers;
 pub mod maps;
+pub mod perf;
+pub mod mod_index;
+pub mod news;
+pub mod rcon;
+pub mod sandbox;
 pub mod saves;
 pub mod server;
+pub mod server_backup;
+pub mod server_config;
+pub mod server_detect;
+pub mod steam_client;
+pub mod tag;
 pub mod viewpoint;
 pub mod zombiebuddy;
 
@@ -46,6 +71,12 @@ impl Paths {
 /// The Steam Workshop content folder for Project Zomboid (the setting, else Steam's libraries).
 pub fn workshop_dir() -> Option<PathBuf> {
     folders::path("workshop", &crate::settings::load())
+}
+
+/// The game's language as its `Translate` folders name it (`EN`, `RU`...): `language=` in
+/// `Zomboid/options.ini`, "" until the game has saved its options.
+pub fn game_language(paths: &Paths) -> String {
+    read_info(&paths.zomboid.join("options.ini")).remove("language").unwrap_or_default().to_uppercase()
 }
 
 pub fn read_info(path: &Path) -> HashMap<String, String> {
@@ -137,6 +168,10 @@ pub struct FoundMod {
     /// `loadModAfter=` / `loadModBefore=`: ordering hints the game reads.
     pub load_after: Vec<String>,
     pub load_before: Vec<String>,
+    /// Mod Load Order Sorter's `loadFirst=` / `loadLast=`: "on", "category" or empty.
+    pub load_first: String,
+    pub load_last: String,
+    pub author: String,
     /// Builds its folder layout supports: 41 needs a root mod.info, 42 a version folder
     /// (`42/`, `42.x/`, `common/`). Both are true for mods that ship both.
     pub supports_41: bool,
@@ -200,8 +235,13 @@ pub fn find_mods(root: &Path, depth: usize) -> Vec<FoundMod> {
                 .flatten()
                 .flatten()
                 .any(|e| e.file_type().is_ok_and(|t| t.is_dir()) && e.file_name().to_str().is_some_and(is_version_dir));
-            let (incompatible, load_after, load_before) =
-                (id_list(&i, "incompatible"), id_list(&i, "loadModAfter"), id_list(&i, "loadModBefore"));
+            // the game's keys, plus Mod Load Order Sorter's (loadAfter=, incompatibleMods=, loadFirst=...)
+            let mut rule = managers::Rule::default();
+            let mut keys: Vec<(&String, &String)> = i.iter().collect();
+            keys.sort();
+            for (k, v) in keys {
+                rule.add(k, v);
+            }
             let fallback = dir.file_name().unwrap_or_default().to_string_lossy().into_owned();
             out.push(FoundMod {
                 id: i.remove("id").filter(|s| !s.is_empty()).unwrap_or(fallback),
@@ -209,9 +249,12 @@ pub fn find_mods(root: &Path, depth: usize) -> Vec<FoundMod> {
                 dir,
                 info,
                 requires,
-                incompatible,
-                load_after,
-                load_before,
+                incompatible: rule.incompatible,
+                load_after: rule.load_after,
+                load_before: rule.load_before,
+                load_first: rule.load_first,
+                load_last: rule.load_last,
+                author: i.remove("author").unwrap_or_default(),
                 supports_41,
                 supports_42,
             });
@@ -292,6 +335,11 @@ pub fn try_read_default(path: &Path) -> Option<DefaultTxt> {
 /// keeps it. Both builds write `map = <folder>,` lines; Muldraugh stays last if the file had it (the game.s
 /// `checkMissingMaps` drops it). The file as it was before PZMM's first write is kept as `default.txt.bak`.
 pub fn write_default(path: &Path, ids: &[String], b41: Option<bool>, maps: Option<&[String]>) -> Result<()> {
+    // the game's list has no quoting: one of these would end the entry or the block, so it's left out
+    let bad = |i: &String| i.contains(['{', '}', ',', '=', '\n', '\r']);
+    for id in ids.iter().filter(|i| bad(i)) {
+        crate::say!("badModId", "error: left {id} out of the game's mod list: a mod ID can't have braces, commas, = or line breaks", id = format!("{id:?}"));
+    }
     // an existing file we can't read keeps its maps block and format unknown: don't overwrite it blind
     let old = if path.exists() {
         try_read_default(path).with_context(|| format!("can't read {} (is the game running?)", path.display()))?
@@ -306,7 +354,7 @@ pub fn write_default(path: &Path, ids: &[String], b41: Option<bool>, maps: Optio
     let mut seen = HashSet::new();
     let body: String = ids
         .iter()
-        .filter(|i| !i.is_empty() && seen.insert(*i))
+        .filter(|i| !i.is_empty() && !bad(i) && seen.insert(*i))
         .map(|i| format!("    mod = {prefix}{i},\n"))
         .collect();
     let maps = match maps {
@@ -323,9 +371,38 @@ pub fn write_default(path: &Path, ids: &[String], b41: Option<bool>, maps: Optio
     Ok(())
 }
 
+/// `ids` with each one's requirements (by `requires`, recursively) placed before it. Ids `requires`
+/// doesn't know (None) are left out, and come back second. Requirement loops keep the list's order.
+pub fn requirements_first(ids: &[String], requires: impl Fn(&str) -> Option<Vec<String>>) -> (Vec<String>, Vec<String>) {
+    fn visit(id: &str, requires: &dyn Fn(&str) -> Option<Vec<String>>, seen: &mut HashSet<String>, out: &mut (Vec<String>, Vec<String>)) {
+        if !seen.insert(id.to_string()) {
+            return;
+        }
+        match requires(id) {
+            Some(rs) => {
+                rs.iter().for_each(|r| visit(r, requires, seen, out));
+                out.0.push(id.to_string());
+            }
+            None => out.1.push(id.to_string()),
+        }
+    }
+    let (mut seen, mut out) = (HashSet::new(), (vec![], vec![]));
+    ids.iter().for_each(|id| visit(id, &requires, &mut seen, &mut out));
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn requirements_load_first_and_loops_keep_order() {
+        let rules: HashMap<&str, &[&str]> = [("Patch", &["Big", "Lib"][..]), ("Big", &["Lib"]), ("Lib", &["Core"]), ("Core", &[]), ("A", &["B"]), ("B", &["A"])].into();
+        let requires = |id: &str| rules.get(id).map(|r| r.iter().map(|s| s.to_string()).collect());
+        let ids: Vec<String> = ["Patch", "Missing", "A", "Core"].map(String::from).into();
+        let (order, unknown) = requirements_first(&ids, requires);
+        assert_eq!((order, unknown), (["Core", "Lib", "Big", "Patch", "B", "A"].map(String::from).to_vec(), vec!["Missing".to_string()]));
+    }
 
     fn write(path: &Path, text: &str) {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -380,6 +457,9 @@ mod tests {
         let d = read_default(&p);
         assert_eq!((d.mods, d.b41), (vec!["ModA".to_string(), "ModB".into()], false));
         assert!(p.with_file_name("default.txt.bak").exists());
+        // one bad ID is left out, the rest written
+        write_default(&p, &["ModA".into(), "A,B".into(), "A}".into(), "x=1".into(), "A\nmod = B".into(), "ModB".into()], None, None).unwrap();
+        assert_eq!(read_default(&p).mods, ["ModA", "ModB"]);
     }
 
     #[test]

@@ -15,7 +15,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 pzmm-core = { path = "../../crates/core" }
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 anyhow = "1"
@@ -25,6 +25,9 @@ serde_json = "1.0.151"
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-dialog = "2"
 tauri-plugin-process = "2.4.0"
-tauri-plugin-single-instance = "2.5.2"
+tauri-plugin-single-instance = { version = "2.5.2", features = ["deep-link"] }
+tauri-plugin-deep-link = "2"
 tauri-plugin-updater = "2.13.2"
 tauri-plugin-window-state = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-notification = "2"

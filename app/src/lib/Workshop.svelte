@@ -1,20 +1,25 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { api, newQuery, type Browse, type Query, type WorkshopItem } from "./api";
+  import { onMount, untrack } from "svelte";
+  import { api, newQuery, VIEWPOINT, type Browse, type Query, type WorkshopItem } from "./api";
   import { compact, fmtDate, fmtNum, plain } from "./format";
-  import { t, th } from "./i18n.svelte";
+  import { keyedError, t, th } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
   import InstallButton from "./InstallButton.svelte";
   import Stars from "./Stars.svelte";
   import WorkshopPanel from "./WorkshopPanel.svelte";
   import { prefs } from "./prefs.svelte";
+  import { arrowPick } from "./ui";
 
-  let { busy, defaultBuild, onInstall, viewpoint = false, hidden = false }: {
+  let { busy, defaultBuild, installed, onInstall, onCollection, viewpoint = false, hidden = false }: {
     busy: boolean;
     /** Kept mounted while another tab shows, so searches, filters and the open panel survive. */
     hidden?: boolean;
     defaultBuild: number | null;
+    /** Workshop items installed now: the Installed marks follow it (installs and removals made anywhere). */
+    installed: Set<string>;
     onInstall: (id: string) => Promise<boolean>;
+    /** A collection's Install all: read it first, to choose what to take (Import's collection picker). */
+    onCollection: (id: string) => void;
     /** Project Viewpoint mode: offer its add-ons and community. */
     viewpoint?: boolean;
   } = $props();
@@ -44,7 +49,6 @@
     ["workshop.home.updated", { sort: "lastupdated" }],
     ["workshop.home.required", { sort: "totaluniquesubscribers", libraries: true }],
   ];
-  const VIEWPOINT_DISCORD = "https://discord.gg/g83XvPhEgQ";
 
   let view = $state<"home" | "browse" | "author">(prefs.workshopView);
   let q = $state<Query>(newQuery({ per_page: prefs.perPage }));
@@ -126,7 +130,7 @@
       const r = view === "author" && context ? await api.workshopAuthor(context.item.creator, authorPage) : await api.browse(request());
       if (mine === seq) data = r;
     } catch (e) {
-      if (mine === seq) error = String(e);
+      if (mine === seq) error = t(...keyedError(e));
     } finally {
       if (mine === seq) loading = false;
     }
@@ -144,7 +148,7 @@
       const r = await api.browse(newQuery({ ...over, required: build ? [`Build ${build}`] : [] }));
       if (mine === seq) rows[title] = r.items.slice(0, 12);
     } catch (e) {
-      if (mine === seq) rowErrors[title] = String(e);
+      if (mine === seq) rowErrors[title] = t(...keyedError(e));
     }
   }
 
@@ -237,15 +241,21 @@
   }
 
   async function install(id: string) {
+    if ([open, ...(data?.items ?? []), ...Object.values(rows).flat()].find((i) => i?.id === id)?.collection) return onCollection(id);
     installing = id;
-    const ok = await onInstall(id);
+    await onInstall(id);
     installing = null;
-    if (!ok) return;
-    const mark = (list: WorkshopItem[] | null | undefined) => list?.map((i) => (i.id === id ? { ...i, have: true } : i)) ?? null;
-    if (data) data.items = mark(data.items)!;
-    for (const k of Object.keys(rows)) rows[k] = mark(rows[k]);
-    if (open?.id === id) open = { ...open, have: true };
   }
+  // the Installed marks as the library has them (lists loaded later come marked already)
+  $effect(() => {
+    const have = (i: WorkshopItem) => i.collection ? i.have : installed.has(i.id);
+    const mark = (list: WorkshopItem[] | null | undefined) => list?.map((i) => (i.have === have(i) ? i : { ...i, have: have(i) })) ?? null;
+    untrack(() => {
+      if (data) data.items = mark(data.items)!;
+      for (const k of Object.keys(rows)) rows[k] = mark(rows[k]);
+      if (open && open.have !== have(open)) open = { ...open, have: have(open) };
+    });
+  });
 
   const perPage = $derived(view === "author" ? 30 : q.per_page);
   const pages = $derived(data ? Math.max(1, Math.min(1000, Math.ceil(data.total / perPage))) : 1);
@@ -302,11 +312,11 @@
 
 <section class="workshop" aria-label={t("workshop.label")} {hidden}>
   <aside class="side" aria-label={t("workshop.optionsLabel")}>
-    <div class="seg" role="tablist" aria-label={t("workshop.viewLabel")}>
-      <button type="button" role="tab" aria-selected={view !== "home"} class:active={view !== "home"} onclick={() => show("browse")}>
+    <div class="subtabs" role="tablist" aria-label={t("workshop.viewLabel")} tabindex="-1" onkeydown={(e) => arrowPick(e, ["browse", "home"], view === "home" ? "home" : "browse", (v) => show(v as "browse" | "home"))}>
+      <button type="button" role="tab" id="ws-tab-browse" aria-controls="ws-panel" aria-selected={view !== "home"} tabindex={view !== "home" ? 0 : -1} class:active={view !== "home"} onclick={() => show("browse")}>
         <Icon name="search" size={14} /> {t("workshop.browse")}
       </button>
-      <button type="button" role="tab" aria-selected={view === "home"} class:active={view === "home"} onclick={() => show("home")}>
+      <button type="button" role="tab" id="ws-tab-home" aria-controls="ws-panel" aria-selected={view === "home"} tabindex={view === "home" ? 0 : -1} class:active={view === "home"} onclick={() => show("home")}>
         <Icon name="flame" size={14} /> {t("workshop.homeTab")}
       </button>
     </div>
@@ -397,14 +407,14 @@
         <button type="button" onclick={() => { queryText = q.search = "Project Viewpoint"; view = "browse"; context = null; go(1); }}>
           <Icon name="layers" size={14} /> {t("workshop.viewpointAddons")}
         </button>
-        <button type="button" class="quiet" onclick={() => api.openUrl(VIEWPOINT_DISCORD)} title={t("workshop.viewpointDiscordTip")}>
+        <button type="button" class="quiet" onclick={() => api.openUrl(VIEWPOINT.discord)} title={t("workshop.viewpointDiscordTip")}>
           <img src="/brand/discord.png" alt="" width="16" height="16" class="brand-img" /> {t("workshop.viewpointDiscord")}
         </button>
       </div>
     {/if}
   </aside>
 
-  <div class="main">
+  <div class="main" id="ws-panel" role="tabpanel" aria-labelledby={view === "home" ? "ws-tab-home" : "ws-tab-browse"}>
   {#if context}
     <div class="context">
       {#if context.kind === "author"}
@@ -537,6 +547,8 @@
   }
   .brand-img {
     border-radius: 3px;
+    /* Discord's logo is white: darkened on the light theme */
+    filter: var(--glyph);
   }
   .hint {
     margin: 0;
@@ -575,7 +587,7 @@
   .chip.in .box {
     background: var(--accent);
     border-color: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
   }
   .chip.out {
     color: var(--danger);

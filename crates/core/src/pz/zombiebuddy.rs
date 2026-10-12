@@ -22,7 +22,7 @@ fn agent_files() -> &'static [&'static str] {
     if cfg!(windows) { &["zbNative.dll", "ZombieBuddy.jar"] } else { &["ZombieBuddy.jar"] }
 }
 
-fn is_zb_arg(a: &str) -> bool {
+pub(crate) fn is_zb_arg(a: &str) -> bool {
     ["-agentlib:zbNative", "-javaagent:ZombieBuddy.jar"].iter().any(|p| a == *p || a.starts_with(&format!("{p}=")))
 }
 
@@ -50,8 +50,26 @@ pub fn locate(mods: &std::collections::BTreeMap<String, crate::store::Row>) -> (
     (launcher, libs)
 }
 
+/// The enabled mods that need ZombieBuddy: those whose mod.info requires it, and Viewpoint (it
+/// loads through it).
+pub fn required_by(enabled: &[String], mods: &std::collections::BTreeMap<String, crate::store::Row>) -> Vec<String> {
+    enabled
+        .iter()
+        .filter(|id| *id == super::viewpoint::MOD_ID || mods.get(*id).is_some_and(|m| m.requires.iter().any(|r| r == MOD_ID)))
+        .cloned()
+        .collect()
+}
+
+/// ZombieBuddy's agent is in the game folder (current) and the launcher loads it.
+pub fn agent_ready(mods: &std::collections::BTreeMap<String, crate::store::Row>) -> bool {
+    match locate(mods) {
+        (Some(l), Some(s)) => files_current(&l, &s) && launcher_patched(&l),
+        _ => false,
+    }
+}
+
 /// The folder inside a ZombieBuddy mod that holds `ZombieBuddy.jar` (normally `libs/`).
-pub fn libs_dir(mod_dir: &Path) -> Option<PathBuf> {
+fn libs_dir(mod_dir: &Path) -> Option<PathBuf> {
     let mut stack = vec![(mod_dir.to_path_buf(), 0)];
     while let Some((d, depth)) = stack.pop() {
         if d.join("ZombieBuddy.jar").is_file() {
@@ -64,13 +82,13 @@ pub fn libs_dir(mod_dir: &Path) -> Option<PathBuf> {
     None
 }
 
-fn read_launcher(launcher: &Path) -> Result<Value> {
+pub(crate) fn read_launcher(launcher: &Path) -> Result<Value> {
     let p = launcher.join(LAUNCHER);
     serde_json::from_str(&fs::read_to_string(&p).with_context(|| format!("reading {}", p.display()))?)
         .with_context(|| format!("{} isn't valid JSON", p.display()))
 }
 
-fn write_launcher(launcher: &Path, v: &Value) -> Result<()> {
+pub(crate) fn write_launcher(launcher: &Path, v: &Value) -> Result<()> {
     let p = launcher.join(LAUNCHER);
     let backup = launcher.join(format!("{LAUNCHER}.pzmm-backup"));
     if !backup.exists() {
@@ -88,13 +106,18 @@ pub fn launcher_patched(launcher: &Path) -> bool {
     read_launcher(launcher).is_ok_and(|v| v["vmArgs"].as_array().is_some_and(|a| a.iter().any(|x| x.as_str().is_some_and(is_zb_arg))))
 }
 
+/// The launcher loads the agent, but its files aren't in the game folder: the JVM won't start.
+pub fn launcher_broken(launcher: &Path) -> bool {
+    launcher_patched(launcher) && !agent_files().iter().all(|f| launcher.join(f).is_file())
+}
+
 /// Whether the agent files in the game folder match the mod's copies.
 pub fn files_current(launcher: &Path, libs: &Path) -> bool {
     agent_files().iter().all(|f| matches!((fs::read(libs.join(f)), fs::read(launcher.join(f))), (Ok(a), Ok(b)) if a == b))
 }
 
 /// Copy the agent files into the game folder and add the launcher flag. With `dry_run`
-/// nothing changes; either way the returned lines describe each change.
+/// nothing changes; either way the returned lines describe each change (`keyed!`, for the app's language).
 pub fn install(launcher: &Path, libs: &Path, dry_run: bool) -> Result<Vec<String>> {
     let mut changes = vec![];
     for f in agent_files() {
@@ -105,13 +128,13 @@ pub fn install(launcher: &Path, libs: &Path, dry_run: bool) -> Result<Vec<String
             continue;
         }
         if dry_run {
-            changes.push(format!("copy {f} to {}", launcher.display()));
+            changes.push(crate::keyed!("zbCopy", "copy {file} to {dir}", file = f, dir = launcher.display()));
         } else if crate::write_atomic(&dst, &new).is_ok() {
-            changes.push(format!("copied {f} to {}", launcher.display()));
+            changes.push(crate::keyed!("zbCopied", "copied {file} to {dir}", file = f, dir = launcher.display()));
         } else if *f == "ZombieBuddy.jar" {
             // the game has it open: zbNative swaps in ZombieBuddy.jar.new on next launch
             fs::write(launcher.join("ZombieBuddy.jar.new"), &new)?;
-            changes.push("staged ZombieBuddy.jar.new (the game is running; it takes effect on next launch)".into());
+            changes.push(crate::keyed!("zbStaged", "staged ZombieBuddy.jar.new (the game is running; it takes effect on next launch)"));
         } else {
             bail!("couldn't replace {} (close the game and try again)", dst.display());
         }
@@ -119,13 +142,23 @@ pub fn install(launcher: &Path, libs: &Path, dry_run: bool) -> Result<Vec<String
     let mut v = read_launcher(launcher)?;
     let Some(args) = v["vmArgs"].as_array_mut() else { bail!("{LAUNCHER} has no vmArgs list") };
     if !args.iter().any(|x| x.as_str().is_some_and(is_zb_arg)) {
-        changes.push(format!("add {} to {}", launch_arg(), launcher.join(LAUNCHER).display()));
+        changes.push(add_flag(launcher));
         if !dry_run {
             args.insert(0, Value::from(launch_arg()));
             write_launcher(launcher, &v)?;
         }
     }
     Ok(changes)
+}
+
+/// The change line for adding the launcher flag in `launcher`.
+pub fn add_flag(launcher: &Path) -> String {
+    crate::keyed!("zbAddFlag", "add {arg} to {file}", arg = launch_arg(), file = launcher.join(LAUNCHER).display())
+}
+
+/// The change line for copying the agent files into `launcher` (before ZombieBuddy is downloaded).
+pub fn copy_agent(launcher: &Path) -> String {
+    crate::keyed!("zbCopyAgent", "copy ZombieBuddy's Java agent files to {dir}", dir = launcher.display())
 }
 
 /// Remove the launcher flag and the agent files from the game folder.
@@ -135,7 +168,7 @@ pub fn uninstall(launcher: &Path, dry_run: bool) -> Result<Vec<String>> {
     if let Some(args) = v["vmArgs"].as_array_mut()
         && args.iter().any(|x| x.as_str().is_some_and(is_zb_arg))
     {
-        changes.push(format!("remove the ZombieBuddy flag from {}", launcher.join(LAUNCHER).display()));
+        changes.push(crate::keyed!("zbRemoveFlag", "remove the ZombieBuddy flag from {file}", file = launcher.join(LAUNCHER).display()));
         if !dry_run {
             args.retain(|x| !x.as_str().is_some_and(is_zb_arg));
             write_launcher(launcher, &v)?;
@@ -144,7 +177,7 @@ pub fn uninstall(launcher: &Path, dry_run: bool) -> Result<Vec<String>> {
     for f in ["zbNative.dll", "ZombieBuddy.jar", "ZombieBuddy.jar.new"] {
         let p = launcher.join(f);
         if p.exists() {
-            changes.push(format!("delete {}", p.display()));
+            changes.push(crate::keyed!("zbDelete", "delete {path}", path = p.display()));
             if !dry_run {
                 fs::remove_file(&p).with_context(|| format!("deleting {} (close the game and try again)", p.display()))?;
             }
@@ -180,6 +213,7 @@ mod tests {
 
         let preview = install(&game, &libs, true).unwrap();
         assert_eq!(preview.len(), agent_files().len() + 1);
+        assert!(preview[0].starts_with("errors.zbCopy{") && crate::unkeyed(&preview[0]).starts_with("copy "), "{preview:?}");
         assert!(!launcher_patched(&game) && !files_current(&game, &libs));
 
         install(&game, &libs, false).unwrap();
@@ -192,8 +226,11 @@ mod tests {
         assert!(game.join(format!("{LAUNCHER}.pzmm-backup")).exists());
         assert!(install(&game, &libs, false).unwrap().is_empty(), "second run changes nothing");
 
+        assert!(!launcher_broken(&game));
+        fs::remove_file(game.join("ZombieBuddy.jar")).unwrap();
+        assert!(launcher_broken(&game), "the flag without the jar stops the game");
         uninstall(&game, false).unwrap();
-        assert!(!launcher_patched(&game) && !game.join("ZombieBuddy.jar").exists());
+        assert!(!launcher_patched(&game) && !game.join("ZombieBuddy.jar").exists() && !launcher_broken(&game));
         assert_eq!(read_launcher(&game).unwrap()["vmArgs"], serde_json::json!(["-Xmx3072m"]));
     }
 

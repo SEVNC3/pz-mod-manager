@@ -1,12 +1,12 @@
 <script lang="ts" module>
   import type { Overlap } from "./api";
-  import { t } from "./i18n.svelte";
+  import { intlLang, t } from "./i18n.svelte";
 
   /** What an overlap means, for the icon's label. */
   export const overlapLabel = (o: Overlap) =>
     [
-      o.wins_over.length && t("layerIcon.overrides", { mods: o.wins_over.join(", ") }),
-      o.loses_to.length && t("layerIcon.overriddenBy", { mods: o.loses_to.join(", ") }),
+      o.wins_over.length && t("layerIcon.overrides", { mods: new Intl.ListFormat(intlLang(), { type: "conjunction" }).format(o.wins_over) }),
+      o.loses_to.length && t("layerIcon.overriddenBy", { mods: new Intl.ListFormat(intlLang(), { type: "conjunction" }).format(o.loses_to) }),
     ]
       .filter(Boolean)
       .join(". ");

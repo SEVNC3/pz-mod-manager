@@ -15,12 +15,21 @@
   --on-accent: #ffffff;
   /* text and markers on a hover or selected highlight: white on Charcoal, ink on Daylight's pale red */
   --on-selected: #ffffff;
+  /* white brand glyphs (GitHub, Discord): as they are on Charcoal, near black on Daylight */
+  --glyph: none;
   --grid-major: rgb(255 255 255 / 0.09);
   --grid-minor: rgb(255 255 255 / 0.035);
   /* the Maps grid: a map's cells, and a map over a vanilla area (conflicts use --danger) */
+  /* subscribed: git-diff green */
+  --ok: #3fb950;
+  /* an update is waiting: orange, apart from the red of problems */
+  --warn: #f0883e;
   --map-cell: #5b9bd5;
   --map-over: #d8b443;
   --map-water: #4fa3a5;
+  /* the world under the grid (the game's own map data): roads and buildings */
+  --map-road: #7d7a72;
+  --map-building: #a08a68;
   /* the accent is dark (1.3-1.5:1 on charcoal): big fills use it as is; text and thin
      indicators (tab underline, selection bars, stars) use --accent-text, ~5.8:1 on raised */
   --accent-soft: color-mix(in oklab, var(--accent) 32%, transparent);
@@ -34,9 +43,12 @@
   --card-shadow: 0 1px 2px rgb(0 0 0 / 0.55), 0 8px 22px rgb(0 0 0 / 0.55);
   --card-drop: drop-shadow(0 1px 2px rgb(0 0 0 / 0.55)) drop-shadow(0 8px 14px rgb(0 0 0 / 0.5));
 
-  --font-body: "Atkinson Hyperlegible", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --font-marker: "Permanent Marker", "Segoe Print", cursive;
+  /* the bundled fonts are Latin (Plex Mono Cyrillic too): Cyrillic and Polish fall to Segoe, Chinese and
+     Korean to their Windows fonts (Korean's first, below), never to a cursive or a guessed font */
+  --cjk: "Microsoft YaHei", "Malgun Gothic";
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", var(--cjk), system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, var(--cjk), monospace;
+  --font-marker: "Permanent Marker", "Segoe Print", "Segoe UI", var(--cjk), cursive;
 
   color-scheme: dark;
 }
@@ -55,11 +67,16 @@
     --panel: #f5f6f3;
     --raised: #ffffff;
     --on-selected: var(--text);
+    --glyph: invert(0.85);
     --grid-major: rgb(27 33 36 / 0.09);
     --grid-minor: rgb(27 33 36 / 0.035);
+    --ok: #1a7f37;
+    --warn: #bc4c00;
     --map-cell: #2f6fae;
-    --map-over: #a47c0c;
+    --map-over: #866207;
     --map-water: #2c8587;
+  --map-road: #8e8a7f;
+  --map-building: #b39770;
     --line: #cdd4ce;
     --text: #1b2124;
     --muted: #59665f;
@@ -78,11 +95,16 @@
   --panel: #f5f6f3;
   --raised: #ffffff;
   --on-selected: var(--text);
+  --glyph: invert(0.85);
   --grid-major: rgb(27 33 36 / 0.09);
   --grid-minor: rgb(27 33 36 / 0.035);
+  --ok: #1a7f37;
+  --warn: #bc4c00;
   --map-cell: #2f6fae;
-  --map-over: #a47c0c;
+  --map-over: #866207;
   --map-water: #2c8587;
+  --map-road: #8e8a7f;
+  --map-building: #b39770;
   --line: #cdd4ce;
   --text: #1b2124;
   --muted: #59665f;
@@ -113,15 +135,17 @@ body {
   font: 14px/1.45 var(--font-body);
   -webkit-font-smoothing: antialiased;
 }
-/* Korean wraps between words, not inside them */
+/* Korean wraps between words, not inside them, and its own font draws the shared Han and punctuation */
 :root:lang(ko) {
+  --cjk: "Malgun Gothic", "Microsoft YaHei";
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
   color: inherit;
 }
@@ -203,8 +227,36 @@ button.link {
   background: var(--accent-soft);
 }
 
+/* tabs inside a page or card (the app's tab bar, smaller): a server's sections and views */
+.subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 2px;
+  border-bottom: 1px solid var(--line);
+}
+.subtabs button {
+  padding: 6px 10px 5px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 4px 4px 0 0; /* the highlight rounded on top, square on the underline */
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--muted);
+}
+.subtabs button:hover:not(:disabled),
+.subtabs button.active {
+  color: var(--on-selected);
+  background: var(--accent-soft);
+  border-bottom-color: var(--on-selected);
+  box-shadow: inset 0 1px 0 var(--hover-line), inset 1px 0 0 var(--hover-line), inset -1px 0 0 var(--hover-line);
+}
+
 input[type="text"],
+input[type="number"],
+input[type="password"],
+input[type="time"],
 input[type="search"],
+textarea,
 select {
   background: var(--raised);
   border: 1px solid var(--line);
@@ -251,6 +303,7 @@ select {
     background: var(--hover);
     color: var(--on-selected);
     outline: none;
+    box-shadow: inset 0 0 0 1px var(--hover-line);
   }
   option:checked {
     font-weight: 700;
@@ -363,6 +416,7 @@ input[type="checkbox"] {
 .drag-list > li:not(.tail):hover,
 .drag-list > li.selected {
   color: var(--on-selected);
+  box-shadow: inset 0 0 0 1px var(--hover-line);
 }
 /* the hover/selection marker: a solid white chevron on the row's left edge */
 .drag-list > li:not(.tail):hover::before,

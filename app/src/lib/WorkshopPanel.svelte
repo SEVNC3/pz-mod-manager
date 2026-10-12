@@ -1,12 +1,14 @@
 <script lang="ts">
-  import { api, type ChangeNote, type Comments, type WorkshopInfo, type WorkshopItem } from "./api";
+  import { api, type ChangeNote, type Comments, type ServerCard, type WorkshopInfo, type WorkshopItem } from "./api";
   import { bbcode } from "./bbcode";
-  import { compact, fmtDate, fmtSize, workshopUrl } from "./format";
+  import { compact, fmtDate, fmtNum, fmtSize, modChanges, workshopUrl } from "./format";
   import Icon from "./Icon.svelte";
   import InstallButton from "./InstallButton.svelte";
+  import Menu from "./Menu.svelte";
   import Stars from "./Stars.svelte";
-  import { t } from "./i18n.svelte";
-  import { trap } from "./ui";
+  import { keyedError, t } from "./i18n.svelte";
+  import { arrowPick, linkClick, trap } from "./ui";
+  import { confirmed } from "./ask.svelte";
 
   // The item panel: everything Steam's item page shows, plus Install.
   let { item, busy, installing, onInstall, onClose, onDependents, onInCollections, onAuthor, onOpen, onBack }: {
@@ -49,7 +51,7 @@
     changesPage = 1;
     commentsStart = 0;
     const mine = ++req;
-    api.workshopInfo(id).then((r) => mine === req && (info = r)).catch((e) => mine === req && (errors.about = String(e)));
+    api.workshopInfo(id).then((r) => mine === req && (info = r)).catch((e) => mine === req && (errors.about = t(...keyedError(e))));
   });
 
   // the card's numbers (rating, author) win; the details call adds the full description
@@ -65,7 +67,7 @@
       const r = await api.workshopChanges(item.id, p);
       if (mine === reqChanges) changes = r;
     } catch (e) {
-      if (mine === reqChanges) errors.changes = String(e);
+      if (mine === reqChanges) errors.changes = t(...keyedError(e));
     }
   }
   async function loadComments(start: number) {
@@ -77,7 +79,7 @@
       const r = await api.workshopComments(it.creator, item.id, start);
       if (mine === reqComments) comments = r;
     } catch (e) {
-      if (mine === reqComments) errors.comments = String(e);
+      if (mine === reqComments) errors.comments = t(...keyedError(e));
     }
   }
 
@@ -94,15 +96,47 @@
     if (t === "comments" && !comments) loadComments(0);
   }
 
-  /** Links in descriptions open in the browser, never inside the app window. */
-  function linkClick(e: MouseEvent) {
-    const a = (e.target as HTMLElement).closest("a[data-href]");
-    if (!a) return;
-    e.preventDefault();
-    api.openUrl(a.getAttribute("data-href")!);
+  const date = (t: number) => fmtDate(t, "long") || "—";
+
+  // --- Add to server: this item (a collection: its items), and what it requires, in a hosted server's mod lines ---
+  let serverMenu = $state<{ x: number; y: number; servers: ServerCard[] } | null>(null);
+  let serverNote = $state("");
+  let serverError = $state("");
+  let adding = $state(false);
+
+  async function chooseServer(e: MouseEvent) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    serverError = serverNote = "";
+    try {
+      const servers = (await api.hostView()).servers.filter((s) => s.managed && !s.remote);
+      if (!servers.length) serverError = t("panel.noServers");
+      else if (servers.length === 1) addToServer(servers[0]);
+      else serverMenu = { x: r.left, y: r.bottom + 2, servers };
+    } catch (err) {
+      serverError = String(err);
+    }
   }
 
-  const date = (t: number) => fmtDate(t, "long") || "—";
+  async function addToServer(s: ServerCard) {
+    adding = true;
+    serverError = serverNote = "";
+    try {
+      const [next, notes] = await api.hostLinesWith(await api.hostLines(s.name), it.id, s.build === "legacy41" ? 41 : 42, false);
+      const p = await api.hostPreview(s.name, next);
+      if (!p.added.length && !p.items_added.length) {
+        serverNote = t("panel.onServerAlready", { name: s.name });
+        return;
+      }
+      const lines = [...modChanges(p.added, p.removed), ...(p.items_added.length ? [t("hosting.mods.itemsAdded", { count: p.items_added.length, ids: p.items_added.join(", ") })] : []), ...notes];
+      if (!(await confirmed(t("panel.addToServerAsk", { name: s.name }), { label: t("panel.addToServer"), icon: "server" }, lines))) return;
+      await api.hostWrite(s.name, next);
+      serverNote = t(s.status === "running" ? "panel.addedToServerRestart" : "panel.addedToServer", { name: s.name });
+    } catch (err) {
+      serverError = String(err);
+    } finally {
+      adding = false;
+    }
+  }
 </script>
 
 <div class="backdrop" onclick={onClose} aria-hidden="true"></div>
@@ -142,7 +176,14 @@
     <div class="actions">
       <InstallButton item={it} {busy} {installing} {onInstall} all={(info?.members.length || it.num_children) ? t("panel.installAll", { count: info?.members.length || it.num_children }) : undefined} />
       <button onclick={() => api.openUrl(workshopUrl(it.id))}><Icon name="steam" size={14} />{t("panel.workshopPage")}</button>
+      <button onclick={chooseServer} disabled={adding} aria-haspopup="menu" aria-expanded={!!serverMenu} title={t("panel.addToServerTip")}><Icon name="server" size={14} />{adding ? t("panel.addingToServer") : t("panel.addToServer")}</button>
     </div>
+    {#if serverNote}<p class="hint" role="status">{serverNote}</p>{/if}
+    {#if serverError}<p class="error">{serverError}</p>{/if}
+    {#if serverMenu}
+      <Menu x={serverMenu.x} y={serverMenu.y} label={t("panel.addToServer")} onClose={() => (serverMenu = null)}
+        items={serverMenu.servers.map((s) => ({ label: s.name, icon: "server" as const, run: () => addToServer(s) }))} />
+    {/if}
 
     <dl class="stats">
       {#if it.votes > 0}
@@ -195,10 +236,10 @@
       </ul>
     {/if}
 
-    <div class="tabs" role="tablist">
-      <button role="tab" aria-selected={tab === "about"} class:on={tab === "about"} onclick={() => pick("about")}>{t("panel.description")}</button>
-      <button role="tab" aria-selected={tab === "changes"} class:on={tab === "changes"} onclick={() => pick("changes")}>{t("panel.changeNotes")}</button>
-      <button role="tab" aria-selected={tab === "comments"} class:on={tab === "comments"} onclick={() => pick("comments")}>{t("panel.commentsTab", { n: compact.format(it.comments) })}</button>
+    <div class="tabs" role="tablist" tabindex="-1" onkeydown={(e) => arrowPick(e, ["about", "changes", "comments"], tab, (v) => pick(v as typeof tab))}>
+      <button role="tab" aria-selected={tab === "about"} tabindex={tab === "about" ? 0 : -1} class:on={tab === "about"} onclick={() => pick("about")}>{t("panel.description")}</button>
+      <button role="tab" aria-selected={tab === "changes"} tabindex={tab === "changes" ? 0 : -1} class:on={tab === "changes"} onclick={() => pick("changes")}>{t("panel.changeNotes")}</button>
+      <button role="tab" aria-selected={tab === "comments"} tabindex={tab === "comments" ? 0 : -1} class:on={tab === "comments"} onclick={() => pick("comments")}>{t("panel.commentsTab", { n: compact.format(it.comments) })}</button>
     </div>
 
     {#if errors[tab]}<p class="error">{errors[tab]}</p>{/if}
@@ -230,7 +271,7 @@
         </ol>
         <nav class="pager">
           <button disabled={commentsStart <= 0} onclick={() => loadComments(Math.max(0, commentsStart - 20))}><Icon name="chevron-left" size={14} />{t("panel.newer")}</button>
-          <span class="muted">{t("panel.commentsRange", { from: commentsStart + 1, to: Math.min(commentsStart + 20, comments.total), total: comments.total })}</span>
+          <span class="muted">{t("panel.commentsRange", { from: fmtNum(commentsStart + 1), to: fmtNum(Math.min(commentsStart + 20, comments.total)), total: fmtNum(comments.total) })}</span>
           <button disabled={commentsStart + 20 >= comments.total} onclick={() => loadComments(commentsStart + 20)}>{t("panel.older")}<Icon name="chevron-right" size={14} /></button>
         </nav>
       {/if}
@@ -424,7 +465,7 @@
   }
   .tabs button {
     border: 0;
-    border-radius: 0;
+    border-radius: 4px 4px 0 0; /* the highlight rounded on top, square on the underline */
     background: transparent;
     color: var(--muted);
     border-bottom: 2px solid transparent;
@@ -435,6 +476,7 @@
     color: var(--on-selected);
     background: var(--accent-soft);
     border-bottom-color: var(--on-selected);
+    box-shadow: inset 0 1px 0 var(--hover-line), inset 1px 0 0 var(--hover-line), inset -1px 0 0 var(--hover-line);
   }
   .desc {
     overflow-wrap: anywhere;

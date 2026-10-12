@@ -154,8 +154,10 @@ pub fn install(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> 
         if dest.exists() && same_tree(&m.dir, &dest) {
             crate::say!("alreadyCurrent", "{id} is already up to date ({source})", id = m.id, source = source);
         } else {
-            // staged outside Zomboid/mods so the game never sees a half-copied mod
-            let staging = paths.data.join("staging").join(&m.id);
+            // staged beside Zomboid/mods (on its drive, even through a link: one rename into place,
+            // never a copy) and outside it, so the game never sees a half-copied mod
+            let mods = fs::canonicalize(paths.mods()).unwrap_or_else(|_| paths.mods());
+            let staging = mods.parent().unwrap_or(&paths.zomboid).join(".pzmm-staging").join(&m.id);
             if staging.exists() {
                 fs::remove_dir_all(&staging)?;
             }
@@ -163,7 +165,8 @@ pub fn install(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> 
                 let _ = fs::remove_dir_all(&staging);
                 return Err(e).with_context(|| format!("copying {} into {}", m.id, paths.mods().display()));
             }
-            if dest.exists() {
+            let update = dest.exists();
+            if update {
                 let backup = backup_dir(paths, &m.id)?;
                 if backup.exists() {
                     fs::remove_dir_all(&backup)?;
@@ -171,7 +174,12 @@ pub fn install(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> 
                 move_dir(&dest, &backup)?;
             }
             move_dir(&staging, &dest).with_context(|| format!("moving {} into place", m.id))?;
-            crate::say!("installed", "installed {id} ({source})", id = m.id, source = source);
+            let _ = fs::remove_dir(staging.parent().unwrap_or(&staging)); // when empty
+            if update {
+                crate::say!("updated", "updated {id} ({source})", id = m.id, source = source);
+            } else {
+                crate::say!("installed", "installed {id} ({source})", id = m.id, source = source);
+            }
         }
         index.insert(m.id.clone(), Entry { source: source.to_string(), installed_at: now() });
         save(paths, &index)?;
@@ -273,7 +281,35 @@ pub fn clear_backups(paths: &Paths) -> Result<()> {
     Ok(())
 }
 
-#[derive(Clone)]
+// --- tags: the player's own labels per mod, in `<data>/tags.json` (every profile shares them) ---
+
+pub type Tags = BTreeMap<String, Vec<String>>;
+
+/// Mod id -> its tags (none without the file; a damaged one is kept aside, see `read_json`).
+pub fn tags(paths: &Paths) -> Tags {
+    crate::read_json(&paths.data.join("tags.json")).unwrap_or_default()
+}
+
+/// Set a mod's tags (trimmed, blanks and repeats dropped; none removes it). Returns them all.
+pub fn set_tags(paths: &Paths, id: &str, list: &[String]) -> Result<Tags> {
+    let mut all: Tags = crate::read_json(&paths.data.join("tags.json"))?;
+    let mut clean: Vec<String> = vec![];
+    for t in list.iter().map(|t| t.trim()).filter(|t| !t.is_empty()) {
+        if !clean.iter().any(|c| c.eq_ignore_ascii_case(t)) {
+            clean.push(t.to_string());
+        }
+    }
+    if clean.is_empty() {
+        all.remove(id);
+    } else {
+        all.insert(id.to_string(), clean);
+    }
+    fs::create_dir_all(&paths.data)?;
+    crate::write_atomic(&paths.data.join("tags.json"), serde_json::to_string_pretty(&all)?)?;
+    Ok(all)
+}
+
+#[derive(Clone, Default)]
 pub struct Row {
     pub id: String,
     pub name: String,
@@ -285,13 +321,20 @@ pub struct Row {
     pub incompatible: Vec<String>,
     pub load_after: Vec<String>,
     pub load_before: Vec<String>,
+    /// Mod Load Order Sorter's `loadFirst=` / `loadLast=` ("on", "category" or empty).
+    pub load_first: String,
+    pub load_last: String,
+    pub author: String,
     pub supports_41: bool,
     pub supports_42: bool,
+    /// Languages it has texts in (`Translate/<LANG>` folders).
+    pub languages: Vec<String>,
 }
 
 impl Row {
     fn from_found(m: pz::FoundMod, source: String) -> Row {
         Row {
+            languages: pz::files::languages(&m.dir),
             id: m.id,
             name: m.name,
             source,
@@ -301,10 +344,21 @@ impl Row {
             incompatible: m.incompatible,
             load_after: m.load_after,
             load_before: m.load_before,
+            load_first: m.load_first,
+            load_last: m.load_last,
+            author: m.author,
             supports_41: m.supports_41,
             supports_42: m.supports_42,
         }
     }
+}
+
+/// The mods in a Workshop content folder (`<ws>/<item>/mods/...`), sourced `steam:<item>`.
+pub fn workshop_rows(ws: &Path) -> impl Iterator<Item = Row> + '_ {
+    pz::workshop_mods(ws).into_iter().map(move |m| {
+        let item = m.dir.strip_prefix(ws).ok().and_then(|r| r.iter().next()).map(|s| s.to_string_lossy().into_owned());
+        Row::from_found(m, format!("steam:{}", item.unwrap_or_default()))
+    })
 }
 
 /// Every mod the game can load: Steam subscriptions, then Zomboid/mods (wins on clashes).
@@ -312,11 +366,7 @@ pub fn scan(paths: &Paths) -> Result<BTreeMap<String, Row>> {
     let index = load(paths)?;
     let mut out = BTreeMap::new();
     if let Some(ws) = pz::workshop_dir() {
-        for m in pz::workshop_mods(&ws) {
-            let item = m.dir.strip_prefix(&ws).ok().and_then(|r| r.iter().next()).map(|s| s.to_string_lossy().into_owned());
-            let source = format!("steam:{}", item.unwrap_or_default());
-            out.insert(m.id.clone(), Row::from_found(m, source));
-        }
+        out.extend(workshop_rows(&ws).map(|r| (r.id.clone(), r)));
     }
     for m in pz::local_mods(paths) {
         let source = index.get(&m.id).map_or("manual".to_string(), |e| e.source.clone());
@@ -393,7 +443,7 @@ pub(crate) mod tests {
         install(&paths, &t.path().join("v2"), "local:v2").unwrap(); // same content again
         rollback(&paths, "M").unwrap();
         assert!(fs::read_to_string(paths.mods().join("M/mod.info")).unwrap().contains("v1"));
-        assert!(!paths.data.join("staging/M").exists());
+        assert!(!paths.zomboid.join(".pzmm-staging").exists(), "staged beside mods, then gone");
     }
 
     #[test]
@@ -415,6 +465,17 @@ pub(crate) mod tests {
         assert!(!paths.data.join("backups/Old").exists() && paths.data.join("backups/New").exists());
         clear_backups(&paths).unwrap();
         assert_eq!(backups_size(&paths), 0);
+    }
+
+    #[test]
+    fn tags_are_cleaned_and_removed_when_empty() {
+        let (_t, paths) = temp_paths();
+        assert!(tags(&paths).is_empty());
+        let all = set_tags(&paths, "A", &[" Guns ".into(), "guns".into(), "".into(), "Must have".into()]).unwrap();
+        assert_eq!(all["A"], ["Guns", "Must have"]);
+        set_tags(&paths, "B", &["Maps".into()]).unwrap();
+        assert_eq!(set_tags(&paths, "A", &[]).unwrap().keys().collect::<Vec<_>>(), ["B"]);
+        assert_eq!(tags(&paths)["B"], ["Maps"], "kept on disk");
     }
 
     #[test]

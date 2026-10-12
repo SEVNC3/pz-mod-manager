@@ -31,17 +31,36 @@ export function systemLang() {
 /** The UI language: the one picked in Settings, or the system's. */
 export const lang = () => (LANGS[prefs.lang] ? prefs.lang : systemLang());
 
+/** The UI language for Intl (lists, relative times): our English is British ("A, B and C", not "A, B, and C"). */
+export const intlLang = () => (lang() === "en" ? "en-GB" : lang());
+
 /** Locale for numbers and dates: the system's own (its region) when it speaks the UI language. */
-export const numLocale = () => (navigator.language.split("-")[0] === lang().split("-")[0] ? navigator.language : lang());
+export const numLocale = () => (navigator.language.split("-")[0] === lang().split("-")[0] ? navigator.language : intlLang());
 
 const lookup = (d: Dict | undefined, key: string) => key.split(".").reduce<string | Dict | undefined>((o, k) => (typeof o === "object" ? o[k] : undefined), d);
 
 export function t(key: string, vars: Vars = {}, to = lang()): string {
   let s = lookup(dicts[`./locales/${to}.json`], key) ?? lookup(dicts["./locales/en.json"], key) ?? key;
   if (typeof s === "object") s = (s[new Intl.PluralRules(to).select(Number(vars.count))] ?? s.other) as string;
-  return s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
+  // a count reads in the UI language's style (12,345), the backend's (a string of digits) too
+  const show = (k: string) => (k === "count" && /^\d+$/.test(String(vars[k])) ? Number(vars[k]).toLocaleString(numLocale()) : String(vars[k]));
+  return s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? show(k) : m));
 }
 
 const esc = (v: string | number) => String(v).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 /** `t` for text with markup (<strong>, <kbd>…) to render with {@html}: the vars are escaped, the locale files are ours. */
 export const th = (key: string, vars: Vars = {}) => t(key, Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, esc(v)])));
+
+/**
+ * A backend error as `t`'s arguments: a keyed one (`errors.<key>{values}: English`, src-tauri's `keyed!`) gives its key
+ * and values, so `t(...keyedError(e))` shows it in the player's language; anything else (or a key we lack) its own text.
+ */
+export function keyedError(e: unknown): [string, Vars] {
+  const s = String(e).replace(/^Error:\s*/, "");
+  const m = s.match(/^(errors\.\w+)(\{[\s\S]*?\})?: /);
+  if (!m) return [s, {}];
+  try {
+    if (lookup(dicts["./locales/en.json"], m[1]) !== undefined) return [m[1], m[2] ? JSON.parse(m[2]) : {}];
+  } catch {}
+  return [s.slice(m[0].length), {}];
+}

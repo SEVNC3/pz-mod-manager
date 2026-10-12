@@ -1,0 +1,33 @@
+name: Bug report
+description: Something in PZMM doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: PZMM is in early access, so bugs are expected. Thanks for reporting one.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, step by step, and what went wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: In PZMM, open Settings > About > Copy diagnostics and paste here. Your user name is masked.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or logs
+      description: Optional. Settings > About > Open log folder has PZMM's log files.

@@ -3,8 +3,8 @@
   import type { MapScan } from "./api";
 
   // the Workshop scan outlives the tab (it runs in the backend), so its state lives here
-  // `build`: the build it last ran for (switching builds scans again); `stopping`: Stop was clicked
-  const scan = $state({ running: false, p: null as MapScan | null, error: "", ticks: 0, started: false, build: 0, stopping: false });
+  // `stopping`: Stop was clicked
+  const scan = $state({ running: false, p: null as MapScan | null, error: "", ticks: 0, stopping: false });
   let listening = false;
   function follow() {
     if (listening) return;
@@ -18,15 +18,18 @@
 </script>
 
 <script lang="ts">
-  import { onMount, untrack } from "svelte";
+  import { untrack } from "svelte";
   import { MediaQuery } from "svelte/reactivity";
-  import { api, type Cell, type GridCell, type MapCompare, type MapMod, type MapsView, type ModRow, type WorkshopItem } from "./api";
+  import { api, type Cell, type GridCell, type MapBackground, type MapCompare, type MapMod, type MapsView, type ModRow, type WorkshopItem } from "./api";
   import Icon from "./Icon.svelte";
+  import MapGrid, { backgrounds, loadImage, readBackground } from "./MapGrid.svelte";
   import MapOrder from "./MapOrder.svelte";
-  import { compact, fmtAgo, fmtSize, workshopUrl } from "./format";
-  import { t, th, type Vars } from "./i18n.svelte";
+  import { compact, fmtAgo, fmtNum, fmtSize, workshopUrl } from "./format";
+  import { intlLang, keyedError, lang, t, th, type Vars } from "./i18n.svelte";
   import { prefs } from "./prefs.svelte";
-  import { arrowPick, isTyping } from "./ui";
+  import { arrowPick, isTyping, trap } from "./ui";
+  import { confirmed } from "./ask.svelte";
+  import { solveBackground } from "./order";
 
   let { busy, profile, mods, loadOrder, say, onSetMods, onInstallWorkshop, onShowMod, canUndo, onUndo, find = "" }: {
     busy: boolean;
@@ -67,7 +70,12 @@
   /** Clicked cells (shift-click adds): the list shows only the maps covering one of them. */
   let pickedCells = $state<Cell[]>([]);
 
-  const load = () => api.mapView().then((v) => (data = v)).catch((e) => say(errText(e), {}, true));
+  // only the latest answer counts: an older, slower one never replaces it
+  let viewFor = 0;
+  const load = () => {
+    const ask = ++viewFor;
+    return api.mapView().then((v) => ask === viewFor && (data = v)).catch((e) => say(errText(e), {}, true));
+  };
   // after installs, removals and toggles (busy flips back), like Details; as the scan reads, and
   // when it ends (even if the tab was closed and opened again meanwhile)
   $effect(() => {
@@ -87,14 +95,18 @@
   /** Shown maps left off the grid (to see what's under them); they still count as shown elsewhere. */
   let hidden = $state<Set<string>>(new Set());
   const drawn = $derived(shown.filter((m) => !hidden.has(m.id)));
+  /** Shown maps hidden from the grid (a hidden map no longer shown doesn't count). */
+  const hiddenCount = $derived(shown.length - drawn.length);
   const cellCount = (m: MapMod) => m.maps.reduce((n, f) => n + f.cells.length, 0);
   const key = ([x, y]: Cell) => `${x},${y}`;
 
   let grid = $state.raw<GridCell[]>([]);
+  /** The grid has been worked out at least once (an empty one then means nothing to draw). */
+  let gridDone = $state(false);
   let gridFor = 0;
   $effect(() => {
     const ask = ++gridFor;
-    api.mapGrid(data?.vanilla ?? [], data?.water ?? [], drawn).then((g) => ask === gridFor && (grid = g)).catch((e) => say(errText(e), {}, true));
+    api.mapGrid(data?.vanilla ?? [], data?.water ?? [], drawn).then((g) => ask === gridFor && ((grid = g), (gridDone = !!data))).catch((e) => say(errText(e), {}, true));
   });
   const byCell = $derived(new Map(grid.map((c) => [`${c.x},${c.y}`, c])));
   const vanillaSet = $derived(new Set((data?.vanilla ?? []).map(key)));
@@ -154,6 +166,9 @@
   }
 
   // --- the list: search, filter, sort ---
+  const collate = $derived(new Intl.Collator(lang()).compare);
+  /** Names as a list in the app's language ("a, b and c"). */
+  const listOf = (xs: string[], type: Intl.ListFormatType = "conjunction") => new Intl.ListFormat(intlLang(), { type }).format(xs);
   // svelte-ignore state_referenced_locally
   let search = $state(find);
   type Filter = "all" | "on" | "installed" | "missing" | "conflict" | "over";
@@ -190,7 +205,7 @@
       newest: (a, b) => (metaOf(b)?.created ?? -1) - (metaOf(a)?.created ?? -1),
     };
     // spawn-point mods (no cells) after the maps, in every sort
-    return out.sort((a, b) => +!cellCount(a) - +!cellCount(b) || by[sortBy](a, b) || nameOf(a).localeCompare(nameOf(b)));
+    return out.sort((a, b) => +!cellCount(a) - +!cellCount(b) || by[sortBy](a, b) || collate(nameOf(a), nameOf(b)));
   });
   // thousands of Workshop maps: draw the list a page at a time
   let limit = $state(150);
@@ -260,13 +275,13 @@
   // --- the Workshop source: every Map-tagged item, read from Steam's file lists ---
   async function startScan() {
     follow();
-    Object.assign(scan, { running: true, error: "", started: true, stopping: false, build: data?.build ?? 0 });
+    Object.assign(scan, { running: true, error: "", stopping: false });
     try {
       const p = await api.mapScan();
       scan.p = p;
       if (p.failed) say("maps.scan.failed", { count: p.failed }, true);
     } catch (e) {
-      scan.error = String(e);
+      scan.error = t(...keyedError(e));
     } finally {
       scan.running = false; // the load effect picks up the last batch
     }
@@ -275,19 +290,14 @@
     scan.stopping = true;
     api.mapScanStop().catch(() => {});
   }
-  $effect(() => {
-    // once per session and build: later scans only read new and updated items
-    const build = data?.build;
-    if (prefs.mapsWorkshop && build && untrack(() => !scan.running && (!scan.started || scan.build !== build))) startScan();
-  });
   const workshopCount = $derived(data ? Object.keys(data.items).length : 0);
   const scanText = $derived.by(() => {
     const p = scan.p;
     if (scan.error) return /429|limiting/i.test(scan.error) ? t("maps.scan.limited") : errText(scan.error);
     if (scan.running && scan.stopping) return t("maps.scan.stopping");
-    if (!scan.running || !p) return t("maps.scan.summary", { n: data?.checked.length ?? 0, count: workshopCount });
-    if (p.phase === "listing") return t("maps.scan.listing", { done: p.done, total: p.total || "?" });
-    return t(p.failed ? "maps.scan.readingFailed" : "maps.scan.reading", { done: p.done, total: p.total, failed: p.failed });
+    if (!scan.running || !p) return t("maps.scan.summary", { n: fmtNum(data?.checked.length ?? 0), count: workshopCount });
+    if (p.phase === "listing") return t("maps.scan.listing", { done: fmtNum(p.done), total: p.total ? fmtNum(p.total) : "?" });
+    return t(p.failed ? "maps.scan.readingFailed" : "maps.scan.reading", { done: fmtNum(p.done), total: fmtNum(p.total), failed: fmtNum(p.failed) });
   });
 
   // --- requirements: required mods (require=) and map folders (lots=) the shown maps need ---
@@ -329,7 +339,7 @@
         add(p?.id ?? `map:${lot}`, p?.id ?? "", lot, m);
       }
     }
-    return [...out.values()].sort((a, b) => (a.id || a.folder).localeCompare(b.id || b.folder));
+    return [...out.values()].sort((a, b) => collate(a.id || a.folder, b.id || b.folder));
   });
   /** The Requirements card: each requirement and the maps that need it, or each map's tree. */
   let reqView = $state<"list" | "tree">("list");
@@ -351,7 +361,7 @@
         finding[n.id] = [list.length ? "maps.req.noClearResult" : "maps.req.noMatch", { id: n.id }];
       }
     } catch (e) {
-      finding[n.id] = [String(e), {}];
+      finding[n.id] = keyedError(e);
     }
   }
 
@@ -369,9 +379,15 @@
   // saved (and given to the game) only when the player arranges, once they stop for a moment:
   // opening the tab changes nothing
   let saving: ReturnType<typeof setTimeout> | undefined;
+  /** The profile was snapshotted before this visit's first arrangement (Snapshots can undo it). */
+  let snapped = false;
   function arranged(line: string[]) {
     lineFor++; // an answer still on its way is older than this
     clearTimeout(saving);
+    if (!snapped) {
+      snapped = true;
+      api.snapshotCreate("maps").catch(() => {});
+    }
     const to = profile; // as arranged: the prop follows a switch made while the save waits
     saving = setTimeout(() => api.mapOrderSave(line, to).catch((e) => say(errText(e), {}, true)), 600);
   }
@@ -390,14 +406,11 @@
   let presets = $state<Record<string, string[]>>({});
   let presetName = $state("");
   let presetPick = $state("");
-  onMount(() => {
-    api.mapPresets().then((p) => (presets = p)).catch(() => {});
-  });
   async function savePreset(e: Event) {
     e.preventDefault();
     const name = presetName.trim();
     if (!name) return;
-    if (presets[name] && !confirm(t("maps.presets.confirmReplace", { name }))) return;
+    if (presets[name] && !(await confirmed(t("maps.presets.confirmReplace", { name }), { label: t("maps.presets.replace"), icon: "check" }))) return;
     try {
       presets = await api.mapPresetSet(name, shown.map((m) => m.id));
       presetPick = name;
@@ -412,9 +425,10 @@
     const known = new Set(all.map((m) => m.id));
     setPreview(new Set(ids.filter((id) => known.has(id) && !isOn(id))));
     const gone = ids.filter((id) => !known.has(id));
-    say(gone.length ? "maps.presets.previewingMissing" : "maps.presets.previewing", { name: presetPick, ids: gone.join(", ") }, gone.length > 0);
+    say(gone.length ? "maps.presets.previewingMissing" : "maps.presets.previewing", { name: presetPick, ids: listOf(gone, "unit") }, gone.length > 0);
   }
   async function deletePreset() {
+    if (!(await confirmed(t("maps.presets.confirmRemove", { name: presetPick }), { label: t("common.remove"), icon: "trash" }))) return;
     try {
       presets = await api.mapPresetSet(presetPick, null);
       presetPick = "";
@@ -427,8 +441,11 @@
   let servers = $state<string[]>([]);
   let server = $state("");
   let compared = $state<MapCompare | null>(null);
-  onMount(() => {
-    api.serversAndSaves().then((d) => ((servers = d.servers), (server = d.servers[0] ?? ""))).catch(() => {});
+  // presets and server configs: read on opening, and again once a busy spell (that may have failed them) ends
+  $effect(() => {
+    if (busy) return;
+    api.mapPresets().then((p) => (presets = p)).catch(() => {});
+    api.serversAndSaves().then((d) => ((servers = d.servers), (server = d.servers.includes(server) ? server : (d.servers[0] ?? "")))).catch(() => {});
   });
   async function compareServer() {
     try {
@@ -467,9 +484,10 @@
       try {
         found = await api.mapCheck(id, false);
       } catch (err) {
-        if (checkStopping) throw err;
+        // only a missing file list is what a SteamCMD download gets round (not being offline, say)
+        if (checkStopping || !String(err).includes("maps.err.fileList")) throw err;
         const why = errParts(err);
-        if (!confirm(t("maps.check.confirmDownload", { title: item.title, error: why.detail || why.text, size: fmtSize(item.file_size) }))) return;
+        if (!(await confirmed(t("maps.check.confirmDownload", { title: item.title, error: why.detail || why.text, size: fmtSize(item.file_size) }), { label: t("maps.check.download"), icon: "download" }))) return;
         found = await api.mapCheck(id, true);
       }
       checkText = "";
@@ -494,7 +512,7 @@
       const known = all.filter((m) => itemOf(m.source) === it.id);
       if (known.length) ids.push(...known.map((m) => m.id));
       else if (!it.have && it.tags.includes("Map")) {
-        say("maps.check.readingMember", { title: it.title, n: i + 1, total: members.length });
+        say("maps.check.readingMember", { title: it.title, n: fmtNum(i + 1), total: fmtNum(members.length) });
         try {
           ids.push(...(await api.mapCheck(it.id, false)).map((m) => m.id));
         } catch {
@@ -509,8 +527,8 @@
     // up to three sentences, logged as one line
     say(
       [
-        t("maps.check.collection", { title, count: ids.length, items: members.length }),
-        failed.length && t("maps.check.collectionFailed", { titles: failed.join(", ") }),
+        t("maps.check.collection", { title, count: ids.length, items: fmtNum(members.length) }),
+        failed.length && t("maps.check.collectionFailed", { titles: listOf(failed) }),
         unread && t("maps.check.collectionUntagged", { count: unread }),
       ]
         .filter(Boolean)
@@ -522,13 +540,13 @@
 
   // --- the tool panel: tabs in a window floating over the map (a sheet over its bottom in narrow windows),
   // moved by its header, sized by its edges, minimisable ---
-  const TABS: [string, string, string, string][] = [["mods", "maps.mapMods", "", "layers"], ["req", "maps.req.title", "", "alert"], ["order", "maps.tabs.order", "maps.export.title", "swap"], ["compare", "maps.tabs.compare", "maps.compare.title", "server"], ["check", "maps.tabs.check", "maps.check.title", "search"]];
+  const TABS: [string, string, string, string][] = [["mods", "maps.mapMods", "", "layers"], ["req", "maps.req.title", "", "alert"], ["order", "maps.tabs.order", "maps.export.title", "swap"], ["compare", "maps.tabs.compare", "maps.compare.title", "server"], ["check", "maps.tabs.check", "maps.check.title", "search"], ["bg", "maps.bg.title", "", "image"]];
   const TAB_IDS = TABS.map(([id]) => id);
   const sideTab = $derived(TAB_IDS.includes(prefs.mapsTab) ? prefs.mapsTab : "mods");
   /** Requirements that aren't installed (the Requirements tab's badge). */
   const missing = $derived(needs.filter((n) => !(n.id && mods.has(n.id))).length);
   /** A tab's count on its icon: the listed maps, the missing requirements. */
-  const countOf = (id: string) => (id === "mods" ? compact.format(listed.length) : id === "req" && missing ? String(missing) : "");
+  const countOf = (id: string) => (id === "mods" ? compact.format(listed.length) : id === "req" && missing ? fmtNum(missing) : "");
   /** The open tab's badge, on the minimised panel. */
   const tabBadge = $derived(sideTab === "req" && missing ? t("maps.tabs.missing", { count: missing }) : countOf(sideTab));
   let side = $state<HTMLElement>();
@@ -583,15 +601,10 @@
     if (!narrow.current && !(e.target as HTMLElement).closest("button")) prefs.mapsPanel = { x: null, y: null, w: box.w, h: null };
   }
 
-  // --- the grid: a canvas (thousands of cells), coloured from the theme's tokens; it fills its pane ---
+  // --- the grid (MapGrid): coloured by kind, or per map ---
   let height = $state(0);
-  let canvas = $state<HTMLCanvasElement>();
-  let probe = $state<HTMLSpanElement>();
   let width = $state(0);
-  /** Pixels per cell and the offset of cell 0,0. */
-  let view = $state({ scale: 0, x: 0, y: 0 });
-  let hover = $state<{ x: number; y: number; px: number; py: number } | null>(null);
-  let theme = $state(0);
+  let mapGrid = $state<ReturnType<typeof MapGrid>>();
   let hideVanilla = $state(false);
   let colours = $state(false);
   let help = $state(false);
@@ -608,155 +621,121 @@
     return `oklch(${n > 10 ? (band ? 0.56 : 0.78) : 0.68} 0.14 ${hue.toFixed(1)})`;
   }
   const colourOf = $derived(new Map(shown.map((m, i) => [m.id, swatchOf(i, shown.length)])));
-  const swatch = (id: string) => colourOf.get(id) ?? "transparent";
 
-  const bounds = $derived.by(() => {
-    if (!grid.length) return null;
-    const xs = grid.map((c) => c.x);
-    const ys = grid.map((c) => c.y);
-    return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
-  });
+  /** Where a map's first folder stands in Map= (unlisted ones after the rest). */
+  const lineRank = (m: MapMod) => Math.min(1e9, ...m.maps.map((f) => mapLine.indexOf(f.folder)).filter((i) => i >= 0));
+  /** The maps whose world is drawn, bottom first: the game's own (unless hidden), then the drawn
+   * installed maps from the last in Map= to the first, which wins where they overlap. */
+  const worldIds = $derived(
+    prefs.mapsWorld && data
+      ? [...(hideVanilla ? [] : [""]), ...drawn.filter((m) => data!.mods.some((x) => x.id === m.id)).sort((a, b) => lineRank(b) - lineRank(a)).map((m) => m.id)]
+      : [],
+  );
+  const swatch = (id: string) => colourOf.get(id) ?? "transparent";
+  const FILL = { vanilla: "--muted", water: "--map-water", map: "--map-cell", over: "--map-over", conflict: "--danger" };
+  function paint(c: GridCell): [string, number] | null {
+    const base = c.kind === "vanilla" || c.kind === "water";
+    if (base && hideVanilla) return null;
+    return [colours && c.maps.length === 1 ? swatch(c.maps[0]) : FILL[c.kind], base ? 0.3 : 0.9];
+  }
 
   /** The part of the map the open tool panel leaves clear: Fit and the zoom buttons use it. */
   function clear() {
     const all = { x: 0, y: 0, w: width, h: height };
-    if (prefs.mapsMin || !side || !canvas) return all;
+    if (prefs.mapsMin || !side || !mapGrid) return all;
     // above the sheet in narrow windows, else the biggest strip beside, above or below the panel
-    if (narrow.current) return { ...all, h: Math.min(height, side.getBoundingClientRect().top - canvas.getBoundingClientRect().top) };
+    if (narrow.current) return { ...all, h: Math.min(height, side.getBoundingClientRect().top - mapGrid.top()) };
     const { x, y, w, h } = box;
     const strips = [{ ...all, w: x }, { ...all, x: x + w, w: width - x - w }, { ...all, h: y }, { ...all, y: y + h, h: height - y - h }];
     return strips.reduce((a, b) => (b.w * b.h > a.w * a.h ? b : a));
   }
-  const clearMid = () => {
-    const c = clear();
-    return [c.x + c.w / 2, c.y + c.h / 2];
-  };
-  function fit() {
-    if (!bounds || !width) return;
-    const { x, y, w, h } = clear();
-    const [cols, rows] = [bounds.x1 - bounds.x0 + 1, bounds.y1 - bounds.y0 + 1];
-    const scale = Math.min(w / (cols + 2), h / (rows + 2));
-    view = { scale, x: x + (w - cols * scale) / 2 - bounds.x0 * scale, y: y + (h - rows * scale) / 2 - bounds.y0 * scale };
-  }
-  let fitted = false;
-  $effect(() => {
-    if (!fitted && bounds && width && height && mapW) {
-      fitted = true;
-      untrack(fit);
-    }
-  });
-
-  function zoom(k: number, [px, py] = clearMid()) {
-    const scale = Math.min(64, Math.max(1, view.scale * k));
-    view = { scale, x: px - ((px - view.x) * scale) / view.scale, y: py - ((py - view.y) * scale) / view.scale };
+  function pick([x, y]: Cell, shift: boolean) {
+    const has = pickedCells.some((c) => c[0] === x && c[1] === y);
+    if (shift) pickedCells = has ? pickedCells.filter((c) => c[0] !== x || c[1] !== y) : [...pickedCells, [x, y]];
+    else pickedCells = has && pickedCells.length === 1 ? [] : [[x, y]];
+    prefs.mapsTab = "mods"; // the list shows the maps there
   }
 
-  $effect(() => {
-    void theme;
-    if (!canvas || !probe || !width || !view.scale) return;
-    const dpr = devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    const g = canvas.getContext("2d")!;
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // resolved through an element, so color-mix() and relative colours come back as rgb()
-    const color = (token: string) => {
-      probe!.style.color = token.startsWith("--") ? `var(${token})` : token;
-      return getComputedStyle(probe!).color;
-    };
-    const fill = { vanilla: color("--muted"), water: color("--map-water"), map: color("--map-cell"), over: color("--map-over"), conflict: color("--danger") };
-    const hues = new Map([...colourOf].map(([id, c]) => [id, color(c)]));
-    g.fillStyle = color("--bg");
-    g.fillRect(0, 0, width, height);
-    const s = view.scale;
-    const gap = s >= 10 ? 1 : 0;
-    for (const c of grid) {
-      const base = c.kind === "vanilla" || c.kind === "water";
-      if (base && hideVanilla) continue;
-      g.globalAlpha = base ? 0.3 : 0.9;
-      g.fillStyle = colours && c.maps.length === 1 ? hues.get(c.maps[0])! : fill[c.kind];
-      g.fillRect(view.x + c.x * s, view.y + c.y * s, s - gap, s - gap);
-    }
-    g.globalAlpha = 1;
-    g.lineWidth = 2;
-    const ring = (cell: Cell | null, token: string) => {
-      if (!cell) return;
-      g.strokeStyle = color(token);
-      g.strokeRect(view.x + cell[0] * s - 1, view.y + cell[1] * s - 1, s + 1, s + 1);
-    };
-    pickedCells.forEach((c) => ring(c, "--accent-text"));
-    ring(hover && [hover.x, hover.y], "--text");
-    // axis labels: cell numbers along the top and left edges, at least 32px apart
-    const step = [1, 2, 5, 10, 20, 50, 100].find((n) => n * s >= 32) ?? 200;
-    g.fillStyle = color("--panel");
-    g.globalAlpha = 0.85;
-    g.fillRect(0, 0, width, 16);
-    g.fillRect(0, 0, 28, height);
-    g.globalAlpha = 1;
-    g.fillStyle = color("--muted");
-    g.font = "11px 'IBM Plex Mono', monospace";
-    g.textAlign = "center";
-    g.textBaseline = "middle";
-    for (let x = Math.ceil(-view.x / s / step) * step; view.x + x * s < width; x += step) if (view.x + (x + 0.5) * s > 28) g.fillText(String(x), view.x + (x + 0.5) * s, 8);
-    g.textAlign = "right";
-    for (let y = Math.ceil(-view.y / s / step) * step; view.y + y * s < height; y += step) if (view.y + (y + 0.5) * s > 16) g.fillText(String(y), 25, view.y + (y + 0.5) * s);
-  });
+  // --- a picture of the player's own under the grid (instead of the world map), lined up from two spots ---
+  $effect(() => void (data && readBackground(data.build)));
+  const picture = $derived(data ? backgrounds[data.build] : null);
+  const tilesPer = $derived(data?.build === 41 ? 300 : 256);
+  /** Lining it up: the spots set so far (in image pixels and world tiles), the image spot waiting for its world spot. */
+  let cal = $state<{ done: { img: number[]; world: number[] }[]; img: number[] | null } | null>(null);
+  let spotText = $state("");
+  let spotUnit = $state<"tiles" | "cells">("tiles");
+  let calError = $state("");
 
-  onMount(() => {
-    // redraw when the theme or accent changes
-    const bump = () => theme++;
-    const mo = new MutationObserver(bump);
-    mo.observe(document.documentElement, { attributes: true });
-    const mq = matchMedia("(prefers-color-scheme: dark)");
-    mq.addEventListener("change", bump);
-    return () => {
-      mo.disconnect();
-      mq.removeEventListener("change", bump);
-    };
-  });
-
-  let drag: { x: number; y: number; vx: number; vy: number; moved: boolean } | null = null;
-  const at = (e: MouseEvent) => {
-    const r = canvas!.getBoundingClientRect();
-    const [px, py] = [e.clientX - r.left, e.clientY - r.top];
-    return { x: Math.floor((px - view.x) / view.scale), y: Math.floor((py - view.y) / view.scale), px, py };
-  };
-  function down(e: PointerEvent) {
-    drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false };
-    canvas!.setPointerCapture(e.pointerId);
-  }
-  function move(e: PointerEvent) {
-    if (drag) {
-      const [dx, dy] = [e.clientX - drag.x, e.clientY - drag.y];
-      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
-      if (drag.moved) {
-        view = { ...view, x: drag.vx + dx, y: drag.vy + dy };
-        hover = null;
-        return;
-      }
+  async function placePicture(bg: MapBackground | null, img: ImageBitmap | null = null) {
+    if (!data) return;
+    const build = data.build;
+    try {
+      await api.mapBackgroundSet(build, bg);
+    } catch (e) {
+      return say(errText(e), {}, true);
     }
-    hover = at(e);
+    backgrounds[build] = bg && { bg, img: img ?? backgrounds[build]?.img ?? null };
   }
-  function up(e: PointerEvent) {
-    if (drag && !drag.moved) {
-      const { x, y } = at(e);
-      const has = pickedCells.some((c) => c[0] === x && c[1] === y);
-      if (e.shiftKey) pickedCells = has ? pickedCells.filter((c) => c[0] !== x || c[1] !== y) : [...pickedCells, [x, y]];
-      else pickedCells = has && pickedCells.length === 1 ? [] : [[x, y]];
-      prefs.mapsTab = "mods"; // the list shows the maps there
+  async function pickPicture() {
+    const path = await api.pickImage().catch((e) => (say(errText(e), {}, true), null));
+    const img = path && (await loadImage(path));
+    if (!path || !data) return;
+    if (!img) return say("maps.bg.unreadable", { path }, true);
+    // until it's lined up, fitted over the grid
+    const [xs, ys] = grid.length ? [grid.map((c) => c.x), grid.map((c) => c.y)] : [[0, 59], [0, 59]];
+    const [x0, y0] = [Math.min(...xs), Math.min(...ys)];
+    const [w, h] = [(Math.max(...xs) + 1 - x0) * tilesPer, (Math.max(...ys) + 1 - y0) * tilesPer];
+    const k = Math.min(w / img.width, h / img.height);
+    await placePicture({ path, scale: [k, k], offset: [x0 * tilesPer, y0 * tilesPer] }, img);
+    prefs.mapsWorld = true;
+    calibrate();
+  }
+  function calibrate() {
+    cal = { done: [], img: null };
+    calError = "";
+    spotText = "";
+  }
+  /** A spot pointed at on the grid (in cells): on the picture first, then in the world. */
+  function point(cx: number, cy: number) {
+    if (!cal || !picture) return;
+    const [x, y] = [cx * tilesPer, cy * tilesPer];
+    const { scale, offset } = picture.bg;
+    calError = "";
+    if (cal.img) setSpot([x, y]);
+    else cal.img = [(x - offset[0]) / scale[0], (y - offset[1]) / scale[1]];
+  }
+  function setSpot(world: number[]) {
+    if (!cal?.img || !picture) return;
+    cal.done.push({ img: cal.img, world });
+    cal.img = null;
+    spotText = "";
+    if (cal.done.length < 2) return;
+    const fit = solveBackground(cal.done[0], cal.done[1]);
+    if (!fit) {
+      cal.done = [];
+      calError = t("maps.bg.tooClose");
+      return;
     }
-    drag = null;
+    cal = null;
+    placePicture({ ...picture.bg, ...fit }).then(() => say("maps.bg.lined"));
   }
-  function wheel(e: WheelEvent) {
+  function typedSpot(e: SubmitEvent) {
     e.preventDefault();
-    const { px, py } = at(e);
-    zoom(e.deltaY < 0 ? 1.25 : 0.8, [px, py]);
+    const n = spotText.match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
+    if (n.length !== 2) return void (calError = t("maps.bg.badSpot"));
+    const k = spotUnit === "cells" ? tilesPer : 1;
+    calError = "";
+    setSpot([n[0] * k, n[1] * k]);
   }
-  const hovered = $derived(hover ? byCell.get(`${hover.x},${hover.y}`) : undefined);
+  function resetPicture() {
+    cal = null;
+    placePicture(null);
+  }
+
   const KIND = { vanilla: "maps.kind.vanilla", water: "maps.kind.water", map: "", over: "maps.kind.over", conflict: "maps.kind.conflict" };
 </script>
 
-<svelte:window onkeydown={undoKey} />
+<svelte:window onkeydown={(e) => (cal && e.key === "Escape" ? (e.preventDefault(), (cal = null)) : undoKey(e))} />
 
 <section class="maps" aria-label={t("maps.label")} style:--bar="{barH}px" bind:clientWidth={mapW}>
   <div class="world">
@@ -781,17 +760,18 @@
     <div class="row layers">
       <label class="check"><input type="checkbox" bind:checked={hideVanilla} />{t("maps.hideVanilla")}</label>
       <label class="check"><input type="checkbox" bind:checked={colours} />{t("maps.perMapColours")}</label>
+      <label class="check" title={t("maps.worldTip")}><input type="checkbox" bind:checked={prefs.mapsWorld} />{t("maps.world")}</label>
       <span class="zoom">
-        <button class="quiet" onclick={() => zoom(1.25)} aria-label={t("maps.zoomIn")}><Icon name="plus" size={14} />{t("maps.zoomIn")}</button>
-        <button class="quiet" onclick={() => zoom(0.8)}>{t("maps.zoomOut")}</button>
-        <button class="quiet" onclick={fit}>{t("maps.fit")}</button>
+        <button class="quiet" onclick={() => mapGrid?.zoom(1.25)} aria-label={t("maps.zoomIn")}><Icon name="plus" size={14} />{t("maps.zoomIn")}</button>
+        <button class="quiet" onclick={() => mapGrid?.zoom(0.8)}>{t("maps.zoomOut")}</button>
+        <button class="quiet" onclick={() => mapGrid?.fit()}>{t("maps.fit")}</button>
         <button class="quiet icon" onclick={undo} disabled={busy || !(history.length || canUndo)} title={t("maps.undoTip")} aria-label={t("maps.undoLabel")}><Icon name="undo" size={16} /></button>
         <button class="quiet" onclick={() => (help = !help)} aria-expanded={help}><Icon name="info" size={14} />{t("maps.help.button")}</button>
       </span>
     </div>
     </div>
     {#if help}
-      <div class="help" role="dialog" aria-label={t("maps.help.label")}>
+      <div class="help" role="dialog" aria-modal="true" tabindex="-1" aria-label={t("maps.help.label")} use:trap onkeydown={(e) => e.key === "Escape" && (e.stopPropagation(), (help = false))}>
         <p class="lede">{t("maps.lede")}</p>
         <h3>{t("maps.help.gridTitle")}</h3>
         <p>{@html th("maps.help.grid", { build: data?.build ?? "" })}</p>
@@ -802,29 +782,28 @@
         <button class="quiet" onclick={() => (help = false)}><Icon name="x" size={14} />{t("common.close")}</button>
       </div>
     {/if}
-    <div class="canvas" bind:clientWidth={width} bind:clientHeight={height}>
-      <canvas bind:this={canvas}
-        aria-label={t("maps.gridLabel", { maps: shown.length, conflicts: conflictCells, over: overCells })}
-        onpointerdown={down} onpointermove={move} onpointerup={up} onpointerleave={() => (hover = null)} onwheel={wheel}></canvas>
-      <span bind:this={probe} hidden></span>
-      {#if hover}
-        <div class="tip" style:left="{Math.min(hover.px + 14, width - 230)}px" style:top="{Math.min(hover.py + 14, height - 140)}px">
-          <strong>{t("maps.cell", { x: hover.x, y: hover.y })}</strong>
-          {#if hovered}
-            {#if KIND[hovered.kind]}<span class="kind {hovered.kind}">{t(KIND[hovered.kind])}</span>{/if}
-            {#each hovered.maps as id}<span>{names.get(id) ?? id}</span>{/each}
-          {:else}
-            <span class="hint">{t("maps.empty")}</span>
-          {/if}
-        </div>
-      {/if}
-      {#if !data}<p class="loading">{t("maps.readingFiles")}</p>{/if}
+    <MapGrid bind:this={mapGrid} bind:width bind:height {grid} {paint} worlds={worldIds} backdrop={data && (cal ? !cal.img : prefs.mapsWorld) ? data.build : undefined} onPoint={cal ? point : undefined} tiles={tilesPer} rings={pickedCells.map((c) => [c, "--accent-text"])} area={clear} ready={!!mapW} onPick={pick}
+      label={t("maps.gridLabel", { maps: fmtNum(shown.length), conflicts: fmtNum(conflictCells), over: fmtNum(overCells) })}>
+      {#snippet tip([x, y])}
+        {@const hovered = byCell.get(`${x},${y}`)}
+        <strong>{t("maps.cell", { x, y })}</strong>
+        {#if hovered}
+          {#if KIND[hovered.kind]}<span class="kind {hovered.kind}">{t(KIND[hovered.kind])}</span>{/if}
+          {#each hovered.maps as id}<span>{names.get(id) ?? id}</span>{/each}
+        {:else}
+          <span class="hint">{t("maps.empty")}</span>
+        {/if}
+      {/snippet}
+      {#if !data}<p class="loading">{t("maps.readingFiles")}</p>{:else if gridDone && !grid.length}<p class="loading">{t("maps.gridEmpty")}</p>{/if}
       {#if prefs.mapsMin}
         <button class="restore" onclick={() => (prefs.mapsMin = false)} aria-expanded="false" title={t("maps.restoreTip")}>{t("maps.tabs.label")}{#if tabBadge}<span class="badge" class:bad={sideTab === "req"}>{tabBadge}</span>{/if}</button>
       {/if}
-    </div>
+    </MapGrid>
     {#if data && !data.vanilla}
       <p class="hint">{t("maps.noVanilla", { build: data.build })}</p>
+    {/if}
+    {#if picture && !picture.img}
+      <p class="hint">{t("maps.bg.missing", { path: picture.bg.path })}</p>
     {/if}
   </div>
 
@@ -843,7 +822,7 @@
     <div class="rail" role="tablist" aria-orientation="vertical" aria-label={t("maps.tabs.label")} tabindex="-1" onkeydown={(e) => arrowPick(e, TAB_IDS, sideTab, (v) => (prefs.mapsTab = v))}>
       {#each TABS as [id, label, tip, icon] (id)}
         {@const count = countOf(id)}
-        <button role="tab" id="maps-tab-{id}" aria-controls="maps-pane" aria-selected={sideTab === id} class:active={sideTab === id}
+        <button role="tab" id="maps-tab-{id}" aria-controls="maps-pane" aria-selected={sideTab === id} tabindex={sideTab === id ? 0 : -1} class:active={sideTab === id}
           title={t(tip || label)} aria-label={count ? `${t(label)} (${count})` : t(label)} onclick={() => (prefs.mapsTab = id)}>
           <Icon name={icon} size={18} />
           {#if count}<span class="badge" class:bad={id === "req"}>{count}</span>{/if}
@@ -861,12 +840,13 @@
     <div class="pane" class:rows={sideTab === "mods"} id="maps-pane" role="tabpanel" aria-labelledby="maps-tab-{sideTab}">
       {#if sideTab === "mods"}
         <div class="source">
-          <label class="check"><input type="checkbox" bind:checked={prefs.mapsWorkshop} />{t("maps.workshopSource")}</label>
+          <!-- reading from Steam starts when it's ticked (or on Refresh), never just by opening the tab -->
+          <label class="check"><input type="checkbox" bind:checked={prefs.mapsWorkshop} onchange={() => prefs.mapsWorkshop && !scan.running && startScan()} />{t("maps.workshopSource")}</label>
           <span class="hint note">{t("maps.workshopSourceNote")}</span>
           {#if prefs.mapsWorkshop}
-            <span class="hint" class:bad={!!scan.error} role="status">{scanText}</span>
+            <span class="hint" class:bad={!!scan.error} role="status" id="maps-scan">{scanText}</span>
             {#if scan.running}
-              {#if scan.p?.total}<progress max={scan.p.total} value={scan.p.done}></progress>{/if}
+              {#if scan.p?.total}<progress max={scan.p.total} value={scan.p.done} aria-labelledby="maps-scan"></progress>{/if}
               <button class="quiet" onclick={stopScan} disabled={scan.stopping}><Icon name="x" size={14} />{scan.stopping ? t("maps.scan.stopping") : t("maps.scan.stop")}</button>
             {:else}
               <button class="quiet" onclick={startScan} title={t("maps.scan.refreshTip")}><Icon name="refresh" size={14} />{t("common.refresh")}</button>
@@ -906,7 +886,7 @@
           {/if}
           {#if previewOff.length}<button onclick={enablePreviewed} disabled={busy}><Icon name="check" size={14} />{t("maps.enablePreviewed", { count: previewOff.length })}</button>{/if}
           {#if listedOn.length}<button onclick={() => setMods(listedOn, false)} disabled={busy}><Icon name="x" size={14} />{t("maps.disableListed", { count: listedOn.length })}</button>{/if}
-          {#if hidden.size}<button onclick={() => (hidden = new Set())} title={t("maps.unhideTip")}>{t("maps.unhide", { count: hidden.size })}</button>{/if}
+          {#if hiddenCount}<button onclick={() => (hidden = new Set())} title={t("maps.unhideTip")}>{t("maps.unhide", { count: hiddenCount })}</button>{/if}
         </div>
         {#if data && !all.length}
           <p class="hint">{t("maps.noMaps", { build: data.build })}</p>
@@ -926,7 +906,7 @@
                   aria-label={t("maps.previewLabel", { name: nameOf(m) })} title={on ? t("maps.alwaysShownTip") : t("maps.previewTip")} />
                 <span class="name">
                   <span class="title"><strong title={nameOf(m)}>{nameOf(m)}</strong>{#if on}<span class="on">{t("common.enabled")}</span>{:else if !installed}<span class="off">{t("maps.notInstalled")}</span>{/if}</span>
-                  <span class="hint">{cellCount(m) ? t("maps.cellCount", { count: cellCount(m) }) : t("maps.spawnPoints")}{` · `}{m.maps.map((f) => f.folder).join("; ")}{meta?.author ? ` · ${t("maps.byAuthor", { author: meta.author })}` : ""}{meta?.subscriptions ? ` · ${t("maps.subscribers", { count: meta.subscriptions, n: compact.format(meta.subscriptions) })}` : ""}{!installed && meta?.size ? ` · ${fmtSize(meta.size)}` : ""}{meta?.updated ? ` · ${t("maps.updatedAgo", { when: fmtAgo(meta.updated) })}` : ""}</span>
+                  <span class="hint">{[cellCount(m) ? t("maps.cellCount", { count: cellCount(m) }) : t("maps.spawnPoints"), listOf(m.maps.map((f) => f.folder), "unit"), meta?.author && t("maps.byAuthor", { author: meta.author }), meta?.subscriptions && t("maps.subscribers", { count: meta.subscriptions, n: compact.format(meta.subscriptions) }), !installed && meta?.size && fmtSize(meta.size), meta?.updated && t("maps.updatedAgo", { when: fmtAgo(meta.updated) })].filter(Boolean).join(" · ")}</span>
                   {#each [...(clash?.with ?? [])].slice(0, 3) as [rival, cells] (rival)}
                     <span class="bad line" title={t("maps.conflictsWith", { count: cells.length, name: names.get(rival) ?? rival, cells: cellList(cells) }).replace(/<[^>]+>/g, "")}><span class="txt">{@html th("maps.conflictsWith", { count: cells.length, name: names.get(rival) ?? rival, cells: cellList(cells) })}</span>
                       <button class="link" onclick={() => swap(m)} disabled={busy} title={t("maps.swapTip")}>{t("maps.swap")}</button></span>
@@ -939,7 +919,7 @@
                   {/each}
                   {#each m.maps.filter((f) => (folderOwners.get(f.folder)?.length ?? 0) > 1) as f (f.folder)}
                     {@const others = folderOwners.get(f.folder)!.filter((id) => id !== m.id)}
-                    <span class="dupe">{t(others.length > 2 ? "maps.dupeFolderMore" : "maps.dupeFolder", { folder: f.folder, names: others.slice(0, 2).map((id) => names.get(id) ?? id).join(", "), count: others.length - 2 })}</span>
+                    <span class="dupe">{t(others.length > 2 ? "maps.dupeFolderMore" : "maps.dupeFolder", { folder: f.folder, names: listOf(others.slice(0, 2).map((id) => names.get(id) ?? id), others.length > 2 ? "unit" : "conjunction"), count: others.length - 2 })}</span>
                   {/each}
                 </span>
                 <span class="btns">
@@ -955,7 +935,7 @@
             {/each}
           </ul>
           {#if listed.length > limit}
-            <button class="quiet more" onclick={() => (limit += 150)}>{t("maps.showMore", { count: Math.min(150, listed.length - limit), total: listed.length })}</button>
+            <button class="quiet more" onclick={() => (limit += 150)}>{t("maps.showMore", { count: Math.min(150, listed.length - limit), total: fmtNum(listed.length) })}</button>
           {/if}
         </div>
 
@@ -1000,7 +980,7 @@
                     <span class="name">
                       <span class="mono">{n.id || n.folder}</span>
                       {@render needState(n)}
-                      <span class="hint">{t(n.folder && n.id ? "maps.req.neededByMap" : n.folder ? "maps.req.neededByFolder" : "maps.req.neededByOnly", { folder: n.folder, names: n.by.map((id) => names.get(id) ?? id).join(", ") })}</span>
+                      <span class="hint">{t(n.folder && n.id ? "maps.req.neededByMap" : n.folder ? "maps.req.neededByFolder" : "maps.req.neededByOnly", { folder: n.folder, names: listOf(n.by.map((id) => names.get(id) ?? id)) })}</span>
                       {#if finding[n.id]}<span class="hint">{t(...finding[n.id])}</span>{/if}
                     </span>
                     {@render needButtons(n)}
@@ -1038,7 +1018,7 @@
         <p class="lede">{@html th("maps.compare.lede")}</p>
         {#if servers.length}
           <div class="row">
-            <select bind:value={server} aria-label={t("maps.compare.serverLabel")}>
+            <select bind:value={server} onchange={() => (compared = null)} aria-label={t("maps.compare.serverLabel")}>
               <!-- i18n-ignore: file names -->
               {#each servers as s (s)}<option value={s}>{s}.ini</option>{/each}
             </select>
@@ -1074,7 +1054,7 @@
           {/if}
           {#if compared.only_you.length}
             <h3>{t("maps.compare.onlyYou")}</h3>
-            <p class="mono hint">{compared.only_you.join("; ")}</p>
+            <p class="mono hint">{listOf(compared.only_you, "unit")}</p>
           {/if}
         {/if}
 
@@ -1094,16 +1074,49 @@
           {#if Object.keys(presets).length}
             <select bind:value={presetPick} aria-label={t("maps.presets.label")}>
               <option value="">{t("maps.presets.pick")}</option>
-              {#each Object.entries(presets) as [name, ids] (name)}<option value={name}>{name} ({ids.length})</option>{/each}
+              {#each Object.entries(presets) as [name, ids] (name)}<option value={name}>{name} ({fmtNum(ids.length)})</option>{/each}
             </select>
             <button onclick={loadPreset} disabled={!presetPick}>{t("maps.presets.preview")}</button>
-            <button class="danger" onclick={deletePreset} disabled={!presetPick}><Icon name="trash" size={14} />{t("common.delete")}</button>
+            <button class="danger" onclick={deletePreset} disabled={!presetPick}><Icon name="trash" size={14} />{t("common.remove")}</button>
           {/if}
         </div>
         <form class="row" onsubmit={savePreset}>
           <input type="text" bind:value={presetName} placeholder={t("maps.presets.namePlaceholder")} aria-label={t("maps.presets.namePlaceholder")} />
           <button type="submit" disabled={!presetName.trim() || !shown.length}><Icon name="plus" size={14} />{t("maps.presets.save", { count: shown.length })}</button>
         </form>
+
+      {:else if sideTab === "bg"}
+        <p class="lede">{t("maps.bg.lede", { build: data?.build ?? "" })}</p>
+        <div class="row">
+          <button onclick={pickPicture} disabled={!data}><Icon name="image" size={14} />{t("maps.bg.pick")}</button>
+          {#if picture}
+            <button onclick={calibrate} disabled={!picture.img || !!cal}><Icon name="pencil" size={14} />{t("maps.bg.calibrate")}</button>
+            <button class="quiet" onclick={resetPicture} title={t("maps.bg.resetTip")}><Icon name="rollback" size={14} />{t("maps.bg.reset")}</button>
+          {/if}
+        </div>
+        {#if picture}
+          <p class="mono hint path">{picture.bg.path}</p>
+          {#if !picture.img}<p class="bad">{t("maps.bg.missing", { path: picture.bg.path })}</p>{/if}
+        {/if}
+        {#if cal}
+          <h3>{t("maps.bg.spot", { n: cal.done.length + 1 })}</h3>
+          <ol class="steps">
+            <li class:now={!cal.img}>{t("maps.bg.stepImage")}</li>
+            <li class:now={!!cal.img}>{t("maps.bg.stepWorld")}</li>
+          </ol>
+          {#if cal.img}
+            <form class="row" onsubmit={typedSpot}>
+              <input type="text" bind:value={spotText} placeholder="10620, 9750" spellcheck="false" aria-label={t("maps.bg.spotLabel")} />
+              <select bind:value={spotUnit} aria-label={t("maps.bg.unitLabel")}>
+                <option value="tiles">{t("maps.bg.tiles")}</option>
+                <option value="cells">{t("maps.bg.cells")}</option>
+              </select>
+              <button type="submit" disabled={!spotText.trim()}><Icon name="check" size={14} />{t("maps.bg.set")}</button>
+            </form>
+          {/if}
+          {#if calError}<p class="bad" role="alert">{calError}</p>{/if}
+          <div class="row"><button class="quiet" onclick={() => (cal = null)} title={t("maps.bg.cancelTip")}><Icon name="x" size={14} />{t("common.cancel")}</button></div>
+        {/if}
 
       {:else}
         <p class="lede">{t("maps.check.lede")}</p>
@@ -1151,7 +1164,13 @@
       right: 12px;
       bottom: 12px;
       width: auto;
-      height: 45%;
+      /* tall enough for a few rows (or all the room below the toolbar in short windows), so the
+         list is reachable; Minimise shows the whole map */
+      height: max(45%, min(200px, calc(100% - var(--bar) - 24px)));
+    }
+    /* Help says it too: the rows get the room */
+    .source .note {
+      display: none;
     }
     .resize {
       display: none;
@@ -1184,7 +1203,7 @@
   .world > .hint {
     padding: 6px 16px;
   }
-  .world .canvas {
+  .world :global(.map-grid) {
     flex: 1;
     min-height: 0;
   }
@@ -1206,12 +1225,16 @@
     width: 44px;
     display: flex;
     flex-direction: column;
+    /* a short sheet scrolls its icons rather than squashing them */
+    overflow-y: auto;
+    scrollbar-width: none;
     padding-top: 6px;
     background: var(--raised);
     border-radius: 7px 0 0 7px;
   }
   .rail button {
     position: relative;
+    flex: none;
     display: grid;
     place-items: center;
     height: 42px;
@@ -1227,6 +1250,7 @@
     color: var(--on-selected);
     background: var(--accent-soft);
     border-left-color: var(--on-selected);
+    box-shadow: inset 0 0 0 1px var(--hover-line);
   }
   /* a count on the icon's corner */
   .rail .badge {
@@ -1234,14 +1258,14 @@
     top: 3px;
     right: 2px;
     padding: 0 4px;
-    font-size: 10px;
+    font-size: 12px;
     line-height: 14px;
     color: var(--text);
     background: var(--line);
   }
   .rail .badge.bad {
     background: var(--danger);
-    color: #fff;
+    color: var(--panel);
   }
   .main {
     flex: 1;
@@ -1265,23 +1289,25 @@
   }
   .top h2 {
     flex: 1;
-    font-size: 16px;
+    font-size: 15px;
   }
   .badge {
     padding: 0 6px;
     border-radius: 8px;
     background: var(--raised);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
   }
   .badge.bad {
     color: var(--danger);
   }
+  /* reaches 6px over the rail: a picked row's chevron, on the rail's edge, isn't cut off */
   .pane {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 12px 16px 16px;
+    margin-left: -6px;
+    padding: 12px 16px 16px 22px;
   }
   /* Map mods: the controls stay put, the rows scroll */
   .pane.rows {
@@ -1297,8 +1323,8 @@
     flex: 1 1 auto;
     min-height: 120px;
     overflow-y: auto;
-    margin: 0 -8px;
-    padding: 0 8px 12px;
+    margin: 0 -8px 0 -22px;
+    padding: 0 8px 12px 22px;
   }
   .pane > .seg {
     width: fit-content;
@@ -1419,17 +1445,6 @@
     display: flex;
     gap: 2px;
   }
-  .canvas {
-    position: relative;
-    overflow: hidden;
-  }
-  canvas {
-    display: block;
-    width: 100%;
-    height: 100%;
-    cursor: crosshair;
-    touch-action: none;
-  }
   /* the tool panel's edges and corner: drag them to resize (they straddle its border) */
   .resize {
     position: absolute;
@@ -1486,19 +1501,6 @@
     margin: 0;
     color: var(--muted);
   }
-  .tip {
-    position: absolute;
-    z-index: 1;
-    width: 216px;
-    display: grid;
-    gap: 2px;
-    padding: 8px 10px;
-    background: var(--raised);
-    border-radius: 6px;
-    box-shadow: var(--shadow);
-    pointer-events: none;
-    overflow-wrap: anywhere;
-  }
   .kind {
     font-size: 12px;
     color: var(--muted);
@@ -1554,15 +1556,44 @@
     gap: 10px;
     padding: 8px;
     margin: 0 -8px;
-    border-radius: 6px;
+    border-radius: 4px;
     border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
   }
   .mods li {
+    position: relative;
     cursor: pointer;
   }
+  /* hovered, and shown (picked) maps: blood red under on-selected text, inset 8px from the pane */
   .mods li:hover,
   .needs li:hover {
-    background: color-mix(in oklab, var(--accent) 16%, var(--panel));
+    background: var(--hover);
+    color: var(--on-selected);
+    box-shadow: inset 0 0 0 1px var(--hover-line);
+  }
+  .mods li.shown {
+    background: var(--accent-soft);
+    color: var(--on-selected);
+    box-shadow: inset 0 0 0 1px var(--hover-line);
+  }
+  .mods li:is(:hover, .shown) :is(.hint, .off),
+  .needs li:hover .hint {
+    color: color-mix(in oklab, var(--on-selected) 72%, transparent);
+  }
+  /* the warning lines too: their own red and amber are unreadable on the highlight (Daylight's ~1.7:1) */
+  .mods li:is(:hover, .shown) :is(.on, .over, .dupe, .bad) {
+    color: var(--on-selected);
+  }
+  /* the chevron, centred on the pane's left edge (the row starts 8px in) */
+  .mods li:is(:hover, .shown)::before {
+    content: "";
+    position: absolute;
+    left: -13px;
+    top: 50%;
+    width: 10px;
+    height: 14px;
+    margin-top: -7px;
+    background: var(--on-selected);
+    clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%);
   }
   .more {
     margin-top: 6px;
@@ -1611,6 +1642,17 @@
   .bad {
     color: var(--danger);
     font-size: 12px;
+  }
+  .path {
+    overflow-wrap: anywhere;
+  }
+  .steps {
+    margin: 4px 0 0;
+    padding-left: 20px;
+    color: var(--muted);
+  }
+  .steps .now {
+    color: var(--text);
   }
   .bad .link {
     margin-left: 6px;

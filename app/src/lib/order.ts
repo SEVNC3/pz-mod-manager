@@ -3,7 +3,7 @@
 // Two lists: the library (`Row[]`, organised by the player, order is cosmetic) and the
 // load order (enabled mod ids). Rule checks and sorts run on a load list: the library's
 // mods with the enabled ones first, in load order (see `loadList`).
-import type { ModRow, Row } from "./api";
+import type { GameServer, ModRow, Row, ServerMods } from "./api";
 
 /** `key`: its text in the locale files, about mod `id`. */
 export type Problem = { key: string; id: string; fixable: boolean };
@@ -198,13 +198,16 @@ export function groupByCategory(rows: Row[], of: Record<string, string>, order: 
 
 /**
  * The most stable load order PZMM knows, for a load list: turn on what enabled mods need,
- * frameworks first and translations last (by category), then satisfy every require /
+ * frameworks first and translations last (by category), Mod Load Order Sorter's loadFirst /
+ * loadLast ("on": the whole list, "category": within its tier), then satisfy every require /
  * loadModAfter / loadModBefore rule while keeping your order everywhere else.
  */
 export function autosort(list: Row[], of: Record<string, string>, order: string[]): Row[] {
   const next = enableRequirements(list);
   const tier = tiers(of, order);
-  const on = next.filter((r) => isMod(r) && r.on).sort((a, b) => tier((a as ModRow).id) - tier((b as ModRow).id)); // stable
+  const edge = (m: ModRow, scope: string) => (m.load_first === scope ? 0 : m.load_last === scope ? 2 : 1);
+  const rank = (m: ModRow) => edge(m, "on") * 100 + tier(m.id) * 10 + edge(m, "category");
+  const on = next.filter((r): r is ModRow => isMod(r) && r.on).sort((a, b) => rank(a) - rank(b)); // stable
   return pullUp([...on, ...next.filter((r) => !(isMod(r) && r.on))]);
 }
 
@@ -231,16 +234,19 @@ export function placeInSections(rows: Row[], of: Record<string, string>, order: 
   return next;
 }
 
+/** The game's own map, which mod maps go before (`server::BASE_MAP`). */
+export const BASE_MAP = "Muldraugh, KY";
+
 /** The server's Map= list sorted: mod maps keep their order, before the game's own map. */
-export const sortMaps = (maps: string[], base = "Muldraugh, KY") => [...maps.filter((m) => m !== base), ...maps.filter((m) => m === base)];
+export const sortMaps = (maps: string[]) => [...maps.filter((m) => m !== BASE_MAP), ...maps.filter((m) => m === BASE_MAP)];
 
 /**
  * Autosort a Map= list: a map whose map.info `lots=` names another listed map builds on it, so
  * it moves to just before that map; everything else keeps its order; Muldraugh last. Maps that
  * build on each other in a loop can't be sorted: the order is kept.
  */
-export function autosortMaps(maps: string[], lotsOf: (folder: string) => string[], base = "Muldraugh, KY"): string[] {
-  const out = sortMaps(maps, base);
+export function autosortMaps(maps: string[], lotsOf: (folder: string) => string[]): string[] {
+  const out = sortMaps(maps);
   for (let pass = 0; pass <= out.length; pass++) {
     let moved = false;
     for (let i = 0; i < out.length; i++) {
@@ -253,7 +259,19 @@ export function autosortMaps(maps: string[], lotsOf: (folder: string) => string[
     }
     if (!moved) return out;
   }
-  return sortMaps(maps, base);
+  return sortMaps(maps);
+}
+
+/**
+ * Where a background picture lies, from two spots on it (`img`, in pixels) and where each is in
+ * the world (`world`, in tiles): a scale and offset per axis (world = img * scale + offset, no
+ * rotation). Null when the spots are under a pixel apart across or down, or the picture would be
+ * mirrored or flat on an axis.
+ */
+export function solveBackground(a: { img: number[]; world: number[] }, b: { img: number[]; world: number[] }): { scale: [number, number]; offset: [number, number] } | null {
+  const scale = [0, 1].map((i) => (b.world[i] - a.world[i]) / (b.img[i] - a.img[i]));
+  if ([0, 1].some((i) => Math.abs(b.img[i] - a.img[i]) < 1 || !(scale[i] > 0) || !isFinite(scale[i]))) return null;
+  return { scale: [scale[0], scale[1]], offset: [a.world[0] - scale[0] * a.img[0], a.world[1] - scale[1] * a.img[1]] };
 }
 
 /**
@@ -281,11 +299,11 @@ export function moveSection(rows: Row[], from: number, to: number): Row[] | null
 
 /**
  * One bisect test: everything enabled that isn't a suspect stays on, plus the first half
- * of the suspects and (transitively) what they require. Returns the ids to enable and
+ * (or the first `count`) of the suspects and (transitively) what they require. Returns the ids to enable and
  * the half under test.
  */
-export function bisectRound(original: Row[], suspects: string[], requires: (id: string) => string[]): { on: Set<string>; testing: string[] } {
-  const testing = suspects.slice(0, Math.ceil(suspects.length / 2));
+export function bisectRound(original: Row[], suspects: string[], requires: (id: string) => string[], count = Math.ceil(suspects.length / 2)): { on: Set<string>; testing: string[] } {
+  const testing = suspects.slice(0, count);
   const suspect = new Set(suspects);
   const on = new Set(original.filter((r): r is ModRow => isMod(r) && r.on && !suspect.has(r.id)).map((r) => r.id));
   const add = (id: string) => {
@@ -311,4 +329,66 @@ export function orphanedRequirements(ids: string[], mods: ModRow[]): string[] {
     }
   }
   return out;
+}
+
+/** A preset as the game's mod menu shares it (`name:A;B;C`, Build 42 `name:\A;\B`), or null when the text isn't
+ * one: the list must use the game's separators (a `;`, or ids starting with `\`) and every id must look like a mod
+ * id (a letter in it, no path or link characters), so a pasted link or "Server IP: 192.168.1.5" isn't taken for one. */
+export function parsePreset(text: string): { name: string; mods: string[] } | null {
+  const at = text.indexOf(":");
+  const name = text.slice(0, Math.max(0, at)).trim();
+  const list = text.slice(at + 1).trim();
+  const mods = list.split(/[;,\n]/).map((m) => m.trim().replace(/^\\/, "")).filter(Boolean);
+  const listed = list.includes(";") || list.startsWith("\\");
+  return name && listed && mods.length && mods.every((m) => /\p{L}/u.test(m) && !/[/\\:<>"|?*]/.test(m)) ? { name, mods } : null;
+}
+
+/** For each mod, the enabled mods that require it directly (the "Needed by" badge). */
+export function neededBy(rows: Row[]): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const r of rows) if (isMod(r) && r.on) for (const req of r.requires ?? []) if (req !== r.id) out.set(req, [...(out.get(req) ?? []), r.id]);
+  return out;
+}
+
+/** The enabled mods that need any of `ids`, directly or through each other (`ids` themselves left out). */
+export function dependants(ids: string[], needed: Map<string, string[]>): string[] {
+  const seen = new Set(ids);
+  const out: string[] = [];
+  const visit = (id: string) => {
+    for (const d of needed.get(id) ?? []) if (!seen.has(d)) seen.add(d), out.push(d), visit(d);
+  };
+  ids.forEach(visit);
+  return out;
+}
+
+/** The load list A-Z by name (loadFirst mods above, loadLast below), then moved only as far as requirements and load rules need. */
+export function sortByName(list: ModRow[]): Row[] {
+  const rank = (m: ModRow) => (m.load_first === "on" ? 0 : m.load_last === "on" ? 2 : 1);
+  const name = (m: ModRow) => (m.name || m.id).toLowerCase();
+  // in the app's language (the page's lang), not the system's
+  const { compare } = new Intl.Collator(globalThis.document?.documentElement.lang || undefined);
+  const on = list.filter((m) => m.on).sort((a, b) => rank(a) - rank(b) || compare(name(a), name(b)));
+  return sortLoadOrder([...on, ...list.filter((m) => !m.on)]);
+}
+
+/** A server's mods against the installed ones: how many it needs that aren't installed (`get`), out of
+ * `total`, and how many it runs but doesn't list (`unlisted`: outside the game only the first ~127
+ * characters of its Mods= line show, so they're unknown). Its full PZMM list, once worked out, counts instead. */
+export function modNeed(server: GameServer, installed: Set<string>, mods?: ServerMods | null) {
+  if (mods?.list === "full") {
+    const need = mods.mods.filter((m) => !mods.server_only.includes(m.id) && !mods.optional.includes(m.id));
+    return { get: need.filter((m) => !installed.has(m.id)).length, total: need.length, unlisted: 0 };
+  }
+  return { get: server.mods.filter((m) => !installed.has(m)).length, total: server.mod_count, unlisted: Math.max(0, server.mod_count - server.mods.length) };
+}
+
+/** Home's Popular list as kept between runs (`text`: what was stored), or null for anything not in its shape. */
+export function keptServers(text: string | null): { at: number; steam: boolean; list: GameServer[] } | null {
+  try {
+    const p = JSON.parse(text ?? "null");
+    const ok = p && typeof p.at === "number" && Array.isArray(p.list) && p.list.every((s: GameServer) => s && typeof s.addr === "string" && typeof s.name === "string" && Array.isArray(s.mods));
+    return ok ? { at: p.at, steam: p.steam === true, list: p.list } : null;
+  } catch {
+    return null;
+  }
 }

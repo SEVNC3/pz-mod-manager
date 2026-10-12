@@ -5,15 +5,15 @@
   // An empty url shows the icon as a disabled "coming soon" stub.
   const LINKS = {
     github: "https://github.com/SEVNC3/pz-mod-manager",
-    discord: "https://discord.gg/TfS9NwNHrH",
+    discord: "https://discord.com/invite/6URUy6mNzu",
     kofi: "https://ko-fi.com/sevnc3",
   };
 
   // Each brand's own logo (static/brand/*.png, downloaded once from logo.dev).
   const ICONS = [
-    { key: "github", label: "links.github" },
-    { key: "discord", label: "links.discord" },
-    { key: "kofi", label: "links.kofi" },
+    { key: "github", label: "links.github", glyph: true },
+    { key: "discord", label: "links.discord", glyph: true },
+    { key: "kofi", label: "links.kofi", glyph: false },
   ] as const;
 </script>
 
@@ -23,7 +23,7 @@
     {@const label = url ? t(icon.label) : t("links.comingSoon", { label: t(icon.label) })}
     <button class="quiet" title={label} aria-label={label}
       disabled={!url} onclick={() => api.openUrl(url)}>
-      <img src={`/brand/${icon.key}.png`} alt="" width="20" height="20" />
+      <img src={`/brand/${icon.key}.png`} alt="" width="20" height="20" class:glyph={icon.glyph} />
     </button>
   {/each}
 </nav>
@@ -45,6 +45,9 @@
     border-radius: 5px;
     opacity: 0.85;
     transition: opacity 0.15s;
+  }
+  img.glyph {
+    filter: var(--glyph);
   }
   button:hover:not(:disabled) img {
     opacity: 1;

@@ -1,7 +1,11 @@
 <script lang="ts" module>
   import type { IconName } from "./Icon.svelte";
-  /** A menu entry; null draws a separator. */
-  export type MenuItem = { label: string; icon: IconName; run: () => void; disabled?: boolean; danger?: boolean } | null;
+  /** A menu entry; null draws a separator, `heading` a group's title (`hint`: a line of help, as written). `checked` makes it a tick-box
+      entry (its tick shows), and `keep` leaves the menu open after a pick (filters set several at once). */
+  export type MenuItem =
+    | { label: string; icon?: IconName; run: () => void; disabled?: boolean; danger?: boolean; checked?: boolean; keep?: boolean }
+    | { heading: string; hint?: boolean }
+    | null;
 </script>
 
 <script lang="ts">
@@ -23,7 +27,7 @@
     // kept inside the window
     const r = menu!.getBoundingClientRect();
     at = { left: Math.max(4, Math.min(x, innerWidth - r.width - 4)), top: Math.max(4, Math.min(y, innerHeight - r.height - 4)) };
-    tick().then(() => menu?.querySelector<HTMLElement>("[role=menuitem]:not(:disabled)")?.focus());
+    tick().then(() => menu?.querySelector<HTMLElement>("[role^=menuitem]:not(:disabled)")?.focus());
     return () => refocus && back?.focus?.();
   });
 
@@ -39,9 +43,12 @@
 <div class="popup-menu" role="menu" aria-label={label} bind:this={menu} style:left="{at.left}px" style:top="{at.top}px" onkeydown={(e) => menuKeys(e, menu, close)}
   oncontextmenu={(e) => e.preventDefault()}>
   {#each items as item}
-    {#if item}
-      <button role="menuitem" class="item" class:danger={item.danger} disabled={item.disabled} onclick={() => { onClose(); item.run(); }}>
-        <span class="tick"><Icon name={item.icon} size={14} /></span>{item.label}
+    {#if item && "heading" in item}
+      <div class="heading" class:hint={item.hint} role="presentation">{item.heading}</div>
+    {:else if item}
+      <button role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"} aria-checked={item.checked} class="item" class:danger={item.danger} disabled={item.disabled}
+        onclick={() => { if (!item.keep) onClose(); item.run(); }}>
+        <span class="tick">{#if item.checked !== undefined ? item.checked : item.icon}<Icon name={item.checked !== undefined ? "check" : item.icon!} size={14} />{/if}</span>{item.label}
       </button>
     {:else}
       <div class="sep" role="separator"></div>
@@ -52,5 +59,20 @@
 <style>
   .popup-menu {
     position: fixed;
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+  }
+  .heading {
+    padding: 8px 10px 3px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .heading.hint {
+    font-weight: 400;
+    letter-spacing: normal;
+    text-transform: none;
   }
 </style>

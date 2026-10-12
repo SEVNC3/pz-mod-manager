@@ -1,5 +1,8 @@
 //! PZMM core. `pz` holds every Project Zomboid specific; the rest is game-neutral.
 
+/// How PZMM introduces itself to web services (Steam limits requests per user agent).
+pub const USER_AGENT: &str = concat!("PZMM/", env!("CARGO_PKG_VERSION"), " (+https://github.com/SEVNC3/pz-mod-manager)");
+
 pub mod profile;
 pub mod pz;
 pub mod settings;
@@ -76,6 +79,32 @@ macro_rules! say {
     };
 }
 
+/// `keyed!(key, template, name = value, ...)` with literal key and template: an error the app shows in
+/// the player's language (`keyedError` in i18n.svelte.ts): `errors.<key>`, its values as JSON when it
+/// has any, then ": " and the English (as `say!`; en.json's `errors.<key>` matches it).
+#[macro_export]
+macro_rules! keyed {
+    ($key:literal, $template:literal $(, $name:ident = $value:expr)* $(,)?) => {
+        $crate::keyed_text($key, $template, &[$((stringify!($name), $value.to_string())),*])
+    };
+}
+
+pub fn keyed_text(key: &str, template: &str, vars: &[(&'static str, String)]) -> String {
+    let map: std::collections::BTreeMap<_, _> = vars.iter().cloned().collect();
+    // a `}` in a value is escaped: keyedError takes the first `}: ` as the end of the values
+    let json = if vars.is_empty() { String::new() } else { serde_json::to_string(&map).map(|j| format!("{}}}", j[..j.len() - 1].replace('}', "\\u007d"))).unwrap_or_default() };
+    format!("errors.{key}{json}: {}", fill(template, vars))
+}
+
+/// A `keyed!` error's English (anything else as it is).
+pub fn unkeyed(s: &str) -> &str {
+    let english = || {
+        let rest = s.strip_prefix("errors.")?.trim_start_matches(|c: char| c.is_ascii_alphanumeric() || c == '_');
+        if rest.starts_with('{') { rest.split_once("}: ").map(|x| x.1) } else { rest.strip_prefix(": ") }
+    };
+    english().unwrap_or(s)
+}
+
 /// Write via a temp file + rename, so a crash never leaves a half-written file.
 pub fn write_atomic(path: &std::path::Path, bytes: impl AsRef<[u8]>) -> std::io::Result<()> {
     // unique per write: two writers of one file (threads or processes) never share a temp file
@@ -100,17 +129,21 @@ fn is_temp(name: &str) -> bool {
     tag.split_once('-').is_some_and(|(pid, n)| [pid, n].iter().all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit())))
 }
 
-/// Delete the temp files a crash mid-`write_atomic` left in the folders PZMM writes to (an
-/// hour old, so another process's write in progress is never touched). Run once at startup.
+/// Delete the temp files a crash mid-`write_atomic` (or mid server backup: `.pzmm-part`) left in
+/// the folders PZMM writes to (an hour old, so another process's write in progress is never
+/// touched), and what restores cut short left ([`pz::saves::sweep`]). Run once at startup.
 pub fn sweep_temp(paths: &pz::Paths) {
-    let profiles = std::fs::read_dir(paths.data.join("profiles")).into_iter().flatten().flatten().map(|e| e.path());
-    let dirs = [paths.data.clone(), paths.mods(), pz::server::dir(paths)].into_iter().chain(profiles);
+    let sub = |d: std::path::PathBuf| std::fs::read_dir(d).into_iter().flatten().flatten().map(|e| e.path());
+    let backups = sub(paths.data.join("server-backups")).flat_map(|d| [d.join("zones"), d]);
+    let dirs = [paths.data.clone(), paths.mods(), pz::server::dir(paths)].into_iter().chain(sub(paths.data.join("profiles"))).chain(backups);
     for e in dirs.filter_map(|d| std::fs::read_dir(d).ok()).flatten().flatten() {
         let old = e.metadata().and_then(|m| m.modified()).is_ok_and(|t| t.elapsed().is_ok_and(|age| age.as_secs() > 3600));
-        if old && e.file_type().is_ok_and(|t| t.is_file()) && is_temp(&e.file_name().to_string_lossy()) {
+        let name = e.file_name().to_string_lossy().into_owned();
+        if old && e.file_type().is_ok_and(|t| t.is_file()) && (is_temp(&name) || name.ends_with(".pzmm-part")) {
             let _ = std::fs::remove_file(e.path());
         }
     }
+    pz::saves::sweep(paths);
 }
 
 /// Keep the file as it was before PZMM first changed it (`<file>.bak`); later writes
@@ -127,6 +160,13 @@ pub fn backup_once(path: &std::path::Path) -> std::io::Result<()> {
 
 /// Usable as a single folder/file name on Windows and Linux: not empty, `.` or `..`, no
 /// path separators or reserved characters, no trailing dot/space, not a DOS device name.
+/// `name` with the characters a file name can't hold as spaces (runs collapsed), its ends trimmed
+/// of dots and spaces: a title or server name made usable as a folder name.
+pub fn clean_file_name(name: &str) -> String {
+    let clean: String = name.chars().map(|c| if r#"<>:"/\|?*"#.contains(c) || c.is_control() { ' ' } else { c }).collect();
+    clean.split_whitespace().collect::<Vec<_>>().join(" ").trim_matches(['.', ' ']).to_string()
+}
+
 pub fn safe_file_name(name: &str) -> bool {
     let reserved = |b: &str| {
         let b = b.to_ascii_uppercase();
@@ -141,18 +181,53 @@ pub fn safe_file_name(name: &str) -> bool {
         && !reserved(name.split('.').next().unwrap_or(name))
 }
 
+/// One of PZMM's JSON files: missing is empty; one that doesn't parse (damaged, or an older
+/// format) is kept as `<file>.bad` and starts over empty; one that can't be read is an error
+/// (saving over it would wipe it).
+pub(crate) fn read_json<T: serde::de::DeserializeOwned + Default>(file: &std::path::Path) -> anyhow::Result<T> {
+    use anyhow::Context;
+    let bytes = match std::fs::read(file) {
+        Ok(b) => b,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(T::default()),
+        Err(e) => return Err(e).with_context(|| format!("reading {}", file.display())),
+    };
+    Ok(serde_json::from_slice(&bytes).unwrap_or_else(|e| {
+        let bad = file.with_extension("json.bad");
+        if std::fs::read(&bad).ok().as_deref() != Some(bytes.as_slice()) {
+            let _ = std::fs::copy(file, &bad);
+            say!("fileDamaged", "error: {file} is damaged ({error}); kept a copy as {copy} and started over", file = file.display(), error = e, copy = bad.display());
+        }
+        T::default()
+    }))
+}
+
 /// Hold this while changing PZMM's data or the game's mod list. It's an OS file lock on
 /// `<data>/pzmm.lock`, so the CLI and the app (and two app windows) never interleave
 /// read-modify-write cycles. Released when the returned file is dropped.
 pub fn lock_data(paths: &pz::Paths) -> std::io::Result<std::fs::File> {
-    std::fs::create_dir_all(&paths.data)?;
-    let f = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(paths.data.join("pzmm.lock"))?;
+    lock_dir(&paths.data)
+}
+
+fn lock_dir(dir: &std::path::Path) -> std::io::Result<std::fs::File> {
+    std::fs::create_dir_all(dir)?;
+    let f = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(dir.join("pzmm.lock"))?;
     f.lock()?;
     Ok(f)
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn keyed_values_never_end_early() {
+        let e = keyed!("stopFirst", "Stop {name} first.", name = "a}: b");
+        // as the UI's keyedError reads it: the values end at the first `}: `
+        let (head, english) = e.split_once("}: ").unwrap();
+        assert_eq!((english, super::unkeyed(&e)), ("Stop a}: b first.", "Stop a}: b first."));
+        let vars: std::collections::BTreeMap<String, String> = serde_json::from_str(&format!("{}}}", head.strip_prefix("errors.stopFirst").unwrap())).unwrap();
+        assert_eq!(vars["name"], "a}: b");
+        assert_eq!(super::unkeyed("plain: text"), "plain: text");
+    }
+
     #[test]
     fn fills_placeholders() {
         let vars = [("id", "A".to_string()), ("other", "B".to_string())];
@@ -168,6 +243,7 @@ mod tests {
         for bad in ["", ".", "..", "a/b", r"a\b", "x:", "trail.", "trail ", "CON", "con.txt", "COM1", "lpt9", "tab\t"] {
             assert!(!super::safe_file_name(bad), "{bad:?}");
         }
+        assert_eq!(super::clean_file_name(" Mods: \"Best\" | 2024? / B42... "), "Mods Best 2024 B42");
     }
 
     #[test]
@@ -195,23 +271,24 @@ mod tests {
         let t = tempfile::tempdir().unwrap();
         let paths = crate::pz::Paths { zomboid: t.path().into(), data: t.path().join("data") };
         let hour_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(7200);
-        let dirs = [paths.data.clone(), paths.mods(), crate::pz::server::dir(&paths), paths.data.join("profiles/Default")];
+        let dirs = [paths.data.clone(), paths.mods(), crate::pz::server::dir(&paths), paths.data.join("profiles/Default"), paths.data.join("server-backups/A"), paths.data.join("server-backups/A/zones")];
         let mut keep = vec![];
+        let gone = ["default.txt.123-4.pzmm-tmp", "1-manual.zip.pzmm-part"];
         for d in &dirs {
             std::fs::create_dir_all(d).unwrap();
-            for (name, old) in [("default.txt.123-4.pzmm-tmp", true), ("default.txt.123-5.pzmm-tmp", false), ("x.pzmm-tmp", true), ("a.1-.pzmm-tmp", true), ("default.txt", true)] {
+            for (name, old) in [("default.txt.123-4.pzmm-tmp", true), ("default.txt.123-5.pzmm-tmp", false), ("x.pzmm-tmp", true), ("a.1-.pzmm-tmp", true), ("default.txt", true), ("1-manual.zip.pzmm-part", true), ("2-manual.zip.pzmm-part", false)] {
                 let f = std::fs::File::create(d.join(name)).unwrap();
                 if old {
                     f.set_modified(hour_ago).unwrap();
                 }
-                if name != "default.txt.123-4.pzmm-tmp" {
+                if !gone.contains(&name) {
                     keep.push(d.join(name));
                 }
             }
         }
         super::sweep_temp(&paths);
         for d in &dirs {
-            assert!(!d.join("default.txt.123-4.pzmm-tmp").exists(), "{}", d.display());
+            assert!(gone.iter().all(|g| !d.join(g).exists()), "{}", d.display());
         }
         assert!(keep.iter().all(|f| f.exists()), "new temp files and other names stay");
     }

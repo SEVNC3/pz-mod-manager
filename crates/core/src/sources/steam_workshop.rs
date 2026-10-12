@@ -20,9 +20,9 @@ pub fn content_dir(app: &str) -> Option<PathBuf> {
     library_path(&format!("steamapps/workshop/content/{app}"))
 }
 
-/// `<library>/<rel>` for the first Steam library that has it, e.g. `steamapps/common/ProjectZomboid`.
-pub fn library_path(rel: &str) -> Option<PathBuf> {
-    let home = dirs::home_dir()?;
+/// Where the Steam client may be installed, the registered one first.
+pub fn steam_roots() -> Vec<PathBuf> {
+    let Some(home) = dirs::home_dir() else { return vec![] };
     #[allow(unused_mut)]
     let mut roots = vec![
         home.join(".steam/steam"),
@@ -36,7 +36,12 @@ pub fn library_path(rel: &str) -> Option<PathBuf> {
             roots.insert(0, PathBuf::from(p));
         }
     }
-    for root in roots {
+    roots
+}
+
+/// `<library>/<rel>` for the first Steam library that has it, e.g. `steamapps/common/ProjectZomboid`.
+pub fn library_path(rel: &str) -> Option<PathBuf> {
+    for root in steam_roots() {
         let vdf = std::fs::read_to_string(root.join("steamapps/libraryfolders.vdf")).unwrap_or_default();
         let libs = vdf.lines().filter_map(|l| {
             let v = l.trim().strip_prefix("\"path\"")?.trim().trim_matches('"');
@@ -50,6 +55,35 @@ pub fn library_path(rel: &str) -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// The SteamID64 of the account signed in to the running Steam client: Steam records its account
+/// ID while it runs (`ActiveProcess\ActiveUser`, in the registry on Windows, `registry.vdf` elsewhere).
+pub fn active_user() -> Option<String> {
+    #[cfg(windows)]
+    let id = {
+        use winreg::{RegKey, enums::HKEY_CURRENT_USER};
+        RegKey::predef(HKEY_CURRENT_USER).open_subkey(r"Software\Valve\Steam\ActiveProcess").and_then(|k| k.get_value::<u32, _>("ActiveUser")).ok()
+    };
+    #[cfg(not(windows))]
+    let id = dirs::home_dir().and_then(|h| std::fs::read_to_string(h.join(".steam/registry.vdf")).ok()).and_then(|t| active_user_in(&t));
+    id.filter(|i| *i != 0).map(steam_id64)
+}
+
+/// `"ActiveUser" "<account id>"` in Steam's registry.vdf.
+pub fn active_user_in(vdf: &str) -> Option<u32> {
+    vdf.lines().find_map(|l| {
+        let parts: Vec<&str> = l.split('"').filter(|p| !p.trim().is_empty()).collect();
+        match parts.as_slice() {
+            [k, v] if k.eq_ignore_ascii_case("ActiveUser") => v.parse().ok(),
+            _ => None,
+        }
+    })
+}
+
+/// A Steam account ID as the SteamID64 the Web API takes (individual accounts, public universe).
+pub fn steam_id64(account: u32) -> String {
+    (76_561_197_960_265_728u64 + u64::from(account)).to_string()
 }
 
 /// Whether the Steam client is running (Steam records its pid while it runs).
@@ -149,7 +183,7 @@ impl Item {
 }
 
 /// Browse sort orders, as Steam names them. Collections only sort by the first four.
-pub const SORTS: &[&str] = &["trend", "toprated", "mostrecent", "lastupdated", "totaluniquesubscribers", "num_parent_collections"];
+const SORTS: &[&str] = &["trend", "toprated", "mostrecent", "lastupdated", "totaluniquesubscribers", "num_parent_collections"];
 
 /// One Workshop browse request: everything Steam's browse page filters on anonymously.
 #[derive(Clone, Debug, Default, serde::Deserialize)]
@@ -189,7 +223,7 @@ fn enc(s: &str) -> String {
 }
 
 /// The browse page URL for `q`.
-pub fn browse_url(app: &str, q: &Query) -> String {
+fn browse_url(app: &str, q: &Query) -> String {
     let search = q.search.trim();
     let mut sort = if !search.is_empty() { "textsearch" } else if SORTS.contains(&q.sort.as_str()) { q.sort.as_str() } else { "trend" };
     if q.collections && !["trend", "toprated", "mostrecent", "lastupdated", "textsearch"].contains(&sort) {
@@ -297,7 +331,7 @@ fn post_form(url: &str, body: &str) -> Result<Value> {
     let bytes = super::polite(url, || {
         super::agent()
             .post(url)
-            .header("User-Agent", "pzmm")
+            .header("User-Agent", crate::USER_AGENT)
             .header("Content-Type", "application/x-www-form-urlencoded")
             .send(body)?
             .body_mut()
@@ -318,11 +352,44 @@ fn id_list(key: &str, ids: &[&str]) -> String {
 
 /// Current details (title, last update, ...) for items by id.
 pub fn details(ids: &[&str]) -> Result<Vec<Item>> {
+    Ok(lookup(ids)?.0)
+}
+
+/// Items that aren't plainly public, by id: "gone" (Steam doesn't serve it: removed, or made
+/// private), "banned" (taken down by Steam), "hidden" (friends only or private), "unlisted".
+pub type Status = Vec<(String, &'static str)>;
+
+/// [`details`], and the items' [`Status`].
+pub fn lookup(ids: &[&str]) -> Result<(Vec<Item>, Status)> {
     if ids.is_empty() {
-        return Ok(vec![]);
+        return Ok(Default::default());
     }
     let v = post_form("https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/", &id_list("itemcount", ids))?;
-    Ok(v["response"]["publishedfiledetails"].as_array().into_iter().flatten().filter(|d| d["result"] == 1).map(Item::from_json).collect())
+    Ok(parse_details(&v))
+}
+
+fn parse_details(v: &Value) -> (Vec<Item>, Status) {
+    let (mut items, mut status) = (vec![], vec![]);
+    for d in v["response"]["publishedfiledetails"].as_array().into_iter().flatten() {
+        let kind = if d["result"] != 1 {
+            "gone"
+        } else if d["banned"] == true || num(d, "banned") != 0 {
+            "banned"
+        } else {
+            match num(d, "visibility") {
+                0 => "",
+                3 => "unlisted",
+                _ => "hidden",
+            }
+        };
+        if !kind.is_empty() {
+            status.push((text(d, "publishedfileid"), kind));
+        }
+        if d["result"] == 1 {
+            items.push(Item::from_json(d));
+        }
+    }
+    (items, status)
 }
 
 /// Items whose Workshop update time moved past what `seen` recorded; records the new
@@ -404,7 +471,7 @@ fn parse_item_page(html: &str) -> ItemPage {
 }
 
 /// Plain text from a scrap of Steam HTML: line breaks kept, tags dropped, entities decoded.
-fn html_text(s: &str) -> String {
+pub(crate) fn html_text(s: &str) -> String {
     let s = s.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n");
     let mut out = String::new();
     let mut in_tag = false;
@@ -419,7 +486,7 @@ fn html_text(s: &str) -> String {
     out.replace("&quot;", "\"").replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">").replace("&nbsp;", " ").replace("&amp;", "&").trim().to_string()
 }
 
-#[derive(Debug, Default, serde::Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct ChangeNote {
     pub time: u64,
     pub text: String,
@@ -436,16 +503,23 @@ pub fn change_notes(id: &str, page: u32) -> Result<Vec<ChangeNote>> {
 
 /// The change notes newer than `since` (Unix seconds: the installed version), newest first.
 pub fn change_notes_since(id: &str, since: u64) -> Result<Vec<ChangeNote>> {
-    notes_since(|page| change_notes(id, page), since)
+    Ok(change_notes_back_to(id, since)?.into_iter().filter(|n| n.time > since).collect())
 }
 
-/// Pages (from `page`, 10 notes each, newest first) until one reaches back to `since`; at most 5.
-fn notes_since(mut page: impl FnMut(u32) -> Result<Vec<ChangeNote>>, since: u64) -> Result<Vec<ChangeNote>> {
+/// The change notes newer than `since`, newest first, then the first one at or before it (the
+/// version you had), if there is one.
+pub fn change_notes_back_to(id: &str, since: u64) -> Result<Vec<ChangeNote>> {
+    notes_back_to(|page| change_notes(id, page), since)
+}
+
+/// Pages (10 notes each, newest first) until one reaches back to `since`; at most 5.
+fn notes_back_to(mut page: impl FnMut(u32) -> Result<Vec<ChangeNote>>, since: u64) -> Result<Vec<ChangeNote>> {
     let mut out = vec![];
     for p in 1..=5 {
         let notes = page(p)?;
         let done = notes.len() < 10 || notes.iter().any(|n| n.time <= since);
-        out.extend(notes.into_iter().filter(|n| n.time > since));
+        let older = notes.iter().position(|n| n.time <= since).map_or(notes.len(), |i| i + 1);
+        out.extend(notes.into_iter().take(older));
         if done {
             break;
         }
@@ -550,18 +624,40 @@ fn parse_required(html: &str) -> Vec<String> {
     ids
 }
 
-fn steamcmd(paths: &Paths) -> Result<PathBuf> {
+/// SteamCMD in PZMM's data folder, downloaded the first time it's needed (one download at a time,
+/// unpacked aside and moved in, so a failed one leaves no half program and the next try starts over).
+pub(crate) fn steamcmd(paths: &Paths) -> Result<PathBuf> {
+    static GETTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _one = GETTING.lock().unwrap_or_else(|e| e.into_inner());
     let dir = paths.data.join("steamcmd");
-    let exe = dir.join(if cfg!(windows) { "steamcmd.exe" } else { "steamcmd.sh" });
+    let name = if cfg!(windows) { "steamcmd.exe" } else { "steamcmd.sh" };
+    let exe = dir.join(name);
     if !exe.exists() {
         crate::say!("downloadingSteamcmd", "downloading steamcmd...");
-        std::fs::create_dir_all(&dir)?;
+        let new = paths.data.join("steamcmd.pzmm-new");
+        if new.exists() {
+            std::fs::remove_dir_all(&new)?;
+        }
+        std::fs::create_dir_all(&new)?;
         if cfg!(windows) {
-            super::unzip(&super::download(&format!("{STEAMCMD_URL}steamcmd.zip"))?, &dir)?;
+            super::unzip(&super::download(&format!("{STEAMCMD_URL}steamcmd.zip"))?, &new)?;
         } else {
             let gz = super::download(&format!("{STEAMCMD_URL}steamcmd_linux.tar.gz"))?;
-            tar::Archive::new(flate2::read::GzDecoder::new(&gz[..])).unpack(&dir)?;
+            tar::Archive::new(flate2::read::GzDecoder::new(&gz[..])).unpack(&new)?;
         }
+        anyhow::ensure!(new.join(name).is_file(), "the SteamCMD download has no {name}");
+        std::fs::create_dir_all(&dir)?;
+        // the program last: it being there means SteamCMD is complete
+        let mut parts: Vec<_> = std::fs::read_dir(&new)?.flatten().map(|e| e.file_name()).collect();
+        parts.sort_by_key(|n| *n == *name);
+        for n in parts {
+            let to = dir.join(&n);
+            if to.is_dir() {
+                std::fs::remove_dir_all(&to)?;
+            }
+            std::fs::rename(new.join(&n), to)?;
+        }
+        let _ = std::fs::remove_dir(&new);
     }
     Ok(exe)
 }
@@ -579,6 +675,9 @@ pub fn steamcmd_dirs(paths: &Paths, app: &str, id: &str) -> [PathBuf; 2] {
     let w = paths.data.join("steamcmd/steamapps/workshop");
     [w.join("content").join(app).join(id), w.join("downloads").join(app).join(id)]
 }
+
+/// One SteamCMD at a time: two sessions fight over its folder.
+pub(crate) static STEAMCMD: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// How long SteamCMD may go without finishing an item before it's stopped.
 const ITEM_LIMIT: Duration = Duration::from_secs(60 * 60);
@@ -600,8 +699,6 @@ pub fn download(paths: &Paths, app: &str, ids: &[&str], stop: &AtomicBool) -> Re
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
-    // one SteamCMD at a time: two sessions fight over its folder
-    static STEAMCMD: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let _one = STEAMCMD.lock().unwrap_or_else(|e| e.into_inner());
     crate::say!("downloadingItems", "downloading {count} workshop item(s)...", count = ids.len());
     crate::progress(0, ids.len());
@@ -683,6 +780,21 @@ mod tests {
         assert_eq!((page.items[0].file_size, page.items[0].tags.clone()), (1_048_576, vec!["Build 42".to_string()]));
         assert_eq!((page.items[0].stars, page.items[0].votes), (4, 767));
         assert!(parse_browse("<html>maintenance</html>").is_err());
+    }
+
+    #[test]
+    fn tells_which_items_are_not_public() {
+        // as GetPublishedFileDetails answers: removed or private items come back as result 9
+        let v = serde_json::json!({"response": {"publishedfiledetails": [
+            {"publishedfileid": "1", "result": 1, "visibility": 0, "banned": 0, "title": "Fine"},
+            {"publishedfileid": "2", "result": 9},
+            {"publishedfileid": "3", "result": 1, "visibility": 3, "banned": 0},
+            {"publishedfileid": "4", "result": 1, "visibility": 1, "banned": 0},
+            {"publishedfileid": "5", "result": 1, "visibility": 0, "banned": 1},
+        ]}});
+        let (items, status) = parse_details(&v);
+        assert_eq!(items.iter().map(|i| i.id.as_str()).collect::<Vec<_>>(), ["1", "3", "4", "5"]);
+        assert_eq!(status, [("2".to_string(), "gone"), ("3".into(), "unlisted"), ("4".into(), "hidden"), ("5".into(), "banned")]);
     }
 
     #[test]
@@ -786,12 +898,12 @@ Downloading item 2 ...
             asked.borrow_mut().push(p);
             Ok((0..10).map(|i| 100 - (p as u64 - 1) * 10 - i).filter(|t| *t > 75).map(note).collect())
         };
-        let got = notes_since(pages, 88).unwrap();
-        assert_eq!(got.iter().map(|n| n.time).collect::<Vec<_>>(), (89..=100).rev().collect::<Vec<_>>(), "newer than the install only");
+        let got = notes_back_to(pages, 88).unwrap();
+        assert_eq!(got.iter().map(|n| n.time).collect::<Vec<_>>(), (88..=100).rev().collect::<Vec<_>>(), "newer than the install, then the install");
         assert_eq!(asked.take(), [1, 2], "stops at the page that reaches the install");
-        assert_eq!(notes_since(pages, 0).unwrap().len(), 25, "a short page is the last");
+        assert_eq!(notes_back_to(pages, 0).unwrap().len(), 25, "a short page is the last");
         assert_eq!(asked.take(), [1, 2, 3]);
-        assert!(notes_since(|_| Ok(vec![note(5)]), 5).unwrap().is_empty(), "the installed version itself isn't new");
+        assert_eq!(notes_back_to(|_| Ok(vec![note(5), note(4)]), 5).unwrap(), [note(5)], "the installed version itself, nothing older");
     }
 
     #[test]

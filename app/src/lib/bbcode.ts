@@ -47,3 +47,20 @@ export function bbcode(src: string): string {
   s = s.replace(/\n/g, "<br>").replace(/<br>\s*(<\/?(?:ul|ol|li|h3|h4|h5|blockquote|table|tr|td|th|hr|pre)[^>]*>)/g, "$1").replace(/(<\/?(?:ul|ol|li|h3|h4|h5|blockquote|table|tr|hr|pre)[^>]*>)\s*<br>/g, "$1");
   return s.replace(/\u0000(\d+)\u0000/g, (_m, i) => kept[Number(i)]);
 }
+
+/** Changelog text, plain or Markdown (`#` headings, `-` lists, **bold**, *italic*, ~~struck~~,
+ * [links](https://...)), as the same safe HTML by way of BBCode; square brackets stay text. */
+export function markdown(src: string): string {
+  const links: string[] = [];
+  const keep = (s: string) => s.replace(/\[/g, "\u0001").replace(/\]/g, "\u0002");
+  let s = src.replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, (_m, label: string, url: string) => {
+    links.push(`[url=${url}]${keep(label)}[/url]`);
+    return `\u0003${links.length - 1}\u0003`;
+  });
+  s = keep(s).replace(/^#{1,6}\s+(.+?)\s*#*\s*$/gm, "[h3]$1[/h3]");
+  s = s.replace(/(?:^[ \t]*[-*\u2022][ \t]+.*(?:\n|$))+/gm, (block) => `[list]${block.trimEnd().split("\n").map((l) => `\u0004${l.replace(/^[ \t]*[-*\u2022][ \t]+/, "")}`).join("")}[/list]\n`);
+  s = s.replace(/\*\*(.+?)\*\*/g, "[b]$1[/b]").replace(/~~(.+?)~~/g, "[s]$1[/s]").replace(/(^|[^\w*])\*([^*\n]+)\*(?!\w)/g, "$1[i]$2[/i]");
+  // list items marked only now: their `[*]` isn't italics
+  s = s.replace(/\u0004/g, "[*]").replace(/\u0003(\d+)\u0003/g, (_m, i) => links[Number(i)]);
+  return bbcode(s).replace(/\u0001/g, "[").replace(/\u0002/g, "]");
+}

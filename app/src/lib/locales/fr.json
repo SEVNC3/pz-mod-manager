@@ -1,18 +1,149 @@
 {
   "tabs": {
+    "home": "Accueil",
     "mods": "Mes mods",
+    "feed": "Nouveautés",
     "workshop": "Parcourir le Workshop",
     "maps": "Cartes",
-    "servers": "Serveurs et sauvegardes",
-    "zb": "ZombieBuddy",
+    "servers": "Serveurs",
+    "saves": "Sauvegardes",
+    "zb": "Mods Java",
+    "authoring": "Créer un mod",
     "settings": "Paramètres"
+  },
+  "home": {
+    "playButton": "Jouer",
+    "notAnswering": "Ne répond pas",
+    "joinTip": "Prépare ses mods dans un profil à part, puis le rejoint",
+    "details": "Détails",
+    "updatesFailed": "Impossible de vérifier les mises à jour",
+    "noneUpdated": "Rien de mis à jour depuis votre dernière partie",
+    "health": {
+      "ok": "Vérifier la configuration : tout est bon",
+      "problems": {
+        "one": "Vérifier la configuration : {count} problème",
+        "other": "Vérifier la configuration : {count} problèmes"
+      },
+      "fix": "Corriger",
+      "run": "Vérifier",
+      "failed": "La vérification de l'installation n'a pas pu s'exécuter"
+    },
+    "newsFailed": "Impossible de charger les actualités",
+    "noNews": "Pas encore d'actualités",
+    "mayAffect": "Peut toucher les mods",
+    "mayAffectTip": "Sorti depuis votre dernière partie : voyez Nouveautés",
+    "firstMods": "Aucun mod activé pour l'instant : choisissez-en dans le Workshop.",
+    "community": "Communauté",
+    "news": "Actualités de The Indie Stone",
+    "links": {
+      "website": "Site de Project Zomboid",
+      "forums": "Forums de The Indie Stone",
+      "discord": "Discord de Project Zomboid",
+      "wiki": "PZwiki",
+      "wikiModding": "PZwiki : Modding",
+      "moddingDiscord": "Discord PZ Modding Community (non officiel)",
+      "reddit": "r/projectzomboid sur Reddit",
+      "workshop": "Steam Workshop",
+      "pzmm": "Discord de PZMM"
+    },
+    "groups": {
+      "favourites": "Favoris",
+      "recent": "Récents",
+      "hosted": "Vos serveurs",
+      "popular": "Populaires"
+    },
+    "more": "Plus",
+    "switchProfile": "Changer de profil",
+    "stat": {
+      "players": "Joueurs",
+      "ping": "Ping",
+      "map": "Carte",
+      "build": "Build",
+      "port": "Port",
+      "played": "Dernier serveur joué",
+      "playedGame": "Dernière partie",
+      "mods": "Mods",
+      "problems": "Problèmes",
+      "updates": "Mises à jour"
+    },
+    "copyAddress": "Copier l'adresse",
+    "copied": "Copié",
+    "manage": "Gérer",
+    "findServer": "Trouver un serveur",
+    "continue": "Continuer {save}",
+    "continueTip": "Lance le jeu : choisissez {save} dans son menu (PZMM ne peut pas dire au jeu quelle partie ouvrir). Dernière partie {ago}.",
+    "zb": {
+      "missing": {
+        "one": "{count} mod a besoin de ZombieBuddy",
+        "other": "{count} mods ont besoin de ZombieBuddy"
+      },
+      "partial": "ZombieBuddy n'est pas entièrement configuré"
+    },
+    "serverDiscord": "Discord du serveur",
+    "serverSite": "Site du serveur",
+    "copyLink": "Copier le lien pour rejoindre",
+    "featured": "À la une chez The Indie Stone",
+    "activity": "Vos mods avec de nouvelles mises à jour",
+    "andMore": {
+      "one": "et {count} de plus",
+      "other": "et {count} de plus"
+    },
+    "tag": {
+      "major": "Grosse mise à jour",
+      "patch": "Correctif",
+      "news": "Actualité"
+    },
+    "library": "Bibliothèque",
+    "search": "Rechercher",
+    "none": {
+      "favourites": "Pas encore de favoris.",
+      "popular": "Aucun des serveurs les plus remplis n'utilise de mods en ce moment.",
+      "game": "La liste de serveurs enregistrée du jeu est vide."
+    },
+    "popularFailed": "Impossible de joindre la liste des serveurs.",
+    "gameList": "La liste de Steam n'a pas chargé (Steam est-il lancé ?), ceux-ci viennent donc de la liste enregistrée du jeu.",
+    "toGetShort": {
+      "one": "{count} à télécharger",
+      "other": "{count} à télécharger"
+    },
+    "official": "Officiel",
+    "server": {
+      "toGet": {
+        "one": "{count} mod à télécharger",
+        "other": "{count} mods à télécharger"
+      },
+      "ready": {
+        "one": "Son mod est prêt",
+        "other": "Les {count} mods sont prêts"
+      },
+      "get": "Télécharger les mods",
+      "toGetUnlisted": {
+        "one": "{count} mod listé à télécharger, {unlisted} non affichés",
+        "other": "{count} mods listés à télécharger, {unlisted} non affichés"
+      },
+      "readyListed": {
+        "one": "{count} mod listé prêt, {unlisted} non affichés",
+        "other": "{count} mods listés prêts, {unlisted} non affichés"
+      }
+    },
+    "serverInfo": "Voir les infos du serveur",
+    "serverInfoSub": "Qui est en ligne, ses mods et réglages, dans Serveurs",
+    "pickServer": "Choisissez un serveur, puis cliquez sur Rejoindre",
+    "deselect": "Cliquez à nouveau (ou Échap) pour revenir à votre profil",
+    "singleplayer": "Solo",
+    "findingMods": "Recherche de ses mods…",
+    "gameListKey": "Lister ici les serveurs de Steam demande une clé Steam Web API, ceux-ci viennent donc de la liste enregistrée du jeu.",
+    "popularKept": "Liste de {ago}. Actualiser interroge Steam, qui vous affiche en jeu un instant.",
+    "popularAsk": "Lister les serveurs les plus fréquentés interroge Steam, qui vous affiche en jeu un instant.",
+    "listServers": "Lister les serveurs",
+    "passwordTip": "Demande un mot de passe : s'il n'est pas enregistré, Rejoindre ouvre les détails du serveur dans Serveurs pour te le demander"
   },
   "app": {
     "newProfilePlaceholder": "Nom, par ex. Serveur entre amis",
     "create": "Créer",
     "share": "Partager",
-    "shareTip": "Copier un code que d'autres peuvent importer",
-    "importTip": "Importer un profil depuis un code de partage",
+    "shareTip": "Copier un code que d'autres peuvent importer, ou enregistrer le profil comme preset dans le menu des mods du jeu ou dans Mod Manager",
+    "importTip": "Importer un profil depuis un code de partage, une collection du Workshop ou la liste d'un autre gestionnaire de mods",
     "installLabel": "Installer un mod",
     "installPlaceholder": "Collez un lien, une collection ou un ID du Workshop, un dépôt GitHub (propriétaire/dépôt) ou le chemin d'un .zip",
     "updateMods": {
@@ -25,7 +156,7 @@
     "launchTip": "Via Steam",
     "launchTipArgs": "Via Steam, avec {args}",
     "launch": "Lancer le jeu",
-    "importIntro": "<strong>Importer un profil</strong> : collez le code de partage qu'on vous a envoyé. Les mods du Workshop manquants sont installés.",
+    "importIntro": "<strong>Importer un profil</strong> : collez un code de partage, des liens de collections ou d'objets du Workshop (plusieurs à la fois) ou un preset partagé depuis le menu des mods du jeu. Les mods du Workshop manquants sont installés.",
     "switchGameLabel": "Changer de jeu",
     "switchToViewpoint": "Passer à Project Viewpoint (3D) ?",
     "switchToZomboid": "Revenir à Project Zomboid ?",
@@ -67,12 +198,31 @@
     "browse": "Parcourir…",
     "browseTip": "Installer un mod depuis un fichier .zip ou un dossier de cet ordinateur",
     "browseZip": "Fichiers .zip…",
-    "browseFolder": "Un dossier de mod…"
+    "browseFolder": "Un dossier de mod…",
+    "importPlaceholder": "PZMM1:…, des liens de collections ou Nom:ModA;ModB;",
+    "importSaved": "Ou une liste enregistrée sur cet ordinateur",
+    "shareCode": "Copier un code de partage",
+    "saveGamePreset": "Enregistrer comme preset dans le menu des mods du jeu",
+    "saveModManagerPreset": "Enregistrer comme preset de Mod Manager",
+    "loadFailed": "Impossible de lire vos mods : {error}",
+    "openFolders": "Vérifier les dossiers dans les Paramètres",
+    "moreTabs": "Plus d'onglets"
   },
   "mods": {
-    "searchPlaceholder": "Rechercher des mods  ( / )",
+    "searchPlaceholder": "Rechercher  ( / )",
     "searchLabel": "Rechercher des mods",
     "showLabel": "Afficher",
+    "filters": "Filtres",
+    "filtersN": {
+      "one": "Filtres ({count})",
+      "other": "Filtres ({count})"
+    },
+    "filtersTip": "Favoris, mods masqués, types, vos étiquettes et langue",
+    "clearFilterTip": "Désactiver ce filtre",
+    "clearFilters": "Effacer les filtres",
+    "more": "Plus",
+    "kindHeading": "Type",
+    "tagHeading": "Vos étiquettes",
     "filterAll": "Tous",
     "filterProblems": "Problèmes",
     "filterProblemsN": "Problèmes ({count})",
@@ -82,10 +232,6 @@
     "sortSize": "Taille",
     "sortUpdated": "Dernière modification",
     "sortStatus": "Problèmes d'abord",
-    "count": {
-      "one": "Activé : {enabled} · {count} mod",
-      "other": "Activés : {enabled} · {count} mods"
-    },
     "installMissingTip": "Rechercher et installer depuis le Workshop : {ids}",
     "installMissing": "Installer les mods manquants ({count})",
     "fixTip": "Activer les mods requis et ordonner les mods selon leurs règles require / loadModAfter / loadModBefore",
@@ -108,15 +254,23 @@
     "undo": "Annuler",
     "redoTip": "Rétablir (Ctrl+Y)",
     "redo": "Rétablir",
-    "separatorTip": "Ajouter un séparateur au-dessus du mod sélectionné",
-    "separator": "Séparateur",
-    "groupTip": "Classer vos mods en une section par catégorie, d'après leurs tags du Workshop. L'ordre de chargement ne change pas.",
+    "addSeparator": "Ajouter un séparateur",
     "group": "Grouper par catégorie",
     "loading": "Chargement de vos mods…",
     "emptyTitle": "Rien dans la réserve pour l'instant.",
     "emptyHint": "Collez un lien du Steam Workshop ci-dessus pour installer un mod, ou abonnez-vous à des mods dans Steam : vos abonnements apparaissent ici automatiquement.",
     "newSection": "Nouvelle section",
-    "newSectionN": "Nouvelle section {n}"
+    "newSectionN": "Nouvelle section {n}",
+    "filterFavourites": "Favoris",
+    "filterHidden": "Masqués",
+    "filterHiddenN": "Masqués ({count})",
+    "kindAny": "Tous les types",
+    "sortEnabled": "Activés d’abord",
+    "sortInstalled": "Date d’installation",
+    "inLanguage": "Dans ma langue ({language})",
+    "selectAll": "Tout sélectionner",
+    "skipFavourites": "Laisser les favoris",
+    "skipFavouritesTip": "Activer et Désactiver laissent vos favoris tels quels"
   },
   "busy": {
     "loading": "Chargement",
@@ -146,6 +300,10 @@
     "loadingSave": "Chargement des mods de {name}",
     "creatingProfile": "Création du profil « {name} »",
     "deletingProfile": "Suppression du profil « {name} »",
+    "pruningProfiles": {
+      "one": "Suppression de {count} profil de serveur",
+      "other": "Suppression de {count} profils de serveur"
+    },
     "removingOne": "Retrait de {name}",
     "removingMany": {
       "one": "Retrait de {count} mod",
@@ -157,7 +315,11 @@
     "copyingProfile": "Copie du profil sous « {name} »",
     "renamingProfile": "Renommage du profil en « {name} »",
     "restoringSnapshot": "Restauration d'un instantané",
-    "lookingUp": "Recherche de {id} sur le Workshop"
+    "lookingUp": "Recherche de {id} sur le Workshop",
+    "settingUpServer": "Préparation de {name}",
+    "checking": "Vérification de vos mods",
+    "importingCollection": "Installation de la collection",
+    "readingCollection": "Lecture de la collection"
   },
   "log": {
     "appLatest": "PZMM {version} est la dernière version.",
@@ -198,7 +360,16 @@
     "snapshotRestored": "Instantané restauré. La liste qu'il a remplacée est aussi un instantané.",
     "pickRequirement": "Aucun élément du Workshop ne fournit clairement {id} : choisissez-en un sous Requiert, dans les détails.",
     "idCopied": "{id} copié.",
-    "bisectOtherProfile": "La recherche du mod défectueux se déroule sur le profil « {profile} » : revenez-y pour répondre ou l'arrêter."
+    "bisectOtherProfile": "La recherche du mod défectueux se déroule sur le profil « {profile} » : revenez-y pour répondre ou l'arrêter.",
+    "pinned": "{id} épinglé entre ses voisins dans l'ordre de chargement. Autosort et Mod Load Order Sorter le gardent là.",
+    "unpinned": "{id} désépinglé.",
+    "savedGamePreset": "« {name} » enregistré comme preset dans le menu des mods du jeu.",
+    "savedModManagerPreset": "« {name} » enregistré comme preset de Mod Manager.",
+    "sortedAz": "Ordre de chargement trié de A à Z ; les prérequis et les règles de chargement passent toujours avant (Ctrl+Z l’annule).",
+    "playFailed": "Impossible de lancer le jeu : {error}",
+    "appUpdateFound": "PZMM {version} est disponible : « Mettre à jour et redémarrer » se trouve au-dessus des onglets.",
+    "bisectSaveFailed": "Impossible d'enregistrer la liste de test suivante, la recherche n'a donc pas avancé. Instantanés contient votre liste d'avant la recherche.",
+    "bisectRestoreFailed": "Impossible de remettre votre liste de mods comme avant la recherche : restaurez-la depuis Instantanés (Avant la recherche du mod défectueux)."
   },
   "confirm": {
     "group": "Grouper par catégorie remplace vos propres sections ({sections}) par des sections de catégorie. Ctrl+Z l'annule. Grouper maintenant ?",
@@ -221,14 +392,50 @@
       "other": "Retirer {count} mods ? Leurs fichiers sont supprimés de votre dossier de mods Zomboid."
     },
     "removeSkipped": {
-      "one": " ({count} non installé par PZMM ne sera pas touché.)",
-      "other": " ({count} non installés par PZMM ne seront pas touchés.)"
+      "one": "{count} mod non installé par PZMM ne sera pas touché.",
+      "other": "{count} mods non installés par PZMM ne seront pas touchés."
     },
     "alsoRemove": {
       "one": "Retirer aussi {ids} ? Aucun autre de vos mods n'en a besoin.",
       "other": "Retirer aussi {ids} ? Aucun autre de vos mods n'en a besoin."
     },
-    "deleteProfile": "Supprimer le profil « {name} » ? Vos mods restent installés. PZMM passera à « {other} »."
+    "removeToo": {
+      "one": "Le retirer aussi",
+      "other": "Les retirer aussi"
+    },
+    "keepThem": {
+      "one": "Le garder",
+      "other": "Les garder"
+    },
+    "deleteProfile": "Supprimer le profil « {name} » ? Vos mods restent installés. PZMM passera à « {other} ».",
+    "neededTitle": {
+      "one": "{count} mod activé a besoin de {name}",
+      "other": "{count} mods activés ont besoin de {name}"
+    },
+    "needsLine": "{name} (a besoin de {needs})",
+    "theseMods": {
+      "one": "ce mod",
+      "other": "ces {count} mods"
+    },
+    "disableToo": {
+      "one": "Le désactiver aussi",
+      "other": "Les désactiver aussi"
+    },
+    "disableOnly": "Désactiver, laisser le reste activé",
+    "deleteOther": "Supprimer le profil « {name} » ? Vos mods restent installés.",
+    "pruneProfiles": {
+      "one": "Supprimer {count} profil de serveur que vous n'utilisez plus ? Son serveur ne figure ni dans votre historique, ni dans vos favoris, ni dans vos serveurs hébergés. Vos mods restent installés.",
+      "other": "Supprimer {count} profils de serveur que vous n'utilisez plus ? Leurs serveurs ne figurent ni dans votre historique, ni dans vos favoris, ni dans vos serveurs hébergés. Vos mods restent installés."
+    },
+    "removeTrashOne": "Retirer {name} ? Ses fichiers sont déplacés de votre dossier de mods Zomboid vers la Corbeille.",
+    "removeTrashMany": {
+      "one": "Retirer {count} mod ? Ses fichiers sont déplacés de votre dossier de mods Zomboid vers la Corbeille.",
+      "other": "Retirer {count} mods ? Leurs fichiers sont déplacés de votre dossier de mods Zomboid vers la Corbeille."
+    },
+    "removeUsedBy": {
+      "one": "Aussi utilisé par {count} autre profil : {profiles}",
+      "other": "Aussi utilisé par {count} autres profils : {profiles}"
+    }
   },
   "common": {
     "cancel": "Annuler",
@@ -265,6 +472,7 @@
     "workshop": "Workshop",
     "steam": "Abonné",
     "local": "Fichier local",
+    "localShort": "Local",
     "manual": "Manuel"
   },
   "api": {
@@ -297,6 +505,8 @@
     },
     "hideVanilla": "Masquer vanilla",
     "perMapColours": "Couleurs par carte",
+    "world": "Carte du monde",
+    "worldTip": "Dessine sous la grille l'eau, les routes et les bâtiments de la carte du monde de chaque carte (celles qui n'en ont pas restent unies)",
     "zoomIn": "Zoom avant",
     "zoomOut": "Zoom arrière",
     "fit": "Ajuster",
@@ -506,12 +716,14 @@
         "other": "Enregistrer {count} affichées"
       },
       "confirmReplace": "Remplacer le préréglage « {name} » ?",
+      "replace": "Remplacer",
       "saved": {
         "one": "{count} carte affichée enregistrée sous « {name} ».",
         "other": "Les {count} cartes affichées ont été enregistrées sous « {name} »."
       },
       "previewing": "Prévisualisation de « {name} ».",
-      "previewingMissing": "Prévisualisation de « {name} » ; introuvables : {ids} (installez-les, ou activez les cartes du Workshop)."
+      "previewingMissing": "Prévisualisation de « {name} » ; introuvables : {ids} (installez-les, ou activez les cartes du Workshop).",
+      "confirmRemove": "Retirer le préréglage « {name} » ?"
     },
     "compare": {
       "title": "Comparer avec un serveur",
@@ -538,6 +750,7 @@
       "noItem": "Il n'existe aucun objet du Workshop {id}.",
       "alreadyInstalled": "{title} est déjà installé : s'il ajoute des cartes, elles sont dans la liste.",
       "confirmDownload": "Steam n'a pas fourni la liste de fichiers de « {title} » ({error}). Le télécharger ({size}) pour lire ses cellules à la place ? Rien n'est installé, et le téléchargement est supprimé ensuite.",
+      "download": "Télécharger",
       "read": "{title} lu : il est prévisualisé sur la grille et dans la liste comme non installé.",
       "noMaps": "{title} n'ajoute aucune carte pour Build {build}.",
       "readingMember": "Lecture de {title} ({n} sur {total})…",
@@ -577,7 +790,30 @@
     "hideSpawn": "Masquer les mods de points d'apparition",
     "hideSpawnTip": "Exclure les mods sans cellule de carte : ils ajoutent seulement des points d'apparition à une ville vanilla",
     "minimise": "Réduire le panneau d'outils",
-    "restoreTip": "Afficher le panneau d'outils"
+    "restoreTip": "Afficher le panneau d'outils",
+    "gridEmpty": "Rien sur la grille : coche une carte dans la liste pour l'afficher.",
+    "bg": {
+      "title": "Image de fond",
+      "lede": "Affiche votre propre image sous la grille de la Build {build} à la place de la carte du monde, par exemple une carte du wiki. Elle reste où elle est sur votre disque ; Calibrer l'aligne à partir de deux points.",
+      "pick": "Utiliser une image comme fond…",
+      "calibrate": "Calibrer",
+      "reset": "Réinitialiser",
+      "resetTip": "Ne plus utiliser cette image : la carte du monde s'affiche de nouveau",
+      "missing": "L'image de fond est introuvable ({path}) : la carte du monde s'affiche à la place.",
+      "unreadable": "Impossible de lire {path} comme image PNG ou JPEG.",
+      "spot": "Point {n} sur 2",
+      "stepImage": "Cliquez sur un point de l'image que vous retrouvez aussi sur la carte du monde, comme un carrefour (ou déplacez la carte avec les flèches et appuyez sur Entrée pour la croix au centre).",
+      "stepWorld": "Cliquez maintenant sur ce point de la carte du monde (l'image est masquée en attendant), appuyez sur Entrée pour la croix ou saisissez sa tuile ou sa cellule ci-dessous.",
+      "spotLabel": "Où il se trouve dans le monde (x, y)",
+      "unitLabel": "Tuiles ou cellules",
+      "tiles": "Tuiles",
+      "cells": "Cellules",
+      "set": "Placer le point",
+      "cancelTip": "Arrêter la calibration (Échap)",
+      "badSpot": "Saisissez deux nombres, x et y, par exemple 10620, 9750.",
+      "tooClose": "Ces points ne permettent pas d'aligner l'image : choisissez-en deux bien éloignés, à l'horizontale comme à la verticale, dans le même ordre sur l'image que dans le monde. Recommencez au point 1.",
+      "lined": "Image de fond alignée."
+    }
   },
   "mapOrder": {
     "label": "Ordre des cartes",
@@ -627,7 +863,16 @@
       "github": "Installé depuis GitHub par PZMM",
       "local": "Installé depuis un fichier par PZMM",
       "manual": "Ajouté au dossier des mods en dehors de PZMM"
-    }
+    },
+    "openWorkshop": "Ouvrir sa page du Workshop",
+    "favourite": "Favori",
+    "byAuthor": "{name}, par {author}",
+    "neededBy": {
+      "one": "Requis par {count}",
+      "other": "Requis par {count}"
+    },
+    "neededByTip": "Mods activés qui en ont besoin : {names}",
+    "languagesTip": "A des textes en : {languages}"
   },
   "details": {
     "label": "Détails du mod",
@@ -677,11 +922,32 @@
     "unsubscribe": "Se désabonner sur la page du Workshop",
     "whatChanged": "Ce qui a changé depuis votre version",
     "loadingChanges": "Lecture des notes de mise à jour…",
-    "noChangeNotes": "L'auteur n'a pas écrit de notes pour cette mise à jour."
+    "noChangeNotes": "L'auteur n'a pas écrit de notes pour cette mise à jour.",
+    "tags": "Vos étiquettes",
+    "addTag": "Ajouter une étiquette",
+    "removeTag": "Retirer l’étiquette {tag}",
+    "neededBy": "Requis par",
+    "rules": "Règles de chargement",
+    "loadFirst": "Charger en premier",
+    "loadLast": "Charger en dernier",
+    "position": {
+      "none": "Non",
+      "on": "De toute la liste",
+      "category": "De sa catégorie"
+    },
+    "loadAfter": "Charger après",
+    "loadBefore": "Charger avant",
+    "incompatible": "Incompatible avec",
+    "category": "Catégorie du Sorter",
+    "addRuleMod": "Ajouter un ID de mod",
+    "fromMod": "Vient du mod.info du mod",
+    "removeRuleMod": "Retirer {id}",
+    "rulesHint": "Enregistrées dans sorting_rules.txt de Mod Load Order Sorter ; le tri automatique et la réparation de l’ordre de chargement les suivent aussi.",
+    "clearRules": "Effacer ces règles"
   },
   "loadOrder": {
     "title": "Ordre de chargement",
-    "lede": "Les mods se chargent de haut en bas. Quand deux mods modifient le même fichier, le plus bas l'emporte. Organisez la bibliothèque à gauche comme vous voulez : son ordre ne change pas celui-ci.",
+    "lede": "Les mods se chargent de haut en bas. Quand deux mods modifient le même fichier, le plus bas l'emporte. Organisez la bibliothèque comme vous voulez : son ordre ne change pas celui-ci.",
     "problems": "Problèmes",
     "overridden": "Remplacés",
     "overriddenTip": "Mods activés dont des fichiers sont remplacés par un autre mod",
@@ -692,14 +958,13 @@
       "rules": "Déplace les mods pour que chaque règle <span class=\"mono\">require</span>, <span class=\"mono\">loadModAfter</span> et <span class=\"mono\">loadModBefore</span> soit respectée.",
       "keep": "Conserve votre ordre pour le reste. Ctrl+Z rétablit l'ancien ordre."
     },
-    "fix": {
-      "one": "Corriger {count} problème sans tri automatique",
-      "other": "Corriger {count} problèmes sans tri automatique"
-    },
     "modsInOrder": "Mods dans l'ordre de chargement",
     "dragHint": "Glissez ou Alt+↑/↓ pour réorganiser · Enter ou double-clic ouvre un mod",
     "notInstalled": "Non installé",
-    "librarySections": "Sections de la bibliothèque"
+    "librarySections": "Sections de la bibliothèque",
+    "pinned": "Épinglé : Autosort le garde entre ses voisins",
+    "sortAz": "Trier de A à Z",
+    "sortAzTip": "Mettre l’ordre de chargement par ordre alphabétique, en ne déplaçant les mods que si leurs prérequis et règles de chargement l’exigent"
   },
   "findings": {
     "findBroken": "Trouver le mod défectueux",
@@ -723,21 +988,36 @@
       "one": "{count} avertissement",
       "other": "{count} avertissements"
     },
-    "luaErrors": "<strong>Erreurs Lua lors de votre dernière partie</strong> (d'après console.txt) :",
     "errorCount": {
       "one": "{count} erreur, la première à <span class=\"mono\">{example}</span>",
       "other": "{count} erreurs, la première à <span class=\"mono\">{example}</span>"
     },
     "disable": "Désactiver {id}",
     "bisectOffer": "Quelque chose plante mais rien ci-dessus ne l'explique ? {link} : PZMM divise par deux vos mods activés à chaque test du jeu.",
-    "finishFirst": "Terminez ou arrêtez d'abord la recherche du mod défectueux."
+    "finishFirst": "Terminez ou arrêtez d'abord la recherche du mod défectueux.",
+    "logErrors": "<strong>Erreurs dans {file}</strong> lors du dernier lancement :",
+    "firstError": "Première vraie erreur, à la ligne {line}.",
+    "pointsAt": "Elle désigne :",
+    "bisectSuspects": {
+      "one": "{link}, en commençant par le mod que désignent les journaux : PZMM le teste d'abord, puis divise le reste par deux.",
+      "other": "{link}, en commençant par les {count} mods que désignent les journaux : PZMM les teste d'abord, puis divise le reste par deux."
+    },
+    "dismiss": "Vérifié",
+    "dismissTip": "Vous avez vérifié ce fichier et lui faites confiance : PZMM ne le signale plus jusqu'à ce qu'il change",
+    "bisectLeft": "La recherche du mod défectueux sur « {profile} » n'est pas terminée",
+    "bisectLeftLine": {
+      "one": "{count} mod est encore suspect. Reprenez là où elle s'est arrêtée, ou remettez la liste de mods d'avant la recherche.",
+      "other": "{count} mods sont encore suspects. Reprenez là où elle s'est arrêtée, ou remettez la liste de mods d'avant la recherche."
+    },
+    "bisectResume": "Reprendre la recherche",
+    "bisectRestore": "Restaurer la liste d'avant"
   },
   "settings": {
     "label": "Paramètres",
     "saveFailed": "Impossible d'enregistrer les paramètres : {error}",
     "tokenSaved": "Jeton GitHub enregistré dans le gestionnaire d'identifiants du système.",
     "tokenForgot": "Jeton GitHub oublié.",
-    "confirmClearBackups": "Supprimer toutes les copies de secours ({size}) ? Les mods ne pourront plus être restaurés à leur version précédente.",
+    "confirmClearBackups": "Supprimer définitivement toutes les copies de secours ({size}) ? Elles ne vont pas à la Corbeille, et les mods ne pourront plus être restaurés à leur version précédente.",
     "diagnosticsCopied": "Diagnostics copiés (votre nom d'utilisateur est masqué). Collez-les dans un rapport de bug.",
     "diagnosticsFailed": "Impossible de copier les diagnostics : {error}",
     "language": "Langue",
@@ -762,7 +1042,23 @@
       "moveConfirm": "Déplacer vos données PZMM de <span class=\"mono\">{from}</span> vers <span class=\"mono\">{to}</span> ? Sans déplacement, PZMM démarre vide à cet endroit.",
       "moveData": "Déplacer les données",
       "switchWithoutMoving": "Changer sans déplacer",
-      "reading": "Lecture des dossiers…"
+      "reading": "Lecture des dossiers…",
+      "hintSaves": "où vont les copies des sauvegardes ; les copies déjà faites restent dans l'ancien dossier",
+      "name": {
+        "game": "Installation de Project Zomboid",
+        "zomboid": "Dossier utilisateur Zomboid",
+        "server": "Installation du serveur dédié",
+        "workshop": "Dossier du Workshop Steam",
+        "data": "Données de PZMM",
+        "saves": "Sauvegardes des parties"
+      },
+      "warn": {
+        "driveRoot": "La racine d'un lecteur ne peut pas accueillir les données de PZMM : choisissez un dossier dessus.",
+        "inGame": "Les données de PZMM ne peuvent pas aller dans le dossier du jeu : Steam les supprime quand il vérifie ou réinstalle le jeu.",
+        "oneDrive": "Il est dans OneDrive, qui peut verrouiller ou remplacer des fichiers pendant que le jeu ou PZMM s'en sert.",
+        "noWrite": "PZMM ne peut pas écrire ici (pas d'autorisation).",
+        "lowSpace": "Plus que {size} libres sur ce lecteur."
+      }
     },
     "downloads": {
       "title": "Téléchargements et mises à jour",
@@ -777,7 +1073,11 @@
       "openIn": "Ouvrir les pages du Workshop dans",
       "inSteam": "Steam (s'il est lancé)",
       "inBrowser": "Le navigateur",
-      "appUpdates": "Rechercher les nouvelles versions de PZMM au démarrage"
+      "appUpdates": "Rechercher les nouvelles versions de PZMM au démarrage",
+      "updates": "Mises à jour",
+      "updatesHint": "À quelle fréquence PZMM cherche de nouvelles versions de tes mods et de lui-même.",
+      "workshop": "Workshop",
+      "workshopHint": "Où s'ouvrent les pages du Workshop et sur quoi s'ouvre l'onglet Workshop."
     },
     "token": {
       "title": "Jeton GitHub",
@@ -786,6 +1086,15 @@
       "savedPlaceholder": "Un jeton est enregistré",
       "save": "Enregistrer le jeton",
       "forget": "Oublier"
+    },
+    "steamKey": {
+      "title": "Clé Steam Web API",
+      "hint": "Facultative. Sans clé, Serveurs liste tous les serveurs via le client Steam tant qu'il tourne. Une clé ajoute la liste complète de Steam même quand Steam n'est pas lancé, et les serveurs où jouent tes amis. Elle est gardée dans le gestionnaire d'identifiants du système, jamais dans un fichier.",
+      "get": "Obtenir une clé",
+      "savedPlaceholder": "Une clé est enregistrée",
+      "save": "Enregistrer la clé",
+      "saved": "Clé Steam Web API enregistrée dans le gestionnaire d'identifiants du système.",
+      "forgot": "Clé Steam Web API oubliée."
     },
     "repair": {
       "title": "Réparation",
@@ -806,7 +1115,10 @@
       "backupCapHint": "0 = sans limite ; les plus anciennes partent en premier",
       "backupsHint": "Une mise à jour conserve la version précédente du mod comme copie de secours (Restaurer la version précédente dans ses détails).",
       "backupsUse": "Les copies de secours occupent <strong>{size}</strong>",
-      "clearBackups": "Effacer les copies de secours"
+      "clearBackups": "Effacer les copies de secours",
+      "mods": "Retirer des mods",
+      "modsHint": "Où vont les mods retirés, et ce que deviennent les mods dont ils avaient besoin.",
+      "backups": "Copies de secours des mods"
     },
     "appearance": {
       "title": "Apparence",
@@ -825,13 +1137,31 @@
       "perPage": "Résultats du Workshop par page",
       "compact": "Lignes compactes",
       "showIds": "Afficher les mod IDs à côté des noms",
-      "windowHint": "La fenêtre mémorise sa taille et sa position."
+      "favFirst": "Favoris en haut des listes triées et filtrées",
+      "look": "Thème et langue",
+      "lookHint": "L'apparence de PZMM. La fenêtre retient sa taille et sa position.",
+      "lists": "Listes de mods",
+      "listsHint": "La version du jeu sur laquelle les mods sont vérifiés, et ce qu'affichent les listes."
     },
     "launch": {
       "title": "Lancement",
       "args": "Arguments de jeu supplémentaires",
       "argsHint": "Lancer le jeu les transmet via Steam, qui demande une fois de les autoriser.",
-      "autosort": "Grouper par catégorie les mods d'un nouveau profil lors de sa première utilisation"
+      "autosort": "Grouper par catégorie les mods d'un nouveau profil lors de sa première utilisation",
+      "profileTitle": "Au lancement avec {profile}",
+      "profileArgs": "Ses propres arguments",
+      "ownFolder": "Un dossier de jeu à lui",
+      "ownFolderHint": "Ses sauvegardes, options, journaux et liste de mods restent à part de ton dossier Zomboid, donc le profil d'un serveur ne touche pas à tes mondes. Ces sauvegardes n'apparaissent pas dans Sauvegardes, et les mods posés à la main dans Zomboid/mods n'y sont pas vus.",
+      "tray": "Garder PZMM dans la zone de notification quand je ferme la fenêtre",
+      "trayHint": "Les programmations des serveurs, la recherche de mises à jour et la surveillance des plantages continuent fenêtre fermée. Quittez depuis l'icône de la zone de notification.",
+      "autostart": "Démarrer PZMM dans la zone de notification quand je me connecte à l'ordinateur",
+      "keepMarks": "Garder les favoris activés et les mods masqués désactivés dans chaque profil créé ou choisi",
+      "section": "Lancement et notifications",
+      "gameHint": "Comment Lancer le jeu démarre Project Zomboid.",
+      "profileHint": "Pour ce profil seulement ; les autres gardent les leurs.",
+      "profiles": "Profils",
+      "profilesHint": "Ce que fait PZMM quand tu crées un profil ou passes à un autre.",
+      "trayTitle": "Zone de notification et démarrage"
     },
     "about": {
       "title": "À propos",
@@ -840,12 +1170,56 @@
       "openLogs": "Ouvrir le dossier des journaux",
       "diagnostics": "Copier les diagnostics",
       "diagnosticsTip": "Version, dossiers, profil, nombre de mods et résultats de Vérifier la configuration, avec votre nom d'utilisateur masqué",
-      "keys": "Clavier : <kbd>/</kbd> rechercher · <kbd>↑</kbd><kbd>↓</kbd> changer de ligne · <kbd>Enter</kbd> détails · <kbd>Space</kbd> activer/désactiver · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> réorganiser · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> annuler/rétablir · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+clic sélectionner plusieurs · <kbd>Esc</kbd> effacer la sélection"
+      "official": "Le seul téléchargement officiel est sur GitHub ; les copies d'autres sites peuvent être modifiées :",
+      "keys": "Clavier : <kbd>/</kbd> rechercher · <kbd>↑</kbd><kbd>↓</kbd> changer de ligne · <kbd>Enter</kbd> détails · <kbd>Space</kbd> activer/désactiver · <kbd>Alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> réorganiser · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> annuler/rétablir · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+clic sélectionner plusieurs · <kbd>Esc</kbd> effacer la sélection",
+      "help": "Aide",
+      "helpHint": "Pour signaler un bug : les journaux du jeu et le diagnostic de PZMM."
     },
-    "readFailed": "Impossible de lire les paramètres : {error}"
+    "readFailed": "Impossible de lire les paramètres : {error}",
+    "saveBackups": {
+      "title": "Copies des sauvegardes",
+      "onLaunch": "Copier la dernière sauvegarde jouée quand PZMM lance le jeu",
+      "onExit": "Copier les sauvegardes jouées quand le jeu se ferme",
+      "keep": "Copies automatiques gardées par sauvegarde",
+      "keepHint": "0 les garde toutes. Les emplacements nommés ne sont jamais retirés.",
+      "hint": "PZMM ne voit le jeu, et un plantage, que s'il l'a lancé. Après un plantage, les sauvegardes jouées sont copiées et gardées comme des emplacements.",
+      "every": "Copier pendant la partie, toutes les (minutes)",
+      "everyHint": "0 désactive. Seules les sauvegardes modifiées depuis la dernière fois sont copiées."
+    },
+    "notify": {
+      "title": "Notifications",
+      "when": "Quand la fenêtre de PZMM n'est pas au premier plan, préviens-moi quand",
+      "crash": "un serveur plante",
+      "restart": "les mods d'un serveur sont mis à jour et il doit redémarrer",
+      "downloads": "les installations et mises à jour sont terminées",
+      "favourites": "un serveur favori est en ligne avec de la place (vérifié toutes les deux minutes)"
+    },
+    "sections": "Sections des paramètres",
+    "keys": {
+      "title": "Comptes et clés"
+    },
+    "desc": {
+      "downloads": "Quand PZMM cherche des mises à jour, comment s'ouvre le Workshop, et les réparations.",
+      "keys": "Des clés facultatives pour GitHub et Steam, gardées dans le coffre d'identifiants du système.",
+      "backups": "Ce que deviennent les mods que tu retires, et les copies de secours des mods et des sauvegardes.",
+      "appearance": "Langue, thème et ce qu'affichent les listes de mods.",
+      "launch": "Comment le jeu démarre, la zone de notification, et ce que PZMM te signale.",
+      "about": "Ta version de PZMM, l'aide et le diagnostic."
+    },
+    "countries": {
+      "title": "Pays des serveurs",
+      "show": "Afficher le pays de chaque serveur dans le navigateur de serveurs"
+    }
   },
   "servers": {
-    "label": "Serveurs et sauvegardes",
+    "label": "Serveurs",
+    "rail": {
+      "label": "Listes de serveurs et vos serveurs",
+      "play": "Jouer",
+      "browse": "Parcourir les serveurs",
+      "overview": "Vue d'ensemble"
+    },
+    "recent": "Connexions récentes",
     "sameMods": "Mêmes mods que votre profil actuel",
     "notInProfile": {
       "one": "{count} absent de votre profil",
@@ -855,7 +1229,6 @@
       "one": "{count} des vôtres n'y est pas",
       "other": "{count} des vôtres n'y sont pas"
     },
-    "started": "Serveur {name} démarré avec {how}. Sa fenêtre de console affiche la progression.",
     "title": "Serveur dédié",
     "lede": "Envoyez le profil « {profile} » vers une configuration de serveur, pour que le serveur charge les mêmes mods dans le même ordre. Cela définit <span class=\"mono\">Mods=</span>, <span class=\"mono\">WorkshopItems=</span> et, si vos mods ajoutent des cartes, <span class=\"mono\">Map=</span>. Tous les autres paramètres sont conservés.",
     "config": "Configuration du serveur",
@@ -866,19 +1239,1106 @@
     "mapOrderHint": "Le serveur charge les cartes de haut en bas : les cartes des mods passent avant <span class=\"mono\">Muldraugh, KY</span>. Glissez ou utilisez Alt+↑/↓ pour les ranger ; Écrire l'enregistre.",
     "join": "Reprendre la configuration d'un serveur",
     "joinHint": "Créez un profil à partir d'une configuration de serveur : les mods du Workshop manquants sont installés et l'ordre des mods est copié.",
-    "startTip": "Démarrer ce serveur dédié",
-    "start": "Démarrer le serveur",
     "useAsProfile": "Utiliser comme profil",
     "noConfigs": "Aucune configuration de serveur dans <span class=\"mono\">{dir}</span> pour l'instant.",
     "saves": {
       "title": "Parties sauvegardées",
       "lede": "Chaque sauvegarde retient les mods avec lesquels elle a été jouée. Chargez les mods d'une sauvegarde avant de la continuer, pour que rien ne manque.",
+      "ownFolder": "Ce profil joue dans son propre dossier de jeu, voici donc ses sauvegardes ({dir}). Passe à un profil sans dossier propre pour voir tes autres sauvegardes.",
       "none": "Aucune sauvegarde avec une liste de mods pour l'instant.",
       "info": {
         "one": "{mode} · {count} mod · jouée le {when} · {diff}",
         "other": "{mode} · {count} mods · jouée le {when} · {diff}"
       },
       "useMods": "Utiliser les mods de cette sauvegarde"
+    },
+    "hostedHint": "Les serveurs que PZMM fait tourner ne sont pas listés ici : ils reçoivent leurs mods dans leur propre onglet Mods."
+  },
+  "launcher": {
+    "title": "Rejoindre un serveur",
+    "lede": "Trouvez un serveur moddé, récupérez exactement ses mods dans un profil à part, et rejoignez-le. Vos autres profils restent tels quels.",
+    "direct": "Connexion directe",
+    "directHint": "IP:port, ou collez un lien pzmm://join",
+    "lookUp": "Chercher",
+    "badAddress": "Ce n'est pas une adresse de serveur : tapez IP:port (ou un nom d'hôte), ou collez un lien pzmm://join.",
+    "views": {
+      "favourites": "Favoris",
+      "history": "Historique",
+      "friends": "Amis"
+    },
+    "startSteam": "Lance Steam et actualise, ou ajoute une clé Steam Web API dans les Paramètres pour lister tous les serveurs sans lui.",
+    "addKey": "Ajouter une clé dans les Paramètres",
+    "filtersLabel": "Filtres",
+    "search": "Chercher par nom",
+    "build": "Build",
+    "anyBuild": "Tous les builds",
+    "b42": "Build 42",
+    "b41": "Build 41",
+    "mods": "Mods",
+    "anyMods": "Tous les mods",
+    "onlyMine": "Seulement des mods que j'ai",
+    "atMost": "Au plus N à télécharger",
+    "atMostCount": "Nombre maximum de mods à télécharger",
+    "map": "Carte",
+    "players": "Joueurs",
+    "anyPlayers": "Tous les joueurs",
+    "notEmpty": "Pas vide",
+    "notFull": "Pas plein",
+    "password": "Mot de passe",
+    "anyPassword": "Avec ou sans mot de passe",
+    "noPassword": "Sans mot de passe",
+    "withPassword": "Avec mot de passe",
+    "pvp": "PvP",
+    "anyPvp": "PvP ou PvE",
+    "pvpOn": "PvP",
+    "pvpOff": "PvE",
+    "sort": "Trier",
+    "byPlayers": "Plus de joueurs",
+    "byPing": "Ping le plus bas",
+    "byName": "Nom",
+    "modsFilterHint": "Hors du jeu, un serveur ne montre que ses premiers mods : PZMM compte le reste comme à télécharger.",
+    "listing": "Récupération de la liste des serveurs sur Steam…",
+    "from": "depuis {sources}",
+    "sources": {
+      "steam": "le client Steam",
+      "web": "la Steam Web API",
+      "game": "la liste enregistrée du jeu"
+    },
+    "shown": {
+      "one": "{count} serveur sur {total}",
+      "other": "{count} serveurs sur {total}"
+    },
+    "asking": "{done} sur {total} interrogés",
+    "empty": {
+      "internet": "Steam n'a listé aucun serveur. Essayez Actualiser.",
+      "favourites": "Pas encore de favoris : mettez une étoile à un serveur pour le garder ici.",
+      "history": "Les serveurs que vous rejoignez apparaissent ici.",
+      "game": "La liste du jeu est vide aussi : lance Steam et actualise, ou ajoute des serveurs sur l'écran Rejoindre du jeu.",
+      "friends": "Aucun de tes amis Steam n'est sur un serveur Project Zomboid en ce moment, ou leurs détails de jeu ne sont pas publics.",
+      "gameKey": "La liste du jeu est vide aussi : ajoute une clé Steam Web API dans les Paramètres, ou ajoute des serveurs sur l'écran Rejoindre du jeu."
+    },
+    "col": {
+      "name": "Serveur",
+      "map": "Carte",
+      "players": "Joueurs",
+      "ping": "Ping",
+      "build": "Build",
+      "mods": "Mods",
+      "country": "Pays"
+    },
+    "favourite": "Favori",
+    "unfavourite": "Retirer des favoris",
+    "locked": "Demande un mot de passe",
+    "pvpTag": "PvP",
+    "ms": "{n} ms",
+    "vanilla": "Vanilla",
+    "modsToGet": {
+      "one": "{count} à récupérer",
+      "other": "{count} à récupérer"
+    },
+    "modsHave": "tous là",
+    "more": "Les {count} premiers sont affichés : affinez les filtres pour voir le reste.",
+    "noMatch": "Aucun serveur ne correspond à ces filtres.",
+    "facts": "{players}/{max} joueurs · {ping} ms",
+    "mapLine": "Carte : {map}",
+    "noAnswer": "Le serveur n'a pas répondu ({error}). Vous pouvez quand même essayer de le rejoindre.",
+    "buildMismatch": "Ce serveur tourne en {server} ; vous jouez au Build {mine}. Rejoindre échouera tant que vous ne jouez pas au même build.",
+    "detailsLabel": "Détails du serveur",
+    "tabs": {
+      "mods": "Mods",
+      "rules": "Règles",
+      "players": "Joueurs",
+      "history": "Vos connexions"
+    },
+    "modsUnknown": "Ses mods s'affichent dès qu'il répond.",
+    "noMods": "Aucun mod : il fait tourner Project Zomboid vanilla.",
+    "resolving": "Recherche de ces mods : installés, puis l'index des cartes, puis le Workshop…",
+    "status": {
+      "installed": "Installé",
+      "found": "Sur le Workshop",
+      "likely": "Probablement",
+      "unknown": "Introuvable"
+    },
+    "updated": "mis à jour {ago}",
+    "andMore": {
+      "one": "et {count} de plus : le serveur fait tourner {total} mods, mais seuls les premiers se voient hors du jeu",
+      "other": "et {count} de plus : le serveur fait tourner {total} mods, mais seuls les premiers se voient hors du jeu"
+    },
+    "mapsUnlisted": {
+      "one": "Une carte du serveur a besoin d'un mod absent de sa liste : {mods} ({maps})",
+      "other": "Des cartes du serveur ont besoin de mods absents de sa liste : {mods} ({maps})"
+    },
+    "mapOverlap": "{a} et {b} couvrent en partie les mêmes cellules : là où elles se chevauchent, celle listée en premier dans le Map= du serveur l'emporte",
+    "keywords": "Mots-clés",
+    "wipeHint": "« Dernier wipe » indique quand son monde a été créé : il ne change pas quand le serveur redémarre.",
+    "asking1": "Interrogation du serveur…",
+    "nobody": "Personne n'est connecté.",
+    "historyHint": "Les mods, l'ordre de chargement et les cartes avec lesquels vous l'avez rejoint. En réutiliser un télécharge ce qui manque ; le Workshop ne sert que la dernière version de chaque élément.",
+    "joinMods": {
+      "one": "{count} mod, {items} éléments du Workshop",
+      "other": "{count} mods, {items} éléments du Workshop"
+    },
+    "useSetup": "Reprendre la configuration du {date}",
+    "preflightSure": "Le serveur tourne depuis au moins {up} (quelqu'un est connecté depuis aussi longtemps), et {mod} a été mis à jour {ago} : il fait encore tourner l'ancienne version, donc rejoindre échouera sans doute jusqu'à son redémarrage.",
+    "preflight": "Sa mise à jour de mod la plus récente sur le Workshop : {mod}, {time}. Si le serveur n'a pas redémarré depuis, rejoindre peut échouer jusqu'à ce qu'il le fasse.",
+    "planDownload": {
+      "one": "Télécharge {count} élément du Workshop ({size})",
+      "other": "Télécharge {count} éléments du Workshop ({size})"
+    },
+    "planNothing": "Rien à télécharger",
+    "planProfile": "utilise un profil à part ; vos autres profils restent tels quels",
+    "planMissing": {
+      "one": "{count} mod listé est introuvable et reste dehors",
+      "other": "{count} mods listés sont introuvables et restent dehors"
+    },
+    "setUpJoin": "Préparer et rejoindre",
+    "joinAsIs": "Rejoindre tel quel",
+    "join": "Rejoindre",
+    "forgetPassword": "Oublier le mot de passe enregistré",
+    "started": "Le jeu démarre et rejoint le serveur (si Steam le lance, Steam demande une fois avant de transmettre l'adresse).",
+    "restored": "Configuration du {date} restaurée. Rejoindre tel quel l'utilise.",
+    "passwordTitle": "Mot de passe de {name}",
+    "remember": "Le retenir (gardé dans le gestionnaire d'identifiants du système)",
+    "minutes": "{count} min",
+    "hours": "{h} h {m} min",
+    "exactList": "Liste exacte des mods du serveur",
+    "exactItems": "Objets Workshop exacts du serveur ; sa liste de mods était trop longue pour sa description, les mods sont donc trouvés par ID",
+    "tagError": {
+      "cut": "La liste de mods PZMM du serveur est tronquée, les mods sont donc trouvés par ID",
+      "damaged": "La liste de mods PZMM du serveur est endommagée, les mods sont donc trouvés par ID",
+      "newer": "La liste de mods PZMM du serveur demande un PZMM plus récent, les mods sont donc trouvés par ID"
+    },
+    "days": {
+      "one": "{count} jour",
+      "other": "{count} jours"
+    },
+    "movedOn": "{mod} a été mis à jour sur le Workshop {gap} après la création de la liste de ce serveur ; la connexion peut échouer jusqu'au redémarrage du serveur",
+    "gameList": "La liste de serveurs de Steam n'a pas chargé, c'est donc la liste du jeu lui-même : les serveurs que tu as ajoutés sur son écran Rejoindre.",
+    "friendsHint": "Les serveurs où jouent tes amis Steam en ce moment. Steam ne montre le serveur d'un ami que si ses détails de jeu sont publics.",
+    "friendsOn": "· amis : {names}",
+    "useMod": "Récupérer et utiliser {id}",
+    "skipped": {
+      "one": "{count} mod est décoché : il n'est ni téléchargé ni mis dans le profil. Le serveur peut te refuser, ou des éléments peuvent manquer.",
+      "other": "{count} mods sont décochés : ils ne sont ni téléchargés ni mis dans le profil. Le serveur peut te refuser, ou des éléments peuvent manquer."
+    },
+    "battlemetrics": "BattleMetrics",
+    "battlemetricsTip": "Chercher le serveur sur BattleMetrics : historique des joueurs, disponibilité et classement",
+    "serverOnly": "Serveur seulement",
+    "serverOnlyTip": "Le serveur indique que lui seul a besoin de ce mod : il reste désactivé sauf si tu le coches.",
+    "optional": "Facultatif",
+    "optionalTip": "Le serveur indique que tu peux te passer de ce mod : coche-le pour l'utiliser.",
+    "country": "Pays",
+    "anyCountry": "Tous les pays",
+    "countries": "Pays (demande à country.is)",
+    "countriesTip": "Affiche le pays de chaque serveur. PZMM envoie les adresses des serveurs, et rien sur vous, à api.country.is en HTTPS, et garde les réponses 30 jours.",
+    "countriesHint": "Les pays viennent d'api.country.is : PZMM ne lui envoie que les adresses des serveurs, rien sur vous, et garde les réponses 30 jours.",
+    "needKey": "Ici, seule une clé Steam Web API liste tous les serveurs : ajoute-en une dans les Paramètres.",
+    "modsShownHave": {
+      "one": "le {count} affiché est là",
+      "other": "les {count} affichés sont là"
+    },
+    "modsCount": {
+      "one": "{count} mod",
+      "other": "{count} mods"
+    },
+    "notShown": {
+      "one": "{count} non affiché",
+      "other": "{count} non affichés"
+    },
+    "passwordFirst": "Ce serveur demande un mot de passe : tu le saisiras en le rejoignant.",
+    "passwordFromLink": "Rempli depuis le lien : vérifie-le avant de rejoindre.",
+    "rule": {
+      "open": "Ouvert à tous",
+      "public": "Listé publiquement",
+      "pvp": "PvP",
+      "version": "Version",
+      "modCount": "Mods",
+      "lastWipe": "Dernier wipe"
+    },
+    "yes": "Oui",
+    "no": "Non",
+    "linkWaiting": "Ouvert depuis un lien pzmm://. Rien n'est envoyé à cette adresse tant que tu n'appuies pas sur Chercher."
+  },
+  "hosting": {
+    "title": "Vos serveurs",
+    "lede": "Configurez un serveur dédié, lancez-le et gérez ses joueurs et ses mods. PZMM démarre Java lui-même avec vos paramètres, laisse UPnP désactivé tant que vous ne l'activez pas et vérifie chaque ID Workshop avant de l'écrire.",
+    "new": "Nouveau serveur…",
+    "none": "Aucun serveur pour l'instant. « Nouveau serveur… » en installe un et le démarre.",
+    "listLabel": "Serveurs",
+    "unmanaged": "Non configuré dans PZMM : adoptez-le pour le démarrer et l'arrêter ici",
+    "adopt": "Adopter",
+    "adoptTip": "Gérer cette configuration avec PZMM, exécutée depuis un serveur dédié installé",
+    "adoptTitle": "Gérer {name} avec PZMM ?",
+    "adoptLine": "Il s'exécute depuis le serveur dédié dans {dir}, avec ses données dans le dossier Zomboid.",
+    "forget": "Retirer de PZMM",
+    "forgetTitle": "Retirer {name} de PZMM ?",
+    "forgetLine": "Ses fichiers restent où ils sont ({dir}) ; PZMM oublie le serveur et son mot de passe admin enregistré.",
+    "start": "Démarrer",
+    "stop": "Arrêter",
+    "restart": "Redémarrer",
+    "join": "Rejoindre",
+    "joinTip": "Y jouer : l'ouvre dans Connexion directe, prépare ses mods et le rejoint",
+    "stopTitle": "Arrêter {name} ?",
+    "restartTitle": "Redémarrer {name} ?",
+    "stopLine": "PZMM sauvegarde le monde, puis quitte {name}. Les joueurs sont déconnectés ; s'il ne s'est pas arrêté au bout de 90 secondes, PZMM termine Java.",
+    "stopRcon": "PZMM ne l'a pas démarré cette fois, il envoie donc les commandes par RCON.",
+    "minutes": {
+      "one": "actif depuis {count} minute",
+      "other": "actif depuis {count} minutes"
+    },
+    "hours": "actif depuis {h} h {m} min",
+    "playerCount": {
+      "one": "{count} joueur",
+      "other": "{count} joueurs"
+    },
+    "memory": "{used} sur {max}",
+    "pageLabel": "Sections du serveur",
+    "status": {
+      "stopped": "Arrêté",
+      "starting": "Démarrage…",
+      "running": "En marche",
+      "stopping": "Arrêt…",
+      "crashed": "Planté"
+    },
+    "tabs": {
+      "console": "Console",
+      "players": "Joueurs",
+      "mods": "Mods",
+      "settings": "Paramètres",
+      "backups": "Sauvegardes",
+      "auto": "Automatisation",
+      "world": "Monde",
+      "files": "Fichiers"
+    },
+    "note": {
+      "started": "Le serveur est en marche : les joueurs peuvent le rejoindre.",
+      "terminated": "Le serveur s'est arrêté sur une erreur irrécupérable (souvent les scripts d'un mod : sa console affiche les erreurs), et Java reste bloqué ensuite : PZMM arrête Java.",
+      "scriptErrors": "Les scripts d'un mod n'ont pas pu se charger : les erreurs juste au-dessus nomment le fichier.",
+      "badItem": "L'objet Workshop {id} n'existe pas (un ID Workshop incorrect) : retirez-le de WorkshopItems.",
+      "itemFailed": "L'objet Workshop {id} n'a pas pu être téléchargé (résultat Steam {result}).",
+      "modMissing": "Le mod ID {id} n'est dans aucun des objets Workshop du serveur : vérifiez Mods et WorkshopItems.",
+      "outdated": "Un mod du Workshop a changé depuis le dernier démarrage : le serveur télécharge la nouvelle version.",
+      "needUpdate": "Un mod du Workshop a une mise à jour : redémarrez le serveur pour que les joueurs puissent le rejoindre.",
+      "upToDate": "Tous les mods du Workshop sont à jour.",
+      "rconRefused": "Quelqu'un a tenté RCON avec un mauvais mot de passe.",
+      "adminPrompt": "Le serveur attend un mot de passe admin : saisissez-en un dans la console.",
+      "exited": "Le serveur s'est arrêté de lui-même (code de sortie {code})."
+    },
+    "check": {
+      "badId": "{id} n'est pas un ID Workshop (uniquement des chiffres)",
+      "notOnWorkshop": "L'objet Workshop {id} n'existe pas ou n'est pas public : le serveur planterait en le téléchargeant",
+      "unchecked": "Impossible de joindre le Workshop pour vérifier que les ID existent",
+      "itemMissing": "{id} vient de l'objet Workshop {item}, qui n'est pas dans WorkshopItems",
+      "notWorkshop": "{id} ne vient pas du Workshop : copiez vous-même son dossier dans le dossier mods du serveur",
+      "unknownMod": "{id} n'est pas installé ici et aucun objet Workshop listé ne le contient : vérifiez le mod ID",
+      "needs": "{id} a besoin de {item}, qui n'est pas dans Mods",
+      "needsLater": "{id} a besoin de {item}, qui vient après dans Mods",
+      "incompatible": "{id} est incompatible avec {item}, qui est aussi dans Mods",
+      "requiredItem": "L'objet Workshop {id} a besoin de {item}, qui n'est pas dans WorkshopItems"
+    },
+    "console": {
+      "filter": "Filtrer le journal",
+      "errorsOnly": "Erreurs et notes seulement",
+      "live": "Sortie en direct",
+      "file": "Depuis server-console.txt",
+      "copy": "Copier le journal",
+      "copied": "Copié",
+      "logLabel": "Journal du serveur",
+      "empty": "Rien dans le journal pour l'instant.",
+      "commands": "Commandes",
+      "command": "Commande du serveur",
+      "send": "Envoyer",
+      "offline": "Démarrez le serveur pour envoyer des commandes.",
+      "viaRcon": "PZMM n'a pas démarré ce serveur, les commandes passent donc par RCON.",
+      "source": "Journal",
+      "sources": {
+        "console": "Console",
+        "chat": "Chat",
+        "perk": "Compétences"
+      },
+      "noChat": "Pas encore de journal du chat : le serveur en écrit un dans Logs dès qu'il tourne.",
+      "noPerks": "Pas encore de journal des compétences : le serveur en écrit un quand PerkLogs est activé et qu'on joue.",
+      "kinds": "Types de ligne",
+      "kind": {
+        "error": "Erreurs",
+        "warn": "Avertissements",
+        "chat": "Chat",
+        "admin": "Admin",
+        "mods": "Mods"
+      }
+    },
+    "cmd": {
+      "players": "Lister qui est en ligne",
+      "servermsg": "Envoyer un message à tout le monde",
+      "save": "Sauvegarder le monde maintenant",
+      "quit": "Sauvegarder et éteindre le serveur",
+      "kickuser": "Expulser un joueur",
+      "banuser": "Bannir un joueur (-ip bannit aussi son IP)",
+      "unbanuser": "Lever un bannissement",
+      "setaccesslevel": "Donner un rôle à un joueur",
+      "adduser": "Ajouter un compte (serveurs avec liste blanche)",
+      "addusertowhitelist": "Ajouter un joueur connecté à la liste blanche",
+      "checkModsNeedUpdate": "Demander si un mod du Workshop a une mise à jour (réponse dans le journal)",
+      "reloadoptions": "Recharger l'ini du serveur",
+      "showoptions": "Lister les paramètres du serveur",
+      "changeoption": "Modifier un paramètre",
+      "chopper": "Déclencher un événement d'hélicoptère",
+      "thunder": "Du tonnerre près d'un joueur",
+      "gunshot": "Un coup de feu près d'un joueur au hasard",
+      "startrain": "Faire pleuvoir",
+      "stoprain": "Arrêter la pluie",
+      "help": "Toutes les commandes que le serveur connaît",
+      "banid": "Bannir un SteamID",
+      "unbanid": "Lever le bannissement d'un SteamID",
+      "removeuserfromwhitelist": "Retirer un compte de la liste blanche",
+      "teleport": "Téléporter un joueur auprès d'un autre joueur",
+      "additem": "Donner un objet à un joueur",
+      "addxp": "Donner de l'XP de compétence à un joueur",
+      "addvehicle": "Faire apparaître un véhicule près d'un joueur",
+      "godmod": "Rendre un joueur invincible",
+      "invisible": "Rendre un joueur invisible aux zombies",
+      "noclip": "Laisser un joueur traverser les murs",
+      "createhorde": "Faire apparaître une horde près d'un joueur",
+      "banip": "Bannir une adresse IP",
+      "unbanip": "Lever un bannissement d'IP",
+      "voiceban": "Couper ou rétablir le chat vocal d'un joueur",
+      "teleportto": "Envoyer un joueur à un endroit",
+      "lightning": "Un éclair près d'un joueur",
+      "startstorm": "Lancer un orage",
+      "stopweather": "Dégager le temps",
+      "setTimeSpeed": "Accélérer ou ralentir le temps"
+    },
+    "players": {
+      "offline": "Démarrez le serveur pour voir qui est en ligne.",
+      "messagePlaceholder": "Un message par ligne",
+      "message": "Message pour tout le monde",
+      "online": {
+        "one": "{count} en ligne",
+        "other": "{count} en ligne"
+      },
+      "nobody": "Personne n'est en ligne.",
+      "level": "Niveau d'accès de {name}",
+      "setLevel": "Appliquer",
+      "kick": "Expulser",
+      "ban": "Bannir",
+      "kickTitle": "Expulser {name} ?",
+      "kickLine": "Il est déconnecté et peut se reconnecter.",
+      "banTitle": "Bannir {name} ?",
+      "banLine": "Il est déconnecté et ne peut plus revenir tant qu'il n'est pas débanni (unbanuser dans la console).",
+      "kicked": "{name} a été expulsé.",
+      "banned": "{name} a été banni.",
+      "levelSet": "{name} est maintenant {level}.",
+      "sent": {
+        "one": "Message envoyé.",
+        "other": "{count} messages envoyés."
+      },
+      "send": "Envoyer",
+      "preview": "Ce que voient les joueurs : la dernière ligne en grand à l'écran, chaque ligne dans le chat",
+      "lines": {
+        "one": "{count} ligne, envoyée comme un seul message",
+        "other": "{count} lignes, chacune envoyée comme un message à part"
+      },
+      "tooMany": "{count} lignes au maximum à la fois.",
+      "views": "Joueurs",
+      "view": {
+        "online": "En ligne",
+        "characters": "Personnages",
+        "whitelist": "Liste blanche",
+        "bans": "Bannis",
+        "map": "Carte",
+        "history": "Historique"
+      },
+      "commands": "Commandes",
+      "done": "Fait.",
+      "charactersHint": "Tous les personnages du players.db du monde, en ligne ou non, et où ils se trouvent.",
+      "noCharacters": "Aucun personnage pour l'instant (ou le players.db du monde est illisible).",
+      "dead": "mort",
+      "isOnline": "en ligne",
+      "username": "Nom d'utilisateur",
+      "passwordOptional": "Mot de passe (pour un nouveau compte)",
+      "add": "Ajouter",
+      "addTip": "Avec un mot de passe : un nouveau compte. Sans : un joueur connecté est ajouté à la liste blanche.",
+      "added": "{name} ajouté.",
+      "noAccounts": "Aucun compte pour l'instant.",
+      "lastSeen": "vu pour la dernière fois {when}",
+      "remove": "Retirer",
+      "removeTitle": "Retirer {name} de la liste blanche ?",
+      "removeLine": "Sur un serveur à liste blanche, il ne pourra plus rejoindre tant qu'il n'est pas ajouté de nouveau.",
+      "removed": "{name} retiré de la liste blanche.",
+      "steamId": "SteamID (17 chiffres)",
+      "banId": "Bannir un SteamID",
+      "bannedId": "{id} banni.",
+      "noBans": "Personne n'est banni.",
+      "bannedAccount": "compte banni",
+      "bannedSteam": "SteamID banni",
+      "bannedIp": "IP bannie",
+      "unban": "Débannir",
+      "unbanned": "{name} débanni.",
+      "mute": "Couper le chat vocal",
+      "muted": "Chat vocal de {name} coupé.",
+      "unmute": "Rétablir le chat vocal",
+      "unmuted": "Chat vocal de {name} rétabli.",
+      "messageAbout": "Envoyer à tous un message à son sujet",
+      "notes": "Notes",
+      "banIpLine": "Bannir avec l'IP bannit aussi l'adresse depuis laquelle il se connecte.",
+      "banWithIp": "Bannir avec l'IP",
+      "bannedIpDone": "{ip} a été bannie.",
+      "mapHint": "Où était chaque personnage à la dernière sauvegarde du serveur (relu toutes les 30 secondes). Clique sur un joueur pour les commandes, ou sur une cellule pour y envoyer quelqu'un.",
+      "mapLabel": "Carte du monde avec les personnages ({count})",
+      "historyHint": "Qui est arrivé et parti pendant que PZMM faisait tourner le serveur, d'après son journal.",
+      "noHistory": "Aucune arrivée ni départ vu pour l'instant.",
+      "joined": "arrivé",
+      "left": "parti",
+      "eventBan": "banni",
+      "eventUnban": "débanni",
+      "eventKick": "expulsé",
+      "ipAddress": "Adresse IP",
+      "banIp": "Bannir l'IP",
+      "noteFor": "Note sur {name}",
+      "tags": "Étiquettes",
+      "tagsPlaceholder": "Séparées par des virgules, comme aide, averti",
+      "saveNote": "Enregistrer"
+    },
+    "mods": {
+      "fromProfile": "Mods d'un profil",
+      "useProfile": "Utiliser ses mods",
+      "hint": "Faites glisser les mods dans l'ordre de chargement (ou utilisez Alt+flèches), ou cochez Modifier en texte pour saisir les lignes. Écrire vérifie chaque ID et montre d'abord les changements ; le fichier tel qu'il était avant le premier changement de PZMM reste en .ini.bak.",
+      "readOnly": "PZMM ne gère pas ce serveur : adoptez-le pour modifier ses mods ici.",
+      "modsHint": {
+        "one": "{count} mod ID",
+        "other": "{count} mod IDs"
+      },
+      "itemsHint": {
+        "one": "{count} objet Workshop",
+        "other": "{count} objets Workshop"
+      },
+      "allGood": "Tous les ID Workshop existent et chaque mod ID a son objet.",
+      "write": "Écrire…",
+      "check": "Vérifier les ID",
+      "checking": "Vérification…",
+      "reload": "Recharger depuis le fichier",
+      "blocked": {
+        "one": "Corrigez d'abord l'erreur ci-dessus : un ID Workshop incorrect fait planter le serveur.",
+        "other": "Corrigez d'abord les {count} erreurs ci-dessus : un ID Workshop incorrect fait planter le serveur."
+      },
+      "written": "Écrit. Le serveur les charge à son prochain démarrage.",
+      "writtenRestart": "Écrit. Redémarrez le serveur pour les charger.",
+      "writeTitle": "Écrire les mods de {name} ?",
+      "itemsAdded": {
+        "one": "Objet Workshop ajouté : {ids}",
+        "other": "{count} objets Workshop ajoutés : {ids}"
+      },
+      "itemsRemoved": {
+        "one": "Objet Workshop retiré : {ids}",
+        "other": "{count} objets Workshop retirés : {ids}"
+      },
+      "fromCollection": "Mods d'une collection du Workshop",
+      "collectionPlaceholder": "Liens ou ID de collections ou d'objets, plusieurs à la fois",
+      "fromPreset": "Mods d'un preset de Mod Manager: Server",
+      "savePreset": "Enregistrer comme preset",
+      "savePresetTip": "Enregistrer ces lignes dans les presets de Mod Manager: Server, sous le nom du serveur",
+      "presetSaved": "Enregistré comme preset « {name} » de Mod Manager: Server.",
+      "copy": "Copier les lignes",
+      "copyTip": "Copier Mods=, WorkshopItems= et Map= tels que l'ini les contient, pour le panneau d'un serveur loué",
+      "copied": "Copié.",
+      "spawnTitle": "Ajouter les points d'apparition des nouvelles cartes ?",
+      "spawnLine": "Ces mods de carte ont leurs propres points d'apparition : {names}. Ajoutez-les aux régions d'apparition du serveur pour que les joueurs puissent y commencer.",
+      "spawnAdd": "Les ajouter",
+      "spawnAdded": {
+        "one": "{count} région d'apparition ajoutée.",
+        "other": "{count} régions d'apparition ajoutées."
+      },
+      "replaceTip": "Remplacer les listes par ce qu'ils contiennent",
+      "addTip": "Ajouter ces objets, et les objets dont ils ont besoin, aux listes",
+      "add": "Ajouter",
+      "requiredMissing": {
+        "one": "Un objet de la liste a besoin d'un objet Workshop absent des listes : {items}",
+        "other": "Des objets de la liste ont besoin de {count} objets Workshop absents des listes : {items}"
+      },
+      "addRequired": {
+        "one": "Ajouter l'objet requis",
+        "other": "Ajouter {count} objets requis"
+      },
+      "search": "Chercher un mod ou un objet",
+      "autosort": "Tri auto",
+      "autosortTip": "Frameworks d'abord, traductions à la fin, et tous les prérequis et règles de chargement des mods installés (les autres gardent leur place)",
+      "sorted": "Trié. Cliquez sur Écrire pour enregistrer le nouvel ordre.",
+      "raw": "Modifier en texte",
+      "shown": {
+        "one": "{count} affiché",
+        "other": "{count} affichés"
+      },
+      "noDragFiltered": "Effacez la recherche pour réordonner.",
+      "modsLabel": "Mods, dans l'ordre de chargement",
+      "itemsLabel": "Objets Workshop",
+      "remove": "Retirer",
+      "removeLabel": "Retirer {name}",
+      "removeItemTip": "Retirer l'objet et les mods qu'il a apportés à la liste",
+      "itemMods": {
+        "one": "{count} mod listé",
+        "other": "{count} mods listés"
+      },
+      "sideTip": "Serveur seulement : seul le serveur en a besoin. Facultatif : les joueurs peuvent s'en passer. Les joueurs PZMM qui rejoignent ignorent les deux sauf s'ils les cochent ; le jeu charge quand même chaque mod de cette liste.",
+      "sideLabel": "Qui a besoin de {name}",
+      "side": {
+        "both": "Serveur et joueurs",
+        "server": "Serveur seulement",
+        "optional": "Facultatif"
+      }
+    },
+    "wizard": {
+      "title": "Nouveau serveur dédié",
+      "step": "Étape {n} sur {count} : {name}",
+      "steps": {
+        "server": "Serveur",
+        "network": "Réseau",
+        "admin": "Admin et mémoire",
+        "mods": "Mods"
+      },
+      "name": "Nom",
+      "nameHint": "C'est aussi le nom du fichier de configuration.",
+      "nameBad": "Ce nom contient un caractère que Windows ou le serveur n'accepte pas.",
+      "nameTaken": "Il existe déjà un serveur portant ce nom.",
+      "build": "Build",
+      "b42": "Build 42",
+      "b41": "Build 41 (legacy41)",
+      "install": "Dossier d'installation",
+      "browse": "Parcourir…",
+      "data": "Dossier de données",
+      "dataZomboid": "Le dossier Zomboid ({dir}), où les joueurs et les autres outils l'attendent",
+      "dataOwn": "Un dossier à part",
+      "dataHint": "Sa configuration, ses sauvegardes de monde, sa base de données et ses copies de secours vont ici.",
+      "gamePort": "Port du jeu",
+      "directPort": "Port direct",
+      "checkPorts": "Vérifier les ports",
+      "portRange": "Les ports vont de 1024 à 65535.",
+      "portSame": "Les deux ports doivent être différents.",
+      "portsFree": "Les deux ports sont libres.",
+      "portsBusy": "Utilisés : {ports}. Choisissez-en d'autres ou arrêtez ce qui les utilise.",
+      "firewall": "Les joueurs hors de votre réseau ont besoin que les deux ports UDP soient redirigés sur votre routeur. Le pare-feu Windows demande l'autorisation au premier démarrage du serveur ; pour les autoriser vous-même, exécutez ceci dans un terminal administrateur :",
+      "copy": "Copier",
+      "copied": "Copié",
+      "maxPlayers": "Joueurs max.",
+      "joinPassword": "Mot de passe d'accès",
+      "joinHint": "Facultatif : les joueurs le saisissent pour rejoindre.",
+      "options": "Options",
+      "public": "Le lister dans le navigateur de serveurs du jeu",
+      "upnp": "Ouvrir les ports du routeur avec UPnP",
+      "upnpHint": "Désactivé par défaut : UPnP ouvre des ports sur votre routeur sans demander.",
+      "adminUser": "Utilisateur admin",
+      "adminPassword": "Mot de passe admin",
+      "newPassword": "Nouveau mot de passe",
+      "passwordHint": "Affiché une seule fois : copiez-le maintenant. PZMM le garde dans le magasin d'identifiants du système pour le transmettre au démarrage du serveur.",
+      "memory": "Mémoire",
+      "gb": "{n} Go",
+      "memoryOf": "Ce PC a {ram} Go.",
+      "memSmall": "Quelques amis, peu de mods : 3-4 Go",
+      "memMedium": "10-20 joueurs ou une grosse liste de mods : 6-8 Go",
+      "memLarge": "30+ joueurs, mods de cartes ou monde longue durée : 10-16 Go ; laissez 4 Go à Windows (plus si vous jouez sur ce PC)",
+      "mods": "Mods",
+      "modsEmpty": "Aucun pour l'instant",
+      "modsProfile": "Les mods d'un profil",
+      "modsCollection": "Une collection du Workshop",
+      "load": "Charger",
+      "loading": "Chargement…",
+      "loadAgain": "Ces mods ont été chargés pour un autre choix : appuie de nouveau sur Charger pour utiliser celui-ci.",
+      "modsLoaded": "{mods}, {items}, {maps}.",
+      "modsHint": "Vous pourrez les modifier plus tard dans la section Mods du serveur.",
+      "summary": "Récapitulatif",
+      "sumInstall": "Installe le serveur (appli Steam 380870, environ 2 Go à télécharger) dans {dir}, s'il n'y est pas déjà",
+      "sumConfig": "Écrit {file}",
+      "sumPorts": "Ports UDP {game} et {direct}",
+      "installing": "Installation : {n} %",
+      "stopInstall": "Arrêter",
+      "starting": "Premier démarrage du serveur (il crée le monde et ses paramètres)…",
+      "next": "Suivant",
+      "back": "Retour",
+      "create": "Configurer et démarrer",
+      "tunnelTitle": "Pas de redirection de ports ?",
+      "tunnelHint": "Si vous ne pouvez pas ouvrir de ports (le routeur n'est pas à vous, ou votre fournisseur partage une adresse entre plusieurs foyers), un tunnel comme playit.gg donne une adresse publique à votre serveur. Installez leur programme depuis leur site, ajoutez un tunnel Project Zomboid (ports UDP {game} et {direct}) et collez ci-dessous l'adresse obtenue. PZMM ne l'installe ni ne le lance.",
+      "tunnelDownload": "Obtenir playit.gg",
+      "tunnelDocs": "Aide de playit.gg",
+      "tunnelAddress": "Adresse à laquelle les joueurs se connectent",
+      "tunnelAddressHint": "Facultatif. Affichée sur la page du serveur et dans le statut Discord.",
+      "sumAddress": "Les joueurs se connectent à {address}",
+      "modIds": {
+        "one": "{count} mod ID",
+        "other": "{count} mod IDs"
+      },
+      "items": {
+        "one": "{count} objet Workshop",
+        "other": "{count} objets Workshop"
+      },
+      "maps": {
+        "one": "{count} carte",
+        "other": "{count} cartes"
+      },
+      "portUsed": "{name} utilise déjà un de ces ports.",
+      "discardAsk": "Abandonner ce nouveau serveur ?",
+      "discard": "Abandonner",
+      "createdHint": "{name} est installé, mais son premier démarrage a échoué. Ouvrez sa page pour régler le problème et le démarrer.",
+      "openServer": "Ouvrir sa page"
+    },
+    "quit": {
+      "title": {
+        "one": "Un serveur lancé par PZMM tourne encore",
+        "other": "{count} serveurs lancés par PZMM tournent encore"
+      },
+      "line": {
+        "one": "En marche : {names}. S'il reste en marche, il continue de tourner ; PZMM le retrouve la prochaine fois et l'atteint par RCON.",
+        "other": "En marche : {names}. S'ils restent en marche, ils continuent de tourner ; PZMM les retrouve la prochaine fois et les atteint par RCON."
+      },
+      "stop": "Arrêter et quitter",
+      "leave": "Laisser en marche et quitter",
+      "stopping": "Arrêt des serveurs…",
+      "leaving": "Fermeture…"
+    },
+    "updatesPending": {
+      "one": "{count} mod mis à jour, redémarrage en attente",
+      "other": "{count} mods mis à jour, redémarrage en attente"
+    },
+    "restartIn": {
+      "one": "redémarrage dans {count} minute",
+      "other": "redémarrage dans {count} minutes"
+    },
+    "restartNow": "Redémarrer maintenant",
+    "external": {
+      "linuxgsm": "LinuxGSM",
+      "docker": "Docker",
+      "runBy": "Géré par {kind}",
+      "how": "{kind} exécute ce serveur depuis {folder}. PZMM modifie ses paramètres, ses mods et ses sauvegardes, mais ne le démarre ni ne l'arrête jamais. Lancez-le là-bas avec :",
+      "find": "Trouver des serveurs existants",
+      "findTip": "Choisissez un dossier contenant une installation LinuxGSM ou une configuration Docker Compose",
+      "foundLabel": "Serveurs trouvés",
+      "none": "Aucun serveur LinuxGSM ou Docker dans ce dossier (PZMM cherche à cet endroit et un dossier plus bas).",
+      "add": "Gérer dans PZMM",
+      "copyCmd": "Copier la commande",
+      "checkWorkshop": "Vérifier les mises à jour du Workshop",
+      "wsUnknown": {
+        "one": "{count} objet du Workshop vérifié, mais PZMM ne voit pas quelles versions ce serveur a téléchargées (son dossier d'installation n'est pas ici).",
+        "other": "{count} objets du Workshop vérifiés, mais PZMM ne voit pas quelles versions ce serveur a téléchargées (son dossier d'installation n'est pas ici)."
+      },
+      "wsOutdated": {
+        "one": "{count} mod a une mise à jour que le serveur n'a pas téléchargée : {titles}. Redémarrez le serveur là-bas pour l'obtenir.",
+        "other": "{count} mods ont des mises à jour que le serveur n'a pas téléchargées : {titles}. Redémarrez le serveur là-bas pour les obtenir."
+      },
+      "wsCurrent": {
+        "one": "Le serveur a la dernière version de son {count} objet du Workshop.",
+        "other": "Le serveur a la dernière version de ses {count} objets du Workshop."
+      },
+      "upkeep": {
+        "checkUpdate": "Chercher une mise à jour du serveur",
+        "update": "Mettre à jour le serveur",
+        "validate": "Vérifier chaque fichier du serveur",
+        "pull": "Récupérer la dernière image",
+        "recreate": "Redémarrer sur la nouvelle image"
+      }
+    },
+    "auto": {
+      "whileOpen": "Tout cela tourne tant que PZMM est ouvert (ou pendant que pzmm server start tourne). Les paramètres peuvent démarrer PZMM dans la zone de notification à la connexion.",
+      "updatesTitle": "Quand un mod est mis à jour sur le Workshop",
+      "updates": {
+        "always": "Redémarrer après les avertissements",
+        "empty": "Redémarrer dès que plus personne n'est en ligne",
+        "scheduled": "Redémarrer à la prochaine heure de redémarrage",
+        "notify": "Me prévenir seulement"
+      },
+      "noTimes": "Ajoutez une heure de redémarrage ci-dessous, sinon les mises à jour attendent votre redémarrage.",
+      "checkEvery": "Vérifier toutes les",
+      "minutesOff": "minutes (0 : jamais)",
+      "checkNow": "Vérifier maintenant",
+      "updatedNow": {
+        "one": "{count} mod mis à jour depuis le démarrage du serveur : {titles}",
+        "other": "{count} mods mis à jour depuis le démarrage du serveur : {titles}"
+      },
+      "allCurrent": "Chaque mod du Workshop est à la version avec laquelle le serveur a démarré.",
+      "warnAt": "Prévenir les joueurs",
+      "warnHint": "minutes avant un redémarrage, en jeu (par exemple 15, 5, 1)",
+      "scheduleTitle": "Planification",
+      "restartsAt": "Redémarrer chaque jour à",
+      "restartTime": "Heure de redémarrage",
+      "restartHour": "Heure du redémarrage",
+      "restartMinute": "Minute du redémarrage",
+      "addTime": "Ajouter une heure",
+      "backupEvery": "Sauvegarder toutes les",
+      "hoursOff": "heures (0 : jamais)",
+      "keep": "Garder",
+      "maxMb": "sauvegardes, jusqu'à",
+      "mbOff": "MB en tout (0 : sans limite)",
+      "backupOnStart": "Sauvegarder avant chaque démarrage (le serveur se sauvegarde aussi au démarrage, voir Sauvegardes)",
+      "crashTitle": "Surveillance des plantages",
+      "crashRestarts": "Redémarrer après un plantage, au plus",
+      "crashHint": "fois par heure (0 : désactivé). Ensuite PZMM cesse d'essayer et vous alerte.",
+      "discordTitle": "Discord",
+      "webhook": "Lien du webhook Discord",
+      "webhookPlaceholder": "https://discord.com/api/webhooks/…",
+      "webhookSavedPlaceholder": "Enregistré. Collez un nouveau lien pour le remplacer",
+      "webhookSave": "Enregistrer le lien",
+      "webhookHint": "Conservé dans le gestionnaire d'identifiants du système, jamais dans les fichiers de PZMM. Créez-en un dans les paramètres de votre salon : Intégrations, Webhooks.",
+      "webhookSaved": "Webhook enregistré.",
+      "webhookForgotten": "Webhook oublié.",
+      "webhookForget": "Oublier",
+      "test": "Envoyer un test",
+      "testSent": "Message de test envoyé.",
+      "event": {
+        "started": "Démarré",
+        "stopped": "Arrêté",
+        "crashed": "Planté (avec les dernières lignes du journal)",
+        "restarting": "Redémarrage imminent",
+        "updated": "Mods mis à jour",
+        "joined": "Un joueur s'est connecté",
+        "left": "Un joueur est parti",
+        "status": "Un message d'état tenu à jour (joueurs, durée de fonctionnement)"
+      },
+      "save": "Enregistrer l'automatisation",
+      "saved": "Enregistré.",
+      "trayHint": "Pour qu'elles continuent fenêtre fermée, activez Garder PZMM dans la zone de notification dans les Paramètres.",
+      "restartEvery": "Redémarrer toutes les",
+      "everyHint": "heures de fonctionnement (0 : non), avec les mêmes avertissements",
+      "saveEvery": "Sauvegarder le monde toutes les",
+      "saveHint": "minutes (0 : seulement les sauvegardes du serveur lui-même)",
+      "messagesTitle": "Messages aux joueurs",
+      "messageText": "Message, par ex. Rejoignez notre Discord",
+      "messageEvery": "toutes les (minutes)",
+      "addMessage": "Ajouter un message",
+      "messageHint": "Affiché en jeu tant que le serveur tourne. Une ligne, sans guillemets doubles.",
+      "historyTitle": "Dernières 24 heures",
+      "historyNone": "Rien ne s'est passé ces dernières 24 heures.",
+      "history": {
+        "mods": "Mises à jour du Workshop : {text}",
+        "restart": "Redémarré",
+        "restartTook": "Redémarré pour prendre les mises à jour : {text}",
+        "aborted": "Redémarrage annulé",
+        "crash": "Planté",
+        "server": "Fichiers du serveur mis à jour (Build {text})"
+      },
+      "botTitle": "Commandes du bot",
+      "botIntro": "Les membres ayant le rôle choisi peuvent piloter le serveur depuis un salon Discord : !status, !players, !restart (avec des minutes, ou 0 pour tout de suite), !save, !msg suivi d'un texte pour tous en jeu, !update-check et !help. PZMM lit le salon toutes les 5 secondes tant qu'il tourne (plus si Discord le demande) et y répond.",
+      "botToken": "Jeton du bot",
+      "botSavedPlaceholder": "Enregistré. Collez un nouveau jeton pour le remplacer",
+      "botSave": "Enregistrer le jeton",
+      "botSaveFirst": "Enregistrez d'abord l'automatisation",
+      "botChannel": "ID du salon",
+      "botRole": "ID du rôle",
+      "botHint": "Sur discord.com/developers, créez une application, ajoutez un bot, activez Message Content Intent et invitez le bot avec Voir le salon, Envoyer des messages et Voir les anciens messages. Pour les ID, activez le mode développeur dans Discord, puis faites un clic droit sur le salon ou le rôle et Copier l'identifiant. Le jeton est conservé dans le gestionnaire d'identifiants du système.",
+      "botSaved": "Jeton du bot enregistré.",
+      "botForgotten": "Jeton du bot oublié.",
+      "botRelay": "Relayer le chat",
+      "botRelayShared": "Un autre serveur utilise le dossier de données de ce serveur, leurs journaux de chat se mélangent donc. Donnez à chaque serveur son propre dossier de données pour relayer le chat.",
+      "botRelayHint": "Le chat général du jeu est publié dans le salon, et les messages normaux des membres ayant le rôle apparaissent en jeu comme messages [Discord] (une ligne, sans guillemets doubles)."
+    },
+    "backups": {
+      "now": "Sauvegarder maintenant",
+      "what": "La sauvegarde de partie, sa base de données et les fichiers de paramètres du serveur.",
+      "done": "Sauvegarde effectuée.",
+      "none": "Aucune sauvegarde pour l'instant.",
+      "listLabel": "Sauvegardes",
+      "gameOn": "Le serveur se sauvegarde aussi à chaque démarrage (garde {count}) dans",
+      "gameOff": "La sauvegarde propre au serveur au démarrage est désactivée (BackupsOnStart dans Paramètres). Ses sauvegardes vont dans",
+      "emptyCells": {
+        "one": "{count} fichier de carte de la partie est vide (0 octet), ce qui indique souvent un plantage pendant l'enregistrement. Restaurez une sauvegarde antérieure :",
+        "other": "{count} fichiers de carte de la partie sont vides (0 octet), ce qui indique souvent un plantage pendant l'enregistrement. Restaurez une sauvegarde antérieure :"
+      },
+      "restore": "Restaurer",
+      "restoreTitle": "Restaurer {name} à {when} ?",
+      "restoreStops": "Le serveur est d'abord arrêté (il enregistre avant de s'arrêter).",
+      "restoreExternal": "Arrêtez d'abord le serveur dans {kind} : PZMM ne peut pas l'arrêter.",
+      "restoreKeeps": "PZMM sauvegarde d'abord la partie et les paramètres actuels, pour que vous puissiez revenir en arrière.",
+      "restored": "Sauvegarde du {when} restaurée. Démarrez le serveur quand vous êtes prêt.",
+      "reason": {
+        "manual": "manuelle",
+        "start": "avant un démarrage",
+        "update": "avant des mises à jour de mods",
+        "scheduled": "planifiée",
+        "restore": "avant une restauration",
+        "wipe": "avant un wipe",
+        "chunks": "avant une remise à zéro de la carte",
+        "migrate": "avant l'import d'un monde coop",
+        "import": "importée"
+      },
+      "export": "Exporter",
+      "exportTip": "Copier cette sauvegarde dans un dossier de votre choix (autre disque, autre PC)",
+      "exported": "{file} enregistré",
+      "import": "Importer",
+      "importTip": "Apporter un zip de sauvegarde (de ce serveur ou d'un autre) : il rejoint la liste, prêt à restaurer",
+      "imported": "Sauvegarde importée : restaurez-la depuis la liste quand vous voulez."
+    },
+    "settings": {
+      "label": "Fichiers de paramètres",
+      "remoteCopy": "Tu modifies les copies PZMM des fichiers de ce serveur. Envoie-les à l'hébergeur quand tu as fini ; arrête d'abord le serveur dans le panneau de ton hébergeur.",
+      "part": {
+        "ini": "Serveur",
+        "sandbox": "Sandbox",
+        "spawn": "Régions d'apparition",
+        "files": "Fichiers"
+      },
+      "filter": "Filtrer les paramètres",
+      "iniHint": "Lu depuis le .ini du serveur, avec les descriptions et les limites qu'il écrit. Les mods, éléments du Workshop et cartes sont dans l'onglet Mods.",
+      "section": {
+        "network": "Réseau et RCON",
+        "anticheat": "Anti-triche",
+        "access": "Connexion et référencement",
+        "pvp": "PvP",
+        "safehouses": "Planques",
+        "factions": "Factions",
+        "chat": "Chat, voix et Discord",
+        "backups": "Enregistrement et sauvegardes",
+        "players": "Joueurs",
+        "other": "Autres"
+      },
+      "general": "Général",
+      "default": "Par défaut : {value}",
+      "save": {
+        "one": "Enregistrer {count} modification",
+        "other": "Enregistrer {count} modifications"
+      },
+      "discard": "Annuler",
+      "backupNote": "Le fichier d'avant la première modification de PZMM reste en .bak, celui d'avant la dernière en .prev.",
+      "saved": "Enregistré.",
+      "savedRestart": "Enregistré. Le serveur l'utilisera après son prochain redémarrage.",
+      "unreadable": "PZMM ne peut pas l'afficher sous forme de formulaire : {error}. Le serveur écrit le fichier à son premier démarrage ; PZMM n'écrit jamais un fichier qu'il ne peut pas lire.",
+      "preset": "Préréglage",
+      "ownPreset": "{name} (le vôtre)",
+      "applyPreset": "Appliquer",
+      "presetHint": "Un préréglage remplit le formulaire ; rien n'est écrit tant que vous n'enregistrez pas.",
+      "presetApplied": {
+        "one": "{count} paramètre rempli depuis le préréglage. Enregistrez pour le conserver.",
+        "other": "{count} paramètres remplis depuis le préréglage. Enregistrez pour les conserver."
+      },
+      "presetName": "Nom du préréglage",
+      "savePreset": "Enregistrer comme préréglage",
+      "presetSaved": "Préréglage {name} enregistré.",
+      "spawnHint": "Où les nouveaux joueurs peuvent choisir de commencer. Les régions d'un mod de carte utilisent son spawnpoints.lua (media/maps/<map>/spawnpoints.lua).",
+      "regionName": "Nom de la région",
+      "regionFile": "Chemin de spawnpoints.lua",
+      "addRegion": "Ajouter",
+      "saveRegions": "Enregistrer les régions d'apparition",
+      "presetWhere": "Les préréglages que tu enregistres vont dans le dossier Sandbox Presets du jeu, donc son écran de nouvelle partie les propose aussi, et ceux enregistrés dans le jeu apparaissent ici.",
+      "restore": "Restaurer la précédente",
+      "restoreTip": "Remettre ce fichier tel qu'il était avant sa dernière modification (restaurer à nouveau annule)",
+      "restored": "La version précédente est revenue.",
+      "origin": "Quels paramètres",
+      "base": "Jeu de base",
+      "fromMods": "Mods ({count})",
+      "offersLabel": "Points d'apparition des mods de carte",
+      "offers": "Les mods de carte de ce serveur ont leurs propres points d'apparition :",
+      "file": "Fichier",
+      "textHint": "Modifiez le fichier en texte. La version d'avant chaque enregistrement est gardée, vous pouvez donc revenir en arrière.",
+      "saveText": "Enregistrer le fichier"
+    },
+    "tag": {
+      "title": "Liste de mods dans la description",
+      "on": "Mettre la liste exacte des mods dans la description du serveur à chaque démarrage",
+      "hint": "Les joueurs PZMM y trouvent exactement ces mods, l'ordre de chargement et les cartes. Le jeu n'affiche une description modifiée qu'après un redémarrage.",
+      "full": "Ça tient : la description fait {length} caractères sur {limit}.",
+      "items": "La liste entière ne tient pas : la description ne contient que les objets Workshop et leurs dates de mise à jour ({length} caractères sur {limit}).",
+      "none": "La liste est trop longue pour la description ({limit} caractères) : les joueurs PZMM trouvent les mods par ID.",
+      "copy": "Copier l'étiquette pour le panneau de mon hébergeur",
+      "copied": "Copiée. Collez-la à la fin de la description du serveur dans le panneau de votre hébergeur, puis redémarrez le serveur."
+    },
+    "startCheckTitle": "{name} risque de ne pas démarrer tel qu'il est configuré :",
+    "startAnyway": "Démarrer quand même",
+    "cpu": "CPU {pct} %",
+    "inGame": "en jeu {date}",
+    "nextRestart": "prochain redémarrage {time}",
+    "sparkLabel": "CPU et mémoire sur les 15 dernières minutes",
+    "abort": "Annuler",
+    "abortTip": "Annuler ce redémarrage : les joueurs sont prévenus et le serveur continue de tourner",
+    "warnStop": "Prévenir les joueurs, arrêter dans une minute",
+    "warnRestart": "Prévenir les joueurs, redémarrer dans une minute",
+    "warnStopMsg": "Le serveur s'arrête dans 1 minute. Mettez-vous à l'abri.",
+    "warnRestartMsg": "Le serveur redémarre dans 1 minute. Mettez-vous à l'abri.",
+    "warnOffMsg": "Fausse alerte : le serveur continue de tourner.",
+    "warnedTip": "Les joueurs ont été prévenus. Annuler : ils sont prévenus et le serveur continue de tourner",
+    "leaveTitle": "Quitter sans enregistrer ?",
+    "leaveLine": "Les modifications faites ici ne sont pas encore enregistrées. En quittant, elles sont perdues.",
+    "leave": "Abandonner les modifications",
+    "diagnostics": "Copier le diagnostic",
+    "diagnosticsTip": "Copier les infos de ce serveur, ses paramètres (mots de passe masqués) et la fin de son journal, pour un rapport de bug",
+    "update": {
+      "button": "Mettre à jour le serveur",
+      "tip": "Mettre à jour les fichiers du serveur dédié avec SteamCMD (vérifie chaque fichier)",
+      "title": "Mettre à jour les fichiers du serveur {name} ?",
+      "line": "SteamCMD télécharge ce qui a changé dans {dir} et vérifie chaque fichier.",
+      "switchLine": "Changer de build change la branche de cette installation et réécrit les lignes de mods pour cette build. Un monde d'une build ne se charge pas dans l'autre.",
+      "same": "Mettre à jour ({build})",
+      "switch": "Passer à {build}",
+      "b42": "Build 42",
+      "b41": "Build 41"
+    },
+    "world": {
+      "stopFirst": "Arrêtez le serveur pour le wiper, remettre à zéro des zones de la carte ou importer un monde.",
+      "copyTitle": "Faire une copie",
+      "copyName": "Nom de la copie",
+      "copy": "Copier les paramètres",
+      "copyHint": "Un nouveau serveur avec les paramètres, le bac à sable, les points d'apparition, l'automatisation et le mot de passe admin de celui-ci, et un monde neuf. Il utilise les mêmes ports : changez-les avant de lancer les deux.",
+      "copied": "{name} créé.",
+      "wipeTitleShort": "Wiper le monde",
+      "keepCharacters": "Garder les personnages (les joueurs gardent leurs survivants et ce qu'ils portent)",
+      "keepZones": "Garder les refuges, zones sûres, zones sans PvP et factions",
+      "keepZonesHint": "Avec cette option, seule la carte est remise à zéro (bâtiments, butin, véhicules, zombies) ; le reste de la partie reste. Les comptes, la liste blanche et les paramètres restent toujours.",
+      "wipeButton": "Wiper…",
+      "wipeTitle": "Wiper le monde de {name} ?",
+      "wipeBackup": "PZMM sauvegarde d'abord le monde : vous pouvez le restaurer depuis Sauvegardes.",
+      "wipeKeepsCharacters": "Les personnages restent.",
+      "wipeResetsCharacters": "Les personnages sont supprimés : les joueurs repartent de zéro.",
+      "wipeKeepsZones": "Les refuges, zones sûres, zones sans PvP et factions restent ; la carte est remise à zéro.",
+      "wipeResetsZones": "Tout le monde est remis à zéro.",
+      "wipe": "Wiper",
+      "wiped": {
+        "one": "Wipe fait : {count} fichier supprimé. Le serveur crée un monde neuf au démarrage.",
+        "other": "Wipe fait : {count} fichiers supprimés. Le serveur crée un monde neuf au démarrage."
+      },
+      "chunksHeading": "Remettre à zéro des zones de la carte",
+      "chunksHint": "Les chunks remis à zéro repoussent depuis la carte (bâtiments, butin, zombies) au prochain chargement. Indiquez chaque zone en coordonnées de case d'un coin au coin opposé, comme le jeu les affiche (ShowCoordinates ou la carte).",
+      "from": "De",
+      "to": "à",
+      "x1": "De x",
+      "y1": "De y",
+      "x2": "À x",
+      "y2": "À y",
+      "addArea": "Ajouter une zone",
+      "outside": "Tout remettre à zéro sauf ces zones (garder les bases)",
+      "inside": "Remettre à zéro seulement ces zones",
+      "chunksButton": {
+        "one": "Remettre à zéro {count} chunk…",
+        "other": "Remettre à zéro {count} chunks…"
+      },
+      "chunksOf": {
+        "one": "sur {count} dans le monde",
+        "other": "sur {count} dans le monde"
+      },
+      "chunksTitle": {
+        "one": "Remettre à zéro {count} chunk de la carte ?",
+        "other": "Remettre à zéro {count} chunks de la carte ?"
+      },
+      "chunksInsideLine": "Les chunks de ces zones repoussent depuis la carte.",
+      "chunksOutsideLine": "Chaque chunk hors de ces zones repousse depuis la carte ; les zones restent telles quelles.",
+      "chunksReset": "Remettre à zéro",
+      "chunksDone": {
+        "one": "{count} chunk remis à zéro.",
+        "other": "{count} chunks remis à zéro."
+      },
+      "migrateHeading": "Importer un monde coop",
+      "noCoop": "Aucun monde coop sur ce PC (Zomboid/Saves/Multiplayer).",
+      "migrate": "Utiliser ce monde",
+      "migrateTitle": "Faire de {world} le monde de {name} ?",
+      "migrateLine": "Le monde coop, ses comptes, et les mods et le bac à sable avec lesquels il a été joué remplacent ceux du serveur. Les ports et mots de passe restent.",
+      "migrateHint": "Un monde que vous avez hébergé depuis le jeu. Ses personnages suivent.",
+      "migrated": "{world} est maintenant le monde de ce serveur. Démarrez-le quand vous voulez.",
+      "scriptHeading": "Script de démarrage",
+      "script": "Enregistrer un script de démarrage…",
+      "scriptHint": "Démarre ce serveur avec la même commande que PZMM, pour le faire tourner sans PZMM (sans mot de passe admin dedans).",
+      "scriptSaved": "{file} enregistré",
+      "zonesHeading": "Refuges, zones et factions",
+      "zonesHint": "Sauvegarder et restaurer seulement le map_meta.bin du monde, qui contient les refuges, zones sûres, zones sans PvP et factions, sans toucher au reste du monde.",
+      "zonesFlags": "Le même fichier contient aussi les marqueurs de chaque bâtiment (alarmes, pièces visitées et pillées, lumières) : une restauration les remet aussi comme avant.",
+      "zonesKeeps": "Le fichier actuel est sauvegardé d'abord, pour pouvoir revenir en arrière.",
+      "zonesSave": "Sauvegarder maintenant",
+      "zonesSaved": "Refuges, zones et factions sauvegardés.",
+      "zonesRestoreTitle": "Restaurer les refuges, zones et factions du {when} ?",
+      "zonesRestored": "Refuges, zones et factions du {when} restaurés.",
+      "zonesManual": "Sauvegarde",
+      "zonesBeforeRestore": "Avant une restauration"
+    },
+    "remote": {
+      "add": "Ajouter un serveur distant…",
+      "addTip": "Joindre un serveur sur une autre machine ou chez un hébergeur via RCON : sa console et ses joueurs",
+      "intro": "Un serveur qui tourne ailleurs : PZMM se connecte à son RCON (RCONPort et RCONPassword dans son ini) pour la console et les joueurs.",
+      "name": "Nom",
+      "host": "Adresse",
+      "port": "Port RCON",
+      "password": "Mot de passe RCON",
+      "build": "Version du jeu",
+      "b42": "Build 42",
+      "b41": "Build 41",
+      "plain": "RCON n'est pas chiffré : utilisez-le sur des réseaux de confiance. Le mot de passe est conservé dans le gestionnaire d'identifiants du système.",
+      "connect": "Se connecter",
+      "connecting": "Connexion…",
+      "at": "Serveur distant · {addr}",
+      "forgetLine": "PZMM oublie {addr} et son mot de passe RCON enregistré. Le serveur n'est pas modifié."
+    },
+    "form": {
+      "player": "Joueur",
+      "move": "Joueur à déplacer",
+      "to": "Vers le joueur",
+      "near": "Près du joueur",
+      "item": "Objet",
+      "vehicle": "Véhicule",
+      "search": "Tapez pour chercher dans la liste du jeu",
+      "count": "Combien",
+      "zombies": "Zombies",
+      "skill": "Compétence",
+      "xp": "XP",
+      "on": "Activé (décochez pour désactiver)",
+      "noCatalog": "La liste d'objets du jeu n'a pas pu être lue ({error}) : saisissez l'ID complet, comme Base.Axe.",
+      "unknown": "Absent de la liste du jeu : l'objet d'un mod fonctionne si le serveur a le mod.",
+      "x": "X",
+      "y": "Y",
+      "floor": "Étage",
+      "intensity": "Intensité : {value}",
+      "hours": "Heures de jeu",
+      "speed": "Multiplicateur de temps",
+      "speedHint": "Build 42 seulement, et seulement pour les rôles que le serveur autorise à utiliser les outils de débogage. 1 est la vitesse normale."
+    },
+    "files": {
+      "title": "Accès aux fichiers (FTP)",
+      "intro": "La plupart des hébergeurs donnent accès aux fichiers du serveur par FTP. PZMM s'en sert pour ouvrir les paramètres dans ses éditeurs et sauvegarder le monde. Il se connecte en TLS sauf si vous le désactivez ; le mot de passe est conservé dans le gestionnaire d'identifiants du système.",
+      "host": "Adresse FTP",
+      "port": "Port",
+      "user": "Nom d'utilisateur",
+      "password": "Mot de passe",
+      "passwordSaved": "Enregistré",
+      "server": "Nom du serveur là-bas",
+      "serverHint": "Le nom de son fichier .ini dans le dossier Server, généralement servertest.",
+      "plain": "FTP simple, sans TLS",
+      "plainWarn": "Seulement si votre hébergeur ne propose rien d'autre : le mot de passe et les fichiers traversent Internet en clair.",
+      "trust": "Faire confiance à ce certificat",
+      "trustNew": "Faire confiance au nouveau certificat…",
+      "trustNewTitle": "Le certificat de {host} a changé",
+      "trustNewDo": "Faire confiance au nouveau certificat",
+      "trustOld": "PZMM fait confiance à : {fingerprint}",
+      "trustShown": "L'hébergeur affiche maintenant : {fingerprint}",
+      "trustOnlyIf": "Ne lui faites confiance que si votre hébergeur a confirmé avoir remplacé le certificat. Sinon, quelqu'un pourrait intercepter la connexion.",
+      "connect": "Se connecter",
+      "connecting": "Connexion…",
+      "forget": "Oublier",
+      "folderTitle": "Dossier du serveur",
+      "folderHint": "Ouvrez le dossier qui contient Server et Saves (souvent Zomboid), puis choisissez Utiliser ce dossier.",
+      "up": "Remonter",
+      "useFolder": "Utiliser ce dossier",
+      "emptyFolder": "Ce dossier est vide.",
+      "folderSet": "Dossier du serveur défini : {folder}",
+      "settingsTitle": "Fichiers de paramètres",
+      "settingsHint": "Récupérer copie les fichiers ini, sandbox et d'apparition de {folder}/Server dans PZMM (en remplaçant sa copie) et ajoute l'onglet Paramètres. Envoyer sauvegarde d'abord ceux de l'hébergeur, puis envoie ceux de PZMM.",
+      "pull": "Récupérer les fichiers de paramètres",
+      "push": "Envoyer les fichiers de paramètres",
+      "lastPulled": "Dernière récupération : {time}",
+      "pulled": {
+        "one": "{count} fichier récupéré. Modifiez-le dans l'onglet Paramètres, puis envoyez-le.",
+        "other": "{count} fichiers récupérés. Modifiez-les dans l'onglet Paramètres, puis envoyez-les."
+      },
+      "pushed": "Envoyés.",
+      "pushedBackup": "Envoyés. Les anciens fichiers de l'hébergeur ont d'abord été sauvegardés.",
+      "stopFirst": "Arrêtez le serveur dans le panneau de votre hébergeur avant d'envoyer : un serveur en marche peut écraser ses paramètres en s'arrêtant.",
+      "worldTitle": "Sauvegarde du monde",
+      "worldHint": "Copie la sauvegarde, sa base de données et les fichiers de paramètres dans une sauvegarde du dossier de données de PZMM. La fois suivante, seul ce qui a changé est récupéré : c'est plus rapide et ça reprend après un arrêt.",
+      "world": "Sauvegarder le monde",
+      "stop": "Arrêter",
+      "progress": "{done} fichiers sur {total}",
+      "worldDone": "Sauvegardé ({size}).",
+      "openFolder": "Ouvrir le dossier",
+      "pullAsk": "Récupérer les fichiers de paramètres chez l'hébergeur ?",
+      "pullLine": "Cela remplace les copies de PZMM, y compris les modifications pas encore envoyées."
+    },
+    "address": {
+      "label": "Adresse à laquelle les joueurs se connectent",
+      "save": "Enregistrer",
+      "at": "Les joueurs se connectent à {address}",
+      "copy": "Copier",
+      "change": "Modifier",
+      "set": "Indiquer l'adresse pour les joueurs",
+      "tip": "Pour un tunnel comme playit.gg ou un nom de domaine : PZMM l'affiche ici et dans le statut Discord."
     }
   },
   "zb": {
@@ -913,7 +2373,63 @@
     "fine": "Les mises à jour du jeu et la fonction « Vérifier l'intégrité des fichiers du jeu » de Steam retirent l'option de lancement. Dans ce cas, cette page affiche <em>Réparer</em>. PZMM ne modifie que le lanceur normal.",
     "useInstallerBefore": "Si vous utilisez le lanceur alternatif ou les options de lancement de Steam, utilisez",
     "installer": "l'installateur officiel",
-    "useInstallerAfter": "à la place."
+    "useInstallerAfter": "à la place.",
+    "removeNeeded": {
+      "one": "{count} mod activé en a besoin et ne se chargera pas sans lui.",
+      "other": "{count} mods activés en ont besoin et ne se chargeront pas sans lui."
+    },
+    "enableHere": "Activer dans ce profil",
+    "setGameFolder": "Indiquer le dossier du jeu"
+  },
+  "vp": {
+    "lede": "Un moteur de rendu 3D pour la Build 42 : joue à la première ou à la troisième personne. Il se charge via ZombieBuddy, et PZMM range ses listes de mods dans des profils à part pour passer du jeu en 2D au jeu en 3D.",
+    "installed": "Installé, version {version}",
+    "notInstalled": "Non installé",
+    "notInstalledHint": "Installer et configurer télécharge Viewpoint et ZombieBuddy, configure ZombieBuddy et crée un profil Viewpoint à partir de ton profil actuel. Tu vois chaque changement avant.",
+    "updateReady": "Une mise à jour du Workshop est prête.",
+    "zbReady": "ZombieBuddy est prêt pour lui",
+    "zbNotReady": "ZombieBuddy n'est pas prêt pour lui",
+    "zbNotReadyHint": "Viewpoint se charge via ZombieBuddy. Passer à Viewpoint le configure, ou tu peux le configurer maintenant.",
+    "build": "Nécessite la Build 42",
+    "build41": "Tu es sur la Build 41. Viewpoint ne fonctionne qu'avec la Build 42 : change la build du jeu dans les Paramètres.",
+    "gameVersion": "Fait pour la version {version} du jeu",
+    "profiles": "Profils Viewpoint : {names}",
+    "noProfile": "Pas encore de profil Viewpoint",
+    "noProfileHint": "Le premier passage en crée un à partir de ton profil actuel, avec ZombieBuddy et Viewpoint activés en haut.",
+    "active": "Tu y joues en ce moment, avec le profil « {profile} ».",
+    "install": "Installer et configurer",
+    "switch": "Passer à Viewpoint",
+    "update": "Mettre à jour Viewpoint",
+    "changeBuild": "Paramètres de build du jeu",
+    "workshopPage": "Page du Workshop",
+    "settings": "Viewpoint garde ses réglages (rendu, pack de shaders, souris, champ de vision) dans le jeu : appuie sur Suppr en jouant. Ses touches sont dans Options > Mods."
+  },
+  "java": {
+    "title": "Mods Java",
+    "lede": "Le code Java apporté par vos mods activés, vérifié avant que ZombieBuddy le charge. Une signature montre qui a fait un fichier, pas qu'il est sûr ; l'analyse signale le code dont un mod de jeu a rarement besoin.",
+    "sig": {
+      "unsigned": "Non signé.",
+      "valid": "Signé par {signer}, inchangé depuis.",
+      "invalid": "Modifié après sa signature : ZombieBuddy ne le chargera pas.",
+      "unknown_key": "Signé par {signer} ; ZombieBuddy vérifie sa clé sur son profil Steam.",
+      "missing": "Le fichier Java est absent."
+    },
+    "allowed": "ZombieBuddy le charge : vous avez autorisé cette version.",
+    "blocked": "ZombieBuddy le bloque : vous avez refusé cette version.",
+    "willAsk": "ZombieBuddy vous demandera avant de le charger.",
+    "copyHash": "Copier le SHA-256",
+    "clean": "L'analyse n'a rien trouvé dont un mod de jeu a rarement besoin.",
+    "none": "Aucun de tes mods activés n'apporte de code Java.",
+    "loaderFound": "{name} {version} est installé dans le dossier du jeu.",
+    "loaderSteam": "Tes options de lancement Steam le démarrent avec le jeu.",
+    "loaderBy": "{file}, dans le dossier du jeu, le démarre.",
+    "loaderNotStarted": "Rien dans le dossier du jeu ni dans tes options de lancement Steam ne le démarre : il ne se charge que si tu le lances toi-même.",
+    "loadsWith": "Chargé par {name}, qui ne vérifie pas les signatures.",
+    "warnings": {
+      "one": "{count} avertissement dans l'onglet Mods Java.",
+      "other": "{count} avertissements dans l'onglet Mods Java."
+    },
+    "hashCopied": "Copié"
   },
   "profile": {
     "tip": "Profil : la liste de mods avec laquelle vous jouez",
@@ -922,7 +2438,17 @@
     "setUpViewpoint": "Configurer Project Viewpoint…",
     "rename": "Renommer…",
     "duplicate": "Dupliquer…",
-    "snapshots": "Instantanés…"
+    "snapshots": "Instantanés…",
+    "servers": "Profils de serveur",
+    "label": "Profil :",
+    "games": {
+      "zomboid": "Profils Project Zomboid",
+      "viewpoint": "Profils Project Viewpoint"
+    },
+    "use": "Basculer dessus",
+    "delete": "Supprimer…",
+    "prune": "Supprimer les profils de serveur inutilisés…",
+    "pruneNone": "Aucun profil de serveur inutilisé : le serveur de chacun figure dans votre historique, vos favoris ou vos serveurs hébergés."
   },
   "activity": {
     "title": "Activité",
@@ -943,7 +2469,8 @@
   "window": {
     "minimise": "Réduire",
     "maximise": "Agrandir",
-    "restore": "Restaurer"
+    "restore": "Restaurer",
+    "skip": "Aller au contenu"
   },
   "workshop": {
     "sorts": {
@@ -1116,8 +2643,8 @@
     "youtubeTip": "Regarder sur YouTube",
     "youtubeLabel": "Regarder la vidéo sur YouTube",
     "installAll": {
-      "one": "Installer {count} mod",
-      "other": "Installer les {count} mods"
+      "one": "Installer {count} mod…",
+      "other": "Installer les {count} mods…"
     },
     "workshopPage": "Page du Workshop",
     "rating": "Note",
@@ -1150,14 +2677,22 @@
     "older": "Plus anciennes",
     "noComments": "Aucun commentaire pour l'instant.",
     "commentsRange": "{from}–{to} sur {total}",
-    "postHint": "Pour publier un commentaire, utilisez la page du Workshop."
+    "postHint": "Pour publier un commentaire, utilisez la page du Workshop.",
+    "addToServer": "Ajouter au serveur",
+    "addToServerTip": "L'ajouter, avec les objets Workshop dont il a besoin, aux lignes de mods d'un serveur hébergé par PZMM",
+    "addingToServer": "Ajout…",
+    "noServers": "PZMM n'héberge encore aucun serveur : créez-en un dans Serveurs, Nouveau serveur…",
+    "onServerAlready": "{name} l'a déjà.",
+    "addToServerAsk": "Écrire ces changements dans les mods de {name} ?",
+    "addedToServer": "Ajouté à {name}. Le serveur les charge à son prochain démarrage.",
+    "addedToServerRestart": "Ajouté à {name}. Redémarrez-le pour les charger."
   },
   "installButton": {
-    "installAll": "Tout installer"
+    "installAll": "Tout installer…"
   },
   "snapshots": {
     "title": "Instantanés de « {profile} »",
-    "intro": "PZMM garde les 10 dernières listes d'avant les mises à jour, le tri automatique, le regroupement, le retrait de mods et les imports.",
+    "intro": "PZMM garde les 10 dernières listes d'avant les installations, les mises à jour, le tri automatique, le regroupement, le retrait de mods, les imports et la recherche d'un mod défectueux.",
     "counts": {
       "one": "{enabled} sur {count} mod activé",
       "other": "{enabled} sur {count} mods activés"
@@ -1167,10 +2702,15 @@
     "why": {
       "update": "Avant la mise à jour de mods",
       "autosort": "Avant le tri automatique",
-      "group": "Avant Grouper par catégorie",
+      "group": "Avant le regroupement par catégorie",
       "remove": "Avant le retrait de mods",
       "import": "Avant un import",
-      "restore": "Avant une restauration"
+      "restore": "Avant une restauration",
+      "maps": "Avant de réorganiser les cartes",
+      "sortAz": "Avant le tri de A à Z",
+      "adopt": "Avant des changements faits dans le menu des mods du jeu",
+      "install": "Avant l'installation de plusieurs mods",
+      "bisect": "Avant la recherche du mod défectueux"
     }
   },
   "preview": {
@@ -1190,7 +2730,16 @@
     "newFile": "Crée {file}.",
     "map": "Map= passe de {from} à {to}",
     "serverTitle": "Écrire ce profil dans {file} ?",
-    "write": "Écrire"
+    "write": "Écrire",
+    "shareTitle": "Importer le profil « {name} » ?",
+    "shareMods": {
+      "one": "{count} mod activé",
+      "other": "{count} mods activés"
+    },
+    "shareDownloads": {
+      "one": "{count} d'entre eux se télécharge depuis le Workshop",
+      "other": "{count} d'entre eux se téléchargent depuis le Workshop"
+    }
   },
   "launch": {
     "title": {
@@ -1199,24 +2748,46 @@
     },
     "notInstalled": "{id} : activé mais pas installé",
     "fix": "Corriger",
-    "anyway": "Lancer quand même"
+    "anyway": "Lancer quand même",
+    "javaTitle": {
+      "one": "ZombieBuddy va vous demander l'accord pour {count} fichier Java nouveau ou modifié. Ce que PZMM a trouvé :",
+      "other": "ZombieBuddy va vous demander l'accord pour {count} fichiers Java nouveaux ou modifiés. Ce que PZMM a trouvé :"
+    },
+    "review": "Examiner les mods Java",
+    "joinAnyway": "Rejoindre quand même",
+    "arrangeMaps": "Organiser les cartes",
+    "warnTitle": {
+      "one": "{count} point à connaître avant de jouer. Le jeu démarre quand même.",
+      "other": "{count} points à connaître avant de jouer. Le jeu démarre quand même."
+    },
+    "stopAsking": "Lancer et ne plus demander pour ceux-ci",
+    "joinStopAsking": "Rejoindre et ne plus demander pour ceux-ci"
   },
   "menu": {
     "label": "{name} : actions",
     "toTop": "Placer en haut de l'ordre de chargement",
     "toBottom": "Placer en bas de l'ordre de chargement",
     "copyId": "Copier l'ID du mod",
-    "showInMaps": "Afficher dans Cartes"
+    "showInMaps": "Afficher dans Cartes",
+    "pin": "Épingler sa place dans l'ordre de chargement",
+    "unpin": "Désépingler sa place dans l'ordre de chargement",
+    "favourite": "Ajouter aux favoris",
+    "unfavourite": "Retirer des favoris",
+    "hide": "Masquer dans la liste",
+    "unhide": "Réafficher dans la liste"
   },
   "backend": {
-    "stateDamaged": "{file} est endommagé ({error}) ; une copie a été conservée sous state.json.bad et le fichier a été recréé",
     "mapsNotUpdated": "impossible de lire vos mods, donc la liste des cartes du jeu n'a pas été mise à jour : {error}",
-    "settingsDamaged": "{file} est endommagé ({error}) ; une copie a été conservée sous {copy} et les paramètres par défaut ont été utilisés",
+    "gameReset": "le jeu a vidé sa liste de mods (il le fait une fois après certaines mises à jour), donc PZMM a gardé la vôtre : lancez depuis PZMM pour la rétablir",
     "duplicateId": "{source} : un second mod avec l'identifiant {id} a été ignoré",
     "notOursInMods": "{id} est déjà dans {dir} et n'a pas été installé par PZMM ; laissé tel quel. Supprimez ce dossier pour installer cette copie.",
     "alreadyCurrent": "{id} est déjà à jour ({source})",
     "installed": "{id} installé ({source})",
-    "backupsPruned": "Les plus anciennes copies de secours ont été supprimées (nombre : {count}) pour les garder sous {mb} MB",
+    "updated": "{id} mis à jour ({source})",
+    "backupsPruned": {
+      "one": "La plus ancienne copie de secours a été supprimée pour les garder sous {mb} MB",
+      "other": "Les {count} plus anciennes copies de secours ont été supprimées pour les garder sous {mb} MB"
+    },
     "tagsFailed": "Impossible de lire les étiquettes du Workshop : {error}",
     "dataCopied": "Les données de PZMM ont été copiées vers {to}, mais l'ancien dossier {from} n'a pas pu être supprimé ({error}). Supprimez-le vous-même.",
     "dataMoved": "Les données de PZMM ont été déplacées vers {to}",
@@ -1231,12 +2802,23 @@
     "oldCopyNotRemoved": "impossible de supprimer l'ancienne copie de PZMM de {ids} : {error}",
     "pruneFailed": "impossible de nettoyer les copies de secours : {error}",
     "collectionsFailed": "impossible de vérifier les collections du Workshop : {error}",
-    "collection": "collection {id} : objets : {count}",
+    "collection": {
+      "one": "collection {id} : {count} objet",
+      "other": "collection {id} : {count} objets"
+    },
     "requiresAdding": "workshop:{id} nécessite workshop:{req}, ajout en cours",
-    "requiresFailed": "impossible de vérifier ce que nécessite workshop:{id} : {error}",
+    "requiresUnchecked": {
+      "one": "impossible de vérifier sur les pages du Workshop ce que nécessite {count} objet ({error}) : {ids}",
+      "other": "impossible de vérifier sur les pages du Workshop ce que nécessitent {count} objets ({error}) : {ids}"
+    },
+    "requiresFromInfo": "{id} nécessite {req} : ajout de workshop:{item} (d'après son mod.info, car Steam n'a pas affiché la page de l'objet)",
+    "requiresUnknown": "{id} nécessite {req}, et aucun objet du Workshop connu de PZMM ne le fournit : trouvez-le et installez-le vous-même",
     "requiredItemsFailed": "impossible de lire les objets requis de workshop:{item} : {error}",
     "downloadingSteamcmd": "téléchargement de steamcmd...",
-    "downloadingItems": "téléchargement des objets du Workshop : {count}...",
+    "downloadingItems": {
+      "one": "téléchargement de {count} objet du Workshop...",
+      "other": "téléchargement de {count} objets du Workshop..."
+    },
     "steamcmdStopped": "SteamCMD a été arrêté (par vous) ; non téléchargé : {ids}",
     "steamcmdTimedOut": "SteamCMD a été arrêté (aucun téléchargement terminé en une heure) ; non téléchargé : {ids}",
     "leftOff": "{id} laissé désactivé : il est incompatible avec {other}. Activez-le à la place de {other} si vous le préférez.",
@@ -1247,17 +2829,104 @@
     "found": "{id} : trouvé sur le Workshop sous le nom « {title} » ({item})",
     "lookupFailed": "échec de la recherche de {id} : {error}",
     "noClearMatch": "{id} : aucun objet du Workshop ne le fournit clairement. Utilisez Télécharger dans les détails du mod pour en choisir un.",
-    "serverItems": "installation des objets du Workshop utilisés par le serveur : {count}",
-    "serverStarted": "Serveur {name} démarré ({script}).",
+    "serverItems": {
+      "one": "installation de {count} objet du Workshop utilisé par le serveur",
+      "other": "installation de {count} objets du Workshop utilisés par le serveur"
+    },
     "noMaps": "workshop:{id} n'ajoute aucune carte pour Build {build}",
-    "sharedItems": "installation des objets du Workshop utilisés par le profil partagé : {count}",
+    "sharedItems": {
+      "one": "installation de {count} objet du Workshop utilisé par le profil partagé",
+      "other": "installation de {count} objets du Workshop utilisés par le profil partagé"
+    },
     "imported": "Le profil a été importé sous « {name} ».",
     "notAFolder": "n'est pas un dossier : {path}",
     "openFailed": "impossible d'ouvrir {path} : {error}",
     "httpsOnly": "PZMM n'ouvre que les liens https : {url}",
     "openUrlFailed": "impossible d'ouvrir {url} : {error} (Steam est-il installé ?)",
     "launchFailed": "impossible de lancer le jeu ({url}) : {error} (Steam est-il installé ?)",
-    "backupsDeleted": "Toutes les copies de secours ont été supprimées."
+    "backupsDeleted": "Toutes les copies de secours ont été supprimées.",
+    "serverInstalling": "installation du serveur dédié dans {dir} (environ 2 Go à télécharger)...",
+    "serverStarting": "démarrage de {name} : {command}",
+    "serverKilled": "{name} ne s'est pas arrêté à temps : PZMM a terminé Java",
+    "serverCreated": "{name} configuré : {file}",
+    "serverWritten": "{mods} mods et {items} objets Workshop écrits dans {file}",
+    "serverModsUpdated": {
+      "one": "{name} : {count} mod du Workshop mis à jour ({titles}) ; le serveur le prendra en compte à son redémarrage",
+      "other": "{name} : {count} mods du Workshop mis à jour ({titles}) ; le serveur les prendra en compte à son redémarrage"
+    },
+    "serverCrashRestart": "{name} a planté : PZMM le redémarre",
+    "serverCrashGaveUp": "{name} a planté {count} fois en une heure : PZMM a cessé de le redémarrer",
+    "serverCrashed": "{name} a planté",
+    "serverAutoRestart": "{name} : redémarrage (enregistrement d'abord)",
+    "serverRestartBroken": "{name} : pas de redémarrage, car Vérifier la configuration trouve des erreurs dans sa configuration (il continue de tourner) : {errors}",
+    "serverBackedUp": "{name} sauvegardé ({size} MB)",
+    "serverRestored": "{name} restauré depuis {file}",
+    "detailsFailed": "impossible de lire les détails Workshop des mods du serveur : {error}",
+    "serverProfile": {
+      "one": "Passé à \"{name}\" avec {count} mod pour {server}.",
+      "other": "Passé à \"{name}\" avec {count} mods pour {server}."
+    },
+    "serverMissing": "Pas installés, donc absents du profil : {ids}",
+    "tagTooBig": "La liste de mods de {name} est trop longue pour sa description : les joueurs PZMM trouvent ses mods par ID",
+    "tagFailed": "impossible de mettre à jour la liste de mods dans la description de {name} : {error}",
+    "modIndexRead": {
+      "one": "ID de mod lus pour {count} objet Workshop mis à jour depuis la dernière fois",
+      "other": "ID de mod lus pour {count} objets Workshop mis à jour depuis la dernière fois"
+    },
+    "modIndexFailed": "impossible de mettre à jour l'index des ID de mod : {error}",
+    "saveBackedUp": "Sauvegarde {name} copiée ({size} Mo)",
+    "saveRestored": "Sauvegarde {name} restaurée depuis {file}",
+    "saveBackupFailed": "impossible de copier la sauvegarde {name} : {error}",
+    "profileUsed": "Profil « {name} » activé.",
+    "profileRenamed": "Le profil « {from} » a été renommé « {to} ».",
+    "profileDeleted": "Le profil « {name} » a été supprimé.",
+    "serverStopped": "{name} arrêté.",
+    "serverAdopted": "PZMM gère maintenant {name}.",
+    "serverForgotten": "PZMM ne gère plus {name} ; ses fichiers restent.",
+    "serverAutoSaved": "Automatisation de {name} enregistrée.",
+    "serverSettingsSaved": "Réglages de {name} enregistrés : {file}",
+    "serverDiscordSaved": "Webhook Discord de {name} enregistré.",
+    "serverDiscordForgot": "Webhook Discord de {name} retiré.",
+    "joining": "Lancement du jeu pour rejoindre {server} avec le profil « {profile} ».",
+    "serverRestartAborted": "{name} : le redémarrage a été annulé",
+    "serverUpdated": "Fichiers du serveur {name} mis à jour",
+    "serverCloned": "{name} créé avec les paramètres de {from}",
+    "serverMigrated": "{name} utilise maintenant le monde coop {world}",
+    "serverBackupImported": "Sauvegarde importée pour {name} depuis {file}",
+    "serverWiped": {
+      "one": "Monde de {name} wipé ({count} fichier)",
+      "other": "Monde de {name} wipé ({count} fichiers)"
+    },
+    "serverChunksReset": "{count} chunks de la carte de {name} remis à zéro",
+    "remoteAdded": "{name} ajouté : {host}:{port}",
+    "marksOn": {
+      "one": "« {name} » : {count} favori activé, comme le demandent les paramètres.",
+      "other": "« {name} » : {count} favoris activés, comme le demandent les paramètres."
+    },
+    "marksOff": {
+      "one": "« {name} » : {count} mod masqué désactivé, comme le demandent les paramètres.",
+      "other": "« {name} » : {count} mods masqués désactivés, comme le demandent les paramètres."
+    },
+    "serverZonesRestored": "Refuges, zones et factions de {name} restaurés depuis {file}",
+    "discordCommand": "{name} : {user} a envoyé {command} sur Discord",
+    "discordRelayShared": "{name} : le relais du chat est désactivé car un autre serveur utilise le même dossier de données, leur chat se mélangerait",
+    "serverBotSaved": "Jeton du bot Discord de {name} enregistré.",
+    "serverBotForgot": "Jeton du bot Discord de {name} supprimé.",
+    "ftpSent": "Fichiers de paramètres de {name} envoyés à son hébergeur",
+    "ftpWorld": "Récupération du monde de {name} depuis son hébergeur : {count} fichiers",
+    "ftpGot": "Fichiers de paramètres de {name} récupérés depuis son hébergeur",
+    "favouriteUp": "En ligne avec de la place : {names}",
+    "serverSourceFailed": "impossible de lister les serveurs depuis {source} : {error}",
+    "listRestored": {
+      "one": "Le mod de « {name} » a été remis dans la liste de mods du jeu avant de le lancer.",
+      "other": "Les {count} mods de « {name} » ont été remis dans la liste de mods du jeu avant de le lancer."
+    },
+    "uploadCopyRecycled": "La copie précédente dans {folder} a été placée dans la Corbeille.",
+    "dataRepointFailed": "impossible de faire pointer les serveurs et les profils vers {to} ({error}) : vérifiez leurs dossiers dans Serveurs et les options de lancement des profils",
+    "secretsFile": "Le gestionnaire d'identifiants du système n'est pas disponible ({error}) : PZMM garde donc les mots de passe et les clés dans {file}",
+    "badModId": "{id} a été laissé hors de la liste de mods du jeu : un ID de mod ne peut pas contenir d'accolades, de virgules, de = ni de sauts de ligne",
+    "leavingViewpoint": "Project Viewpoint est quitté pour ce serveur",
+    "profileNew": "Profil vide « {name} » créé, et activé."
   },
   "doctor": {
     "notInstalled": "est activé mais pas installé : le jeu l'ignore",
@@ -1282,6 +2951,533 @@
     "itemUnused": "WorkshopItems= contient {item}, mais aucun de ses mods n'est dans Mods=",
     "backslash": "les entrées de Mods= doivent commencer par une barre oblique inverse sur Build 42 (\\ModId)",
     "mapNotListed": "un mod ajoute la carte {map}, mais Map= ne la liste pas",
-    "mapsAfterBase": "Map= liste les cartes de mods après Muldraugh, KY : les cartes de mods doivent venir en premier"
+    "mapsAfterBase": "Map= liste les cartes de mods après Muldraugh, KY : les cartes de mods doivent venir en premier",
+    "sameId": "Les objets du Workshop {items} utilisent tous cet ID de mod : le jeu n'en charge qu'un seul",
+    "noId": "son mod.info n'a pas d'id=, le jeu risque de ne pas l'afficher (PZMM utilise le nom du dossier)",
+    "noName": "son mod.info n'a pas de name=, il apparaît donc sans nom dans la liste des mods du jeu",
+    "idMismatch": "son mod.info de la Build 41 indique id={other} : les joueurs de l'autre build voient un autre ID de mod",
+    "versionMin": "nécessite la version {version} du jeu ou plus récente (vous avez {game}) : le jeu ne le chargera pas",
+    "versionMax": "est fait pour la version {version} du jeu ou antérieure (vous avez {game}) : le jeu ne le chargera pas",
+    "requireDisabled": "son Lua a besoin de {file} de {other}, qui est désactivé",
+    "requireMissing": "son Lua a besoin de {file}, qu'aucun mod activé ni le jeu ne fournit",
+    "idCase": "Mods= contient {id}, mais l'ID du mod est {real} : les ID doivent correspondre exactement",
+    "javaNoJar": "mod.info indique le fichier Java {file}, qui est absent : sa partie Java ne se chargera pas",
+    "javaBadSignature": "son fichier Java a été modifié après sa signature par l'auteur : ZombieBuddy ne le chargera pas",
+    "javaBlocked": "ZombieBuddy bloque cette version de son fichier Java (vous avez refusé auparavant), il risque donc de ne pas fonctionner",
+    "javaProcess": "son code Java peut lancer d'autres programmes ({what})",
+    "javaShell": "son code Java mentionne un interpréteur de commandes ou un outil de téléchargement ({what})",
+    "javaEndpoint": "son code Java mentionne {what}, une destination courante pour les données volées",
+    "javaPrivate": "son code Java mentionne {what}, où les navigateurs, Steam, Discord ou Windows gardent des données privées",
+    "javaNoLeaf": "son code Java se charge via Leaf, qui n'est pas installé pour le jeu, donc cette partie ne fonctionnera pas",
+    "javaLeafOff": "son code Java se charge via Leaf, qui est installé, mais rien ne lance Leaf avec le jeu (options de lancement Steam ou configuration du lanceur)",
+    "javaLoadsCode": "son code Java peut charger d'autre code pendant que le jeu tourne ({what})",
+    "javaLaunchFlags": "son code Java mentionne des options de lancement de Java ({what})",
+    "javaNativeFile": "son fichier Java contient un programme ou une bibliothèque native ({what})",
+    "javaBadClass": "son fichier Java contient du code que PZMM ne peut pas lire ({what}) : il est peut-être caché exprès",
+    "javaNetwork": "son code Java utilise le réseau ({what})",
+    "javaFiles": "son code Java écrit, déplace ou supprime des fichiers ({what})",
+    "javaNative": "son code Java charge des bibliothèques natives ({what})",
+    "javaCrypto": "son code Java chiffre ou déchiffre des données ({what})",
+    "javaNestedJar": "son fichier Java en contient un autre ({what}), analysé lui aussi",
+    "zbAgent": "a besoin de l'agent Java de ZombieBuddy, qui n'est pas installé dans le dossier du jeu : installe-le dans l'onglet Mods Java",
+    "zbBroken": "charge l'agent Java de ZombieBuddy, dont les fichiers ne sont pas dans le dossier du jeu, donc le jeu ne démarrera pas : installe-le ou retire-le dans l'onglet Mods Java",
+    "viewpoint41": "a besoin du Build 42 : il ne fonctionne pas sur le Build 41",
+    "mapFolderTwice": "ajoute le dossier de carte {map}, que {other} ajoute aussi : le jeu n'en charge qu'un",
+    "mapOverlap": "sa carte couvre certaines des mêmes cellules que celle de {other} : là où elles se chevauchent, celle listée en premier dans Map= l'emporte",
+    "serverBuild": "est pour un serveur en Build {theirs}, mais tu joues en Build {mine} : le serveur ne te laissera pas entrer",
+    "serverNeeds": "Mods= contient {id}, qui a besoin de {req}, mais Mods= ne le liste pas : {id} ne se chargera pas",
+    "serverNeedsLater": "Mods= place {req} après {id}, qui en a besoin : {req} doit venir avant",
+    "serverIncompatible": "Mods= contient {id} et {other}, qui ne fonctionnent pas ensemble",
+    "workshopGone": "son objet Workshop {item} a disparu (supprimé, ou rendu privé) : il ne reçoit plus de mises à jour et les serveurs ne peuvent pas le télécharger",
+    "workshopBanned": "son objet Workshop {item} a été retiré par Steam : il ne reçoit plus de mises à jour et les serveurs ne peuvent pas le télécharger",
+    "workshopHidden": "son objet Workshop {item} est masqué (amis seulement ou privé) : les serveurs et les autres joueurs ne peuvent pas le télécharger",
+    "workshopUnlisted": "son objet Workshop {item} n'est plus répertorié : il fonctionne encore, mais son auteur ne le met peut-être plus à jour",
+    "notOriginal": "vient de l'objet Workshop {mine}, mais l'original avec cet ID de mod est l'objet Workshop {item} ({title}) : le vôtre est peut-être une vieille copie ou un repack",
+    "luaSyntax": "son fichier Lua {file} a une erreur de syntaxe vers la ligne {line} : le jeu n'exécutera pas ce fichier",
+    "modCodeFile": "son dossier contient {what}, du code Java ou natif que son mod.info ne déclare pas : le jeu ne le charge pas, mais un autre code peut le faire",
+    "luaEndpoint": "son Lua ({file}) mentionne {what}, une destination courante pour des données volées",
+    "luaShell": "son Lua ({file}) mentionne un interpréteur de commandes ou un outil de téléchargement ({what})",
+    "luaPrivate": "son Lua ({file}) mentionne {what}, où les navigateurs, Steam, Discord ou Windows gardent des données privées",
+    "luaProcess": "son Lua ({file}) essaie de lancer des programmes ({what})",
+    "luaDownload": "son Lua ({file}) télécharge depuis Internet ({what})",
+    "luaFileEscape": "son Lua ({file}) accède à des fichiers hors des dossiers du jeu ({what})",
+    "javaEnvOptions": "est définie ({what}) : chaque programme Java de ce PC démarre avec, le jeu aussi",
+    "launcherAgent": "lance le jeu avec l'agent Java {what} : seul celui de ZombieBuddy est attendu",
+    "launcherBootPath": "lance le jeu avec {what}, qui place du code avant celui de Java",
+    "launcherClasspath": "met {what} dans le classpath du jeu, alors qu'il ne fait pas partie du jeu",
+    "gameJar": "contient {what}, un fichier Java qui n'est pas celui du jeu",
+    "gameClass": "contient une classe Java isolée, {what} : le jeu l'exécute à la place de son propre code",
+    "zbChanged": "ses fichiers ZombieBuddy ne sont pas ceux du mod ZombieBuddy (obsolètes ou remplacés) : réinstallez-le dans l'onglet Mods Java"
+  },
+  "saves": {
+    "tools": "Outils",
+    "toolsLabel": "Outils de la sauvegarde",
+    "part": {
+      "backups": "Copies",
+      "mods": "Mods",
+      "players": "Personnages",
+      "sandbox": "Bac à sable",
+      "recovery": "Secours",
+      "data": "Données"
+    },
+    "reason": {
+      "manual": "à la main",
+      "launch": "jeu lancé",
+      "exit": "jeu fermé",
+      "restore": "avant une restauration",
+      "repair": "avant une réparation",
+      "interval": "pendant la partie",
+      "crash": "après un plantage",
+      "reset": "avant une remise à zéro"
+    },
+    "slotName": "Nom de l'emplacement (facultatif)",
+    "saveSlot": "Enregistrer l'emplacement",
+    "backUpNow": "Copier maintenant",
+    "backupHint": "Une copie avec un nom est un emplacement : elle reste jusqu'à ce que tu la supprimes. Les copies sans nom sont réduites au nombre choisi dans les Réglages.",
+    "noBackups": "Aucune copie de cette sauvegarde pour l'instant.",
+    "backupsLabel": "Copies de cette sauvegarde",
+    "backedUp": "Copie faite.",
+    "slotSaved": "Emplacement « {slot} » enregistré.",
+    "restore": "Restaurer",
+    "restoreTitle": "Remettre {name} comme le {when} ?",
+    "restoreKeeps": "La sauvegarde telle qu'elle est maintenant est copiée d'abord, pour pouvoir revenir en arrière.",
+    "closeGame": "Le jeu doit être fermé.",
+    "restored": "Copie du {when} restaurée.",
+    "deleteTitle": "Supprimer la copie {what} ?",
+    "deleteWhat": "Elle ne pourra pas être récupérée.",
+    "deleted": "Supprimée.",
+    "brokenCells": {
+      "one": "{count} fichier de carte est vide : un plantage pendant l'enregistrement en laisse, et le jeu ne peut pas les charger.",
+      "other": "{count} fichiers de carte sont vides : un plantage pendant l'enregistrement en laisse, et le jeu ne peut pas les charger."
+    },
+    "brokenOther": {
+      "one": "{count} fichier du monde est vide, et seule une copie le ramène :",
+      "other": "{count} fichiers du monde sont vides, et seule une copie les ramène :"
+    },
+    "repair": "Réparer",
+    "repairTitle": {
+      "one": "Retirer {count} fichier de carte vide ?",
+      "other": "Retirer {count} fichiers de carte vides ?"
+    },
+    "repairWhat": "La sauvegarde est copiée d'abord. Le jeu reconstruit ces zones à partir de la carte : ce que tu y as construit ou posé disparaît.",
+    "repaired": {
+      "one": "{count} fichier de carte vide retiré.",
+      "other": "{count} fichiers de carte vides retirés."
+    },
+    "modsHint": "Donne à cette sauvegarde les mods de {profile}. Tu vois ce qui change avant toute écriture, et son ancienne liste reste à côté sous le nom mods.txt.prev.",
+    "giveMods": "Lui donner mes mods",
+    "giveModsTitle": "Donner à {save} les mods de {profile} ?",
+    "removedWarning": "Les objets, bâtiments et recettes des mods retirés disparaissent du monde au chargement.",
+    "mapsKept": "La sauvegarde garde ses cartes ; les cartes ajoutées par tes mods rejoignent sa liste de cartes.",
+    "modsGiven": "La sauvegarde a maintenant tes mods.",
+    "players": {
+      "name": "Personnage",
+      "where": "Position (x, y, étage)",
+      "state": "État",
+      "data": "Données enregistrées",
+      "alive": "Vivant",
+      "dead": "Mort",
+      "none": "Aucun personnage dans cette sauvegarde pour l'instant.",
+      "hint": "Lu dans le players.db de la sauvegarde ; rien n'est modifié."
+    },
+    "deletedTitle": "Sauvegardes supprimées avec des copies",
+    "deletedHint": "Ces sauvegardes ne sont plus dans le jeu, mais PZMM a encore leurs copies. Restaures-en une pour récupérer la sauvegarde.",
+    "backupsButton": "Copies",
+    "autoHint": "Copies au lancement ou à la fermeture du jeu :",
+    "autoSettings": "à régler dans les Réglages",
+    "sandboxSaved": "Enregistré. Le jeu s'en sert au prochain chargement de cette sauvegarde.",
+    "sandboxHint": "Les réglages de cette sauvegarde, tirés de son map_sand.bin. Les changements s'appliquent au prochain chargement, et le jeu doit être fermé. Les options des mods s'affichent comme de simples valeurs.",
+    "thumbAlt": "La dernière capture de {name}",
+    "name": "Nommer",
+    "rename": "Renommer",
+    "keepAs": "Garder comme emplacement",
+    "copyAs": "Copier comme emplacement",
+    "renamed": "Nommée « {slot} ».",
+    "copiedAs": "Copiée sous « {slot} ».",
+    "clone": "Copier avec mes mods",
+    "cloneHint": "Copier avec mes mods crée une nouvelle sauvegarde à côté de celle-ci, dont le nom finit par _modded, et lui donne tes mods. Celle-ci reste telle quelle.",
+    "cloneTitle": "Copier {save} avec les mods de {profile} ?",
+    "cloneKeeps": "La copie est une nouvelle sauvegarde dont le nom finit par _modded ; celle-ci reste telle quelle.",
+    "cloned": "{copy} créée avec tes mods. {save} n'a pas changé.",
+    "reset": {
+      "hint": "Répare un monde qui a mal tourné : PZMM copie la sauvegarde, puis retire des fichiers que le jeu reconstruit au prochain chargement.",
+      "do": "Remettre à zéro",
+      "nothing": "Cette sauvegarde n'a aucun de ces fichiers.",
+      "backupFirst": "La sauvegarde est d'abord copiée, tu peux donc revenir en arrière.",
+      "done": {
+        "one": "{count} fichier retiré. Charge la sauvegarde et le jeu le reconstruit.",
+        "other": "{count} fichiers retirés. Charge la sauvegarde et le jeu les reconstruit."
+      },
+      "noHeal": "Soigner un personnage n'est pas possible ici : le jeu garde la santé dans players.db sous une forme que lui seul écrit.",
+      "zombies": {
+        "label": "Population de zombies",
+        "short": "répartie à nouveau sur la carte",
+        "title": "Remettre à zéro la population de zombies ?",
+        "what": "Les zombies sont répartis à nouveau selon la carte et tes réglages de bac à sable, comme dans un nouveau monde. Les zones nettoyées peuvent se remplir à nouveau."
+      },
+      "time": {
+        "label": "Horloge, calendrier et météo",
+        "short": "retour au début de la sauvegarde",
+        "title": "Remettre à zéro l'horloge, le calendrier et la météo ?",
+        "what": "map_t.bin est retiré : la date et l'heure reviennent au début de la sauvegarde et la météo repart de zéro. Ce qui compte depuis le début du monde, comme la coupure d'eau et d'électricité et la réapparition du butin, recompte à partir de là."
+      },
+      "animals": {
+        "label": "Animaux (Build 42)",
+        "short": "répartis à nouveau sur la carte",
+        "title": "Remettre à zéro les animaux ?",
+        "what": "Les animaux et leurs zones sont reconstruits à partir de la carte. N'importe quel animal, même apprivoisé, peut être perdu."
+      }
+    },
+    "data": {
+      "hint": "Les bases de données de la sauvegarde telles que le jeu les a écrites, lues depuis une copie : rien n'est modifié. Les données enregistrées s'affichent par leur taille.",
+      "none": "Cette sauvegarde n'a pas de base de données.",
+      "pick": "Choisir une table",
+      "table": {
+        "one": "{table} ({count} ligne)",
+        "other": "{table} ({count} lignes)"
+      },
+      "prev": "Précédent",
+      "next": "Suivant",
+      "range": "Lignes {from} à {to} sur {total}",
+      "bytes": "[{size} de données]"
+    },
+    "mode": {
+      "Apocalypse": "Apocalypse",
+      "Survivor": "Survivant",
+      "Builder": "Bâtisseur",
+      "Sandbox": "Bac à sable",
+      "Multiplayer": "Multijoueur",
+      "Beginner": "Débutant"
+    },
+    "backupWhilePlaying": "Reviens d'abord au menu principal : une sauvegarde faite pendant que le jeu enregistre peut saisir la partie à moitié écrite.",
+    "reading": "Lecture…"
+  },
+  "perf": {
+    "title": "Performances",
+    "lede": "La mémoire donnée au jeu, PZ_Optimization et ce que tes mods coûtent au chargement.",
+    "reading": "Lecture…",
+    "gameNotFound": "Le jeu est introuvable : indique son dossier dans Dossiers.",
+    "closeGame": "Quitte d'abord le jeu.",
+    "memory": {
+      "title": "Mémoire pour le jeu",
+      "now": "Le jeu peut utiliser jusqu'à {size} sur les {ram} de cet ordinateur.",
+      "unset": "La mémoire du jeu n'est pas fixée, c'est donc Java qui choisit.",
+      "tooHigh": "Il reste trop peu pour Windows et le pilote graphique : baisse-la.",
+      "raise": {
+        "one": "Avec {count} mod, {size} charge plus vite et saccade moins.",
+        "other": "Avec {count} mods, {size} charge plus vite et saccade moins."
+      },
+      "fine": "C'est assez pour tes mods.",
+      "pzopt": "Le réglage de mémoire de PZ_Optimization a choisi cette taille, et le changer là-bas la fixe de nouveau.",
+      "suggested": "conseillé",
+      "noRoom": "Ce PC a {ram} de mémoire, trop peu pour conseiller une taille : quelle qu'elle soit, il reste moins de 2 Go à Windows.",
+      "apply": "Appliquer",
+      "set": "Le jeu a maintenant {size}.",
+      "hint": "PZMM modifie -Xmx dans ProjectZomboid64.json ; le fichier d'avant sa première modification reste sous le nom ProjectZomboid64.json.pzmm-backup. Vérifier les fichiers du jeu dans Steam remet la valeur par défaut."
+    },
+    "pzopt": {
+      "title": "PZ_Optimization",
+      "what": "Un correctif de performances de la communauté pour la Build 42 : des fichiers de classe posés à côté de ceux du jeu, chaque version faite pour une version du jeu.",
+      "github": "Sa page sur GitHub",
+      "notInstalled": "Pas installé.",
+      "ok": "Installé, fait pour cette version du jeu ({rev}).",
+      "mismatch": "Installé, mais fait pour la version {built} alors que la tienne est {game} : il se désactive. Mets-le à jour.",
+      "noCopy": "Abonne-toi sur le Workshop ; PZMM lance ensuite l'installateur fourni avec.",
+      "workshop": "Ouvrir sur le Workshop",
+      "copyOld": "La copie du Workshop est faite pour la version {rev} et la tienne est {game} : attends sa mise à jour.",
+      "install": "Installer",
+      "update": "Mettre à jour",
+      "uninstall": "Désinstaller",
+      "confirmInstall": "Lancer l'installateur de PZ_Optimization depuis son objet du Workshop ? Il copie des fichiers de classe dans le dossier du jeu ; projectzomboid.jar n'est pas modifié.",
+      "confirmRemove": "Retirer PZ_Optimization du dossier du jeu ? Son installateur remet les réglages de lancement du jeu.",
+      "installedNow": "PZ_Optimization est installé.",
+      "removed": "PZ_Optimization est retiré."
+    },
+    "mods": {
+      "title": "Mods et temps de chargement",
+      "count": {
+        "one": "{count} mod activé, {size} sur le disque.",
+        "other": "{count} mods activés, {size} sur le disque."
+      },
+      "many": "Avec autant de mods, le premier chargement est long et le jeu a besoin de plus de mémoire.",
+      "largest": "Les plus gros :",
+      "hint": "Le premier chargement après un changement de la liste de mods est le plus lent, car le jeu lit les fichiers de chaque mod. Les cartes et les packs de textures pèsent le plus ; désactiver ce que tu n'utilises pas aide le plus."
+    },
+    "jvm": {
+      "title": "Options Java",
+      "gc": "Ramasse-miettes",
+      "gcs": {
+        "Z": "ZGC (le choix du jeu)",
+        "G1": "G1 (plus stable avec peu de mémoire)",
+        "Shenandoah": "Shenandoah (pauses courtes)",
+        "other": "{name} (réglé à la main)"
+      },
+      "args": "Autres options Java, une par ligne",
+      "saved": "Enregistré. Le jeu les utilise à son prochain lancement.",
+      "hint": "Écrites dans ProjectZomboid64.json ; le fichier tel qu'il était avant la première modification de PZMM reste à côté sous le nom ProjectZomboid64.json.pzmm-backup. La mémoire a son propre réglage plus haut. Une option erronée empêche le jeu de démarrer : retire-la ici, ou vérifie les fichiers du jeu dans Steam pour remettre les valeurs par défaut."
+    }
+  },
+  "feed": {
+    "title": "Nouveautés",
+    "latest": "Dernières mises à jour",
+    "history": "Toutes les notes de version",
+    "readAll": "Lire toutes les notes",
+    "since": {
+      "launch": "Tes mods du Workshop mis à jour depuis ta dernière partie ({time}).",
+      "save": "Tes mods du Workshop mis à jour depuis ta dernière sauvegarde ({time}).",
+      "week": "Tes mods du Workshop mis à jour la semaine dernière (aucune partie repérée pour l'instant)."
+    },
+    "enabledOnly": "Activés seulement",
+    "refresh": "Actualiser",
+    "loading": "Chargement…",
+    "riskyCount": {
+      "one": "{count} mod activé a changé d'une façon qui peut casser une partie en cours. Lis ses notes avant de charger une sauvegarde.",
+      "other": "{count} mods activés ont changé d'une façon qui peut casser une partie en cours. Lis leurs notes avant de charger une sauvegarde."
+    },
+    "notesFailed": "Certaines notes de mise à jour ne se sont pas chargées : {error}",
+    "none": "Aucun de tes mods n'a été mis à jour depuis ta dernière partie.",
+    "noneEnabled": "Aucun de tes mods activés n'a été mis à jour depuis ta dernière partie.",
+    "showTip": "L'afficher dans Mes mods",
+    "mayBreak": "Peut casser les parties",
+    "risk": {
+      "map": "Ajoute une carte.",
+      "version": "Nouvelle version majeure.",
+      "notes": "Ses notes parlent d'une nouvelle partie ou des sauvegardes."
+    },
+    "update": "Mettre à jour",
+    "changelog": "Notes de mise à jour",
+    "changelogTip": "Toutes ses notes de mise à jour sur le Workshop",
+    "notLoaded": "Notes de mise à jour pas encore chargées.",
+    "emptyNote": "(sans texte)",
+    "fewer": "Afficher moins",
+    "more": {
+      "one": "Afficher {count} note plus ancienne",
+      "other": "Afficher {count} notes plus anciennes"
+    },
+    "bundled": "Aucune note de mise à jour sur le Workshop. Le journal des modifications du mod, le plus récent d'abord :",
+    "noNotes": "L'auteur n'a pas écrit de notes pour cette mise à jour.",
+    "loadRest": {
+      "one": "Charger les notes de {count} mod de plus",
+      "other": "Charger les notes de {count} mods de plus"
+    },
+    "fine": "« Peut casser les parties » est un indice : PZMM signale les mods de carte, les nouvelles versions majeures et les notes qui parlent d'une nouvelle partie ou des sauvegardes. Sauvegarde ta partie avant de la charger avec eux.",
+    "countLabel": {
+      "one": "{count} mod mis à jour depuis ta dernière partie",
+      "other": "{count} mods mis à jour depuis ta dernière partie"
+    }
+  },
+  "authoring": {
+    "title": "Créer un mod",
+    "lede": "Vérifie un mod que tu crées comme le feront le jeu et son outil d'envoi vers le Workshop, puis construis le dossier qu'il attend. L'outil d'envoi du jeu échoue souvent sans dire pourquoi : ici, tu le sauras.",
+    "modPlaceholder": "Le dossier de ton mod, ou un dossier d'envoi",
+    "modLabel": "Dossier à vérifier",
+    "chooseMod": "Choisir un dossier…",
+    "checkAgain": "Vérifier à nouveau",
+    "uploadCheck": "Vérification du dossier d'envoi",
+    "modCheck": "Vérification du mod",
+    "noProblems": "Aucun problème trouvé.",
+    "uploadTitle": "Dossier d'envoi pour le Workshop",
+    "uploadIntro": "PZMM écrit workshop.txt, un preview.png de 256×256 et une copie propre de ton mod dans Contents/mods/ (sans fichiers cachés ni types de fichiers refusés par l'outil d'envoi) dans le dossier que tu choisis.",
+    "itemTitle": "Titre",
+    "description": "Description",
+    "tags": "Tags",
+    "tagsPlaceholder": "Séparés par ;, par ex. Build 42; Items",
+    "visibility": "Visibilité",
+    "vis": {
+      "public": "Public",
+      "friendsOnly": "Amis seulement",
+      "private": "Privé",
+      "unlisted": "Non répertorié"
+    },
+    "itemId": "ID de l'objet Workshop",
+    "itemIdHint": "Vide pour un nouvel objet. Le jeu l'écrit après le premier envoi, et PZMM le garde quand tu reconstruis.",
+    "preview": "Aperçu",
+    "previewAlt": "L'aperçu du Workshop",
+    "previewFromPoster": "Fait à partir du poster de mod.info, recadré en carré à 256×256.",
+    "noPoster": "Pas de poster dans mod.info : mets toi-même un preview.png de 256×256 dans le dossier d'envoi.",
+    "saveIn": "Enregistrer dans",
+    "saveInPlaceholder": "Choisis un dossier (l'outil d'envoi du jeu regarde dans Zomboid/Workshop)",
+    "choose": "Choisir…",
+    "build": "Construire le dossier d'envoi",
+    "built": "Construit dans {folder}.",
+    "showFolder": "Afficher le dossier",
+    "skipped": {
+      "one": "{count} fichier laissé de côté : {files}",
+      "other": "{count} fichiers laissés de côté : {files}"
+    },
+    "notInWorkshop": "Ce dossier n'est pas dans {workshop}, où regarde l'outil d'envoi du jeu : construis-le là avant l'envoi.",
+    "nextStep": "Pour l'envoyer : dans le menu principal du jeu, choisis Workshop, puis Créer et mettre à jour des objets, et ce dossier.",
+    "check": {
+      "versionFolderName": "{folder}/ ressemble à un dossier de version, mais le jeu ne lit que 42, 42.x et common/",
+      "noModInfo": "pas de mod.info : le jeu ne verra pas ce dossier comme un mod",
+      "noFolder": "ce dossier n'existe pas",
+      "b41Only": "Structure Build 41 seulement, donc Build 42 ne le listera pas : ajoute common/ et un dossier 42/ avec son propre mod.info, et déplace media/ dans l'un d'eux",
+      "noCommon": "pas de dossier common/ : la structure Build 42 en a un à côté des dossiers de version (il peut être vide), et certaines versions du jeu ignorent un mod sans lui",
+      "noVersionFolder": "seulement common/ : Build 42 lit normalement mod.info dans un dossier de version comme 42/",
+      "versionBelow42": "les dossiers de version sont propres à Build 42 : Build 41 ne lit jamais celui-ci",
+      "versionNoInfo": "pas de mod.info ici : Build 42 ne chargera pas ce dossier de version",
+      "infoInCommon": "le jeu ignore mod.info dans common/ : chaque dossier de version a besoin du sien",
+      "rootMedia": "Build 42 ignore media/ au premier niveau du mod : déplace-le dans common/ ou dans un dossier de version",
+      "outsideMedia": "{folder}/ doit être dans media/ : le jeu ne le cherche pas ici",
+      "fileType": "l'outil d'envoi du Workshop refuse les fichiers .exe, .dll, .bat, .sh, .so, .dylib, .app et .zip (sauf pyramid.zip)",
+      "badLine": "la ligne {line} n'est pas de la forme clé=valeur : le jeu l'ignore",
+      "spaceBeforeEquals": "« {key} = » : le jeu ne lit que {key}= sans espace avant le =",
+      "wrongCase": "{key}= est ignoré : les clés tiennent compte de la casse, écris {right}=",
+      "unknownKey": "le jeu ignore {key}=",
+      "duplicateKey": "{key}= est défini plusieurs fois : un seul compte",
+      "idChars": "id={id} contient des caractères qui cassent les listes de mods (\\ / , ; \")",
+      "missingFile": "{key}={path} : ce fichier n'existe pas à côté de ce mod.info (ni dans common/)",
+      "notPng": "{key}={path} : les posters et les icônes devraient être en PNG",
+      "separator": "{key}= : sépare les ID de mods par des virgules, le jeu ne coupe pas sur ;",
+      "needsBackslash": "{key}={item} : Build 42 écrit les ID de mods sous la forme \\{item}",
+      "noBackslash41": "{key}={item} : Build 41 n'utilise pas le \\ devant les ID de mods",
+      "badVersion": "{key}={value} n'est pas une version que le jeu sait lire (comme 42.0 ou 41.78.16)",
+      "packFormat": "pack= a besoin d'un nom de fichier",
+      "tiledefFormat": "tiledef= a besoin d'un nom de fichier et d'un nombre",
+      "badUrl": "url= devrait commencer par https://",
+      "noName": "pas de name= : le mod apparaît sans nom",
+      "noId": "pas d'id= : le jeu ne peut pas le charger et les autres mods ne peuvent pas le requérir",
+      "listsItself": "il se cite lui-même dans {key}=",
+      "noDescription": "pas de description= : la liste des mods du jeu n'en affiche aucune",
+      "minAboveMax": "versionMin est supérieur à versionMax : aucune version du jeu ne peut le charger",
+      "maxBelow42": "versionMax est inférieur à 42 dans un dossier Build 42 : Build 42 ne le chargera pas",
+      "noTitle": "pas de title= : l'outil d'envoi ne continue pas sans",
+      "titleLong": "le titre dépasse 128 caractères : Steam le coupe",
+      "descriptionLong": "la description dépasse 8000 caractères : Steam la refuse",
+      "badVisibility": "visibility={value} n'est pas une valeur connue du jeu (public, friendsOnly, private, unlisted)",
+      "badId": "id={value} n'est pas un numéro d'objet du Workshop",
+      "unknownTag": "{tag} ne fait pas partie des tags Workshop du jeu",
+      "noPreview": "pas de preview.png : le Workshop a besoin d'un PNG de 256×256",
+      "previewFormat": "pas un PNG que l'outil d'envoi sait lire",
+      "previewSize": "{size} pixels : il doit faire exactement 256×256",
+      "previewBig": "plus de 1000 Ko : l'outil d'envoi le refuse",
+      "noContents": "pas de dossier Contents/ : l'outil d'envoi a besoin de ton mod dans Contents/mods/",
+      "emptyContents": "Contents/ est vide",
+      "fileInContents": "Contents/ ne peut contenir que des dossiers",
+      "folderInContents": "Contents/ ne peut contenir que buildings/, creative/ et mods/",
+      "emptyMods": "Contents/mods/ ne contient aucun dossier de mod",
+      "fileInMods": "Contents/mods/ ne peut contenir que des dossiers de mods"
+    },
+    "posterUnreadable": "L'affiche n'a pas pu être lue comme une image, donc pas d'aperçu : réenregistre-la en PNG ou JPEG.",
+    "notAbsolute": "Indique le chemin complet, en commençant par une lettre de lecteur (C:\\…) : un chemin seul serait cherché dans le dossier de PZMM."
+  },
+  "presets": {
+    "modManager": "{name} ({count} mods, Mod Manager)",
+    "game": "{name} ({count} mods, menu des mods du jeu)",
+    "server": "{name} ({count} mods, Mod Manager: Server)"
+  },
+  "kinds": {
+    "framework": "Framework",
+    "patch": "Patch",
+    "map": "Carte",
+    "ui": "Interface",
+    "translation": "Traduction"
+  },
+  "gameLog": {
+    "title": "Journal du jeu",
+    "open": "Lire le journal",
+    "openTip": "Les journaux du jeu et des serveurs, chaque erreur une seule fois avec sa trace et les mods qu'elle désigne",
+    "file": "Fichier journal",
+    "follow": "Suivre",
+    "followTip": "Continuer à lire le journal pendant que le jeu l'écrit",
+    "none": "Pas encore de journal : lancez le jeu une fois.",
+    "errors": {
+      "one": "{count} erreur",
+      "other": "{count} erreurs différentes"
+    },
+    "noErrors": "Aucune erreur dans ce journal.",
+    "once": "une fois, à la ligne {line}",
+    "times": "d'abord à la ligne {line}, en dernier à la ligne {last}",
+    "timesTip": "Combien de fois c'est arrivé",
+    "noMod": "Aucun mod nommé (le code du jeu lui-même, ou un mod qu'il ne sait pas identifier).",
+    "showInLog": "Voir dans le journal",
+    "byMod": "Erreurs par mod :",
+    "older": "Les {count} dernières lignes (les erreurs ci-dessus couvrent tout le journal)"
+  },
+  "tray": {
+    "open": "Ouvrir PZMM",
+    "quit": "Quitter PZMM",
+    "hidden": "PZMM tourne toujours dans la zone de notification. Ouvrez-le ou quittez-le depuis son icône."
+  },
+  "collection": {
+    "title": "Importer {title}",
+    "untitled": "les objets Workshop",
+    "summary": "{items} objets Workshop avec {mods} mods ; {have} déjà installés.",
+    "onlyHave": {
+      "one": "Seulement l'objet que j'ai déjà ({count}) : ne rien installer",
+      "other": "Seulement les objets que j'ai déjà ({count}) : ne rien installer"
+    },
+    "delisted": {
+      "one": "N'est plus sur le Workshop, donc impossible à installer : {items}",
+      "other": "{count} objets ne sont plus sur le Workshop, donc impossibles à installer : {items}"
+    },
+    "choose": "Ces objets contiennent plusieurs mods (versions alternatives, parties optionnelles). Choisissez lesquels activer :",
+    "notes": {
+      "one": "{count} note",
+      "other": "{count} notes"
+    },
+    "import": {
+      "one": "Créer un profil avec {count} mod",
+      "other": "Créer un profil avec {count} mods"
+    },
+    "add": {
+      "one": "Ajouter {count} mod à ce profil",
+      "other": "Ajouter {count} mods à ce profil"
+    }
+  },
+  "notify": {
+    "done": "Terminé : {job}",
+    "failed": "Pas terminé : {job} (le journal d'activité dit pourquoi)"
+  },
+  "serverSetup": {
+    "title": {
+      "one": "Ce serveur a besoin de {count} élément du Workshop. Voulez-vous créer un nouveau profil et le télécharger ?",
+      "other": "Ce serveur a besoin de {count} éléments du Workshop. Voulez-vous créer un nouveau profil et les télécharger ?"
+    },
+    "go": "Créer le profil et télécharger",
+    "goSize": "Créer le profil et télécharger ({size})",
+    "heading": "Préparer {name}",
+    "note": "PZMM crée un nouveau profil pour ce serveur et bascule dessus. Vos autres profils restent tels quels.",
+    "unlisted": {
+      "one": "Il fait aussi tourner {count} mod qu'il ne montre pas hors du jeu : PZMM ne peut pas l'obtenir avant que vous rejoigniez.",
+      "other": "Il fait aussi tourner {count} mods qu'il ne montre pas hors du jeu : PZMM ne peut pas les obtenir avant que vous rejoigniez."
+    },
+    "guess": "Supposition",
+    "guessTip": "Une correspondance probable : sa page Workshop ne cite pas l'ID de mod du serveur. Décoche-la pour l'exclure."
+  },
+  "errors": {
+    "busy": "PZMM est occupé à installer ou modifier des mods : réessayez quand il aura fini",
+    "reloaded": "La liste de mods a été modifiée dans le menu des mods du jeu, donc PZMM l'a rechargée. Refaites votre modification.",
+    "profileChanged": "Le profil actif est maintenant « {now} », donc cette modification de « {profile} » n'a pas été enregistrée.",
+    "stopFirst": "Arrêtez d'abord {name}.",
+    "stopForUpdate": "Arrêtez d'abord {name} : SteamCMD ne peut pas remplacer les fichiers d'un serveur en marche.",
+    "runningOutside": "{name} tourne sur cette machine (lancé en dehors de PZMM) : arrêtez-le d'abord.",
+    "closeGameFirst": "Le jeu est lancé et héberge peut-être {name} : ferme-le d'abord.",
+    "ftpUntrusted": "Cet ordinateur ne peut pas vérifier le certificat de {host} (souvent un certificat auto-signé). Son empreinte SHA-256 est {fingerprint} : si votre hébergeur affiche la même, faites confiance à ce certificat.",
+    "ftpCertChanged": "Le certificat de {host} a changé : PZMM fait confiance à {old}, mais l'hôte affiche maintenant {fingerprint}. Ne faites confiance au nouveau que si votre hébergeur confirme l'avoir remplacé.",
+    "runningUnknown": "Impossible de vérifier si {name} tourne : arrêtez-le d'abord.",
+    "notFullPath": "{path} n'est pas un chemin complet (comme D:\\Games\\Zomboid)",
+    "dataDriveRoot": "La racine d'un lecteur ne peut pas contenir les données de PZMM : choisissez un dossier sur ce lecteur.",
+    "dataInGame": "Les données de PZMM ne peuvent pas aller dans le dossier du jeu : Steam les supprime quand il vérifie ou réinstalle le jeu.",
+    "dataServerRuns": "Arrêtez d'abord {name} : les données de PZMM ne peuvent pas être déplacées tant qu'un serveur qu'il gère tourne.",
+    "zbCopy": "copier {file} dans {dir}",
+    "zbCopied": "{file} copié dans {dir}",
+    "zbStaged": "ZombieBuddy.jar.new préparé (le jeu est lancé ; il prend effet au prochain lancement)",
+    "zbAddFlag": "ajouter {arg} à {file}",
+    "zbRemoveFlag": "retirer l'option ZombieBuddy de {file}",
+    "zbDelete": "supprimer {path}",
+    "zbDownload": "télécharger ZombieBuddy (objet du Workshop {item}) dans Zomboid/mods",
+    "zbCopyAgent": "copier les fichiers de l'agent Java de ZombieBuddy dans {dir}",
+    "zbEnable": "activer ZombieBuddy dans le profil actif",
+    "vpToProfile": "passer à votre profil « {name} »",
+    "vpMakePlain": "créer un profil « {name} » à partir de « {current} » sans Viewpoint, et l'activer",
+    "vpDownload": "télécharger {id} depuis le Steam Workshop (objet {item})",
+    "vpToVpProfile": "passer à votre profil « {name} », avec ZombieBuddy et Viewpoint activés en tête",
+    "vpMakeVp": "créer un profil « {name} » à partir de « {current} » avec ZombieBuddy et Viewpoint activés en tête, et l'activer",
+    "profileInvalidName": "nom de profil invalide : « {name} »",
+    "profileMissing": "aucun profil nommé « {name} »",
+    "profileExists": "un profil nommé « {name} » existe déjà",
+    "linkPercent": "Impossible de lier {path} : son chemin contient un %. Renommez ou déplacez ce dossier.",
+    "profileActive": "« {name} » est le profil actif ; passez d'abord à un autre"
   }
 }

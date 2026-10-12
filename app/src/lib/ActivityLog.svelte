@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api } from "./api";
-  import { fmtTime } from "./format";
+  import { fmtNum, fmtTime } from "./format";
   import { t } from "./i18n.svelte";
   import Icon, { type IconName } from "./Icon.svelte";
 
@@ -39,9 +39,10 @@
     <button class="quiet bar" aria-expanded={open} onclick={() => (open = !open)}>
       <span class="dot" class:busy aria-hidden="true"></span>
       <span class="label">{busy ? busyLabel + "…" : t("activity.title")}</span>
-      {#if busy && progress}<span class="count">{t("activity.progress", { done: progress[0], total: progress[1] })}</span>{/if}
+      {#if busy && progress}<span class="count">{t("activity.progress", { done: fmtNum(progress[0]), total: fmtNum(progress[1]) })}</span>{/if}
       {#if log.length}<Icon name={logIcon(log.at(-1)!.en, log.at(-1)!.error)} size={12} />{/if}
-      <span class="last">{log.at(-1)?.text ?? ""}</span>
+      <!-- read out while the log is closed (open, the list below is) -->
+      <span class="last" aria-live={open ? "off" : "polite"}>{log.at(-1)?.text ?? ""}</span>
     </button>
     {#if busy && progress}
       <button class="quiet" onclick={onCancel} title={t("activity.cancelTip")}><Icon name="x" size={14} />{t("common.cancel")}</button>
@@ -52,7 +53,7 @@
   </div>
   {#if open}
     <ol class="log mono" aria-live="polite">
-      {#each log as l}
+      {#each log as l (l)}
         <li class:error={l.error}><span class="time">{fmtTime(l.time)}</span><Icon name={logIcon(l.en, l.error)} size={12} /><span>{l.text}
           {#if l.url}<button class="quiet link" onclick={() => api.openUrl(l.url!)}>{t("activity.whatChanged")}</button>{/if}</span></li>
       {:else}
