@@ -261,6 +261,7 @@ The full plan is in [docs/FOUNDATION.md](docs/FOUNDATION.md). To release, set th
 
 <img src="docs/media/section-credits.png" alt="Credits">
 
+- [Anthropic](https://www.anthropic.com) for [Claude Code](https://claude.com/claude-code) - Welcome to the future baby
 - Icons: [Feather](https://feathericons.com) (MIT)
 - Fonts: [Atkinson Hyperlegible](https://brailleinstitute.org/freefont), [IBM Plex Mono](https://github.com/IBM/plex) and [Permanent Marker](https://fonts.google.com/specimen/Permanent+Marker), all under the SIL Open Font License, via [Fontsource](https://fontsource.org)
 - Steam, GitHub, Discord and Ko-fi logos via [Logo.dev](https://logo.dev); they belong to their owners
