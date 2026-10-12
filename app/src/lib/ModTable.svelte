@@ -21,6 +21,7 @@
     problems,
     updates,
     favourites,
+    fresh,
     hidden,
     kinds,
     neededBy,
@@ -55,6 +56,8 @@
     updates: Set<string>;
     /** Mods starred or hidden in the game's mod menu or a Workshop mod manager (see Lists). */
     favourites: Set<string>;
+    /** Mods new to this profile (this session): a New pill. */
+    fresh: Set<string>;
     hidden: Set<string>;
     /** Each mod's kinds (framework, patch, ...), once read. */
     kinds: Record<string, string[]>;
@@ -184,6 +187,7 @@
             {#if favourites.has(r.id)}<span class="fav" title={t("modTable.favourite")}><Icon name="star" size={12} /></span>{/if}
             <span class="title" title={r.author ? t("modTable.byAuthor", { name: r.name || r.id, author: r.author }) : r.name || r.id}>{r.name || r.id}</span>
             {#if prefs.showIds && r.name && r.name !== r.id}<span class="id mono">{r.id}</span>{/if}
+            {#if fresh.has(r.id)}<span class="build-badge new" title={t("modTable.newTip")}>{t("modTable.new")}</span>{/if}
             {#each kinds[r.id] ?? [] as k}<span class="build-badge kind">{t(`kinds.${k}`)}</span>{/each}
             {#if langsOf(r).length}
               <!-- i18n-ignore: language codes as the game's Translate folders name them -->
@@ -437,6 +441,12 @@
     font-weight: 600;
     color: var(--muted);
     border-color: var(--line);
+  }
+  /* new to the profile: the accent, to be spotted wherever it was filed */
+  .build-badge.new {
+    font-weight: 600;
+    color: var(--accent-text);
+    border-color: var(--accent-soft);
   }
   /* needed by an enabled mod: a fact, not a problem, so plain text rather than the warning red */
   .build-badge.need {

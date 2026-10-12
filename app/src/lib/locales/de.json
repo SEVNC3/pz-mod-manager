@@ -872,7 +872,9 @@
       "other": "Benötigt von {count}"
     },
     "neededByTip": "Aktivierte Mods, die ihn brauchen: {names}",
-    "languagesTip": "Hat Texte in: {languages}"
+    "languagesTip": "Hat Texte in: {languages}",
+    "new": "Neu",
+    "newTip": "Neu in diesem Profil"
   },
   "details": {
     "label": "Mod-Details",
@@ -2474,6 +2476,7 @@
   },
   "workshop": {
     "sorts": {
+      "relevance": "Relevanz",
       "popular": "Am beliebtesten",
       "subscribed": "Meiste Abonnenten",
       "topRated": "Am besten bewertet",
@@ -2488,7 +2491,8 @@
       "month": "Diesen Monat",
       "months3": "3 Monate",
       "months6": "6 Monate",
-      "year": "Dieses Jahr"
+      "year": "Dieses Jahr",
+      "all": "Alle Zeiten"
     },
     "within": {
       "any": "Jederzeit",
@@ -2782,6 +2786,7 @@
     "duplicateId": "{source}: einen zweiten Mod mit der ID {id} übersprungen",
     "notOursInMods": "{id} liegt schon in {dir} und wurde nicht von PZMM installiert; nicht angetastet. Entferne diesen Ordner, um diese Kopie zu installieren.",
     "alreadyCurrent": "{id} ist schon aktuell ({source})",
+    "subscribedCopyRemoved": "{id}: in Steam abonniert; die Kopie von PZMM wurde entfernt",
     "installed": "{id} installiert ({source})",
     "updated": "{id} aktualisiert ({source})",
     "backupsPruned": {

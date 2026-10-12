@@ -4,7 +4,7 @@
   import { getVersion } from "@tauri-apps/api/app";
   import { check, type Update } from "@tauri-apps/plugin-updater";
   import { relaunch } from "@tauri-apps/plugin-process";
-  import { decodeShare, describeSource, encodeShare, isOurs, WINDOWS, type ModDetails, type Snapshot } from "$lib/api";
+  import { decodeShare, describeSource, encodeShare, isOurs, removable, WINDOWS, type ModDetails, type Snapshot } from "$lib/api";
   import { arrowPick, isTyping, trap } from "$lib/ui";
   import { api, modeOf, VIEWPOINT, zbReady, type Mode, type ModRow, type NotifyKind, type Row, type View, type ZbStatus } from "$lib/api";
   import Details from "$lib/Details.svelte";
@@ -351,7 +351,12 @@
 
   /** Show view `v`. On another profile, what's open about the last one closes: its snapshots, a question
    * (a preview showed its mods), the game switch. */
+  /** Per profile, the mods that came new to it this session (the backend appended them): a New pill until restart. */
+  let fresh = $state<Record<string, string[]>>({});
+  const freshHere = $derived(new Set(fresh[view?.profile ?? ""] ?? []));
   function show(v: View) {
+    const add = v.rows.flatMap((r) => (r.kind === "mod" && r.new && !fresh[v.profile]?.includes(r.id) ? [r.id] : []));
+    if (add.length) fresh[v.profile] = [...(fresh[v.profile] ?? []), ...add];
     if (view && v.profile !== view.profile) {
       snapList = null;
       findings = null; // the last profile's check
@@ -1335,8 +1340,9 @@
       { label: t("details.showFiles"), icon: "folder", run: () => d && api.openPath(d.dir), disabled: !d },
       ...(src.url ? [{ label: t(github ? "details.githubPage" : "details.workshopPage"), icon: (github ? "external" : "steam") as IconName, run: () => api.openUrl(src.url!) }] : []),
       { label: t("menu.copyId"), icon: "copy", run: () => navigator.clipboard.writeText(id).then(() => say("log.idCopied", { id })).catch(() => {}) },
+      { label: t("mods.group"), icon: "layers", run: () => groupLibrary(), disabled: editBusy },
       ...(d?.maps ? [{ label: t("menu.showInMaps"), icon: "search" as IconName, run: () => ((mapsFind = id), (tab = "maps")) }] : []),
-      ...(isOurs(m) ? [null, { label: t("common.remove"), icon: "trash" as IconName, run: () => remove(id), disabled: editBusy, danger: true }] : []),
+      ...(removable(m) ? [null, { label: t("common.remove"), icon: "trash" as IconName, run: () => (picked.size > 1 && picked.has(id) ? bulkRemove() : remove(id)), disabled: editBusy, danger: true }] : []),
     ];
   });
 
@@ -1421,7 +1427,7 @@
   }
 
   function bulkRemove() {
-    const ids = [...picked].filter((id) => mods.get(id) && isOurs(mods.get(id)!));
+    const ids = [...picked].filter((id) => mods.get(id) && removable(mods.get(id)!));
     if (!ids.length) return say("log.noneOurs", {}, true);
     const skipped = picked.size - ids.length;
     removeMods(ids, skipped ? [t("confirm.removeSkipped", { count: skipped })] : []).then(() => (picked = new Set()));
@@ -1435,11 +1441,11 @@
     // other profiles lose them too
     const others = Object.keys(await api.profilesUsing(ids).catch(() => ({})));
     const usedBy = others.length ? [t("confirm.removeUsedBy", { count: others.length, profiles: listed(others) })] : [];
-    if (!(await confirmed(t(key, { count: ids.length, name: ids[0] }), { label: t("common.remove"), icon: "trash" }, [...notes, ...usedBy]))) return;
+    if (!(await confirmed(t(key, { count: ids.length, name: ids[0] }), { label: t("common.remove"), icon: "trash" }, [...notes, ...usedBy], false, true))) return;
     let extra = s?.remove_requirements === "never" ? [] : orphanedRequirements(ids, [...mods.values()]).filter((id) => isOurs(mods.get(id)!));
     if (extra.length && s?.remove_requirements !== "always") {
       const n = extra.length;
-      const i = await ask(t("confirm.alsoRemove", { count: n, ids: listed(extra) }), [], [{ label: t("confirm.removeToo", { count: n }), icon: "trash" }, { label: t("confirm.keepThem", { count: n }), icon: "check" }]);
+      const i = await ask(t("confirm.alsoRemove", { count: n, ids: listed(extra) }), [], [{ label: t("confirm.removeToo", { count: n }), icon: "trash" }, { label: t("confirm.keepThem", { count: n }), icon: "check" }], false, true);
       if (i < 0) return;
       if (i === 1) extra = [];
     }
@@ -1628,7 +1634,6 @@
       <Menu x={moreAt.x} y={moreAt.y} label={t("mods.more")} onClose={() => (moreAt = null)} items={[
         { label: t("mods.selectAll"), icon: "check", run: selectAll, disabled: !visible.length },
         { label: t("mods.addSeparator"), icon: "plus", run: addSeparator, disabled: editBusy || filtering },
-        { label: t("mods.group"), icon: "layers", run: () => groupLibrary(), disabled: editBusy },
         null,
         { heading: t("mods.hint"), hint: true },
       ]} />
@@ -1688,7 +1693,8 @@
   {/if}
 
   {#if asking.now}
-    <div class="strip asking" role="alertdialog" aria-label={asking.now.title} use:trap={{ focus: !asking.now.background }}>
+    {#if asking.now.modal}<div class="backdrop" onclick={() => answer(-1)} aria-hidden="true"></div>{/if}
+    <div class="strip asking" class:modal={asking.now.modal} role="alertdialog" aria-modal={asking.now.modal || undefined} aria-label={asking.now.title} use:trap={{ focus: !asking.now.background }}>
       <p><strong>{asking.now.title}</strong></p>
       {#if asking.now.lines.length}<ul class="mono">{#each asking.now.lines as l}<li>{l}</li>{/each}</ul>{/if}
       <div class="row">
@@ -1864,6 +1870,7 @@
         <button role="radio" aria-checked={filter === v} class:active={filter === v} onclick={() => (filter = v as typeof filter)}>{label}</button>
       {/each}
     </div>
+    <button class="quiet" onclick={() => groupLibrary()} disabled={editBusy}><Icon name="layers" size={14} /><span class="lbl">{t("mods.group")}</span></button>
     <button class="quiet" class:on={extraFilters.length} aria-haspopup="menu" aria-expanded={!!filtersAt} onpointerdown={(e) => filtersAt && e.stopPropagation()} title={t("mods.filtersTip")}
       onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); filtersAt = filtersAt ? null : { x: r.left, y: r.bottom + 4 }; }}>
       <Icon name="filter" size={14} /><span class="lbl">{extraFilters.length ? t("mods.filtersN", { count: extraFilters.length }) : t("mods.filters")}</span></button>
@@ -1930,7 +1937,7 @@
           <p>{t("mods.emptyHint")}</p>
         </div>
       {:else}
-        <ModTable {rows} {order} {visible} {sectionOf} {filtering} busy={editBusy} build={view?.build ?? null} {stats} {overlaps} {problems} {updates} {favourites} {hidden} kinds={cats?.kinds ?? {}} neededBy={needed} tags={marks.tags}
+        <ModTable {rows} {order} {visible} {sectionOf} {filtering} busy={editBusy} build={view?.build ?? null} {stats} {overlaps} {problems} {updates} {favourites} fresh={freshHere} {hidden} kinds={cats?.kinds ?? {}} neededBy={needed} tags={marks.tags}
           {collapsed} {picked} {selected} bind:dragFrom bind:editingSep onRowClick={rowClick} onRowKey={rowKey} onToggle={toggle} onMenu={openMenu}
           onToggleSection={toggleSection} onDrop={dropOn} onRename={renameSep} onRemoveSep={removeSep} />
       {/if}
@@ -2095,6 +2102,32 @@
   }
   .strip p {
     margin: 0 0 6px;
+  }
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgb(0 0 0 / 0.45);
+  }
+  .asking.modal {
+    position: fixed;
+    z-index: 31;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    width: min(480px, calc(100vw - 32px));
+    max-height: calc(100vh - 64px);
+    overflow: auto;
+    padding: 20px 22px;
+    border: 0;
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+  }
+  .asking.modal p {
+    margin-bottom: 10px;
+  }
+  .asking.modal .row {
+    justify-content: flex-end;
   }
   .strip ul {
     margin: 0 0 8px;

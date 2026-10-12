@@ -131,6 +131,9 @@ enum Row {
         /// Languages it has texts in (`Translate/<LANG>` folders).
         #[serde(default)]
         languages: Vec<String>,
+        /// The profile didn't mention it yet (installed since): appended, off.
+        #[serde(default)]
+        new: bool,
     },
     Sep {
         name: String,
@@ -184,7 +187,7 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
         }
     }
     let pinned = |id: &str| rules.get(id).is_some_and(|r| !r.load_after.is_empty() || !r.load_before.is_empty());
-    let row = |m: store::Row, on: bool| Row::Mod {
+    let row = |m: store::Row, on: bool, new: bool| Row::Mod {
         pinned: pinned(&m.id),
         id: m.id,
         name: m.name,
@@ -201,13 +204,14 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
         only41: m.supports_41 && !m.supports_42,
         only42: m.supports_42 && !m.supports_41,
         languages: m.languages,
+        new,
     };
     let mut rows = vec![];
     for line in &p.lines {
         match line {
             Line::Separator(name) => rows.push(Row::Sep { name: name.clone() }),
             Line::Mod { id, on } => match mods.remove(id) {
-                Some(m) => rows.push(row(m, *on)),
+                Some(m) => rows.push(row(m, *on, false)),
                 None if *on => rows.push(Row::Mod {
                     id: id.clone(),
                     name: String::new(),
@@ -225,6 +229,7 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
                     only41: false,
                     only42: false,
                     languages: vec![],
+                    new: false,
                 }),
                 None => {} // disabled and gone: drop it
             },
@@ -238,7 +243,7 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
     if in_section && !rest.is_empty() {
         rows.push(Row::Sep { name: String::new() });
     }
-    rows.extend(rest.into_iter().map(|m| row(m, false)));
+    rows.extend(rest.into_iter().map(|m| row(m, false, true)));
     // a per-server profile is a Project Zomboid profile like any other
     let mode = Some(profile::kind_of(paths, &p.name)).filter(|k| k == vp::KIND).unwrap_or_else(|| profile::DEFAULT_KIND.into());
     Ok(View {
@@ -334,6 +339,7 @@ async fn install(sources: Vec<String>) -> Res<View> {
 fn remove(ids: Vec<String>) -> Res<View> {
     locked(|paths| {
         let refused = store::remove(paths, &ids, settings::load().recycle)?;
+        let refused = store::remove_manual(paths, &refused)?; // added outside PZMM: to the Recycle Bin
         for id in &refused {
             pzmm_core::say!("notOurs", "{id}: not installed by PZMM (Workshop subscription or manual install); left alone", id = id);
         }
@@ -3463,6 +3469,13 @@ fn diagnostics(app: AppHandle) -> Res<String> {
             writeln!(out, "Profile made for server: {server}")?;
         }
         writeln!(out, "Servers joined: {}", launcher::state(paths).history.len())?;
+        // the PZMM - Client Workshop mod leaves what the game last reported here
+        let game = std::fs::read_to_string(paths.zomboid.join("Lua/pzmm/game.json")).ok().and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok());
+        match game {
+            Some(g) => writeln!(out, "PZMM - Client {}: game {}, {} ({} mods loaded{}), at {}", g["client"].as_str().unwrap_or("?"), g["game"].as_str().unwrap_or("?"),
+                g["state"].as_str().unwrap_or("?"), g["mods"].as_array().map_or(0, |m| m.len()), g["server"].as_str().map(|s| format!(", on {s}")).unwrap_or_default(), g["at"])?,
+            None => writeln!(out, "PZMM - Client: not seen")?,
+        }
         for s in pz::host::load(paths) {
             let run_by = s.external.as_ref().map(|e| format!(", run by {}", e.kind)).unwrap_or_default();
             writeln!(out, "Hosted server {}: {} ({:?}{run_by}), data in {}", s.name, s.build, pz::host::state(&s).0, s.cachedir(paths).display())?;
@@ -3656,6 +3669,34 @@ mod tests {
         // joining a server: the game gets +connect (and +password)
         let join = pzmm_core::pz::launcher::join_args("203.0.113.5:16261", "pw1").unwrap();
         assert_eq!(launch_url(&format!("-debug {join}")), "steam://run/108600//-debug%20%2Bconnect%20203.0.113.5%3A16261%20%2Bpassword%20pw1/");
+    }
+
+    /// A mod installed under one profile shows in every other one, off, after its own rows.
+    #[test]
+    fn unlisted_mods_show_off_in_every_profile() {
+        use pzmm_core::profile::{self, Line, Profile};
+        let root = std::env::temp_dir().join(format!("pzmm-view-{}", std::process::id()));
+        let paths = pzmm_core::pz::Paths { zomboid: root.join("Zomboid"), data: root.join("data") };
+        for id in ["A", "New"] {
+            let d = paths.mods().join(id);
+            std::fs::create_dir_all(&d).unwrap();
+            std::fs::write(d.join("mod.info"), format!("name={id}
+id={id}
+")).unwrap();
+        }
+        let other = Profile { name: "Other".into(), lines: vec![Line::Separator("Sec".into()), Line::Mod { id: "A".into(), on: true }], order: vec!["A".into()] };
+        profile::apply(&paths, &other, None).unwrap();
+        // a Viewpoint profile lists them the same way
+        profile::set_kind(&paths, "Other", pzmm_core::pz::viewpoint::KIND).unwrap();
+        let v = super::view(&paths).unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(v.mode, pzmm_core::pz::viewpoint::KIND);
+        // Steam's own Workshop folder (if any) adds its mods too: only ours are checked
+        let rows: Vec<(String, bool)> = v.rows.iter().filter_map(|r| match r { Row::Sep { name } => Some((format!("# {name}"), false)), Row::Mod { id, on, .. } => ["A", "New"].contains(&id.as_str()).then(|| (id.clone(), *on)) }).collect();
+        assert_eq!(rows, [("# Sec".into(), false), ("A".into(), true), ("# ".into(), false), ("New".into(), false)]);
+        assert_eq!(v.order, ["A"]);
+        let new: Vec<&str> = v.rows.iter().filter_map(|r| match r { Row::Mod { id, new: true, .. } => Some(id.as_str()), _ => None }).collect();
+        assert!(new.contains(&"New") && !new.contains(&"A"), "only the appended mods are new");
     }
 
     /// The UI saves slim rows: everything but kind, id/name and on is optional.

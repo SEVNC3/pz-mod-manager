@@ -241,6 +241,29 @@ pub fn remove(paths: &Paths, ids: &[String], recycle: bool) -> Result<Vec<String
     Ok(refused)
 }
 
+/// Remove mods added to `Zomboid/mods` outside PZMM: always to the Recycle Bin, since PZMM can't
+/// get them back. A folder holding other mods too is left alone. Returns the ids it refused.
+pub fn remove_manual(paths: &Paths, ids: &[String]) -> Result<Vec<String>> {
+    let index = load(paths)?;
+    let mods = paths.mods();
+    let found = pz::local_mods(paths);
+    let top = |m: &pz::FoundMod| m.dir.strip_prefix(&mods).ok().and_then(|r| r.iter().next()).map(|f| mods.join(f));
+    let mut refused = vec![];
+    for id in ids {
+        let dir = found.iter().find(|m| &m.id == id && !index.contains_key(id)).and_then(top);
+        let shared = |d: &PathBuf| found.iter().any(|m| !ids.contains(&m.id) && top(m).as_ref() == Some(d));
+        match dir {
+            Some(d) if !shared(&d) => {
+                if d.exists() {
+                    trash::delete(&d).with_context(|| format!("moving {} to the Recycle Bin", d.display()))?;
+                }
+            }
+            _ => refused.push(id.clone()),
+        }
+    }
+    Ok(refused)
+}
+
 /// Each backup (a mod's previous version) with its size and age (its newest file).
 fn backups(paths: &Paths) -> Vec<(PathBuf, pz::files::Stats)> {
     let dirs = fs::read_dir(paths.data.join("backups")).into_iter().flatten().flatten();
@@ -362,14 +385,25 @@ pub fn workshop_rows(ws: &Path) -> impl Iterator<Item = Row> + '_ {
 }
 
 /// Every mod the game can load: Steam subscriptions, then Zomboid/mods (wins on clashes).
+/// A PZMM copy of a Workshop item the user has since subscribed to goes to the Recycle Bin.
 pub fn scan(paths: &Paths) -> Result<BTreeMap<String, Row>> {
+    scan_in(paths, pz::workshop_dir().as_deref(), true)
+}
+
+fn scan_in(paths: &Paths, ws: Option<&Path>, recycle: bool) -> Result<BTreeMap<String, Row>> {
     let index = load(paths)?;
     let mut out = BTreeMap::new();
-    if let Some(ws) = pz::workshop_dir() {
-        out.extend(workshop_rows(&ws).map(|r| (r.id.clone(), r)));
+    if let Some(ws) = ws {
+        out.extend(workshop_rows(ws).map(|r| (r.id.clone(), r)));
     }
     for m in pz::local_mods(paths) {
         let source = index.get(&m.id).map_or("manual".to_string(), |e| e.source.clone());
+        // Steam keeps the subscription updated, and the game would load our copy over it
+        let subscribed = source.strip_prefix("workshop:").is_some_and(|item| out.get(&m.id).is_some_and(|r: &Row| r.source == format!("steam:{item}")));
+        if subscribed && remove(paths, std::slice::from_ref(&m.id), recycle)?.is_empty() {
+            crate::say!("subscribedCopyRemoved", "{id}: you subscribed in Steam; PZMM's copy was removed", id = m.id);
+            continue;
+        }
         out.insert(m.id.clone(), Row::from_found(m, source));
     }
     Ok(out)
@@ -389,6 +423,24 @@ pub(crate) mod tests {
         let p = root.join(rel);
         fs::create_dir_all(&p).unwrap();
         fs::write(p.join("mod.info"), info).unwrap();
+    }
+
+    #[test]
+    fn subscribed_copy_removed() {
+        let (t, paths) = temp_paths();
+        let ws = t.path().join("ws");
+        mod_tree(&ws, "42/mods/ModA", "id=ModA
+name=A");
+        mod_tree(&paths.mods(), "ModA", "id=ModA
+name=A");
+        mod_tree(&paths.mods(), "ModB", "id=ModB
+name=B");
+        fs::write(paths.mods().join("pzmm.json"), r#"{"ModA": "workshop:42", "ModB": "workshop:7"}"#).unwrap();
+        let rows = scan_in(&paths, Some(&ws), false).unwrap();
+        assert_eq!(rows["ModA"].source, "steam:42");
+        assert_eq!(rows["ModB"].source, "workshop:7");
+        assert!(!paths.mods().join("ModA").exists());
+        assert!(!load(&paths).unwrap().contains_key("ModA"));
     }
 
     #[test]
@@ -412,6 +464,13 @@ pub(crate) mod tests {
         mod_tree(&paths.mods(), "Manual", "id=Manual\n");
         assert_eq!(remove(&paths, &["RootMod".into(), "Manual".into()], false).unwrap(), ["Manual"]);
         assert!(!paths.mods().join("RootMod").exists() && paths.mods().join("Manual").exists());
+        // remove_manual: refuses PZMM's own, unknown ids and a folder that holds another mod too
+        // (the Recycle Bin move itself isn't run here, so tests leave nothing in the real one)
+        install(&paths, &t.path().join("src"), "github:owner/repo").unwrap();
+        mod_tree(&paths.mods(), "Pack/A", "id=PackA\n");
+        mod_tree(&paths.mods(), "Pack/B", "id=PackB\n");
+        assert_eq!(remove_manual(&paths, &["RootMod".into(), "Nope".into(), "PackA".into()]).unwrap(), ["RootMod", "Nope", "PackA"]);
+        assert!(paths.mods().join("Pack/A").exists() && paths.mods().join("RootMod").exists());
     }
 
     #[test]

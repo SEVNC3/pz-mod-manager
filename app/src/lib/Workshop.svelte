@@ -27,6 +27,7 @@
   // Steam's own sorts and filters for the Project Zomboid Workshop (docs/WORKSHOP-PARITY.md)
   // [value, label key]: labels are translated where they're shown
   const ITEM_SORTS: [string, string][] = [
+    ["textsearch", "workshop.sorts.relevance"], // only offered while searching
     ["trend", "workshop.sorts.popular"],
     ["totaluniquesubscribers", "workshop.sorts.subscribed"],
     ["toprated", "workshop.sorts.topRated"],
@@ -35,8 +36,8 @@
     ["libraries", "workshop.sorts.libraries"],
     ["num_parent_collections", "workshop.sorts.collections"],
   ];
-  const COLLECTION_SORTS = ITEM_SORTS.filter(([v]) => ["trend", "toprated", "mostrecent", "lastupdated"].includes(v));
-  const DAYS: [number, string][] = [[1, "workshop.days.today"], [7, "workshop.days.week"], [30, "workshop.days.month"], [90, "workshop.days.months3"], [180, "workshop.days.months6"], [365, "workshop.days.year"]];
+  const COLLECTION_SORTS = ITEM_SORTS.filter(([v]) => ["textsearch", "trend", "toprated", "mostrecent", "lastupdated"].includes(v));
+  const DAYS: [number, string][] = [[1, "workshop.days.today"], [7, "workshop.days.week"], [30, "workshop.days.month"], [90, "workshop.days.months3"], [180, "workshop.days.months6"], [365, "workshop.days.year"], [-1, "workshop.days.all"]];
   // Steam's tag values; shown as workshop.tagNames.<value without punctuation>
   const TAGS = ["Animals", "Audio", "Balance", "Building", "Clothing/Armor", "Farming", "Food", "Framework", "Hardmode", "Interface", "Items",
     "Language/Translation", "Literature", "Map", "Military", "Misc", "Models", "Multiplayer", "Pop Culture", "QoL", "Realistic", "Silly/Fun",
@@ -108,6 +109,7 @@
   /** The request as Steam wants it: build in the tags, libraries as a filter, dates as unix times. */
   function request(over: Partial<Query> = {}): Query {
     const required = [...q.required.filter((t) => !t.startsWith("Build ")), ...(build ? [`Build ${build}`] : [])];
+    if (!q.search && sortChoice === "textsearch") sortChoice = "trend";
     const libraries = sortChoice === "libraries";
     return {
       ...$state.snapshot(q),
@@ -248,7 +250,8 @@
   }
   // the Installed marks as the library has them (lists loaded later come marked already)
   $effect(() => {
-    const have = (i: WorkshopItem) => i.collection ? i.have : installed.has(i.id);
+    const now = installed; // tracked here: the marks below are made untracked
+    const have = (i: WorkshopItem) => i.collection ? i.have : now.has(i.id);
     const mark = (list: WorkshopItem[] | null | undefined) => list?.map((i) => (i.have === have(i) ? i : { ...i, have: have(i) })) ?? null;
     untrack(() => {
       if (data) data.items = mark(data.items)!;
@@ -261,7 +264,7 @@
   const pages = $derived(data ? Math.max(1, Math.min(1000, Math.ceil(data.total / perPage))) : 1);
   const page = $derived(view === "author" ? authorPage : q.page);
   const builds = (tags: string[]) => tags.filter((t) => /^Build \d+$/.test(t)).map((t) => t.replace("Build ", "B"));
-  const sorts = $derived(q.collections ? COLLECTION_SORTS : ITEM_SORTS);
+  const sorts = $derived((q.collections ? COLLECTION_SORTS : ITEM_SORTS).filter(([v]) => q.search || v !== "textsearch"));
 
   onMount(() => (view === "home" ? loadHome() : load()));
 </script>
@@ -352,20 +355,6 @@
           <button type="button" role="radio" aria-checked={q.collections} class:active={q.collections} onclick={() => setSection(true)}>{t("workshop.collections")}</button>
         </div>
       </div>
-      {#if !q.search}
-        <label class="field"><span>{t("workshop.sortBy")}</span>
-          <select bind:value={sortChoice} onchange={() => go(1)}>
-            {#each sorts as [v, label]}<option value={v}>{t(label)}</option>{/each}
-          </select>
-        </label>
-        {#if sortChoice === "trend"}
-          <label class="field"><span>{t("workshop.popularOver")}</span>
-            <select bind:value={q.days} onchange={() => go(1)}>
-              {#each DAYS as [d, label]}<option value={d}>{t(label)}</option>{/each}
-            </select>
-          </label>
-        {/if}
-      {/if}
       <label class="field"><span>{t("workshop.perPage")}</span>
         <select bind:value={q.per_page} onchange={() => go(1)}>
           <option value={30}>30</option>
@@ -386,16 +375,6 @@
           {/each}
         </div>
       </div>
-      <label class="field"><span>{t("workshop.posted")}</span>
-        <select bind:value={within.posted} onchange={() => go(1)}>
-          {#each WITHIN as [d, label]}<option value={d}>{t(label)}</option>{/each}
-        </select>
-      </label>
-      <label class="field"><span>{t("workshop.updated")}</span>
-        <select bind:value={within.updated} onchange={() => go(1)}>
-          {#each WITHIN as [d, label]}<option value={d}>{t(label)}</option>{/each}
-        </select>
-      </label>
       <label class="check"><input type="checkbox" bind:checked={q.incompatible} onchange={() => go(1)} /> {t("workshop.onlyIncompatible")}</label>
       {#if filterCount}<button type="button" class="quiet small" onclick={clearFilters}><Icon name="x" size={12} /> {t("workshop.clearFilters")}</button>{/if}
     {/if}
@@ -463,7 +442,35 @@
       </div>
     {:else if data}
       {@const counted = view !== "author" && q.collections ? "workshop.countCollections" : "workshop.countMods"}
-      <p class="count">{t(q.search ? `${counted}For` : counted, { count: data.total, n: compact.format(data.total), search: q.search })}{loading ? t("workshop.loadingSuffix") : ""}</p>
+      <div class="bar">
+        <p class="count">{t(q.search ? `${counted}For` : counted, { count: data.total, n: compact.format(data.total), search: q.search })}{loading ? t("workshop.loadingSuffix") : ""}</p>
+        {#if view !== "author"}
+          <div class="sorts">
+            <label><span>{t("workshop.sortBy")}</span>
+              <select bind:value={sortChoice} onchange={() => go(1)}>
+                {#each sorts as [v, label]}<option value={v}>{t(label)}</option>{/each}
+              </select>
+            </label>
+            {#if sortChoice === "trend"}
+              <label><span>{t("workshop.popularOver")}</span>
+                <select bind:value={q.days} onchange={() => go(1)}>
+                  {#each DAYS as [d, label]}<option value={d}>{t(label)}</option>{/each}
+                </select>
+              </label>
+            {/if}
+            <label><span>{t("workshop.posted")}</span>
+              <select bind:value={within.posted} onchange={() => go(1)}>
+                {#each WITHIN as [d, label]}<option value={d}>{t(label)}</option>{/each}
+              </select>
+            </label>
+            <label><span>{t("workshop.updated")}</span>
+              <select bind:value={within.updated} onchange={() => go(1)}>
+                {#each WITHIN as [d, label]}<option value={d}>{t(label)}</option>{/each}
+              </select>
+            </label>
+          </div>
+        {/if}
+      </div>
       <ul class="grid" class:dim={loading}>
         {#each shown(data.items) as it (it.id)}{@render card(it)}{/each}
       </ul>
@@ -603,7 +610,31 @@
     color: var(--muted);
   }
   .count {
-    margin: 0 0 12px;
+    margin: 0;
+    color: var(--muted);
+  }
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .sorts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 4px 8px;
+    background: var(--panel);
+    border-radius: 8px;
+    box-shadow: var(--card-shadow);
+  }
+  .sorts label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
     color: var(--muted);
   }
   .context {
@@ -798,6 +829,7 @@
   }
   .card.small .title {
     font-size: 14px;
+    min-height: 2.5em; /* two lines, so every shelf card lines up */
   }
   .pager {
     gap: 14px;

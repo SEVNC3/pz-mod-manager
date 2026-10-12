@@ -14,6 +14,8 @@ export type ModRow = {
   source: string;
   on: boolean;
   missing: boolean;
+  /** The profile didn't list it yet (installed since): appended, off. */
+  new?: boolean;
   requires: string[];
   incompatible: string[];
   load_after: string[];
@@ -870,6 +872,8 @@ export const api = {
 
 /** Installed by PZMM (so it can update and remove it), not a Steam subscription or a manual install. */
 export const isOurs = (m: ModRow) => /^(workshop|github|local):/.test(m.source);
+/** Remove can take it: PZMM's own, or a folder added to Zomboid/mods by hand (that goes to the Recycle Bin). */
+export const removable = (m: ModRow) => !m.missing && (isOurs(m) || m.source === "manual");
 
 /** Human label + page URL for a source string from the backend. */
 export function describeSource(source: string): { label: string; url: string | null } {

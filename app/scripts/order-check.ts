@@ -72,6 +72,9 @@ assert.equal(ids(grouped), "#Gameplay -Off +App #Maps +Town +Lib #Other +Gone");
 // a new mod goes to the end of its section, or a new section in its place
 const placed = placeInSections([{ kind: "sep", name: "Gameplay" }, mod("A"), { kind: "sep", name: "Other" }, mod("B"), mod("New"), mod("Map1")], { New: "Gameplay", Map1: "Maps" }, order, ["New", "Map1"]);
 assert.equal(ids(placed), "#Gameplay +A +New #Maps +Map1 #Other +B");
+// a new last section goes above the loose mods (after the break), which stay at the bottom
+const aboveLoose = placeInSections([{ kind: "sep", name: "Gameplay" }, mod("A"), { kind: "sep", name: "" }, mod("Loose", false), mod("New")], { New: "Other" }, order, ["New", "Loose"]);
+assert.equal(ids(aboveLoose), "#Gameplay +A #Other +New # -Loose");
 
 // autosort (a load list): turns on a needed mod, frameworks first, translations last, loadModBefore honoured
 const auto = autosort([mod("Tr"), mod("Ui", true, { load_before: ["Core"] }), mod("Core"), mod("App", true, { requires: ["Dep"] }), mod("Dep", false), mod("Off", false)],

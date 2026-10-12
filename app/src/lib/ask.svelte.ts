@@ -3,15 +3,15 @@
 import type { IconName } from "./Icon.svelte";
 
 export type Choice = { label: string; icon: IconName };
-type Ask = { title: string; lines: string[]; choices: Choice[]; background: boolean; done: (i: number) => void };
+type Ask = { title: string; lines: string[]; choices: Choice[]; background: boolean; modal: boolean; done: (i: number) => void };
 
 export const asking = $state<{ now: Ask | null }>({ now: null });
 
 /** Show `lines` with a button per choice (the first is the main one) and Cancel; resolves to the choice, -1 for Cancel.
  * `background`: nobody just asked for it (a scheduled job), so focus stays where it is (a key meant elsewhere doesn't answer it). */
-export function ask(title: string, lines: string[], choices: Choice[], background = false): Promise<number> {
+export function ask(title: string, lines: string[], choices: Choice[], background = false, modal = false): Promise<number> {
   asking.now?.done(-1);
-  return new Promise((done) => (asking.now = { title, lines, choices, background, done }));
+  return new Promise((done) => (asking.now = { title, lines, choices, background, modal, done }));
 }
 
 export function answer(i: number) {
@@ -21,4 +21,5 @@ export function answer(i: number) {
 }
 
 /** A yes-or-cancel question: true when `yes` is picked. */
-export const confirmed = async (question: string, yes: Choice, lines: string[] = [], background = false) => (await ask(question, lines, [yes], background)) === 0;
+/** `modal`: a box in the middle over a dimmed window, for a question that deletes things. */
+export const confirmed = async (question: string, yes: Choice, lines: string[] = [], background = false, modal = false) => (await ask(question, lines, [yes], background, modal)) === 0;

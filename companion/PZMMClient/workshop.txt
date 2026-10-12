@@ -1,0 +1,23 @@
+version=1
+title=PZMM - Client
+description=[h1]PZMM - Client[/h1]
+description=Connects Project Zomboid to [url=https://github.com/SEVNC3/pz-mod-manager]PZMM[/url], the free mod manager, server browser and server host.
+description=
+description=[h2]What it does[/h2]
+description=When you reach the main menu or load into a world, it tells the PZMM app what you're running: the exact game version, the mods the game actually loaded, and whether you're in singleplayer or on a server. The app uses that to check your profile really got applied.
+description=
+description=This is the first version of the link between the game and the app. More is coming: your PZMM profile and mod updates shown in the main menu, switching profiles from the game, and the full mod list of a server you're joining.
+description=
+description=[h2]Safe to leave on[/h2]
+description=[list]
+description=[*]Client only. Servers don't need it, so it never forces a server restart.
+description=[*]It doesn't touch your saves.
+description=[*]It only writes one small file, Zomboid/Lua/pzmm/game.json, on your own PC. Nothing goes online.
+description=[/list]
+description=
+description=[h2]Get the app[/h2]
+description=PZMM installs and sorts your mods, keeps profiles, joins modded servers with exactly the right mods, and hosts dedicated servers. Free and open source, Windows and Linux: [url=https://github.com/SEVNC3/pz-mod-manager]github.com/SEVNC3/pz-mod-manager[/url]
+description=
+description=Bugs or ideas: [url=https://discord.com/invite/6URUy6mNzu]Discord[/url]
+tags=Build 41;Build 42;Framework;Interface;Misc
+visibility=public

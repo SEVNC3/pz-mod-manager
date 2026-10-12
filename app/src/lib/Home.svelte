@@ -673,6 +673,9 @@
           </div>
           <!-- the tab's list fills the card, down to where the page's left column ends -->
           <ul class="llist">
+            {#if popularLoading && shownTab === "popular"}
+              <li class="none fetching" role="status">{t("launcher.listing")}<span class="bar wide" aria-hidden="true"><span></span></span></li>
+            {/if}
             {#if shownTab === "favourites"}
               {#each favourites.filter((s) => match(s.name)) as s (s.addr)}{@render serverRow(s)}{/each}
               {#if launcher && !favourites.length}<li class="none">{t("home.none.favourites")}</li>{/if}
@@ -1089,6 +1092,24 @@
     display: block;
     height: 100%;
     background: var(--accent-text);
+  }
+  /* the server list being fetched: no count to show, so a segment sweeps across */
+  .bar.wide {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+  }
+  .bar.wide > span {
+    width: 35%;
+    animation: sweep 1.2s ease-in-out infinite;
+  }
+  @keyframes sweep {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(290%);
+    }
   }
 
   .said {

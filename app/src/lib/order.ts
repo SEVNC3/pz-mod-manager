@@ -225,6 +225,9 @@ export function placeInSections(rows: Row[], of: Record<string, string>, order: 
     let sep = next.findIndex((r) => r.kind === "sep" && r.name === name);
     if (sep < 0) {
       sep = next.findIndex((r) => r.kind === "sep" && order.indexOf(r.name) > order.indexOf(name));
+      // last section: before the loose mods at the bottom (after the break), which stay last
+      const last = next.findLastIndex((r) => r.kind === "sep" && r.name !== "");
+      if (sep < 0) sep = next.findIndex((r, i) => i > last && r.kind === "sep");
       if (sep < 0) sep = next.length;
       next.splice(sep, 0, { kind: "sep", name });
     }

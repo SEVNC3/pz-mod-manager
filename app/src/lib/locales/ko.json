@@ -810,7 +810,9 @@
       "other": "{count}개가 필요로 함"
     },
     "neededByTip": "이 모드가 필요한 활성 모드: {names}",
-    "languagesTip": "텍스트 언어: {languages}"
+    "languagesTip": "텍스트 언어: {languages}",
+    "new": "새 모드",
+    "newTip": "이 프로필에 새로 추가됨"
   },
   "details": {
     "label": "모드 상세 정보",
@@ -2354,6 +2356,7 @@
   },
   "workshop": {
     "sorts": {
+      "relevance": "관련성순",
       "popular": "인기순",
       "subscribed": "최다 구독",
       "topRated": "최고 평점",
@@ -2368,7 +2371,8 @@
       "month": "이번 달",
       "months3": "3개월",
       "months6": "6개월",
-      "year": "올해"
+      "year": "올해",
+      "all": "전체 기간"
     },
     "within": {
       "any": "전체 기간",
@@ -2644,6 +2648,7 @@
     "duplicateId": "{source}: ID가 {id}인 두 번째 모드를 건너뛰었어요",
     "notOursInMods": "{id}은(는) 이미 {dir}에 있고 PZMM이 설치한 것이 아니어서 그대로 두었어요. 이 사본을 설치하려면 그 폴더를 지우세요.",
     "alreadyCurrent": "{id}은(는) 이미 최신 상태예요({source})",
+    "subscribedCopyRemoved": "{id}: Steam에서 구독해서 PZMM 사본을 삭제했어요",
     "installed": "{id} 설치함({source})",
     "updated": "{id} 업데이트함({source})",
     "backupsPruned": {

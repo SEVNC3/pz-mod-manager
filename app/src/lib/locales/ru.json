@@ -996,7 +996,9 @@
       "other": "Нужен {count} модам"
     },
     "neededByTip": "Включённые моды, которым он нужен: {names}",
-    "languagesTip": "Есть тексты на: {languages}"
+    "languagesTip": "Есть тексты на: {languages}",
+    "new": "Новый",
+    "newTip": "Новый в этом профиле"
   },
   "details": {
     "label": "Подробности мода",
@@ -2722,6 +2724,7 @@
   },
   "workshop": {
     "sorts": {
+      "relevance": "По релевантности",
       "popular": "Самые популярные",
       "subscribed": "Больше всего подписчиков",
       "topRated": "С лучшими оценками",
@@ -2736,7 +2739,8 @@
       "month": "Этот месяц",
       "months3": "3 месяца",
       "months6": "6 месяцев",
-      "year": "Этот год"
+      "year": "Этот год",
+      "all": "За всё время"
     },
     "within": {
       "any": "За всё время",
@@ -3066,6 +3070,7 @@
     "duplicateId": "{source}: пропущен второй мод с id {id}",
     "notOursInMods": "{id} уже есть в {dir} и установлен не PZMM; оставлен как есть. Удалите эту папку, чтобы установить эту копию.",
     "alreadyCurrent": "{id} уже актуален ({source})",
+    "subscribedCopyRemoved": "{id}: вы подписались в Steam; копия PZMM удалена",
     "installed": "{id} установлен ({source})",
     "updated": "{id} обновлён ({source})",
     "backupsPruned": {

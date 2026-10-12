@@ -1,0 +1,8 @@
+name=PZMM - Client
+id=PZMMClient
+description=Connects the game to PZMM, the free mod manager, server browser and server host for Project Zomboid. Client only: servers don't need it. Get the app at github.com/SEVNC3/pz-mod-manager
+poster=poster.png
+icon=icon.png
+author=SEVNC3
+modversion=0.1.0
+url=https://github.com/SEVNC3/pz-mod-manager

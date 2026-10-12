@@ -810,7 +810,9 @@
       "other": "被 {count} 个模组需要"
     },
     "neededByTip": "需要它的已启用模组：{names}",
-    "languagesTip": "包含以下语言的文本：{languages}"
+    "languagesTip": "包含以下语言的文本：{languages}",
+    "new": "新",
+    "newTip": "此配置中新增"
   },
   "details": {
     "label": "模组详情",
@@ -2354,6 +2356,7 @@
   },
   "workshop": {
     "sorts": {
+      "relevance": "相关度",
       "popular": "最热门",
       "subscribed": "订阅最多",
       "topRated": "评分最高",
@@ -2368,7 +2371,8 @@
       "month": "本月",
       "months3": "3 个月",
       "months6": "6 个月",
-      "year": "今年"
+      "year": "今年",
+      "all": "全部时间"
     },
     "within": {
       "any": "任意时间",
@@ -2644,6 +2648,7 @@
     "duplicateId": "{source}：已跳过第二个 ID 为 {id} 的模组",
     "notOursInMods": "{id} 已在 {dir} 中，且不是由 PZMM 安装的，已保持原样。如需安装此副本，请删除该文件夹。",
     "alreadyCurrent": "{id} 已是最新（{source}）",
+    "subscribedCopyRemoved": "{id}：你已在 Steam 订阅；已移除 PZMM 的副本",
     "installed": "已安装 {id}（{source}）",
     "updated": "已更新 {id}（{source}）",
     "backupsPruned": {

@@ -182,8 +182,8 @@ impl Item {
     }
 }
 
-/// Browse sort orders, as Steam names them. Collections only sort by the first four.
-const SORTS: &[&str] = &["trend", "toprated", "mostrecent", "lastupdated", "totaluniquesubscribers", "num_parent_collections"];
+/// Browse sort orders, as Steam names them. Collections only sort by the first five; "textsearch" is relevance.
+const SORTS: &[&str] = &["textsearch", "trend", "toprated", "mostrecent", "lastupdated", "totaluniquesubscribers", "num_parent_collections"];
 
 /// One Workshop browse request: everything Steam's browse page filters on anonymously.
 #[derive(Clone, Debug, Default, serde::Deserialize)]
@@ -192,10 +192,10 @@ pub struct Query {
     pub search: String,
     /// Where the words must appear: 0 anywhere, 1 title, 2 description.
     pub scope: u8,
-    /// One of [`SORTS`]; ignored when searching.
+    /// One of [`SORTS`]; "textsearch" (relevance) only applies with a search.
     pub sort: String,
-    /// Popularity window for the "trend" sort, in days (1, 7, 30, 90, 180, 365).
-    pub days: u32,
+    /// Popularity window for the "trend" sort, in days (1, 7, 30, 90, 180, 365; -1 all time).
+    pub days: i32,
     /// From 1.
     pub page: u32,
     /// 30 or 50 (Steam ignores other sizes).
@@ -225,7 +225,7 @@ fn enc(s: &str) -> String {
 /// The browse page URL for `q`.
 fn browse_url(app: &str, q: &Query) -> String {
     let search = q.search.trim();
-    let mut sort = if !search.is_empty() { "textsearch" } else if SORTS.contains(&q.sort.as_str()) { q.sort.as_str() } else { "trend" };
+    let mut sort = if SORTS.contains(&q.sort.as_str()) && (q.sort != "textsearch" || !search.is_empty()) { q.sort.as_str() } else { "trend" };
     if q.collections && !["trend", "toprated", "mostrecent", "lastupdated", "textsearch"].contains(&sort) {
         sort = "trend"; // other sorts return nothing for collections
     }
@@ -234,7 +234,7 @@ fn browse_url(app: &str, q: &Query) -> String {
     if sort == "trend" {
         url += &format!("&days={}", if q.days == 0 { 7 } else { q.days });
     }
-    if sort == "textsearch" {
+    if !search.is_empty() {
         url += &format!("&searchtext={}", enc(search));
         if q.scope > 0 {
             url += &format!("&search_text_target={}", q.scope.min(2));
@@ -704,10 +704,18 @@ pub fn download(paths: &Paths, app: &str, ids: &[&str], stop: &AtomicBool) -> Re
     crate::progress(0, ids.len());
     let mut child = cmd.spawn().with_context(|| format!("running {}", exe.display()))?;
     let out = child.stdout.take().context("SteamCMD's output")?;
-    let (done, stopped) = finished_items(out, ITEM_LIMIT, stop, |n| crate::progress(n, ids.len()), || {
-        let _ = child.kill();
-    });
-    let _ = child.wait();
+    let child = std::cell::RefCell::new(child);
+    let (done, stopped) = finished_items(
+        out,
+        ITEM_LIMIT,
+        stop,
+        |n| crate::progress(n, ids.len()),
+        || matches!(child.borrow_mut().try_wait(), Ok(Some(_))),
+        || {
+            let _ = child.borrow_mut().kill();
+        },
+    );
+    let _ = child.borrow_mut().wait();
     let got: Vec<(String, Option<PathBuf>)> =
         ids.iter().map(|id| (id.to_string(), Some(steamcmd_dirs(paths, app, id)[0].clone()).filter(|d| done.contains(*id) && d.is_dir()))).collect();
     if stopped {
@@ -723,8 +731,9 @@ pub fn download(paths: &Paths, app: &str, ids: &[&str], stop: &AtomicBool) -> Re
 
 /// The ids SteamCMD's output `out` reports downloaded, read until it ends; `done` hears how many
 /// so far. `kill` runs when no item finishes within `limit` (a stuck download) or `stop` is
-/// set; the bool says it ran.
-fn finished_items(out: impl Read + Send + 'static, limit: Duration, stop: &AtomicBool, mut done_so_far: impl FnMut(usize), kill: impl FnOnce()) -> (HashSet<String>, bool) {
+/// set; the bool says it ran. It also ends once `exited` says SteamCMD has: a process SteamCMD
+/// left behind can hold its output open, and waiting for that to end held up every install after.
+fn finished_items(out: impl Read + Send + 'static, limit: Duration, stop: &AtomicBool, mut done_so_far: impl FnMut(usize), mut exited: impl FnMut() -> bool, kill: impl FnOnce()) -> (HashSet<String>, bool) {
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         for line in BufReader::new(out).lines().map_while(Result::ok) {
@@ -745,6 +754,12 @@ fn finished_items(out: impl Read + Send + 'static, limit: Duration, stop: &Atomi
                 done.insert(id);
                 done_so_far(done.len());
                 since = Instant::now();
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) if exited() => {
+                // what it printed before exiting is still in the pipe
+                done.extend(std::iter::from_fn(|| rx.recv_timeout(Duration::from_secs(1)).ok()));
+                done_so_far(done.len());
+                return (done, false);
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) if since.elapsed() < limit && !stop.load(Relaxed) => {}
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
@@ -825,7 +840,7 @@ mod tests {
 Success. Downloaded item 1 to \"x\" (5 bytes)
 Success. Downloaded item 22 to \"y\"
 ";
-        let (done, stopped) = finished_items(std::io::Cursor::new(out), Duration::from_secs(60), &never, |_| {}, || panic!("not stuck"));
+        let (done, stopped) = finished_items(std::io::Cursor::new(out), Duration::from_secs(60), &never, |_| {}, || false, || panic!("not stuck"));
         assert_eq!((done, stopped), (["1".to_string(), "22".to_string()].into(), false));
 
         // item 1 finishes, then nothing: stopped after `limit`, item 1 kept
@@ -833,12 +848,21 @@ Success. Downloaded item 22 to \"y\"
         std::io::Write::write_all(&mut w, b"Success. Downloaded item 1 to \"x\"
 Downloading item 2 ...
 ").unwrap();
-        let (done, stopped) = finished_items(r, Duration::from_millis(500), &never, |_| {}, move || drop(w));
+        let (done, stopped) = finished_items(r, Duration::from_millis(500), &never, |_| {}, || false, move || drop(w));
         assert_eq!((done, stopped), (["1".to_string()].into(), true));
 
         let (r, w) = std::io::pipe().unwrap();
-        let (done, stopped) = finished_items(r, Duration::from_secs(60), &AtomicBool::new(true), |_| {}, move || drop(w));
+        let (done, stopped) = finished_items(r, Duration::from_secs(60), &AtomicBool::new(true), |_| {}, || false, move || drop(w));
         assert!(done.is_empty() && stopped, "Stop ends it at once");
+
+        // SteamCMD exits but something it left keeps its output open: ends anyway, item 3 kept
+        let (r, mut w) = std::io::pipe().unwrap();
+        std::io::Write::write_all(&mut w, b"Success. Downloaded item 3 to \"z\"
+Unloading Steam API...OK
+").unwrap();
+        let (done, stopped) = finished_items(r, Duration::from_secs(60), &never, |_| {}, || true, || panic!("not stuck"));
+        assert_eq!((done, stopped), (["3".to_string()].into(), false));
+        drop(w);
     }
 
     #[test]
@@ -859,9 +883,13 @@ Downloading item 2 ...
         assert!(u.contains("&num_per_page=50&requiredtags%5B%5D=Build%2042&excludedtags%5B%5D=Map"));
         let c = browse_url("108600", &Query { collections: true, sort: "totaluniquesubscribers".into(), child: "123".into(), ..Default::default() });
         assert!(c.contains("section=collections&browsesort=trend") && c.contains("&days=7&childpublishedfileid=123"));
-        let s = browse_url("108600", &Query { search: "more traits".into(), scope: 1, created_from: 5, libraries: true, ..Default::default() });
+        let s = browse_url("108600", &Query { search: "more traits".into(), sort: "textsearch".into(), scope: 1, created_from: 5, libraries: true, ..Default::default() });
         assert!(s.contains("browsesort=textsearch") && s.contains("searchtext=more%20traits&search_text_target=1"));
         assert!(s.contains("&special_filter=6") && s.contains("&created_date_range_filter_start=5"));
+        // a search keeps the chosen sort; relevance without a search falls back to trend
+        let t = browse_url("108600", &Query { search: "x".into(), sort: "trend".into(), days: 30, ..Default::default() });
+        assert!(t.contains("browsesort=trend") && t.contains("&days=30&searchtext=x"));
+        assert!(browse_url("108600", &Query { sort: "textsearch".into(), ..Default::default() }).contains("browsesort=trend"));
     }
 
     #[test]
