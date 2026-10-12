@@ -16,6 +16,10 @@ I made PZMM because of [Project Viewpoint](https://steamcommunity.com/sharedfile
 Then it kept growing. It's a proper mod manager now, it gets you into modded servers with exactly the right mods, and it runs dedicated servers too.
 
 <a id="install"></a>
+<p align="center">
+  <img src="docs/media/ai-banner.jpg" alt="I use AI to help with my projects. Welcome to the future baby: a robot with glowing red eyes, a man laughing and pointing at three Reddit comments calling PZMM vibecoded" width="900">
+</p>
+
 <img src="docs/media/section-install.png" alt="Install">
 
 > [!WARNING]
@@ -259,7 +263,7 @@ The full plan is in [docs/FOUNDATION.md](docs/FOUNDATION.md). To release, set th
 
 <img src="docs/media/section-credits.png" alt="Credits">
 
-- [Anthropic](https://www.anthropic.com) for [Claude Code](https://claude.com/claude-code) - Welcome to the future baby
+- [Anthropic](https://www.anthropic.com) for [Claude Code](https://claude.com/claude-code)
 - Icons: [Feather](https://feathericons.com) (MIT)
 - Fonts: [Atkinson Hyperlegible](https://brailleinstitute.org/freefont), [IBM Plex Mono](https://github.com/IBM/plex) and [Permanent Marker](https://fonts.google.com/specimen/Permanent+Marker), all under the SIL Open Font License, via [Fontsource](https://fontsource.org)
 - Steam, GitHub, Discord and Ko-fi logos via [Logo.dev](https://logo.dev); they belong to their owners
