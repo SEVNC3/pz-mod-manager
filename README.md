@@ -15,8 +15,6 @@ I made PZMM because of [Project Viewpoint](https://steamcommunity.com/sharedfile
 
 Then it kept growing. It's a proper mod manager now, it gets you into modded servers with exactly the right mods, and it runs dedicated servers too.
 
-Honest status: Windows and Build 42 are tested properly. Linux (Proton and the Steam Deck included) and Build 41 dedicated servers work, but they've had a lot less testing. If something breaks there, tell me and I'll fix it.
-
 <a id="install"></a>
 <img src="docs/media/section-install.png" alt="Install">
 
