@@ -1,0 +1,31 @@
+version=1
+title=PZMM Database (data for the PZMM mod manager app)
+description=[h1]PZMM Database[/h1]
+description=Data for PZMM, a free mod manager app for Project Zomboid. This isn't a mod. There's nothing to enable and it does nothing in game.
+description=
+description=You don't need to subscribe. PZMM downloads this itself to keep its indexes fresh; subscribing just saves it the download.
+description=
+description=[h2]What's in it[/h2]
+description=[list]
+description=[*]Every Workshop map PZMM knows about, for the grid on its Maps tab.
+description=[*]Which Workshop item each mod ID comes from, so PZMM can set up any server's mod list.
+description=[/list]
+description=
+description=[h2]The app[/h2]
+description=PZMM is free and open source, for Windows and Linux, B41 and B42.
+description=[list]
+description=[*]Sets up Project Viewpoint and ZombieBuddy for you. No copying jars, no launch options.
+description=[*]Autosort: load order sorted by each mod's own require, loadModAfter and loadModBefore lines.
+description=[*]The whole Workshop in the app, no Steam login. Install mods or whole collections, plus whatever they require.
+description=[*]Every Workshop map on one grid, clashes shown, map order written for you.
+description=[*]Find the broken mod: it halves your list until the crash goes away.
+description=[/list]
+description=
+description=[url=https://github.com/SEVNC3/pz-mod-manager/releases/latest]Download from GitHub[/url]. Windows: the file ending in _x64-setup.exe. Linux: the .AppImage or the .deb.
+description=If Steam ever strips that link, search GitHub for "SEVNC3 pz-mod-manager".
+description=
+description=[url=https://discord.com/invite/6URUy6mNzu]Discord[/url] for help, bugs and ideas. PZMM is free; if it saved you some hassle, there's a [url=https://ko-fi.com/sevnc3]Ko-fi[/url].
+description=
+description=[i]Fan project. Not made by or affiliated with The Indie Stone, the Viewpoint team or ZombieBuddy's author.[/i]
+tags=Build 41;Build 42;Misc
+visibility=private

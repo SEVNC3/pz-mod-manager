@@ -1,0 +1,5 @@
+name=PZMM Database (data for the PZMM app, nothing to enable)
+id=PZMM_Database
+description=Data for PZMM, a mod manager app. It does nothing in game; you don't need to enable it.
+poster=poster.png
+icon=icon.png
