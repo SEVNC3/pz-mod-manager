@@ -183,6 +183,7 @@ fn ugc(_game: &Path, _on: bool, _id: u64) -> Result<()> {
 }
 
 /// `RemoteStorageSubscribePublishedFileResult_t` / `...Unsubscribe...`: an `EResult`, then the item (8-byte aligned).
+#[cfg(any(windows, test))] // only the Windows helper reads it
 #[repr(C)]
 struct UgcResult {
     result: i32,
