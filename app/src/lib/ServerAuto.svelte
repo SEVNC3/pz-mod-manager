@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { track } from "./activity.svelte";
   import { onMount } from "svelte";
   import { api, type ServerAuto, type ServerCard, type ServerEvent24 } from "./api";
   import { fmtDateTime } from "./format";
@@ -85,6 +86,11 @@
   }
 
   const toggle = (e: string, on: boolean) => (a.discord.events = on ? [...a.discord.events, e] : a.discord.events.filter((x) => x !== e));
+
+  // the activity bar moves while this tab works
+  $effect(() => {
+    if (working) return track();
+  });
 </script>
 
 <div class="auto" use:wholeNumbers>

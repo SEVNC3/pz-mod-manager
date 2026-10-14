@@ -77,7 +77,8 @@ Everything the app and the `pzmm` command line do today, grouped the way the app
 ### Launching
 - **Launch game** starts the game through Steam, after a check. Problems get **Fix** or **Launch anyway**; minor notes get **Launch, and don't ask about these again**.
 - Warns when your latest save was played with a different mod list, with **Use this save's mods**.
-- The activity log shows installs, updates and errors with times, and **Copy log** (your user name hidden).
+- The activity log shows installs, updates and errors with times, and **Copy log** (your user name hidden). Its bar shows the job running; expand it to filter the full log.
+- **Download history**: every install, update, removal and Workshop subscription, with reinstall. The last 500 are kept.
 
 ## Profiles
 
@@ -239,7 +240,7 @@ Everything the app and the `pzmm` command line do today, grouped the way the app
 - **Set up ZombieBuddy** lists every change, then **Apply changes**. Works with a game on any drive, and on Linux.
 - Game updates and Steam's "Verify integrity of game files" remove the flag. PZMM notices, puts a red dot on the tab and offers **Repair ZombieBuddy**.
 - **Remove from game folder** takes it all back out.
-- ZombieBuddy still asks you to approve each new or changed Java mod in its own dialog. PZMM never skips that.
+- Java mods you turn on in PZMM are approved in ZombieBuddy when you press Play, so it doesn't ask again in the game. An update brings a new jar, which PZMM approves on the next Play. Jars with scan warnings, or not from the Workshop, still ask. A "no" you gave in ZombieBuddy's own dialog stays, and Check setup offers to allow it again.
 - People on the alternate launcher or Steam launch options get pointed to the official installer.
 
 ### Project Viewpoint
@@ -261,7 +262,8 @@ Everything the app and the `pzmm` command line do today, grouped the way the app
 
 - **Check setup** checks the profile and server configs: missing, disabled or late requirements, incompatible mods, wrong-build mods, Lua `require`s that point nowhere, Lua syntax errors, mod.info problems, duplicate mod IDs, game version limits, overlapping maps, mods in two places, Workshop items that are gone, hidden or unlisted, and repacks of another author's mod.
 - Server lines: missing Workshop items, wrong mod ID case, missing backslashes on Build 42, maps after Muldraugh, and a build different from yours.
-- Findings offer **Install** and **Disable {id}**.
+- Problems are sorted Broken, Risk, Check and Low, each with its fixes (download, turn on or off, sort, switch build, uninstall, find a Build 42 version and more). One button runs all the harmless fixes. **It's fine** hides a finding until that mod changes.
+- A Java file you refused in ZombieBuddy's dialog gets **Allow it again**.
 - Lua errors from the last game session, counted per mod.
 - The same check runs before **Launch game**, **Join** and starting a server.
 - **Read the log**: the game's and servers' logs, each error once with its trace and the mods it points at, with search, errors only, **Follow** and **Show in log**.
@@ -280,7 +282,7 @@ Everything the app and the `pzmm` command line do today, grouped the way the app
 - **Accounts and keys**: a GitHub token and a Steam Web API key, both kept in the system's credential store.
 - **Removing and backups**: Recycle Bin or delete, removing unused requirements (Ask, Always, Never), a size cap for mod backups, **Clear backups**, and save backup settings.
 - **Appearance**: language, theme (dark, light or match system), accent colour, game build (or detect from `default.txt`), what the Workshop tab opens on, results per page, **Compact rows**, **Show mod IDs beside names**, favourites at the top.
-- **Launch and notifications**: extra game arguments, per-profile arguments and game folder, grouping a new profile by category, keeping favourites on and hidden mods off, the tray, starting in the tray at sign-in, desktop notifications (server crashes, restarts needed, finished downloads, favourite servers online), and server countries.
+- **Launch and notifications**: extra game arguments, per-profile arguments and game folder, grouping a new profile by category, keeping favourites on and hidden mods off, the tray, what the close button does (ask, minimise to the tray or quit), starting in the tray at sign-in, desktop notifications (server crashes, restarts needed, finished downloads, favourite servers online), and server countries.
 - **Performance**: the game's memory with a suggestion (**Set**), Java options and garbage collector, PZ_Optimization **Install**, **Update** and **Uninstall**, and the mods that slow loading most.
 - **About**: version, **Check for updates**, **Open log folder**, **Copy diagnostics** (user name masked) and the keyboard shortcuts.
 - PZMM updates itself (**Update and restart**), with signed updates.

@@ -55,6 +55,8 @@ export type View = {
   /** The build the profile runs (its forced one, else the game's), and the one the profile forces (null: follows the game). */
   build: 41 | 42 | null;
   forced_build: number | null;
+  game_version: string | null;
+  steam_branch: string | null;
   /** The game's language, as its Translate folders name it ("" until the game saved its options). */
   language: string;
 };
@@ -214,7 +216,7 @@ type ErrorGroup = { line: number; last: number; count: number; text: string; ids
 /** A log for the viewer: its last lines (`seq`: 0-based line in the file), errors grouped, errors per mod. */
 export type LogView = { file: string; size: number; lines: LogLine[]; groups: ErrorGroup[]; mods: ModErrors[] };
 /** `key`: doctor.<key> in the locale files, worded with `vars` (`text` is the English); `action`: a fix to offer (install a missing mod, disable an incompatible one, dismiss a scan's findings about a file by its SHA-256). */
-export type Finding = { level: "error" | "warning" | "note"; subject: string; text: string; key: string; vars: Record<string, string>; action: { install?: string; disable?: string; dismiss?: string } | null };
+export type Finding = { level: "error" | "warning" | "note"; subject: string; text: string; key: string; vars: Record<string, string>; action: { install?: string; disable?: string; dismiss?: string } | null; hidden: boolean };
 export type Snapshot = { id: string; time: number; label: string; enabled: number; mods: number };
 /** What writing a server config would change; `maps_to` equals `maps_from` when Map= stays. */
 type ServerPreview = { new: boolean; added: string[]; removed: string[]; maps_from: string[]; maps_to: string[]; items_added: string[]; items_removed: string[] };
@@ -429,6 +431,8 @@ export type Settings = {
   save_backup_exit: boolean;
   save_backup_keep: number;
   tray: boolean;
+  /** null: not chosen yet (asks, unless `tray` already says the tray). */
+  close_ask: boolean | null;
   save_backup_every: number;
   countries: boolean;
   /** Start PZMM in the tray when signing in. */
@@ -639,6 +643,16 @@ export const api = {
   /** `viewpoint`: from the Viewpoint card, which enables ZombieBuddy only in a Viewpoint profile. */
   zbInstall: (viewpoint = false) => invoke<View>("zb_install", { viewpoint }),
   zbUninstall: () => invoke<View>("zb_uninstall"),
+  /** The window's close button, answered: hide to the tray, or quit (asking first when servers run). */
+  /** Hide a Check setup finding (back when its mod changes), or show it again. */
+  findingHide: (f: Finding, on: boolean) => invoke<void>("finding_hide", { key: f.key, subject: f.subject, vars: f.vars, on }),
+  zbUnblock: (sha: string) => invoke<void>("zb_unblock", { sha }),
+  historyList: () => invoke<HistoryRecord[]>("history_list"),
+  historyClear: (ids?: string[]) => invoke<HistoryRecord[]>("history_clear", { ids: ids ?? null }),
+  /** The page is ready: close the start-up splash window and show this one. */
+  splashDone: () => invoke<void>("splash_done"),
+  appClose: (toTray: boolean) => invoke<void>("app_close", { toTray }),
+  workshopSubscribe: (id: string, on: boolean, modId?: string, name?: string) => invoke<View>("workshop_subscribe", { id, on, modId: modId ?? null, name: name ?? null }),
   javaMods: () => invoke<JavaMod[]>("java_mods"),
   findRequirement: (modId: string, neededBy: string) =>
     invoke<Candidate[]>("find_requirement", { modId, neededBy }),
@@ -871,6 +885,9 @@ export const api = {
 };
 
 /** Installed by PZMM (so it can update and remove it), not a Steam subscription or a manual install. */
+/** A download history record: `source` is `workshop:<id>`, `steam:<id>` (a subscription), `github:...` or `local:...`. */
+export type HistoryRecord = { id: string; name: string; source: string; action: "installed" | "updated" | "removed" | "subscribed" | "unsubscribed"; at: number };
+
 export const isOurs = (m: ModRow) => /^(workshop|github|local):/.test(m.source);
 /** Remove can take it: PZMM's own, or a folder added to Zomboid/mods by hand (that goes to the Recycle Bin). */
 export const removable = (m: ModRow) => !m.missing && (isOurs(m) || m.source === "manual");

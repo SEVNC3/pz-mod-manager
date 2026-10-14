@@ -10,13 +10,17 @@
   import { prefs } from "./prefs.svelte";
   import { arrowPick } from "./ui";
 
-  let { busy, defaultBuild, installed, onInstall, onCollection, viewpoint = false, hidden = false }: {
+  let { busy, defaultBuild, installed, onInstall, onUninstall, onCollection, onLoading, viewpoint = false, hidden = false }: {
     busy: boolean;
+    /** Told when a Steam fetch starts and ends, for the activity bar. */
+    onLoading?: (loading: boolean) => void;
     /** Kept mounted while another tab shows, so searches, filters and the open panel survive. */
     hidden?: boolean;
     defaultBuild: number | null;
     /** Workshop items installed now: the Installed marks follow it (installs and removals made anywhere). */
     installed: Set<string>;
+    /** Uninstall a Workshop item's mods (the marks then follow `installed`). */
+    onUninstall: (id: string) => void;
     onInstall: (id: string) => Promise<boolean>;
     /** A collection's Install all: read it first, to choose what to take (Import's collection picker). */
     onCollection: (id: string) => void;
@@ -71,6 +75,7 @@
     return /429|limiting requests/i.test(s) ? t("workshop.errors.rateLimited") : t("workshop.errors.unreachable", { error: s.replace(/^Error:\s*/, "") });
   };
   let loading = $state(false);
+  $effect(() => onLoading?.(loading));
   let error = $state("");
   let installing = $state<string | null>(null);
   let open = $state<WorkshopItem | null>(null);
@@ -305,7 +310,7 @@
       {/if}
     </div>
     <div class="actions">
-      <InstallButton item={it} {busy} {installing} onInstall={install} />
+      <InstallButton item={it} {busy} {installing} onInstall={install} {onUninstall} />
       <button class="quiet" onclick={() => (open = it)}>{t("workshop.details")}</button>
     </div>
   </li>
@@ -485,7 +490,7 @@
 </section>
 
 {#if open && !hidden}
-  <WorkshopPanel item={open} {busy} {installing} onInstall={install} onClose={closePanel}
+  <WorkshopPanel item={open} {busy} {installing} onInstall={install} {onUninstall} onClose={closePanel}
     onDependents={dependents} onInCollections={inCollections} onAuthor={byAuthor} onOpen={(it) => { leave(); open = it; }} onBack={history.length ? back : null} />
 {/if}
 
@@ -820,6 +825,8 @@
   }
   .actions {
     display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
     justify-content: space-between;
     align-items: center;
     padding: 8px 12px 12px;

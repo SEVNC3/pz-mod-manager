@@ -50,9 +50,3 @@ export function modChanges(added: string[], removed: string[]): string[] {
   ];
 }
 
-/** A Java mod's signature, and how many scan warnings it has, in a sentence. */
-export function javaSummary(j: { signature: string; signer: string | null; signer_name: string | null; risks: { level: string }[] }) {
-  const warnings = j.risks.filter((r) => r.level === "warning").length;
-  const sig = t(`java.sig.${j.signature}`, { signer: j.signer_name || j.signer || "" });
-  return warnings ? `${sig} ${t("java.warnings", { count: warnings })}` : sig;
-}

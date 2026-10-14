@@ -133,9 +133,6 @@
     "singleplayer": "Solo",
     "findingMods": "Recherche de ses mods…",
     "gameListKey": "Lister ici les serveurs de Steam demande une clé Steam Web API, ceux-ci viennent donc de la liste enregistrée du jeu.",
-    "popularKept": "Liste de {ago}. Actualiser interroge Steam, qui vous affiche en jeu un instant.",
-    "popularAsk": "Lister les serveurs les plus fréquentés interroge Steam, qui vous affiche en jeu un instant.",
-    "listServers": "Lister les serveurs",
     "passwordTip": "Demande un mot de passe : s'il n'est pas enregistré, Rejoindre ouvre les détails du serveur dans Serveurs pour te le demander"
   },
   "app": {
@@ -206,7 +203,9 @@
     "saveModManagerPreset": "Enregistrer comme preset de Mod Manager",
     "loadFailed": "Impossible de lire vos mods : {error}",
     "openFolders": "Vérifier les dossiers dans les Paramètres",
-    "moreTabs": "Plus d'onglets"
+    "moreTabs": "Plus d'onglets",
+    "rescan": "Rescanner",
+    "rescanTip": "Chercher les mods abonnés ou copiés depuis l'ouverture de PZMM"
   },
   "mods": {
     "searchPlaceholder": "Rechercher  ( / )",
@@ -319,7 +318,9 @@
     "settingUpServer": "Préparation de {name}",
     "checking": "Vérification de vos mods",
     "importingCollection": "Installation de la collection",
-    "readingCollection": "Lecture de la collection"
+    "readingCollection": "Lecture de la collection",
+    "subscribing": "Abonnement à {name}",
+    "unsubscribing": "Désabonnement de {name}"
   },
   "log": {
     "appLatest": "PZMM {version} est la dernière version.",
@@ -435,7 +436,16 @@
     "removeUsedBy": {
       "one": "Aussi utilisé par {count} autre profil : {profiles}",
       "other": "Aussi utilisé par {count} autres profils : {profiles}"
-    }
+    },
+    "needs42Title": {
+      "one": "Ce mod ne fonctionne que sur le Build 42",
+      "other": "{count} de ces mods ne fonctionnent que sur le Build 42"
+    },
+    "switch42": "Passer au Build 42",
+    "keep41": "Rester sur le Build 41",
+    "unsubscribeTitle": "Se désabonner de {name} ?",
+    "unsubscribeLine": "Steam supprime ses fichiers : les profils qui l'utilisent le perdent.",
+    "unsubscribe": "Se désabonner"
   },
   "common": {
     "cancel": "Annuler",
@@ -864,7 +874,6 @@
       "local": "Installé depuis un fichier par PZMM",
       "manual": "Ajouté au dossier des mods en dehors de PZMM"
     },
-    "openWorkshop": "Ouvrir sa page du Workshop",
     "favourite": "Favori",
     "byAuthor": "{name}, par {author}",
     "neededBy": {
@@ -874,7 +883,9 @@
     "neededByTip": "Mods activés qui en ont besoin : {names}",
     "languagesTip": "A des textes en : {languages}",
     "new": "Nouveau",
-    "newTip": "Nouveau dans ce profil"
+    "newTip": "Nouveau dans ce profil",
+    "subscribeTip": "S'abonner sur Steam pour qu'il reste à jour",
+    "unsubscribeTip": "Se désabonner sur Steam"
   },
   "details": {
     "label": "Détails du mod",
@@ -979,33 +990,15 @@
     "stillHappens": "Le problème persiste",
     "gone": "Le problème a disparu",
     "stop": "Arrêter et restaurer ma liste",
-    "setupCheck": "Vérification de la configuration",
     "noProblems": "Aucun problème trouvé.",
-    "summary": "{errors}, {warnings}",
-    "errors": {
-      "one": "{count} erreur",
-      "other": "{count} erreurs"
-    },
-    "warnings": {
-      "one": "{count} avertissement",
-      "other": "{count} avertissements"
-    },
     "errorCount": {
       "one": "{count} erreur, la première à <span class=\"mono\">{example}</span>",
       "other": "{count} erreurs, la première à <span class=\"mono\">{example}</span>"
     },
-    "disable": "Désactiver {id}",
-    "bisectOffer": "Quelque chose plante mais rien ci-dessus ne l'explique ? {link} : PZMM divise par deux vos mods activés à chaque test du jeu.",
     "finishFirst": "Terminez ou arrêtez d'abord la recherche du mod défectueux.",
     "logErrors": "<strong>Erreurs dans {file}</strong> lors du dernier lancement :",
     "firstError": "Première vraie erreur, à la ligne {line}.",
     "pointsAt": "Elle désigne :",
-    "bisectSuspects": {
-      "one": "{link}, en commençant par le mod que désignent les journaux : PZMM le teste d'abord, puis divise le reste par deux.",
-      "other": "{link}, en commençant par les {count} mods que désignent les journaux : PZMM les teste d'abord, puis divise le reste par deux."
-    },
-    "dismiss": "Vérifié",
-    "dismissTip": "Vous avez vérifié ce fichier et lui faites confiance : PZMM ne le signale plus jusqu'à ce qu'il change",
     "bisectLeft": "La recherche du mod défectueux sur « {profile} » n'est pas terminée",
     "bisectLeftLine": {
       "one": "{count} mod est encore suspect. Reprenez là où elle s'est arrêtée, ou remettez la liste de mods d'avant la recherche.",
@@ -1143,7 +1136,8 @@
       "look": "Thème et langue",
       "lookHint": "L'apparence de PZMM. La fenêtre retient sa taille et sa position.",
       "lists": "Listes de mods",
-      "listsHint": "La version du jeu sur laquelle les mods sont vérifiés, et ce qu'affichent les listes."
+      "listsHint": "La version du jeu sur laquelle les mods sont vérifiés, et ce qu'affichent les listes.",
+      "gameVersion": "Dernière partie : version {version}, branche Steam « {branch} ». Autres versions : Steam › Project Zomboid › Propriétés › Bêtas."
     },
     "launch": {
       "title": "Lancement",
@@ -1154,7 +1148,6 @@
       "profileArgs": "Ses propres arguments",
       "ownFolder": "Un dossier de jeu à lui",
       "ownFolderHint": "Ses sauvegardes, options, journaux et liste de mods restent à part de ton dossier Zomboid, donc le profil d'un serveur ne touche pas à tes mondes. Ces sauvegardes n'apparaissent pas dans Sauvegardes, et les mods posés à la main dans Zomboid/mods n'y sont pas vus.",
-      "tray": "Garder PZMM dans la zone de notification quand je ferme la fenêtre",
       "trayHint": "Les programmations des serveurs, la recherche de mises à jour et la surveillance des plantages continuent fenêtre fermée. Quittez depuis l'icône de la zone de notification.",
       "autostart": "Démarrer PZMM dans la zone de notification quand je me connecte à l'ordinateur",
       "keepMarks": "Garder les favoris activés et les mods masqués désactivés dans chaque profil créé ou choisi",
@@ -1163,7 +1156,9 @@
       "profileHint": "Pour ce profil seulement ; les autres gardent les leurs.",
       "profiles": "Profils",
       "profilesHint": "Ce que fait PZMM quand tu crées un profil ou passes à un autre.",
-      "trayTitle": "Zone de notification et démarrage"
+      "trayTitle": "Zone de notification et démarrage",
+      "onClose": "À la fermeture de la fenêtre",
+      "onCloseAsk": "Demander à chaque fois"
     },
     "about": {
       "title": "À propos",
@@ -2427,10 +2422,6 @@
     "loaderBy": "{file}, dans le dossier du jeu, le démarre.",
     "loaderNotStarted": "Rien dans le dossier du jeu ni dans tes options de lancement Steam ne le démarre : il ne se charge que si tu le lances toi-même.",
     "loadsWith": "Chargé par {name}, qui ne vérifie pas les signatures.",
-    "warnings": {
-      "one": "{count} avertissement dans l'onglet Mods Java.",
-      "other": "{count} avertissements dans l'onglet Mods Java."
-    },
     "hashCopied": "Copié"
   },
   "profile": {
@@ -2459,7 +2450,21 @@
     "cancelTip": "Arrêter le téléchargement. Les mods déjà téléchargés s'installent quand même.",
     "copy": "Copier le journal",
     "copyTip": "Copier le journal avec les heures (votre nom d'utilisateur est masqué dans les chemins)",
-    "whatChanged": "Nouveautés"
+    "whatChanged": "Nouveautés",
+    "wait": "Patiente",
+    "history": "Historique des téléchargements",
+    "expand": "Agrandir l'activité",
+    "filter": "Afficher",
+    "pickLine": "Choisis une ligne pour voir de quoi il s'agit.",
+    "reinstall": "Réinstaller",
+    "kind": {
+      "all": "Tout",
+      "install": "Installations",
+      "update": "Mises à jour",
+      "remove": "Suppressions",
+      "error": "Erreurs",
+      "info": "Autres"
+    }
   },
   "links": {
     "label": "Liens PZMM",
@@ -2692,7 +2697,9 @@
     "addedToServerRestart": "Ajouté à {name}. Redémarrez-le pour les charger."
   },
   "installButton": {
-    "installAll": "Tout installer…"
+    "installAll": "Tout installer…",
+    "uninstall": "Désinstaller",
+    "uninstallTip": "Supprimer la copie de PZMM, ou se désabonner sur Steam"
   },
   "snapshots": {
     "title": "Instantanés de « {profile} »",
@@ -2753,11 +2760,6 @@
     "notInstalled": "{id} : activé mais pas installé",
     "fix": "Corriger",
     "anyway": "Lancer quand même",
-    "javaTitle": {
-      "one": "ZombieBuddy va vous demander l'accord pour {count} fichier Java nouveau ou modifié. Ce que PZMM a trouvé :",
-      "other": "ZombieBuddy va vous demander l'accord pour {count} fichiers Java nouveaux ou modifiés. Ce que PZMM a trouvé :"
-    },
-    "review": "Examiner les mods Java",
     "joinAnyway": "Rejoindre quand même",
     "arrangeMaps": "Organiser les cartes",
     "warnTitle": {
@@ -2765,7 +2767,18 @@
       "other": "{count} points à connaître avant de jouer. Le jeu démarre quand même."
     },
     "stopAsking": "Lancer et ne plus demander pour ceux-ci",
-    "joinStopAsking": "Rejoindre et ne plus demander pour ceux-ci"
+    "joinStopAsking": "Rejoindre et ne plus demander pour ceux-ci",
+    "fixAndPlay": "Corriger et jouer",
+    "turnOff": {
+      "one": "Désactiver ce mod",
+      "other": "Désactiver ces {count} mods"
+    },
+    "updateGame": "Ouvrir dans Steam",
+    "branchHint": "Ton jeu est sur la branche « {branch} » de Steam. Les versions plus récentes viennent d'une mise à jour Steam ou d'une autre branche : Project Zomboid › Propriétés › Bêtas.",
+    "trustFiles": {
+      "one": "Faire confiance à ce fichier et jouer",
+      "other": "Faire confiance à ces {count} fichiers et jouer"
+    }
   },
   "menu": {
     "label": "{name} : actions",
@@ -2931,7 +2944,18 @@
     "secretsFile": "Le gestionnaire d'identifiants du système n'est pas disponible ({error}) : PZMM garde donc les mots de passe et les clés dans {file}",
     "badModId": "{id} a été laissé hors de la liste de mods du jeu : un ID de mod ne peut pas contenir d'accolades, de virgules, de = ni de sauts de ligne",
     "leavingViewpoint": "Project Viewpoint est quitté pour ce serveur",
-    "profileNew": "Profil vide « {name} » créé, et activé."
+    "profileNew": "Profil vide « {name} » créé, et activé.",
+    "zbApproved": {
+      "one": "{ids} autorisé dans ZombieBuddy : il ne demandera rien en jeu",
+      "other": "{count} mods Java autorisés dans ZombieBuddy : il ne demandera rien en jeu : {ids}"
+    },
+    "zbApproveFailed": "impossible d'autoriser les mods Java dans ZombieBuddy ({error}) : il demandera en jeu",
+    "resetMarkerUnknown": "Impossible de savoir quelle version du jeu est installée : il peut vider sa liste de mods au premier lancement. Jouer depuis PZMM la remet",
+    "viewpointB42": "Passage au Build 42 pour « {name} » : Project Viewpoint ne fonctionne pas sur le Build 41.",
+    "steamWait": "Steam limite les requêtes : nouvel essai dans {seconds} s",
+    "subscribed": "Abonné à {id} sur Steam : Steam le télécharge et le tient à jour",
+    "unsubscribed": "Désabonné de {id} sur Steam : Steam supprime ses fichiers",
+    "removed": "{id} supprimé ({source})"
   },
   "doctor": {
     "notInstalled": "est activé mais pas installé : le jeu l'ignore",
@@ -2941,8 +2965,8 @@
     "incompatible": "est incompatible avec {other}, qui est aussi activé",
     "loadAfter": "devrait se charger après {other}",
     "loadBefore": "devrait se charger avant {other}",
-    "only41": "est conçu pour Build 41 (pas de dossier 42/ ni common/) ; sur Build 42, il peut provoquer des erreurs ou ne rien faire",
-    "only42": "est conçu pour Build 42 uniquement (pas de mod.info à la racine)",
+    "only41": "est fait pour le Build 41 seulement (pas de dossier 42/ ni common/) : le Build 42 ne le charge pas",
+    "only42": "est fait pour le Build 42 seulement (pas de mod.info à la racine) : le Build 41 ne le charge pas",
     "twoCopies": "est dans Zomboid/mods et aussi abonné dans Steam : la copie de Zomboid/mods l'emporte et ne recevra pas les mises à jour de Steam",
     "missingEnv": "{path} n'existe pas (défini par {env})",
     "missingSet": "{path} n'existe pas (défini dans les Paramètres)",
@@ -3484,5 +3508,95 @@
     "profileExists": "un profil nommé « {name} » existe déjà",
     "linkPercent": "Impossible de lier {path} : son chemin contient un %. Renommez ou déplacez ce dossier.",
     "profileActive": "« {name} » est le profil actif ; passez d'abord à un autre"
+  },
+  "close": {
+    "title": "Fermer PZMM ?",
+    "line": "Dans la zone de notification, les plannings de serveurs, la recherche de mises à jour et la surveillance des plantages continuent. Tes profils et réglages sont enregistrés dans tous les cas.",
+    "tray": "Réduire dans la zone de notification",
+    "quit": "Quitter",
+    "dontAsk": "Ne plus demander",
+    "settingsHint": "Tu peux le changer plus tard dans les Réglages."
+  },
+  "whatsNew": {
+    "notes": "Les actions groupées s'appliquent à tous les mods sélectionnés\nLes pastilles Workshop s'abonnent et se désabonnent en un clic\nLes mods Java que tu actives sont autorisés dans ZombieBuddy pour toi\nLes alertes au lancement proposent une correction, et moins de fausses alertes\nVérifier la config trie les problèmes par gravité, chacun avec sa solution\nHistorique des téléchargements : chaque installation, mise à jour et suppression\nLes mods réservés au Build 42 proposent de changer de build\nNavigation Workshop plus rapide, avec barre de progression\nRescanner trouve les mods téléchargés hors de PZMM\nChoisis ce que fait la fermeture de la fenêtre",
+    "title": "Nouveautés de la {version}",
+    "enjoying": "PZMM te plaît ?",
+    "upvote": "Si l'appli te plaît, vote pour elle sur Steam !",
+    "clickMe": "(clique-moi)",
+    "upvoteButton": "Voter sur Steam"
+  },
+  "history": {
+    "none": "Rien de téléchargé pour l'instant.",
+    "forget": "Oublier cette entrée",
+    "clear": "Effacer l'historique",
+    "clearAsk": "Effacer l'historique ? Tes mods restent installés.",
+    "kept": "Les 500 derniers changements sont gardés.",
+    "action": {
+      "installed": "Installé",
+      "updated": "Mis à jour",
+      "removed": "Supprimé",
+      "subscribed": "Abonné",
+      "unsubscribed": "Désabonné"
+    }
+  },
+  "check": {
+    "title": "Vérifier la config",
+    "summary": {
+      "one": "1 point à voir",
+      "other": "{count} points à voir"
+    },
+    "severity": {
+      "broken": "Cassé",
+      "risk": "Risque",
+      "check": "À vérifier",
+      "low": "Mineur"
+    },
+    "severityHint": {
+      "broken": "Le jeu ne les charge pas, ou ne démarre pas",
+      "risk": "Du code qui pourrait toucher tes fichiers ou internet : fais confiance seulement si tu connais le mod",
+      "check": "Peut poser problème en jeu",
+      "low": "Bon à savoir ; rien à corriger"
+    },
+    "ignored": {
+      "one": "1 masqué",
+      "other": "{count} masqués"
+    },
+    "again": "Revérifier",
+    "fixAll": {
+      "one": "Corriger 1 sans risque",
+      "other": "Corriger {count} sans risque"
+    },
+    "hideTip": "Masquer jusqu'à ce que le mod change",
+    "fix": {
+      "download": "Télécharger",
+      "downloadReq": "Télécharger {req}",
+      "turnOn": "Activer {name}",
+      "turnOff": "Désactiver",
+      "turnOffOther": "Désactiver {name}",
+      "uninstall": "Désinstaller",
+      "findB42": "Chercher une version B42",
+      "switchBuild": "Passer au Build {build}",
+      "updateGame": "Mettre le jeu à jour",
+      "updateMod": "Retélécharger",
+      "allow": "L'autoriser à nouveau",
+      "openJava": "Ouvrir les mods Java",
+      "zbSetup": "Installer ZombieBuddy",
+      "zbRemove": "Retirer ZombieBuddy",
+      "removeCopy": "Retirer la copie en trop",
+      "unsubscribeOthers": "Se désabonner des autres",
+      "getOriginal": "Prendre l'original",
+      "findReplacement": "Chercher un remplaçant",
+      "arrangeMaps": "Ranger les cartes",
+      "verify": "Vérifier les fichiers du jeu",
+      "autodetect": "Le trouver automatiquement",
+      "openSettings": "Ouvrir les réglages",
+      "startGame": "Lancer le jeu une fois",
+      "openAuthoring": "Ouvrir Créer un mod",
+      "openServers": "Ouvrir Serveurs",
+      "trust": "Faire confiance à ce fichier",
+      "sort": "Corriger l'ordre",
+      "hide": "C'est bon",
+      "unhide": "Réafficher"
+    }
   }
 }

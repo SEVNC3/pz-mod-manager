@@ -158,6 +158,9 @@ struct View {
     build: Option<u8>,
     /// The build forced in Settings (None: follow the game's mod list).
     forced_build: Option<u8>,
+    /// The game version of the last run ("42.19.2") and the Steam branch installed ("public").
+    game_version: Option<String>,
+    steam_branch: Option<String>,
     /// The game's language (`Translate` folder name, "" if unknown).
     language: String,
     /// Kind of the active profile: "zomboid" or "viewpoint".
@@ -168,7 +171,23 @@ struct View {
     servers: BTreeMap<String, String>,
 }
 
+/// The game's version and Steam branch: they change only with a game update, so they're read once a
+/// minute rather than on every view (finding the game folder probes Steam's libraries).
+type GameInfo = (std::time::Instant, (Option<String>, Option<String>));
+static GAME_INFO: Mutex<Option<GameInfo>> = Mutex::new(None);
+
+fn game_info(paths: &Paths) -> (Option<String>, Option<String>) {
+    let mut c = GAME_INFO.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((_, info)) = c.as_ref().filter(|(at, _)| at.elapsed() < std::time::Duration::from_secs(60)) {
+        return info.clone();
+    }
+    let info = (pz::logs::game_version(&paths.zomboid), pz::zombiebuddy::game_dir().and_then(|g| pz::logs::steam_branch(&g)));
+    *c = Some((std::time::Instant::now(), info.clone()));
+    info
+}
+
 fn view(paths: &Paths) -> anyhow::Result<View> {
+    let (game_version, steam_branch) = game_info(paths);
     let created = profile::list(paths).is_empty();
     let (p, adopted) = profile::sync(paths)?;
     let mut mods = scan(paths)?;
@@ -257,6 +276,8 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
         workshop: pz::workshop_dir().map(|d| d.display().to_string()),
         build: Some(profile::effective_build(paths)),
         forced_build: profile::build(paths),
+        game_version,
+        steam_branch,
         language: pz::game_language(paths),
         mode,
         kinds: profile::list(paths).into_iter().map(|n| { let kind = profile::kind_of(paths, &n); (n, kind) }).collect(),
@@ -825,6 +846,25 @@ async fn java_mods() -> Res<Vec<pz::javamods::JavaMod>> {
         Ok::<_, anyhow::Error>(out)
     })
     .await
+}
+
+/// Subscribe to (or unsubscribe from) a Workshop item through the running Steam client.
+/// `mod_id`/`name`: the mod it is, for the download history (else the item's id).
+#[tauri::command]
+async fn workshop_subscribe(id: String, on: bool, mod_id: Option<String>, name: Option<String>) -> Res<View> {
+    blocking(move || workshop_subscribe_now(&id, on, mod_id, name)).await
+}
+
+fn workshop_subscribe_now(id: &str, on: bool, mod_id: Option<String>, name: Option<String>) -> Res<View> {
+    let game = zb::game_dir().ok_or("Project Zomboid's game folder wasn't found in your Steam libraries")?;
+    pz::steam_client::subscribe(&game, id, on).map_err(|e| format!("{e:#}"))?;
+    pzmm_core::history::add(&Paths::detect(), mod_id.as_deref().unwrap_or(id), name.as_deref().unwrap_or(""), &format!("steam:{id}"), if on { "subscribed" } else { "unsubscribed" });
+    if on {
+        pzmm_core::say!("subscribed", "Subscribed to {id} in Steam: Steam downloads it and keeps it updated", id = id);
+    } else {
+        pzmm_core::say!("unsubscribed", "Unsubscribed from {id} in Steam: Steam removes its files", id = id);
+    }
+    locked(view)
 }
 
 #[tauri::command(async)]
@@ -2093,6 +2133,56 @@ fn tray_words(app: AppHandle, open: String, quit: String, hidden: String) -> Res
     Ok(())
 }
 
+/// The page has loaded: the splash goes and the main window shows (once; a start in the tray had no splash).
+#[tauri::command]
+fn splash_done(app: AppHandle) {
+    PAGE_UP.store(true, std::sync::atomic::Ordering::Relaxed);
+    lift_splash(&app);
+}
+
+/// The splash goes and the main window shows (the page's call, or the fallback when it never comes).
+fn lift_splash(app: &AppHandle) {
+    if let Some(s) = app.get_webview_window("splash") {
+        // hidden first: closing takes a moment, and the splash stays on top of the window showing under it
+        let _ = s.hide();
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.center(); // where the splash was, every launch
+        }
+        show_window(app);
+        let _ = s.close();
+    }
+}
+
+/// The page has mounted (it lifted the splash), so it can answer "close-ask": a page that never did can't.
+static PAGE_UP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Download history: installs, updates, removals and subscriptions, newest first.
+#[tauri::command(async)]
+fn history_list() -> Vec<pzmm_core::history::Record> {
+    pzmm_core::history::list(&Paths::detect())
+}
+
+/// Forget history records: those of `ids`, or all.
+#[tauri::command(async)]
+fn history_clear(ids: Option<Vec<String>>) -> Vec<pzmm_core::history::Record> {
+    pzmm_core::history::clear(&Paths::detect(), ids.as_deref())
+}
+
+/// The window's close button, answered: hide to the tray (turning it on), or quit.
+#[tauri::command]
+fn app_close(app: AppHandle, to_tray: bool) -> Res<()> {
+    if !to_tray {
+        quit_app(&app);
+        return Ok(());
+    }
+    tray(&app, true).map_err(|e| e.to_string())?;
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.hide();
+    }
+    tell_tray(&app);
+    Ok(())
+}
+
 /// Quit after the "servers are running" question: stop them first, or leave them running
 /// (PZMM finds them again next time by their process id, and reaches them over RCON).
 #[tauri::command]
@@ -2898,9 +2988,24 @@ async fn doctor(online: Option<bool>) -> Res<Vec<pz::doctor::Finding>> {
         if online == Some(true) {
             out.extend(pz::doctor::check_workshop(&Paths::detect(), &enabled, &mods));
         }
+        pz::doctor::mark_hidden(&Paths::detect(), &mods, &mut out);
         Ok::<_, String>(out)
     })
     .await
+}
+
+/// Forget ZombieBuddy's "no" for a Java file (by its SHA-256): PZMM allows it on the next Play.
+#[tauri::command(async)]
+fn zb_unblock(sha: String) -> Res<()> {
+    let file = pz::javamods::zb_config_dir().ok_or("no home folder")?.join("mod_approvals.json");
+    pz::javamods::unblock(&file, &sha).map_err(|e| format!("{e:#}"))
+}
+
+/// Hide a Check setup finding ("It's fine"), or show it again; it comes back by itself when its mod changes.
+#[tauri::command(async)]
+fn finding_hide(key: String, subject: String, vars: BTreeMap<String, String>, on: bool) -> Res<()> {
+    let mods = quick_read(scan)?;
+    pz::doctor::hide(&Paths::detect(), &mods, &key, &subject, vars, on).map_err(|e| format!("{e:#}"))
 }
 
 /// What switching to `mode` would do, for the confirmation panel.
@@ -2983,6 +3088,24 @@ fn start_game(app: &AppHandle, args: &str) -> anyhow::Result<Paths> {
             apply(paths, &p)?;
             pzmm_core::say!("listRestored", "Put the {count} mod(s) of \"{name}\" back in the game's mod list before starting it.", count = p.enabled().len(), name = p.name);
         }
+        // a first start of Build 42 empties the list unless its marker is there (apply above wrote it already)
+        else if profile::effective_build(paths) >= 42 {
+            profile::keep_through_game_reset(paths);
+        }
+        // Java mods turned on here are allowed in ZombieBuddy too, so it doesn't ask again in the game
+        // (best effort: a scan that fails here doesn't stop the game starting)
+        let mods = scan(paths).unwrap_or_default();
+        let java: Vec<&store::Row> = p.enabled().iter().filter_map(|id| mods.get(id)).filter(|m| !(m.id == zb::MOD_ID && zb::official_source(&m.source))).collect();
+        // only where ZombieBuddy keeps its settings already (no folder made for players who don't use it),
+        // and not for a profile set up from a server's list or a share code: its Java mods are someone else's pick
+        let mine = profile::picked_by_player(paths, &p.name);
+        if let Some(file) = pz::javamods::zb_config_dir().filter(|d| d.is_dir() && mine).map(|d| d.join("mod_approvals.json")) {
+            match pz::javamods::approve(&file, &java, &pz::javamods::exceptions(paths)) {
+                Ok(ids) if !ids.is_empty() => pzmm_core::say!("zbApproved", "Allowed {count} Java mod(s) in ZombieBuddy, so it won't ask in the game: {ids}", count = ids.len(), ids = ids.join(", ")),
+                Ok(_) => {}
+                Err(e) => pzmm_core::say!("zbApproveFailed", "error: couldn't allow the Java mods in ZombieBuddy ({error}): it asks in the game", error = format!("{e:#}")),
+            }
+        }
         Ok(())
     })
     .map_err(anyhow::Error::msg)?;
@@ -3046,7 +3169,7 @@ fn profile_launch_set(args: String, own_folder: bool) -> Res<ProfileLaunch> {
 
 // --- the launcher: find servers, set up their mods, join ---
 
-/// Every PZ server, kept two minutes: Steam's list and the game's saved one, merged. Steam's list
+/// Every PZ server, kept ten minutes (Home lists them at start-up, so the Servers tab opens at once): Steam's list and the game's saved one, merged. Steam's list
 /// comes from the Web API key when one is saved, else (or when the key fails) from the Steam
 /// client: both give the same list, and the client shows the player in the game for a moment.
 #[tauri::command]
@@ -3058,7 +3181,7 @@ async fn servers_list(fresh: bool) -> Res<launcher::Listing> {
         let asked = std::time::Instant::now();
         let _loading = LOADING.lock().unwrap_or_else(|e| e.into_inner());
         if let Some((at, l)) = LIST.lock().unwrap_or_else(|e| e.into_inner()).as_ref()
-            && (*at >= asked || !fresh && at.elapsed() < std::time::Duration::from_secs(120))
+            && (*at >= asked || !fresh && at.elapsed() < std::time::Duration::from_secs(600))
         {
             return Ok(l.clone());
         }
@@ -3372,6 +3495,7 @@ async fn folder_set(key: String, path: String, move_data: bool) -> Res<SettingsV
     blocking(move || {
         // the in-process locks only: the core takes the data lock itself where a move allows it
         let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        *GAME_INFO.lock().unwrap_or_else(|e| e.into_inner()) = None; // the game or Zomboid folder may move
         let _paused = TICKING.write().unwrap_or_else(|e| e.into_inner());
         *SCAN.lock().unwrap_or_else(|e| e.into_inner()) = None;
         let path = Some(path.trim()).filter(|p| !p.is_empty()).map(std::path::PathBuf::from);
@@ -3524,7 +3648,13 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // size only: restoring visibility, position or maximised would show the window behind the splash
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(tauri_plugin_window_state::StateFlags::SIZE)
+                .with_denylist(&["splash"])
+                .build(),
+        )
         .plugin(updater().build())
         .plugin(tauri_plugin_process::init())
         // signing in starts PZMM in the tray (Settings: autostart)
@@ -3566,8 +3696,29 @@ pub fn run() {
             {
                 pzmm_core::log!("tray icon: {e}");
             }
-            if minimised && let Some(w) = app.get_webview_window("main") {
-                let _ = w.hide();
+            // the main window starts hidden: a small splash of its own, centred on the screen, shows while it
+            // loads (the page calls splash_done; after 10 s it goes anyway). Started in the tray: neither shows.
+            if !minimised {
+                if let Err(e) = tauri::WebviewWindowBuilder::new(app, "splash", tauri::WebviewUrl::App("splash.html".into()))
+                    .title("PZMM")
+                    .inner_size(240.0, 240.0)
+                    .decorations(false)
+                    .transparent(true)
+                    .shadow(false)
+                    .resizable(false)
+                    .always_on_top(true)
+                    .skip_taskbar(true)
+                    .center()
+                    .build()
+                {
+                    pzmm_core::log!("splash window: {e}");
+                    show_window(app.handle());
+                }
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(10));
+                    lift_splash(&handle);
+                });
             }
             std::thread::spawn(watch_favourites);
             // the built-in mod ID and map indexes parse once (a moment, seconds in a debug build): now,
@@ -3605,10 +3756,25 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // servers PZMM runs: ask before quitting (the UI answers with app_quit)
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                // with the tray, closing hides the window: automation goes on
-                if window.app_handle().tray_by_id("main").is_some() {
+            // the splash closed early (Alt+F4): the main window shows anyway (splash_done closes it the same way)
+            if window.label() == "splash" && matches!(event, tauri::WindowEvent::Destroyed) {
+                show_window(window.app_handle());
+                return;
+            }
+            // servers PZMM runs: ask before quitting (the UI answers with app_quit); the splash just closes
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event
+                && window.label() == "main"
+            {
+                // the page asks: quit or the tray (it answers with app_close)
+                let s = settings::load();
+                if s.close_ask.unwrap_or(!s.tray) && PAGE_UP.load(std::sync::atomic::Ordering::Relaxed) {
+                    api.prevent_close();
+                    let _ = window.emit("close-ask", ());
+                    return;
+                }
+                // Settings say closing goes to the tray: hide the window (the icon brings it back), automation goes on
+                // (no tray icon to bring it back, where the system has none: closing quits instead)
+                if s.tray && tray(window.app_handle(), true).is_ok() && window.app_handle().tray_by_id("main").is_some() {
                     api.prevent_close();
                     let _ = window.hide();
                     tell_tray(window.app_handle());
@@ -3623,12 +3789,12 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             load, save, install, remove, rollback, profile_new, profile_use, profile_delete, profiles_unused, profiles_prune, profile_rename, profile_duplicate, snapshot_create, snapshot_list, snapshot_restore, set_build,
-            details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, mod_changes, feed, news, authoring_check, authoring_poster, authoring_build, workshop_comments, workshop_author, workshop_items, zb_status, zb_preview, zb_install, zb_uninstall, java_mods,
+            details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, mod_changes, feed, news, authoring_check, authoring_poster, authoring_build, workshop_comments, workshop_author, workshop_items, zb_status, zb_preview, zb_install, zb_uninstall, java_mods, workshop_subscribe,
             find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_preview, server_check, server_export, server_import, save_use,
             perf_view, game_running, perf_memory_set, perf_jvm_set, profile_launch, profile_launch_set, pzopt_run, save_sandbox, save_sandbox_write, save_sandbox_preset, save_details, save_backup, save_restore, save_backup_delete, save_repair, save_set_mods, save_players,
             save_backup_name, save_thumb, save_reset, save_clone, save_databases, save_table,
             host_view, host_ports, host_create, host_preflight, host_start, host_stop, host_restart, host_log, host_send, host_players, host_lines, host_lines_from_profile,
-            host_lines_from_collection, host_check, host_lines_with, host_people, host_catalog, host_remote_add, host_remote_forget, host_preview, host_write, host_adopt, host_forget, app_quit,
+            host_lines_from_collection, host_check, host_lines_with, host_people, host_catalog, host_remote_add, host_remote_forget, host_preview, host_write, host_adopt, host_forget, app_quit, app_close, splash_done, history_list, history_clear, finding_hide, zb_unblock,
             host_auto_set, host_tag, host_tag_set, host_check_updates, host_backups, host_backup, host_restore, host_config, host_ini_write, host_sandbox_write, host_spawn_write, host_preset, host_preset_save,
             host_discord_set, host_discord_test, host_discord_bot_set, host_discord_bot_test, host_address_set, host_ftp_set, host_ftp_browse, host_ftp_forget, host_ftp_pull, host_ftp_push, host_ftp_world,
             host_ftp_stop, host_detect, host_add_external, host_sides_set, host_zones, host_zones_save, host_zones_restore, host_dossier, host_player_set, host_world,

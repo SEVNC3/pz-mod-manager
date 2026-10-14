@@ -46,6 +46,7 @@
 </script>
 
 <script lang="ts">
+  import { track } from "./activity.svelte";
   import { onMount, untrack } from "svelte";
   import { api, fromSteam, parseServer, patient, WINDOWS, type GameServer, type SetupItem } from "./api";
   import { modNeed } from "./order";
@@ -289,6 +290,11 @@
     await refreshState();
     if (first) api.modIndexRefresh().catch(() => {});
     ready = true;
+  });
+
+  // the activity bar moves while this tab works
+  $effect(() => {
+    if (loading) return track();
   });
 </script>
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { track } from "./activity.svelte";
   import { onMount } from "svelte";
   import { confirmed } from "./ask.svelte";
   import { api, type ConfigView, type ServerCard, type Setting, type SpawnRegion } from "./api";
@@ -179,6 +180,11 @@
 
   onMount(() => {
     load(["ini", "sandbox", "spawn"]);
+  });
+
+  // the activity bar moves while this tab works
+  $effect(() => {
+    if (working) return track();
   });
 </script>
 

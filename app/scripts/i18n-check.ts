@@ -116,6 +116,11 @@ const quoted = (k: string) => ['"', "'", "`"].some((q) => code.includes(q + k + 
 for (const k of Object.keys(en))
   if (!used.has(k) && !quoted(k) && !prefixes.some((p) => k.startsWith(p)) && !suffixes.some((s) => k.endsWith(s) && quoted(k.slice(0, -s.length)))) errors.push(`en.json: ${k} is never used`);
 
+// What's new pops up only when its notes were written for the version being built: say so when they weren't
+const version = readFileSync(new URL("../../Cargo.toml", import.meta.url), "utf8").match(/^version = "(.+)"/m)?.[1];
+const notesFor = readFileSync(new URL("../src/lib/WhatsNew.svelte", import.meta.url), "utf8").match(/NOTES_FOR = "(.+)"/)?.[1];
+if (version !== notesFor) console.warn(`i18n-check: warning: whatsNew.notes are for ${notesFor}, the app is ${version}: no What's new shows after this update (update the notes in every locale and NOTES_FOR)`);
+
 if (errors.length) {
   console.error(errors.join("\n"));
   console.error(`i18n-check: ${errors.length} problem(s)`);

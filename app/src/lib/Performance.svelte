@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { track } from "./activity.svelte";
   import { onMount } from "svelte";
   import { api, type PerfView } from "./api";
   import { fmtSize, workshopUrl } from "./format";
@@ -75,6 +76,11 @@
 
   onMount(() => {
     load();
+  });
+
+  // the activity bar moves while this tab works
+  $effect(() => {
+    if (working) return track();
   });
 </script>
 

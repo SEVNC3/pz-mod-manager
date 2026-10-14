@@ -131,6 +131,10 @@ struct State {
     /// default.txt's format the last time it listed mods: an empty list can't show it.
     #[serde(default)]
     seen_b41: Option<bool>,
+    /// What `b41` and `seen_b41` were before a Viewpoint profile moved PZMM to Build 42: put back
+    /// when another kind of profile is used (a build picked in Settings meanwhile drops it).
+    #[serde(default)]
+    before_viewpoint: Option<(Option<bool>, Option<bool>)>,
     /// Profile name -> kind (e.g. "viewpoint"). Untagged profiles are the default kind.
     #[serde(default)]
     kinds: std::collections::BTreeMap<String, String>,
@@ -143,6 +147,16 @@ struct State {
     /// Server (its key) -> the mods it listed when its profile was last set up.
     #[serde(default)]
     listed: std::collections::BTreeMap<String, Vec<String>>,
+    /// Profiles imported from a share code: someone else picked their mods.
+    #[serde(default)]
+    imported: std::collections::BTreeSet<String>,
+}
+
+/// The player picked this profile's mods themselves: it wasn't set up from a server's list or
+/// imported from someone's share code (whose Java mods ZombieBuddy should still ask about).
+pub fn picked_by_player(paths: &Paths, name: &str) -> bool {
+    let s = state(paths);
+    s.kinds.get(name).is_none_or(|k| k != SERVER_KIND) && !s.imported.contains(name)
 }
 
 /// The default profile kind: plain Project Zomboid.
@@ -560,6 +574,7 @@ pub fn delete(paths: &Paths, name: &str) -> Result<()> {
     let mut s = state(paths);
     s.kinds.remove(name);
     s.servers.remove(name);
+    s.imported.remove(name);
     s.last.retain(|_, n| n != name);
     save_state(paths, &s)
 }
@@ -597,6 +612,9 @@ pub fn rename(paths: &Paths, from: &str, to: &str) -> Result<()> {
     }
     if let Some(k) = s.servers.remove(&from) {
         s.servers.insert(to.into(), k);
+    }
+    if s.imported.remove(&from) {
+        s.imported.insert(to.into());
     }
     s.last.values_mut().filter(|n| **n == from).for_each(|n| *n = to.into());
     if active {
@@ -760,7 +778,7 @@ pub fn effective_build(paths: &Paths) -> u8 {
 }
 
 pub fn set_b41(paths: &Paths, b41: Option<bool>) -> Result<()> {
-    save_state(paths, &State { b41, ..state(paths) })
+    save_state(paths, &State { b41, before_viewpoint: None, ..state(paths) })
 }
 
 /// The active profile as saved, without picking up in-game changes (for callers that don't
@@ -833,11 +851,17 @@ fn game_reset(paths: &Paths, p: &Profile, game: &pz::DefaultTxt) -> bool {
 
 /// Write the marker that stops Build 42 emptying default.txt (see [`game_reset`]). Before the
 /// profile's save: a marker newer than the save reads as the game's reset.
-fn keep_through_game_reset(paths: &Paths) {
+pub fn keep_through_game_reset(paths: &Paths) {
     // tests keep a game folder next to their Zomboid folder
     let game = if cfg!(test) { Some(paths.zomboid.with_file_name("game")) } else { pz::folders::path("game", &crate::settings::load()) };
     let Some(game) = game else { return };
-    let Some(release) = ["projectzomboid.jar", "projectzomboid/projectzomboid.jar"].iter().find_map(|j| reset_release(&game.join(j))) else { return };
+    let Some(release) = ["projectzomboid.jar", "projectzomboid/projectzomboid.jar"].iter().find_map(|j| reset_release(&game.join(j))) else {
+        static SAID: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        if !SAID.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            crate::say!("resetMarkerUnknown", "Couldn't tell which game release this is, so the game may empty its mod list on its first start: Play from PZMM puts it back");
+        }
+        return;
+    };
     let marker = paths.zomboid.join("mods").join(format!("reset-mods-{release}.txt"));
     if !marker.exists() {
         let _ = fs::write(marker, "If this file does not exist, default.txt will be reset to empty (no mods active).");
@@ -884,6 +908,15 @@ pub fn apply(paths: &Paths, profile: &Profile, mods: Option<&std::collections::B
     let profile = &profile;
     if let Some(d) = pz::try_read_default(&paths.default_txt()).filter(|d| !d.mods.is_empty()) {
         s.seen_b41 = Some(d.b41);
+    }
+    // Project Viewpoint only runs on Build 42; leaving it puts back the build played before
+    let viewpoint = s.kinds.get(&profile.name).is_some_and(|k| k == pz::viewpoint::KIND);
+    if viewpoint && s.b41.or(s.seen_b41) == Some(true) {
+        s.before_viewpoint = Some((s.b41, s.seen_b41));
+        s.b41 = Some(false);
+        crate::say!("viewpointB42", "Switched to Build 42 for \"{name}\": Project Viewpoint doesn't run on Build 41.", name = profile.name);
+    } else if !viewpoint && let Some((b41, seen)) = s.before_viewpoint.take() {
+        (s.b41, s.seen_b41) = (b41, seen);
     }
     let b41 = s.b41.or(s.seen_b41);
     if b41 != Some(true) {
@@ -971,6 +1004,9 @@ pub fn import(paths: &Paths, shared: &Shared) -> Result<Profile> {
         set_kind(paths, &name, &shared.kind)?;
     }
     set_map_order(paths, &name, &shared.maps)?;
+    let mut s = state(paths);
+    s.imported.insert(name.clone());
+    save_state(paths, &s)?;
     apply(paths, &p, crate::store::scan(paths).ok().as_ref())?;
     Ok(p)
 }
@@ -1009,6 +1045,10 @@ mod tests {
         let p = import(&paths, &back).unwrap();
         assert_eq!((p.name.as_str(), p.to_text().as_str(), p.enabled()), ("Friends 2", "# --- Core\n+A\n-B\n+C\n", ids(&["C", "A"])));
         assert_eq!(map_order(&paths, "Friends 2"), ids(&["Town", "Muldraugh, KY"]), "the map arrangement comes along");
+        // someone else picked an imported profile's mods (ZombieBuddy still asks about its Java mods), even renamed
+        assert!(picked_by_player(&paths, "Friends") && !picked_by_player(&paths, "Friends 2"));
+        rename(&paths, "Friends 2", "Theirs").unwrap();
+        assert!(!picked_by_player(&paths, "Theirs"));
         // a code made before maps were shared still reads
         let old: Shared = serde_json::from_str(r#"{"name":"Old","list":"+A\n"}"#).unwrap();
         assert!(old.maps.is_empty() && import(&paths, &old).is_ok());
@@ -1481,6 +1521,23 @@ mod tests {
         let mut p = Profile::parse("x", "+A\n");
         p.adopt(&ids(&["A", "", "A"]));
         assert_eq!(p.to_text(), "+A\n");
+    }
+
+    #[test]
+    fn viewpoint_moves_to_build_42_and_back() {
+        let (_t, paths) = temp_paths();
+        set_b41(&paths, Some(true)).unwrap();
+        apply(&paths, &Profile::from_ids("Default", ids(&["A"]))).unwrap();
+        set_kind(&paths, "3D", "viewpoint").unwrap();
+        apply(&paths, &Profile::from_ids("3D", ids(&["Viewpoint"]))).unwrap();
+        assert_eq!((build(&paths), pz::read_default(&paths.default_txt()).b41), (Some(42), false));
+        apply(&paths, &Profile::from_ids("Default", ids(&["A"]))).unwrap();
+        assert_eq!((build(&paths), pz::read_default(&paths.default_txt()).b41), (Some(41), true), "the B41 profile is B41 again");
+        // a build picked in Settings while on Viewpoint stays
+        apply(&paths, &Profile::from_ids("3D", ids(&["Viewpoint"]))).unwrap();
+        set_b41(&paths, None).unwrap();
+        apply(&paths, &Profile::from_ids("Default", ids(&["A"]))).unwrap();
+        assert_eq!(build(&paths), None);
     }
 
     #[test]

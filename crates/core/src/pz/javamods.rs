@@ -69,6 +69,47 @@ pub fn read_approvals(file: &Path) -> Approvals {
         .collect()
 }
 
+/// Allow, in ZombieBuddy's `mod_approvals.json`, the current jar of each mod in `mods` that it has
+/// no answer for: turning a Java mod on in PZMM is the player's yes, so ZombieBuddy doesn't ask again
+/// at launch. A "no" the player gave in ZombieBuddy stands, a jar whose scan warns or that loads native
+/// code, or whose mod folder's scan warns (unless the player trusted the jar, see [`exceptions`]), is
+/// left for ZombieBuddy to ask about, and so is one with no
+/// Workshop item (ZombieBuddy's own entries always carry one). The ids allowed.
+pub fn approve(file: &Path, mods: &[&Row], trusted: &HashSet<String>) -> anyhow::Result<Vec<String>> {
+    let mut v: serde_json::Value = match std::fs::read_to_string(file) {
+        Ok(t) => serde_json::from_str(&t)?, // unreadable: an error rather than saving over the player's answers
+        Err(_) => serde_json::json!({"formatVersion": 2, "mods": []}),
+    };
+    let known = read_approvals(file);
+    let mut added = vec![];
+    for m in mods {
+        let Some((_, jar)) = jar_of(m) else { continue };
+        let Some(workshop_id) = crate::sources::workshop_item(&m.source).and_then(|i| i.parse::<u64>().ok()) else { continue };
+        let Some((sha, risks)) = hash_and_scan(&m.id, &jar) else { continue };
+        let flagged = || risks.iter().any(|r| r.level == Level::Warning || r.key == "javaNative") || scan_folder(m, trusted).iter().any(|f| f.level == Level::Warning);
+        if known.contains_key(&sha) || (!trusted.contains(&sha) && flagged()) {
+            continue;
+        }
+        let Some(list) = v["mods"].as_array_mut() else { anyhow::bail!("{} has no mods list", file.display()) };
+        list.push(serde_json::json!({"id": m.id, "workshop_id": workshop_id, "jar_hash": sha, "decision": true}));
+        added.push(m.id.clone());
+    }
+    if !added.is_empty() {
+        std::fs::create_dir_all(file.parent().unwrap_or(Path::new(".")))?;
+        crate::write_atomic(file, serde_json::to_vec_pretty(&v)?)?;
+    }
+    Ok(added)
+}
+
+/// Forget ZombieBuddy's "no" for the jar with this SHA-256, so it asks (or PZMM allows it) again.
+pub fn unblock(file: &Path, sha: &str) -> anyhow::Result<()> {
+    let mut v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(file)?)?;
+    if let Some(list) = v["mods"].as_array_mut() {
+        list.retain(|m| !(m["jar_hash"].as_str().is_some_and(|h| h.eq_ignore_ascii_case(sha)) && m["decision"] == false));
+    }
+    Ok(crate::write_atomic(file, serde_json::to_vec_pretty(&v)?)?)
+}
+
 /// ZombieBuddy's settings folder (`~/.zombie_buddy`).
 pub fn zb_config_dir() -> Option<PathBuf> {
     dirs::home_dir().map(|h| h.join(".zombie_buddy"))
@@ -177,7 +218,10 @@ pub fn findings(j: &JavaMod, except: &HashSet<String>) -> Vec<Finding> {
         out.push(err(id, "javaBadSignature", "its Java file was changed after its author signed it: ZombieBuddy won't load it", &[]));
     }
     if j.approved == Some(false) {
-        out.push(warn(id, "javaBlocked", "ZombieBuddy blocks this version of its Java file (you said no before), so it may not work", &[]));
+        out.push(warn(id, "javaBlocked", "ZombieBuddy blocks this version of its Java file (you said no before), so it may not work", &[("sha", j.sha256.clone().unwrap_or_default())]));
+    }
+    if j.signature == "valid" {
+        return out; // a known author signed this exact file: their code, not a stranger's
     }
     let sha = j.sha256.as_deref().unwrap_or_default();
     out.extend(dismissable(j.risks.iter().filter(|r| r.level == Level::Warning).cloned().collect(), sha, except));
@@ -438,7 +482,8 @@ fn constant_pool(b: &[u8]) -> Option<(HashMap<u16, String>, Vec<Ref>, Vec<u16>)>
 // --- beyond declared jars: every Java and native file, the game folder, its launcher, mod Lua ---
 
 /// Files a game mod rarely ships outside a declared jar: Java code, native libraries, programs and scripts.
-const CODE_FILES: &[&str] = &["jar", "class", "dll", "so", "dylib", "exe", "bat", "cmd", "ps1", "sh", "vbs"];
+/// Loose scripts (build.ps1, run.sh) are left out: nothing runs them unless a program already does.
+const CODE_FILES: &[&str] = &["jar", "class", "dll", "so", "dylib", "exe"];
 
 /// SHA-256 of `bytes`, lowercase hex.
 pub fn sha256(bytes: &[u8]) -> String {
@@ -1121,5 +1166,47 @@ javaJarFile=media/java/client/Viewpoint.jar
         let f = t.path().join("mod_approvals.json");
         std::fs::write(&f, r#"{"formatVersion":2,"mods":[{"id":"A","jar_hash":"AB12","decision":true},{"id":"B","jar_hash":"cd34","decision":false}]}"#).unwrap();
         assert_eq!(read_approvals(&f), Approvals::from([("ab12".into(), true), ("cd34".into(), false)]));
+    }
+
+    #[test]
+    fn approves_enabled_jars_once_and_keeps_a_no() {
+        let t = tempfile::tempdir().unwrap();
+        let mk = |id: &str, body: &[u8], source: &str| {
+            let dir = t.path().join(id);
+            std::fs::create_dir_all(dir.join("42/media/java")).unwrap();
+            std::fs::write(dir.join("42/mod.info"), format!("id={id}
+javaJarFile=media/java/M.jar
+")).unwrap();
+            std::fs::write(dir.join("42/media/java/M.jar"), body).unwrap();
+            Row { id: id.into(), source: source.into(), info: dir.join("42/mod.info"), dir, ..Default::default() }
+        };
+        let clean = |n: &str| jar(&[(&format!("a/{n}.class"), class_file("zombie/X", "y", "z"))]);
+        let (one, two) = (clean("A"), clean("B"));
+        let (a, b) = (mk("A", &one, "steam:42"), mk("B", &two, "steam:43"));
+        let f = t.path().join("zb/mod_approvals.json");
+        std::fs::create_dir_all(f.parent().unwrap()).unwrap();
+        std::fs::write(&f, format!(r#"{{"formatVersion":2,"mods":[{{"id":"B","jar_hash":"{}","decision":false}}]}}"#, sha256(&two))).unwrap();
+        let none = HashSet::new();
+        assert_eq!(approve(&f, &[&a, &b], &none).unwrap(), ["A"]);
+        assert_eq!(read_approvals(&f), Approvals::from([(sha256(&one), true), (sha256(&two), false)]));
+        assert!(approve(&f, &[&a, &b], &none).unwrap().is_empty());
+        let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
+        assert_eq!((v["formatVersion"].as_u64(), v["mods"][1]["workshop_id"].as_u64()), (Some(2), Some(42)));
+        // no Workshop item: left for ZombieBuddy to ask
+        assert!(approve(&f, &[&mk("C", &clean("C"), "local:C")], &none).unwrap().is_empty());
+        // a jar the scan warns about waits for the player, unless they trusted it
+        let bad = b"not a jar".to_vec();
+        let d = mk("D", &bad, "steam:44");
+        assert!(approve(&f, &[&d], &none).unwrap().is_empty());
+        // a jar that loads native code, or a mod folder carrying a program, waits for the player too
+        let native = mk("E", &jar(&[("a/E.class", class_file("java/lang/System", "load", "x"))]), "steam:45");
+        assert!(approve(&f, &[&native], &none).unwrap().is_empty());
+        let dll = mk("F", &clean("F"), "steam:46");
+        std::fs::write(dll.dir.join("42/media/java/x.dll"), b"MZ").unwrap();
+        assert!(approve(&f, &[&dll], &none).unwrap().is_empty());
+        assert_eq!(approve(&f, &[&d], &HashSet::from([sha256(&bad)])).unwrap(), ["D"]);
+        // a "no" forgotten: allowed on the next approve
+        unblock(&f, &sha256(&two)).unwrap();
+        assert_eq!(approve(&f, &[&b], &none).unwrap(), ["B"]);
     }
 }

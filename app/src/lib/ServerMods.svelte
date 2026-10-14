@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { track } from "./activity.svelte";
   import { onMount, tick } from "svelte";
   import { api, type LineProblem, type ModRow, type ModSide, type Preset, type Row, type ServerCard, type ServerLines, type TagView } from "./api";
   import { fmtNum, modChanges, workshopUrl } from "./format";
@@ -324,6 +325,11 @@
       check(); // titles and names for the list
     }
     api.lists().then((l) => (presets = l.presets.filter((p) => p.from === "server"))).catch(() => {});
+  });
+
+  // the activity bar moves while this tab works
+  $effect(() => {
+    if (loading) return track();
   });
 </script>
 

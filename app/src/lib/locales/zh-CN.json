@@ -125,9 +125,6 @@
     "singleplayer": "单人游戏",
     "findingMods": "正在查找它的模组…",
     "gameListKey": "在这里列出 Steam 的服务器需要 Steam Web API 密钥，所以这些来自游戏保存的服务器列表。",
-    "popularKept": "列表获取于{ago}。刷新会询问 Steam，你会短暂显示为正在游戏。",
-    "popularAsk": "列出最热门的服务器会询问 Steam，你会短暂显示为正在游戏。",
-    "listServers": "列出服务器",
     "passwordTip": "需要密码：未保存密码时，点击加入会在服务器页打开该服务器的详情并在那里询问密码"
   },
   "app": {
@@ -193,7 +190,9 @@
     "saveModManagerPreset": "保存为 Mod Manager 预设",
     "loadFailed": "无法读取你的模组：{error}",
     "openFolders": "在设置中检查文件夹",
-    "moreTabs": "更多标签页"
+    "moreTabs": "更多标签页",
+    "rescan": "重新扫描",
+    "rescanTip": "查找 PZMM 打开后订阅或复制进来的模组"
   },
   "mods": {
     "searchPlaceholder": "搜索模组  ( / )",
@@ -299,7 +298,9 @@
     "settingUpServer": "正在准备 {name}",
     "checking": "正在检查你的模组",
     "importingCollection": "正在安装合集",
-    "readingCollection": "正在读取合集"
+    "readingCollection": "正在读取合集",
+    "subscribing": "正在订阅 {name}",
+    "unsubscribing": "正在取消订阅 {name}"
   },
   "log": {
     "appLatest": "PZMM {version} 已是最新版本。",
@@ -398,7 +399,15 @@
     },
     "removeUsedBy": {
       "other": "另有 {count} 个配置方案也在使用：{profiles}"
-    }
+    },
+    "needs42Title": {
+      "other": "其中 {count} 个模组只能在 Build 42 上运行"
+    },
+    "switch42": "切换到 Build 42",
+    "keep41": "留在 Build 41",
+    "unsubscribeTitle": "取消订阅 {name}？",
+    "unsubscribeLine": "Steam 会删除其文件，使用它的配置都会失去它。",
+    "unsubscribe": "取消订阅"
   },
   "common": {
     "cancel": "取消",
@@ -803,7 +812,6 @@
       "local": "由 PZMM 从文件安装",
       "manual": "在 PZMM 之外添加到模组文件夹"
     },
-    "openWorkshop": "打开创意工坊页面",
     "favourite": "已收藏",
     "byAuthor": "{name}，作者 {author}",
     "neededBy": {
@@ -812,7 +820,9 @@
     "neededByTip": "需要它的已启用模组：{names}",
     "languagesTip": "包含以下语言的文本：{languages}",
     "new": "新",
-    "newTip": "此配置中新增"
+    "newTip": "此配置中新增",
+    "subscribeTip": "在 Steam 订阅，由 Steam 保持更新",
+    "unsubscribeTip": "在 Steam 取消订阅"
   },
   "details": {
     "label": "模组详情",
@@ -913,29 +923,14 @@
     "stillHappens": "问题仍然存在",
     "gone": "问题消失了",
     "stop": "停止并恢复我的列表",
-    "setupCheck": "设置检查",
     "noProblems": "未发现问题。",
-    "summary": "{errors}，{warnings}",
-    "errors": {
-      "other": "{count} 个错误"
-    },
-    "warnings": {
-      "other": "{count} 个警告"
-    },
     "errorCount": {
       "other": "{count} 个错误，首个位于 <span class=\"mono\">{example}</span>"
     },
-    "disable": "禁用 {id}",
-    "bisectOffer": "出了问题，但上面没有任何解释？{link}：PZMM 每次测试游戏时都会把你已启用的模组减半。",
     "finishFirst": "请先完成或停止查找出问题的模组。",
     "logErrors": "<strong>{file} 中的错误</strong>（上次运行）：",
     "firstError": "第一个真正的错误，位于第 {line} 行。",
     "pointsAt": "指向：",
-    "bisectSuspects": {
-      "other": "{link}，从日志指向的 {count} 个模组开始：PZMM 先测试它们，再把其余的减半。"
-    },
-    "dismiss": "已检查",
-    "dismissTip": "你已检查并信任此文件：在文件改变之前，PZMM 不再对它发出警告",
     "bisectLeft": "配置方案“{profile}”上查找出问题的模组还没有完成",
     "bisectLeftLine": {
       "other": "仍有 {count} 个模组可疑。从停下的地方继续，或恢复查找前的模组列表。"
@@ -1072,7 +1067,8 @@
       "look": "主题与语言",
       "lookHint": "PZMM 的外观。窗口会记住它的大小和位置。",
       "lists": "模组列表",
-      "listsHint": "检查模组所依据的游戏版本，以及列表显示的内容。"
+      "listsHint": "检查模组所依据的游戏版本，以及列表显示的内容。",
+      "gameVersion": "上次游玩：版本 {version}，Steam 分支“{branch}”。其他版本：Steam › Project Zomboid › 属性 › 测试版。"
     },
     "launch": {
       "title": "启动",
@@ -1083,7 +1079,6 @@
       "profileArgs": "它自己的参数",
       "ownFolder": "独立的游戏文件夹",
       "ownFolderHint": "它的存档、选项、日志和模组列表与你的 Zomboid 文件夹分开存放，服务器的配置方案就碰不到你的世界。这些存档不会显示在“存档”里，你手动放进 Zomboid/mods 的模组在那里也看不到。",
-      "tray": "关闭窗口时把 PZMM 留在托盘",
       "trayHint": "关闭窗口后，服务器计划、更新检查和崩溃监视仍会继续。从托盘图标退出。",
       "autostart": "登录电脑时在托盘中启动 PZMM",
       "keepMarks": "在你新建或切换到的每个配置中，保持收藏启用、隐藏的模组禁用",
@@ -1092,7 +1087,9 @@
       "profileHint": "仅用于此配置档；其他配置档保留各自的设置。",
       "profiles": "配置档",
       "profilesHint": "新建或切换到某个配置档时 PZMM 会做什么。",
-      "trayTitle": "托盘与开机启动"
+      "trayTitle": "托盘与开机启动",
+      "onClose": "关闭窗口时",
+      "onCloseAsk": "每次询问"
     },
     "about": {
       "title": "关于",
@@ -2308,9 +2305,6 @@
     "loaderBy": "游戏文件夹中的 {file} 会启动它。",
     "loaderNotStarted": "游戏文件夹和 Steam 启动选项中都没有启动它的设置，只有你手动启动时才会加载。",
     "loadsWith": "由 {name} 加载，它不检查签名。",
-    "warnings": {
-      "other": "Java 模组标签页中有 {count} 条警告。"
-    },
     "hashCopied": "已复制"
   },
   "profile": {
@@ -2339,7 +2333,21 @@
     "cancelTip": "停止下载。已下载完的模组仍会安装。",
     "copy": "复制日志",
     "copyTip": "复制带时间的日志（路径中的用户名已隐藏）",
-    "whatChanged": "更新内容"
+    "whatChanged": "更新内容",
+    "wait": "请稍候",
+    "history": "下载记录",
+    "expand": "展开活动",
+    "filter": "显示",
+    "pickLine": "选择一行查看详情。",
+    "reinstall": "重新安装",
+    "kind": {
+      "all": "全部",
+      "install": "安装",
+      "update": "更新",
+      "remove": "移除",
+      "error": "错误",
+      "info": "其他"
+    }
   },
   "links": {
     "label": "PZMM 链接",
@@ -2562,7 +2570,9 @@
     "addedToServerRestart": "已添加到 {name}。重启服务器即可加载。"
   },
   "installButton": {
-    "installAll": "全部安装…"
+    "installAll": "全部安装…",
+    "uninstall": "卸载",
+    "uninstallTip": "删除 PZMM 的副本，或在 Steam 取消订阅"
   },
   "snapshots": {
     "title": "“{profile}”的快照",
@@ -2617,17 +2627,22 @@
     "notInstalled": "{id}：已启用但未安装",
     "fix": "修复",
     "anyway": "仍然启动",
-    "javaTitle": {
-      "other": "ZombieBuddy 会就 {count} 个新的或改动过的 Java 文件询问你。PZMM 的发现："
-    },
-    "review": "查看 Java 模组",
     "joinAnyway": "仍然加入",
     "arrangeMaps": "调整地图",
     "warnTitle": {
       "other": "开始游戏前有 {count} 件事需要了解。游戏仍会启动。"
     },
     "stopAsking": "启动，不再询问这些",
-    "joinStopAsking": "加入，不再询问这些"
+    "joinStopAsking": "加入，不再询问这些",
+    "fixAndPlay": "修复并开始游戏",
+    "turnOff": {
+      "other": "关闭这 {count} 个模组"
+    },
+    "updateGame": "在 Steam 中打开",
+    "branchHint": "你的游戏在 Steam 的“{branch}”分支上。更新版本来自 Steam 更新或其他分支：Project Zomboid › 属性 › 测试版。",
+    "trustFiles": {
+      "other": "信任这 {count} 个文件并开始游戏"
+    }
   },
   "menu": {
     "label": "{name}：操作",
@@ -2780,7 +2795,17 @@
     "secretsFile": "系统凭据存储不可用（{error}），因此 PZMM 将密码和密钥保存在 {file} 中",
     "badModId": "已将 {id} 排除在游戏的模组列表之外：模组 ID 不能包含花括号、逗号、= 或换行",
     "leavingViewpoint": "此服务器不使用 Project Viewpoint",
-    "profileNew": "已创建空配置方案“{name}”并切换到它。"
+    "profileNew": "已创建空配置方案“{name}”并切换到它。",
+    "zbApproved": {
+      "other": "已在 ZombieBuddy 中允许 {count} 个 Java 模组，游戏中不会再询问：{ids}"
+    },
+    "zbApproveFailed": "无法在 ZombieBuddy 中允许 Java 模组（{error}）：游戏中会询问",
+    "resetMarkerUnknown": "无法确定游戏版本，首次启动时游戏可能会清空模组列表：从 PZMM 启动会将其恢复",
+    "viewpointB42": "已为“{name}”切换到 Build 42：Project Viewpoint 无法在 Build 41 上运行。",
+    "steamWait": "Steam 正在限制请求：{seconds} 秒后重试",
+    "subscribed": "已在 Steam 订阅 {id}：Steam 会下载并保持更新",
+    "unsubscribed": "已在 Steam 取消订阅 {id}：Steam 会删除其文件",
+    "removed": "已移除 {id}（{source}）"
   },
   "doctor": {
     "notInstalled": "已启用但未安装：游戏会跳过它",
@@ -2790,8 +2815,8 @@
     "incompatible": "与 {other} 不兼容，而它也已启用",
     "loadAfter": "应在 {other} 之后加载",
     "loadBefore": "应在 {other} 之前加载",
-    "only41": "是为 Build 41 制作的（没有 42/ 或 common/ 文件夹）；在 Build 42 上可能报错或无效果",
-    "only42": "仅为 Build 42 制作（根目录没有 mod.info）",
+    "only41": "仅适用于 Build 41（没有 42/ 或 common/ 文件夹）：Build 42 不会加载它",
+    "only42": "仅适用于 Build 42（根目录没有 mod.info）：Build 41 不会加载它",
     "twoCopies": "既在 Zomboid/mods 中，又在 Steam 中订阅：以 Zomboid/mods 中的副本为准，不会获得 Steam 的更新",
     "missingEnv": "{path} 不存在（由 {env} 设置）",
     "missingSet": "{path} 不存在（在设置中指定）",
@@ -3312,5 +3337,92 @@
     "profileExists": "名为“{name}”的配置方案已存在",
     "linkPercent": "无法链接 {path}：路径中含有 %。请重命名或移动该文件夹。",
     "profileActive": "“{name}”是当前配置方案，请先切换到其他配置方案"
+  },
+  "close": {
+    "title": "关闭 PZMM？",
+    "line": "最小化到托盘时，服务器计划、更新检查和崩溃监控会继续运行。无论哪种方式，你的配置和设置都已保存。",
+    "tray": "最小化到托盘",
+    "quit": "退出",
+    "dontAsk": "不再询问",
+    "settingsHint": "之后可以在设置中更改。"
+  },
+  "whatsNew": {
+    "notes": "批量操作现在作用于所有选中的模组\n创意工坊标签一键订阅或取消订阅\n你开启的 Java 模组会自动在 ZombieBuddy 中允许\n启动警告附带修复按钮，误报更少\n检查设置按严重程度排列问题，每个都附带修复方法\n每次安装、更新和移除的下载记录\n仅限 Build 42 的模组会提示切换版本\n创意工坊浏览更快，并有进度条\n重新扫描可找到在 PZMM 外下载的模组\n可选择关闭窗口时的行为",
+    "title": "{version} 更新内容",
+    "enjoying": "喜欢 PZMM 吗？",
+    "upvote": "如果你喜欢这个应用，请在 Steam 上点个赞！",
+    "clickMe": "（点我）",
+    "upvoteButton": "在 Steam 点赞"
+  },
+  "history": {
+    "none": "还没有下载任何内容。",
+    "forget": "忘记此记录",
+    "clear": "清除记录",
+    "clearAsk": "清除下载记录？模组仍会保留安装。",
+    "kept": "保留最近 500 条更改。",
+    "action": {
+      "installed": "已安装",
+      "updated": "已更新",
+      "removed": "已移除",
+      "subscribed": "已订阅",
+      "unsubscribed": "已取消订阅"
+    }
+  },
+  "check": {
+    "title": "检查设置",
+    "summary": {
+      "other": "{count} 项需要查看"
+    },
+    "severity": {
+      "broken": "已损坏",
+      "risk": "风险",
+      "check": "检查",
+      "low": "次要"
+    },
+    "severityHint": {
+      "broken": "游戏不会加载这些，或无法启动",
+      "risk": "可能访问你的文件或网络的代码：只在了解该模组时信任",
+      "check": "游戏中可能出问题",
+      "low": "仅供参考；无需修复"
+    },
+    "ignored": {
+      "other": "已隐藏 {count} 项"
+    },
+    "again": "重新检查",
+    "fixAll": {
+      "other": "安全修复 {count} 项"
+    },
+    "hideTip": "在模组变化前隐藏",
+    "fix": {
+      "download": "下载",
+      "downloadReq": "下载 {req}",
+      "turnOn": "开启 {name}",
+      "turnOff": "关闭",
+      "turnOffOther": "关闭 {name}",
+      "uninstall": "卸载",
+      "findB42": "查找 B42 版本",
+      "switchBuild": "切换到 Build {build}",
+      "updateGame": "更新游戏",
+      "updateMod": "重新下载",
+      "allow": "重新允许",
+      "openJava": "打开 Java 模组",
+      "zbSetup": "设置 ZombieBuddy",
+      "zbRemove": "移除 ZombieBuddy",
+      "removeCopy": "移除多余副本",
+      "unsubscribeOthers": "取消订阅其他",
+      "getOriginal": "获取原版",
+      "findReplacement": "寻找替代",
+      "arrangeMaps": "整理地图",
+      "verify": "验证游戏文件",
+      "autodetect": "自动查找",
+      "openSettings": "打开设置",
+      "startGame": "先启动一次游戏",
+      "openAuthoring": "打开制作模组",
+      "openServers": "打开服务器",
+      "trust": "信任此文件",
+      "sort": "修正顺序",
+      "hide": "没问题",
+      "unhide": "重新显示"
+    }
   }
 }

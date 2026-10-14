@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { track } from "./activity.svelte";
   import { onDestroy } from "svelte";
   import { api, type AuthoringReport, type Built, type Finding, type Upload } from "./api";
   import { intlLang, keyedError, t } from "./i18n.svelte";
@@ -98,6 +99,11 @@
     }
     working = false;
   }
+
+  // the activity bar moves while this tab works
+  $effect(() => {
+    if (working) return track();
+  });
 </script>
 
 {#snippet findings(list: Finding[])}

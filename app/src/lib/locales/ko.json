@@ -125,9 +125,6 @@
     "singleplayer": "싱글플레이",
     "findingMods": "모드를 찾는 중…",
     "gameListKey": "여기서 Steam 서버 목록을 보려면 Steam Web API 키가 필요해서 게임에 저장된 서버 목록에서 가져왔어요.",
-    "popularKept": "{ago} 목록이에요. 새로고침하면 Steam에 물어보는데, 잠깐 게임 중으로 표시돼요.",
-    "popularAsk": "가장 붐비는 서버 목록은 Steam에 물어보는데, 잠깐 게임 중으로 표시돼요.",
-    "listServers": "서버 목록 보기",
     "passwordTip": "비밀번호 필요: 저장된 비밀번호가 없으면 접속을 눌렀을 때 서버 탭의 서버 정보가 열리고 거기서 비밀번호를 물어봐요"
   },
   "app": {
@@ -193,7 +190,9 @@
     "saveModManagerPreset": "Mod Manager 프리셋으로 저장",
     "loadFailed": "모드를 읽지 못했어요: {error}",
     "openFolders": "설정에서 폴더 확인",
-    "moreTabs": "탭 더 보기"
+    "moreTabs": "탭 더 보기",
+    "rescan": "다시 검색",
+    "rescanTip": "PZMM을 연 뒤 구독하거나 복사한 모드를 찾습니다"
   },
   "mods": {
     "searchPlaceholder": "모드 검색  ( / )",
@@ -299,7 +298,9 @@
     "settingUpServer": "{name} 준비 중",
     "checking": "모드 확인 중",
     "importingCollection": "컬렉션 설치 중",
-    "readingCollection": "컬렉션 읽는 중"
+    "readingCollection": "컬렉션 읽는 중",
+    "subscribing": "{name} 구독 중",
+    "unsubscribing": "{name} 구독 취소 중"
   },
   "log": {
     "appLatest": "최신 버전(PZMM {version})을 사용 중이에요.",
@@ -398,7 +399,15 @@
     },
     "removeUsedBy": {
       "other": "다른 프로필 {count}개에서도 사용해요: {profiles}"
-    }
+    },
+    "needs42Title": {
+      "other": "이 중 모드 {count}개는 빌드 42에서만 실행됩니다"
+    },
+    "switch42": "빌드 42로 전환",
+    "keep41": "빌드 41 유지",
+    "unsubscribeTitle": "{name} 구독을 취소할까요?",
+    "unsubscribeLine": "Steam이 파일을 삭제하므로 이 모드를 쓰는 프로필에서 사라집니다.",
+    "unsubscribe": "구독 취소"
   },
   "common": {
     "cancel": "취소",
@@ -803,7 +812,6 @@
       "local": "PZMM이 파일에서 설치함",
       "manual": "PZMM 밖에서 모드 폴더에 추가함"
     },
-    "openWorkshop": "창작마당 페이지 열기",
     "favourite": "즐겨찾기",
     "byAuthor": "{name} (제작: {author})",
     "neededBy": {
@@ -812,7 +820,9 @@
     "neededByTip": "이 모드가 필요한 활성 모드: {names}",
     "languagesTip": "텍스트 언어: {languages}",
     "new": "새 모드",
-    "newTip": "이 프로필에 새로 추가됨"
+    "newTip": "이 프로필에 새로 추가됨",
+    "subscribeTip": "Steam에서 구독해 Steam이 최신 상태로 유지하게 합니다",
+    "unsubscribeTip": "Steam에서 구독 취소"
   },
   "details": {
     "label": "모드 상세 정보",
@@ -913,29 +923,14 @@
     "stillHappens": "문제가 여전히 생겨요",
     "gone": "문제가 사라졌어요",
     "stop": "중지하고 목록 복원",
-    "setupCheck": "설정 점검",
     "noProblems": "문제가 없어요.",
-    "summary": "{errors}, {warnings}",
-    "errors": {
-      "other": "오류 {count}개"
-    },
-    "warnings": {
-      "other": "경고 {count}개"
-    },
     "errorCount": {
       "other": "오류 {count}개, 첫 오류 위치: <span class=\"mono\">{example}</span>"
     },
-    "disable": "{id} 비활성화",
-    "bisectOffer": "뭔가 고장 났는데 위에서는 이유를 알 수 없나요? {link}: PZMM이 게임을 테스트할 때마다 활성화된 모드를 절반씩 줄여요.",
     "finishFirst": "문제 모드 찾기를 먼저 끝내거나 중지하세요.",
     "logErrors": "<strong>{file}의 오류</strong> (지난 실행):",
     "firstError": "첫 번째 실제 오류, {line}번째 줄.",
     "pointsAt": "가리키는 모드:",
-    "bisectSuspects": {
-      "other": "{link}: 로그가 가리키는 모드 {count}개부터 시작해요. PZMM이 먼저 그 모드를 테스트하고 나머지를 절반씩 줄여요."
-    },
-    "dismiss": "확인함",
-    "dismissTip": "이 파일을 확인했고 믿을 수 있습니다: 파일이 바뀔 때까지 PZMM이 더 이상 경고하지 않습니다",
     "bisectLeft": "“{profile}”에서 문제 모드 찾기가 끝나지 않았어요",
     "bisectLeftLine": {
       "other": "아직 의심되는 모드가 {count}개 있어요. 멈춘 곳에서 이어서 하거나, 찾기 전 모드 목록으로 되돌리세요."
@@ -1072,7 +1067,8 @@
       "look": "테마 및 언어",
       "lookHint": "PZMM의 모양이에요. 창 크기와 위치는 기억돼요.",
       "lists": "모드 목록",
-      "listsHint": "모드를 확인할 게임 빌드와 목록에 표시할 내용."
+      "listsHint": "모드를 확인할 게임 빌드와 목록에 표시할 내용.",
+      "gameVersion": "마지막 플레이: 버전 {version}, Steam 브랜치 \"{branch}\". 다른 버전: Steam › Project Zomboid › 속성 › 베타."
     },
     "launch": {
       "title": "실행",
@@ -1083,7 +1079,6 @@
       "profileArgs": "이 프로필만의 인수",
       "ownFolder": "전용 게임 폴더",
       "ownFolderHint": "세이브, 옵션, 로그, 모드 목록이 Zomboid 폴더와 따로 보관돼서 서버 프로필이 내 월드를 건드리지 못해요. 그 세이브는 세이브 탭에 나오지 않고, Zomboid/mods에 직접 넣은 모드도 거기서는 보이지 않아요.",
-      "tray": "창을 닫으면 트레이에 PZMM 남기기",
       "trayHint": "창을 닫아도 서버 일정, 업데이트 확인, 충돌 감시가 계속됩니다. 종료는 트레이 아이콘에서 하세요.",
       "autostart": "컴퓨터에 로그인하면 PZMM을 트레이에서 시작",
       "keepMarks": "새로 만들거나 전환하는 모든 프로필에서 즐겨찾기는 켜고 숨긴 모드는 끄기",
@@ -1092,7 +1087,9 @@
       "profileHint": "이 프로필에만 적용돼요. 다른 프로필은 각자의 설정을 유지해요.",
       "profiles": "프로필",
       "profilesHint": "프로필을 만들거나 전환할 때 PZMM이 하는 일.",
-      "trayTitle": "트레이 및 시작"
+      "trayTitle": "트레이 및 시작",
+      "onClose": "창을 닫을 때",
+      "onCloseAsk": "매번 묻기"
     },
     "about": {
       "title": "정보",
@@ -2308,9 +2305,6 @@
     "loaderBy": "게임 폴더의 {file}이(가) 실행합니다.",
     "loaderNotStarted": "게임 폴더나 Steam 실행 옵션에 이를 실행하는 것이 없어서, 직접 실행할 때만 로드됩니다.",
     "loadsWith": "서명을 확인하지 않는 {name}이(가) 로드합니다.",
-    "warnings": {
-      "other": "Java 모드 탭에 경고 {count}개."
-    },
     "hashCopied": "복사됨"
   },
   "profile": {
@@ -2339,7 +2333,21 @@
     "cancelTip": "다운로드를 멈춰요. 다운로드가 끝난 모드는 그래도 설치돼요.",
     "copy": "기록 복사",
     "copyTip": "시간이 포함된 기록 복사(경로의 사용자 이름은 가려져요)",
-    "whatChanged": "변경 사항"
+    "whatChanged": "변경 사항",
+    "wait": "잠시 기다려 주세요",
+    "history": "다운로드 기록",
+    "expand": "활동 크게 보기",
+    "filter": "보기",
+    "pickLine": "줄을 고르면 자세한 내용이 보입니다.",
+    "reinstall": "다시 설치",
+    "kind": {
+      "all": "전체",
+      "install": "설치",
+      "update": "업데이트",
+      "remove": "제거",
+      "error": "오류",
+      "info": "기타"
+    }
   },
   "links": {
     "label": "PZMM 링크",
@@ -2562,7 +2570,9 @@
     "addedToServerRestart": "{name}에 추가했어요. 불러오려면 서버를 다시 시작하세요."
   },
   "installButton": {
-    "installAll": "모두 설치…"
+    "installAll": "모두 설치…",
+    "uninstall": "제거",
+    "uninstallTip": "PZMM 사본을 지우거나 Steam 구독을 취소합니다"
   },
   "snapshots": {
     "title": "\"{profile}\"의 스냅샷",
@@ -2617,17 +2627,22 @@
     "notInstalled": "{id}: 활성화됐지만 설치되지 않음",
     "fix": "고치기",
     "anyway": "그래도 실행",
-    "javaTitle": {
-      "other": "ZombieBuddy가 새로 생기거나 바뀐 Java 파일 {count}개에 대해 물어볼 거예요. PZMM이 찾은 내용:"
-    },
-    "review": "Java 모드 살펴보기",
     "joinAnyway": "그래도 접속",
     "arrangeMaps": "맵 정리",
     "warnTitle": {
       "other": "플레이 전에 알아둘 점이 {count}개 있어요. 게임은 그대로 시작돼요."
     },
     "stopAsking": "실행하고 이 내용은 다시 묻지 않기",
-    "joinStopAsking": "접속하고 이 내용은 다시 묻지 않기"
+    "joinStopAsking": "접속하고 이 내용은 다시 묻지 않기",
+    "fixAndPlay": "고치고 플레이",
+    "turnOff": {
+      "other": "해당 모드 {count}개 끄기"
+    },
+    "updateGame": "Steam에서 열기",
+    "branchHint": "게임이 Steam의 \"{branch}\" 브랜치에 있습니다. 새 버전은 Steam 업데이트나 다른 브랜치로 받습니다: Project Zomboid › 속성 › 베타.",
+    "trustFiles": {
+      "other": "파일 {count}개를 신뢰하고 플레이"
+    }
   },
   "menu": {
     "label": "{name}: 작업",
@@ -2780,7 +2795,17 @@
     "secretsFile": "시스템 자격 증명 저장소를 사용할 수 없어({error}) PZMM이 비밀번호와 키를 {file}에 보관합니다",
     "badModId": "{id}을(를) 게임 모드 목록에서 뺐습니다: 모드 ID에는 중괄호, 쉼표, = 또는 줄바꿈을 쓸 수 없습니다",
     "leavingViewpoint": "이 서버에서는 Project Viewpoint 없이 접속해요",
-    "profileNew": "빈 프로필 “{name}”을(를) 만들고 전환했어요."
+    "profileNew": "빈 프로필 “{name}”을(를) 만들고 전환했어요.",
+    "zbApproved": {
+      "other": "ZombieBuddy에서 Java 모드 {count}개를 허용했습니다. 게임에서 다시 묻지 않습니다: {ids}"
+    },
+    "zbApproveFailed": "ZombieBuddy에서 Java 모드를 허용하지 못했습니다({error}). 게임에서 묻습니다",
+    "resetMarkerUnknown": "게임 릴리스를 확인하지 못해 첫 실행 시 게임이 모드 목록을 비울 수 있습니다. PZMM에서 플레이하면 다시 넣습니다",
+    "viewpointB42": "\"{name}\"을(를) 위해 빌드 42로 전환했습니다. Project Viewpoint는 빌드 41에서 실행되지 않습니다.",
+    "steamWait": "Steam이 요청을 제한하고 있습니다. {seconds}초 후 다시 시도합니다",
+    "subscribed": "Steam에서 {id}을(를) 구독했습니다. Steam이 다운로드하고 최신 상태로 유지합니다",
+    "unsubscribed": "Steam에서 {id} 구독을 취소했습니다. Steam이 파일을 삭제합니다",
+    "removed": "{id} 제거됨 ({source})"
   },
   "doctor": {
     "notInstalled": "활성화돼 있지만 설치되지 않았어요: 게임이 건너뛰어요",
@@ -2790,8 +2815,8 @@
     "incompatible": "{other}와(과) 호환되지 않는데 둘 다 활성화돼 있어요",
     "loadAfter": "{other} 뒤에 로드되어야 해요",
     "loadBefore": "{other} 앞에 로드되어야 해요",
-    "only41": "Build 41용이에요(42/ 또는 common/ 폴더 없음). Build 42에서는 오류가 나거나 작동하지 않을 수 있어요",
-    "only42": "Build 42 전용이에요(루트에 mod.info 없음)",
+    "only41": "빌드 41 전용입니다(42/ 또는 common/ 폴더 없음). 빌드 42는 불러오지 않습니다",
+    "only42": "빌드 42 전용입니다(루트 mod.info 없음). 빌드 41은 불러오지 않습니다",
     "twoCopies": "Zomboid/mods에 있으면서 Steam에서도 구독 중이에요: Zomboid/mods 사본이 우선하며 Steam 업데이트를 받지 못해요",
     "missingEnv": "{path}이(가) 없어요({env}이(가) 지정함)",
     "missingSet": "{path}이(가) 없어요(설정에서 지정함)",
@@ -3312,5 +3337,92 @@
     "profileExists": "“{name}” 프로필이 이미 있어요",
     "linkPercent": "{path}을(를) 연결할 수 없어요. 경로에 %가 들어 있습니다. 폴더 이름을 바꾸거나 옮겨 주세요.",
     "profileActive": "“{name}”은(는) 활성 프로필이에요. 먼저 다른 프로필로 전환하세요"
+  },
+  "close": {
+    "title": "PZMM을 닫을까요?",
+    "line": "트레이에서는 서버 일정, 업데이트 확인, 충돌 감시가 계속됩니다. 프로필과 설정은 어느 쪽이든 저장됩니다.",
+    "tray": "트레이로 최소화",
+    "quit": "종료",
+    "dontAsk": "다시 묻지 않기",
+    "settingsHint": "나중에 설정에서 바꿀 수 있습니다."
+  },
+  "whatsNew": {
+    "notes": "일괄 작업이 선택한 모든 모드에 적용됩니다\nWorkshop 칩으로 한 번에 구독하고 구독 취소합니다\n켠 Java 모드는 ZombieBuddy에서 자동으로 허용됩니다\n실행 경고에 해결 버튼이 생기고 잘못된 경고가 줄었습니다\n설정 확인이 문제를 심각도순으로 정렬하고 각각 해결 방법을 제공합니다\n모든 설치, 업데이트, 제거의 다운로드 기록\n빌드 42 전용 모드는 빌드 전환을 제안합니다\n더 빠른 Workshop 탐색과 진행 표시줄\n다시 검색으로 PZMM 밖에서 받은 모드를 찾습니다\n창을 닫을 때 동작을 고를 수 있습니다",
+    "title": "{version}의 새로운 점",
+    "enjoying": "PZMM이 마음에 드나요?",
+    "upvote": "이 앱이 마음에 든다면 Steam에서 추천해 주세요!",
+    "clickMe": "(클릭!)",
+    "upvoteButton": "Steam에서 추천"
+  },
+  "history": {
+    "none": "아직 받은 것이 없습니다.",
+    "forget": "이 항목 지우기",
+    "clear": "기록 지우기",
+    "clearAsk": "다운로드 기록을 지울까요? 모드는 그대로 설치되어 있습니다.",
+    "kept": "최근 500개 변경 사항이 보관됩니다.",
+    "action": {
+      "installed": "설치됨",
+      "updated": "업데이트됨",
+      "removed": "제거됨",
+      "subscribed": "구독함",
+      "unsubscribed": "구독 취소함"
+    }
+  },
+  "check": {
+    "title": "설정 확인",
+    "summary": {
+      "other": "확인할 항목 {count}개"
+    },
+    "severity": {
+      "broken": "작동 안 함",
+      "risk": "위험",
+      "check": "확인",
+      "low": "낮음"
+    },
+    "severityHint": {
+      "broken": "게임이 불러오지 않거나 시작되지 않습니다",
+      "risk": "파일이나 인터넷에 접근할 수 있는 코드: 아는 모드일 때만 신뢰하세요",
+      "check": "게임에서 문제가 생길 수 있습니다",
+      "low": "참고용; 고칠 것 없음"
+    },
+    "ignored": {
+      "other": "숨김 {count}개"
+    },
+    "again": "다시 확인",
+    "fixAll": {
+      "other": "{count}개 안전하게 고치기"
+    },
+    "hideTip": "모드가 바뀔 때까지 숨기기",
+    "fix": {
+      "download": "받기",
+      "downloadReq": "{req} 받기",
+      "turnOn": "{name} 켜기",
+      "turnOff": "끄기",
+      "turnOffOther": "{name} 끄기",
+      "uninstall": "제거",
+      "findB42": "B42 버전 찾기",
+      "switchBuild": "빌드 {build}로 전환",
+      "updateGame": "게임 업데이트",
+      "updateMod": "다시 받기",
+      "allow": "다시 허용",
+      "openJava": "Java 모드 열기",
+      "zbSetup": "ZombieBuddy 설정",
+      "zbRemove": "ZombieBuddy 제거",
+      "removeCopy": "남는 사본 제거",
+      "unsubscribeOthers": "나머지 구독 취소",
+      "getOriginal": "원본 받기",
+      "findReplacement": "대체 모드 찾기",
+      "arrangeMaps": "맵 정리",
+      "verify": "게임 파일 검사",
+      "autodetect": "자동으로 찾기",
+      "openSettings": "설정 열기",
+      "startGame": "게임 한 번 실행",
+      "openAuthoring": "모드 만들기 열기",
+      "openServers": "서버 열기",
+      "trust": "이 파일 신뢰",
+      "sort": "순서 고치기",
+      "hide": "괜찮음",
+      "unhide": "다시 보기"
+    }
   }
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { track } from "./activity.svelte";
   import { onMount } from "svelte";
   import { api, type BackupView, type ServerBackup, type ServerCard } from "./api";
   import { fmtDateTime, fmtSize } from "./format";
@@ -61,6 +62,11 @@
 
   onMount(() => {
     load();
+  });
+
+  // the activity bar moves while this tab works
+  $effect(() => {
+    if (working) return track();
   });
 </script>
 

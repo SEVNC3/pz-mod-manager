@@ -129,7 +129,7 @@
     position: fixed;
     inset: 0;
     background: rgb(0 0 0 / 0.45);
-    z-index: 20;
+    z-index: 32; /* over Check setup, which opens it */
   }
   .panel:focus {
     outline: none;
@@ -140,7 +140,7 @@
     right: 0;
     bottom: 0;
     width: min(980px, 96vw);
-    z-index: 21;
+    z-index: 33;
     display: flex;
     flex-direction: column;
     background: var(--panel);

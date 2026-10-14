@@ -3,6 +3,7 @@
 /// How PZMM introduces itself to web services (Steam limits requests per user agent).
 pub const USER_AGENT: &str = concat!("PZMM/", env!("CARGO_PKG_VERSION"), " (+https://github.com/SEVNC3/pz-mod-manager)");
 
+pub mod history;
 pub mod profile;
 pub mod pz;
 pub mod settings;

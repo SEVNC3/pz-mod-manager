@@ -4,6 +4,7 @@
 </script>
 
 <script lang="ts">
+  import { track } from "./activity.svelte";
   import { onMount, untrack } from "svelte";
   import { api, connectOf, defaultSkip, joinPlan, knownItems, type GameServer, type MapCompare, type ServerJoin, type ServerMods, type ServerPlayer, type SetupItem } from "./api";
   import { fmtAgo, fmtDate, fmtDateTime, fmtNum, fmtSize } from "./format";
@@ -184,6 +185,11 @@
     if (server.probed) resolve();
     if (server.password) api.serverPasswordSaved(connect).then((v) => (passwordSaved = v)).catch(() => {});
   });
+
+  // the activity bar moves while this tab works
+  $effect(() => {
+    if (working) return track();
+  });
 </script>
 
 <section class="details" aria-label={server.name}>
@@ -329,7 +335,8 @@
   </div>
 
   {#if asking}
-    <div class="strip ask" role="dialog" tabindex="-1" aria-label={t("launcher.passwordTitle", { name: server.name })} use:trap onkeydown={(e) => e.key === "Escape" && asking?.done(false)}>
+    <div class="dim" onclick={() => asking?.done(false)} aria-hidden="true"></div>
+    <div class="strip ask" role="dialog" aria-modal="true" tabindex="-1" aria-label={t("launcher.passwordTitle", { name: server.name })} use:trap onkeydown={(e) => e.key === "Escape" && asking?.done(false)}>
     <form onsubmit={(e) => { e.preventDefault(); asking?.done(true); }}>
       <p><strong>{t("launcher.passwordTitle", { name: server.name })}</strong></p>
       <!-- a link's password in clear, to read before it's sent -->
@@ -501,12 +508,27 @@
   .plan p {
     margin: 0 0 8px;
   }
+  /* a box in the middle over the dimmed window, like every question */
+  .dim {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgb(0 0 0 / 0.45);
+  }
   .ask {
-    margin-top: 12px;
-    padding: 12px 14px;
+    position: fixed;
+    z-index: 31;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    width: min(560px, calc(100vw - 32px));
+    max-height: calc(100vh - 64px);
+    overflow: auto;
+    margin: 0;
+    padding: 20px 22px;
+    border-radius: 10px;
     background: var(--panel);
-    border-radius: 8px;
-    box-shadow: var(--card-shadow);
+    box-shadow: var(--shadow);
   }
   .ask p {
     margin: 0 0 8px;

@@ -348,16 +348,49 @@ pub fn reports(paths: &Paths, mods: &BTreeMap<String, Row>) -> Vec<Report> {
 
 /// The game version of the last run (`version=42.21.0 ...` in console.txt), e.g. `42.21.0`.
 pub fn game_version(zomboid: &Path) -> Option<String> {
-    let text = String::from_utf8_lossy(&std::fs::read(zomboid.join("console.txt")).ok()?).into_owned();
+    use std::io::Read;
+    // the version is in the log's opening lines; the rest can be tens of MB
+    let mut head = vec![];
+    std::fs::File::open(zomboid.join("console.txt")).ok()?.take(256 << 10).read_to_end(&mut head).ok()?;
+    let text = String::from_utf8_lossy(&head).into_owned();
     text.lines().find_map(|l| {
         let v = l.split_once("> version=")?.1.split_whitespace().next()?;
         (v.contains('.') && v.bytes().all(|b| b.is_ascii_digit() || b == b'.')).then(|| v.to_string())
     })
 }
 
+/// The Steam branch the game folder `game` is on ("public", "unstable", ...), from its Steam manifest.
+pub fn steam_branch(game: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(game.parent()?.parent()?.join("appmanifest_108600.acf")).ok()?;
+    let from = text.find("\"MountedConfig\"").unwrap_or(0);
+    let at = text[from..].find("\"BetaKey\"").map(|i| i + from).or_else(|| text.find("\"BetaKey\""))? + "\"BetaKey\"".len();
+    let v = text[at..].split('"').nth(1)?.trim();
+    Some(if v.is_empty() { "public" } else { v }.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_the_steam_branch() {
+        let t = tempfile::tempdir().unwrap();
+        let game = t.path().join("common/ProjectZomboid");
+        std::fs::create_dir_all(&game).unwrap();
+        assert_eq!(steam_branch(&game), None);
+        std::fs::write(t.path().join("appmanifest_108600.acf"), "\"AppState\"
+{
+	\"UserConfig\"
+	{
+		\"BetaKey\"		\"unstable\"
+	}
+}
+").unwrap();
+        assert_eq!(steam_branch(&game).as_deref(), Some("unstable"));
+        // the branch installed, not the one picked while its download waits
+        std::fs::write(t.path().join("appmanifest_108600.acf"), "\"UserConfig\" { \"BetaKey\" \"unstable\" } \"MountedConfig\" { \"BetaKey\" \"\" }").unwrap();
+        assert_eq!(steam_branch(&game).as_deref(), Some("public"));
+    }
 
     fn row(id: &str, name: &str, dir: &str, source: &str) -> Row {
         Row {

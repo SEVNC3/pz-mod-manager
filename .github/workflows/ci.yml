@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: npm ci && npm run check && node scripts/order-check.ts && node scripts/bbcode-check.ts && node scripts/i18n-check.ts && node scripts/logkind-check.ts && npm run build
+      - run: npm ci && npm run check && node scripts/order-check.ts && node scripts/bbcode-check.ts && node scripts/i18n-check.ts && node scripts/logkind-check.ts && node scripts/findings-check.ts && npm run build
         working-directory: app
       - run: cargo clippy -p pzmm-app --all-targets -- -D warnings
       - run: cargo test -p pzmm-app

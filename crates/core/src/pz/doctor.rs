@@ -29,6 +29,8 @@ pub struct Finding {
     pub vars: BTreeMap<&'static str, String>,
     /// What would fix it, for a button beside it.
     pub action: Option<Action>,
+    /// The player chose to hide it (see [`hide`]); it shows under Ignored, uncounted.
+    pub hidden: bool,
 }
 
 /// A fix the UI can offer: install a missing mod, disable a clashing one, or stop reporting a
@@ -44,7 +46,53 @@ pub enum Action {
 /// A finding worded by the English template (with {name} placeholders) and keyed for the app;
 /// scripts/i18n-check.ts checks the template matches doctor.<key> in en.json.
 fn finding(level: Level, subject: &str, key: &'static str, template: &str, vars: &[(&'static str, String)]) -> Finding {
-    Finding { level, subject: subject.into(), text: crate::fill(template, vars), key, vars: vars.iter().cloned().collect(), action: None }
+    Finding { level, subject: subject.into(), text: crate::fill(template, vars), key, vars: vars.iter().cloned().collect(), action: None, hidden: false }
+}
+
+// --- findings the player hid ("It's fine" / Hide): back when the mod changes ---
+
+/// A hidden finding: which one, and the mod.info it was about (its SHA-256), so an update brings it back.
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+struct Hidden {
+    key: String,
+    subject: String,
+    vars: BTreeMap<String, String>,
+    stamp: String,
+}
+
+fn hidden_file(paths: &Paths) -> std::path::PathBuf {
+    paths.data.join("finding-dismissals.json")
+}
+
+/// The mod's mod.info as it is now (SHA-256), or "" when the subject isn't a mod.
+fn stamp(mods: &BTreeMap<String, Row>, subject: &str) -> String {
+    mods.get(subject).and_then(|m| std::fs::read(&m.info).ok()).map(|b| super::javamods::sha256(&b)).unwrap_or_default()
+}
+
+fn same(h: &Hidden, f: &Finding) -> bool {
+    h.key == f.key && h.subject == f.subject && h.vars.len() == f.vars.len() && f.vars.iter().all(|(k, v)| h.vars.get(*k) == Some(v))
+}
+
+/// Hide the finding `key` about `subject` with `vars` (show it again with `on` false). Errors are
+/// never marked hidden (see [`mark_hidden`]), so hiding one does nothing.
+pub fn hide(paths: &Paths, mods: &BTreeMap<String, Row>, key: &str, subject: &str, vars: BTreeMap<String, String>, on: bool) -> anyhow::Result<()> {
+    static WRITING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _one = WRITING.lock().unwrap_or_else(|e| e.into_inner());
+    let mut all: Vec<Hidden> = crate::read_json(&hidden_file(paths))?;
+    all.retain(|h| !(h.key == key && h.subject == subject && h.vars == vars));
+    if on {
+        all.push(Hidden { key: key.into(), subject: subject.into(), vars, stamp: stamp(mods, subject) });
+    }
+    std::fs::create_dir_all(&paths.data)?;
+    Ok(crate::write_atomic(&hidden_file(paths), serde_json::to_vec(&all)?)?)
+}
+
+/// Mark the findings the player hid, while their mod is unchanged.
+pub fn mark_hidden(paths: &Paths, mods: &BTreeMap<String, Row>, found: &mut [Finding]) {
+    let all: Vec<Hidden> = crate::read_json(&hidden_file(paths)).unwrap_or_default();
+    for f in found.iter_mut().filter(|f| f.level != Level::Error) {
+        f.hidden = all.iter().any(|h| same(h, f) && h.stamp == stamp(mods, &f.subject));
+    }
 }
 
 pub(crate) fn err(subject: &str, key: &'static str, template: &str, vars: &[(&'static str, String)]) -> Finding {
@@ -82,7 +130,7 @@ pub fn check(paths: &Paths, enabled: &[String], mods: &BTreeMap<String, Row>, bu
     let pos: HashMap<&str, usize> = enabled.iter().enumerate().map(|(i, id)| (id.as_str(), i)).collect();
     for (i, id) in enabled.iter().enumerate() {
         let Some(m) = mods.get(id) else {
-            out.push(err(id, "notInstalled", "enabled but not installed: the game skips it", &[]));
+            out.push(Finding { action: Some(Action::Install(id.clone())), ..err(id, "notInstalled", "enabled but not installed: the game skips it", &[]) });
             continue;
         };
         out.extend(check_info(m, game.as_deref()));
@@ -123,9 +171,9 @@ pub fn check(paths: &Paths, enabled: &[String], mods: &BTreeMap<String, Row>, bu
             }
         }
         if build >= 42 && !m.supports_42 {
-            out.push(warn(id, "only41", "is built for Build 41 (no 42/ or common/ folder); on Build 42 it may error or do nothing", &[]));
+            out.push(err(id, "only41", "is built for Build 41 only (no 42/ or common/ folder): Build 42 doesn't load it", &[]));
         } else if build == 41 && !m.supports_41 {
-            out.push(warn(id, "only42", "is built for Build 42 only (no root mod.info)", &[]));
+            out.push(warn(id, "only42", "is built for Build 42 only (no root mod.info): Build 41 won't load it", &[]));
         }
         if !m.source.starts_with("steam:") && items_of.contains_key(id) {
             out.push(warn(id, "twoCopies", "is in Zomboid/mods and also subscribed in Steam: the Zomboid/mods copy wins and won't get Steam's updates", &[]));
@@ -143,7 +191,8 @@ pub fn check(paths: &Paths, enabled: &[String], mods: &BTreeMap<String, Row>, bu
     }
     // ZombieBuddy's agent: the mod alone isn't enough (tests never read the real game folder)
     let zb = super::zombiebuddy::required_by(enabled, mods);
-    if !zb.is_empty() && mods.contains_key(super::zombiebuddy::MOD_ID) && !cfg!(test) && !super::zombiebuddy::agent_ready(mods) {
+    // the same test as the Java tab's "set up" tick: installed, agent current, and enabled here
+    if !zb.is_empty() && !cfg!(test) && (!enabled.iter().any(|id| id == super::zombiebuddy::MOD_ID) || !super::zombiebuddy::agent_ready(mods)) {
         out.extend(zb.iter().map(|id| err(id, "zbAgent", "needs ZombieBuddy's Java agent, which isn't set up in the game folder: set it up in the Java mods tab", &[])));
     }
     // Leaf mods need Leaf installed and started (tests never read the real game folder)
@@ -536,10 +585,12 @@ fn check_lua(on: &[&Row], except: &HashSet<String>) -> Vec<Finding> {
                         out.push(warn(&m.id, "luaSyntax", "its Lua file {file} has a syntax error near line {line}: the game won't run that file", &[("file", file.clone()), ("line", line.to_string())]));
                     }
                 }
-                let risks: Vec<Finding> = super::javamods::scan_lua(&m.id, &file, &String::from_utf8_lossy(&bytes)).into_iter().filter(|r| said.insert(r.key)).collect();
-                if !risks.is_empty() {
-                    out.extend(super::javamods::dismissable(risks, &super::javamods::sha256(&bytes), except));
+                let sha = super::javamods::sha256(&bytes);
+                if except.contains(&sha) {
+                    continue; // trusted: its findings don't use up the mod's one-per-kind
                 }
+                let risks: Vec<Finding> = super::javamods::scan_lua(&m.id, &file, &String::from_utf8_lossy(&bytes)).into_iter().filter(|r| said.insert(r.key)).collect();
+                out.extend(super::javamods::dismissable(risks, &sha, except));
             }
         }
     }
@@ -592,17 +643,18 @@ fn check_folders() -> Vec<Finding> {
         let Some(p) = &f.path else { continue };
         let path = ("path", p.display().to_string());
         let folder = ("folder", f.label.to_string());
+        let key = ("key", f.key.to_string());
         let env = f.env.filter(|_| f.overridden).map(|e| ("env", e.to_string()));
         match (f.status, env) {
             ("missing", Some(env)) => out.push(err(f.label, "missingEnv", "{path} doesn't exist (set by {env})", &[path.clone(), env])),
-            ("missing", None) if f.custom => out.push(err(f.label, "missingSet", "{path} doesn't exist (set in Settings)", std::slice::from_ref(&path))),
+            ("missing", None) if f.custom => out.push(err(f.label, "missingSet", "{path} doesn't exist (set in Settings)", &[path.clone(), key.clone()])),
             ("missing", None) if f.key == "zomboid" => out.push(warn(f.label, "notYet", "{path} doesn't exist yet: start the game once", std::slice::from_ref(&path))),
             ("not_pz", Some(env)) => out.push(warn(f.label, "notPzEnv", "{path} doesn't look like the {folder} (set by {env})", &[path.clone(), folder, env])),
-            ("not_pz", None) if f.custom => out.push(warn(f.label, "notPzSet", "{path} doesn't look like the {folder} (set in Settings)", &[path.clone(), folder])),
-            ("not_pz", None) => out.push(warn(f.label, "notPz", "{path} doesn't look like the {folder}", &[path.clone(), folder])),
+            ("not_pz", None) if f.custom => out.push(warn(f.label, "notPzSet", "{path} doesn't look like the {folder} (set in Settings)", &[path.clone(), folder, key.clone()])),
+            ("not_pz", None) => out.push(warn(f.label, "notPz", "{path} doesn't look like the {folder}", &[path.clone(), folder, key.clone()])),
             _ => {}
         }
-        out.extend(f.warnings.iter().map(|w| warn(f.label, "folderWarning", "{path}: {warning}", &[path.clone(), ("warning", w.clone())])));
+        out.extend(f.warnings.iter().map(|w| warn(f.label, "folderWarning", "{path}: {warning}", &[path.clone(), ("warning", w.clone()), key.clone()])));
     }
     out
 }
@@ -732,6 +784,28 @@ mod tests {
             r"Zomboid: C:\Users\<user>\Zomboid, data: /home/<user>/.local/share/pzmm, Sam's profile, C:\Users\Samuel\x, D:\<user>"
         );
         assert_eq!(mask_user(r"C:\Users\A\x", "A"), r"C:\Users\A\x", "one letter is too short to mask safely");
+    }
+
+    #[test]
+    fn hidden_findings_come_back_when_the_mod_changes() {
+        let t = tempfile::tempdir().unwrap();
+        let paths = Paths { zomboid: t.path().join("Zomboid"), data: t.path().join("data") };
+        let dir = t.path().join("M");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("mod.info"), "id=M\n").unwrap();
+        let mods = BTreeMap::from([("M".to_string(), Row { id: "M".into(), info: dir.join("mod.info"), dir: dir.clone(), ..Default::default() })]);
+        let f = warn("M", "only41", "is built for Build 41 only (no 42/ or common/ folder): Build 42 doesn't load it", &[]);
+        hide(&paths, &mods, "only41", "M", BTreeMap::new(), true).unwrap();
+        let mut found = vec![f.clone(), warn("N", "only41", "is built for Build 41 only (no 42/ or common/ folder): Build 42 doesn't load it", &[])];
+        mark_hidden(&paths, &mods, &mut found);
+        assert_eq!(found.iter().map(|f| f.hidden).collect::<Vec<_>>(), [true, false]);
+        fs::write(dir.join("mod.info"), "id=M\nname=New\n").unwrap();
+        mark_hidden(&paths, &mods, &mut found);
+        assert!(!found[0].hidden, "an update brings it back");
+        hide(&paths, &mods, "notInstalled", "M", BTreeMap::new(), true).unwrap();
+        let mut errs = vec![err("M", "notInstalled", "enabled but not installed: the game skips it", &[])];
+        mark_hidden(&paths, &mods, &mut errs);
+        assert!(!errs[0].hidden, "errors stay");
     }
 
     #[test]

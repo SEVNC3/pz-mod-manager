@@ -1,0 +1,96 @@
+<!doctype html>
+<!-- The start-up splash: a small window of its own, centred on the screen, while the main window loads
+     (lib.rs opens it and closes it when the page says it's ready). The logo's two layers come from
+     SEVNC3/brand/animate-transparent.py and beat in CSS, so it's smooth at any frame rate. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>PZMM</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+      }
+      /* the app's blueprint grid, as a rounded tile */
+      .tile {
+        position: absolute;
+        inset: 0;
+        border-radius: 14px;
+        background-color: #121212;
+        background-image:
+          radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / 0.05), transparent 60%),
+          linear-gradient(rgb(255 255 255 / 0.06) 1px, transparent 1px),
+          linear-gradient(90deg, rgb(255 255 255 / 0.06) 1px, transparent 1px),
+          linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px),
+          linear-gradient(90deg, rgb(255 255 255 / 0.025) 1px, transparent 1px);
+        background-size: 100% 100%, 64px 64px, 64px 64px, 16px 16px, 16px 16px;
+        animation: open 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      }
+      .logo {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 160px;
+        height: 160px;
+        translate: -50% -50%;
+        opacity: 0;
+        animation:
+          fade 0.45s 0.2s ease-out forwards,
+          beat 2s 0.65s infinite;
+      }
+      img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .hot {
+        opacity: 0;
+        animation: flare 2s 0.65s infinite;
+      }
+      @keyframes open {
+        from {
+          clip-path: inset(50% 0 50% 0 round 14px);
+        }
+        to {
+          clip-path: inset(0 0 0 0 round 14px);
+        }
+      }
+      @keyframes fade {
+        from {
+          opacity: 0;
+          scale: 0.94;
+        }
+        to {
+          opacity: 1;
+          scale: 1;
+        }
+      }
+      /* lub-dub, then rest (animate.py's beat: peaks at 12% and 30% of the loop, the second at 70%) */
+      @keyframes beat {
+        0%, 4%, 20%, 24%, 38%, 100% { scale: 1; }
+        12% { scale: 1.09; }
+        30% { scale: 1.063; }
+      }
+      @keyframes flare {
+        0%, 4%, 20%, 24%, 38%, 100% { opacity: 0; }
+        12% { opacity: 1; }
+        30% { opacity: 0.7; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .logo { animation: fade 0.45s 0.2s ease-out forwards; }
+        .hot { animation: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="tile"></div>
+    <div class="logo">
+      <img src="/brand/pzmm-logo.png" alt="" />
+      <img class="hot" src="/brand/pzmm-logo-hot.png" alt="" />
+    </div>
+  </body>
+</html>

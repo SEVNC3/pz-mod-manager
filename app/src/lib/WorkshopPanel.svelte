@@ -11,12 +11,13 @@
   import { confirmed } from "./ask.svelte";
 
   // The item panel: everything Steam's item page shows, plus Install.
-  let { item, busy, installing, onInstall, onClose, onDependents, onInCollections, onAuthor, onOpen, onBack }: {
+  let { item, busy, installing, onInstall, onUninstall, onClose, onDependents, onInCollections, onAuthor, onOpen, onBack }: {
     /** The card it was opened from (has the rating and author, which the details API lacks). */
     item: WorkshopItem;
     busy: boolean;
     installing: string | null;
     onInstall: (id: string) => void;
+    onUninstall: (id: string) => void;
     onClose: () => void;
     onDependents: (it: WorkshopItem) => void;
     onInCollections: (it: WorkshopItem) => void;
@@ -174,7 +175,7 @@
     {/if}
 
     <div class="actions">
-      <InstallButton item={it} {busy} {installing} {onInstall} all={(info?.members.length || it.num_children) ? t("panel.installAll", { count: info?.members.length || it.num_children }) : undefined} />
+      <InstallButton item={it} {busy} {installing} {onInstall} {onUninstall} all={(info?.members.length || it.num_children) ? t("panel.installAll", { count: info?.members.length || it.num_children }) : undefined} />
       <button onclick={() => api.openUrl(workshopUrl(it.id))}><Icon name="steam" size={14} />{t("panel.workshopPage")}</button>
       <button onclick={chooseServer} disabled={adding} aria-haspopup="menu" aria-expanded={!!serverMenu} title={t("panel.addToServerTip")}><Icon name="server" size={14} />{adding ? t("panel.addingToServer") : t("panel.addToServer")}</button>
     </div>

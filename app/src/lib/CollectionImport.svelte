@@ -32,6 +32,7 @@
   const count = $derived(items.flatMap(mods).filter((m) => on[m]).length);
 </script>
 
+<div class="dim" onclick={onCancel} aria-hidden="true"></div>
 <div class="pick" role="dialog" tabindex="-1" aria-modal="true" aria-label={t("collection.title", { title: pack.title || t("collection.untitled") })} use:trap
   onkeydown={(e) => e.key === "Escape" && (e.stopPropagation(), onCancel())}>
   <p><strong>{t("collection.title", { title: pack.title || t("collection.untitled") })}</strong></p>
@@ -73,11 +74,27 @@
 </div>
 
 <style>
+  /* a box in the middle over the dimmed window, like every question */
+  .dim {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgb(0 0 0 / 0.45);
+  }
   .pick {
-    margin: 10px 16px 0;
-    padding: 10px 16px;
-    border-radius: 8px;
+    position: fixed;
+    z-index: 31;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    width: min(560px, calc(100vw - 32px));
+    max-height: calc(100vh - 64px);
+    overflow: auto;
+    margin: 0;
+    padding: 20px 22px;
+    border-radius: 10px;
     background: var(--panel);
+    box-shadow: var(--shadow);
   }
   .pick p {
     margin: 0 0 6px;

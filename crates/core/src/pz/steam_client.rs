@@ -26,11 +26,26 @@ const SETTLED: Duration = Duration::from_secs(1);
 /// The child's whole run, after which it's killed.
 const CHILD: Duration = Duration::from_secs(30);
 
+/// The hidden argument that makes PZMM's exe subscribe to (`sub`) or unsubscribe from (`unsub`) a Workshop item and exit.
+pub const UGC_ARG: &str = "--steam-ugc";
+
 /// Steam's internet server list for PZ, from the running Steam client (the game's install `game` has the DLL).
 pub fn list(game: &Path) -> Result<Vec<Server>> {
+    parse(&helper(&[CHILD_ARG.as_ref(), game.as_os_str()], "Steam didn't send its server list in time")?)
+}
+
+/// Subscribe the signed-in Steam account to Workshop item `id` (or unsubscribe with `on` false),
+/// through the running Steam client: Steam then downloads (or deletes) it as for any subscription.
+pub fn subscribe(game: &Path, id: &str, on: bool) -> Result<()> {
+    anyhow::ensure!(crate::sources::steam_workshop::valid_id(id), "not a Workshop item: {id}");
+    helper(&[UGC_ARG.as_ref(), game.as_os_str(), (if on { "sub" } else { "unsub" }).as_ref(), id.as_ref()], "Steam didn't answer in time").map(|_| ())
+}
+
+/// Run PZMM's exe as a Steam helper with `args`: its stdout, or its last error line.
+fn helper(args: &[&std::ffi::OsStr], late: &str) -> Result<String> {
     let exe = std::env::current_exe()?;
     let mut cmd = Command::new(exe);
-    cmd.arg(CHILD_ARG).arg(game).env("SteamAppId", super::STEAM_APP).env("SteamGameId", super::STEAM_APP).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    cmd.args(args).env("SteamAppId", super::STEAM_APP).env("SteamGameId", super::STEAM_APP).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -38,6 +53,13 @@ pub fn list(game: &Path) -> Result<Vec<Server>> {
     }
     let mut child = cmd.spawn().context("starting the Steam list helper")?;
     let mut out = child.stdout.take().context("the helper's output")?;
+    let mut err = child.stderr.take().context("the helper's errors")?;
+    // stderr too: Steam's DLL can write more than a pipe holds, and the helper would wait on it
+    let errs = std::thread::spawn(move || {
+        let mut s = String::new();
+        let _ = err.read_to_string(&mut s);
+        s
+    });
     // drained on its own thread: thousands of servers overflow a pipe's buffer
     let reader = std::thread::spawn(move || {
         let mut s = String::new();
@@ -51,19 +73,16 @@ pub fn list(game: &Path) -> Result<Vec<Server>> {
         if Instant::now() > end {
             let _ = child.kill();
             let _ = child.wait();
-            bail!("Steam didn't send its server list in time");
+            bail!("{late}");
         }
         std::thread::sleep(Duration::from_millis(100));
     };
     let out = reader.join().map_err(|_| anyhow::anyhow!("reading the helper's output"))??;
     if !status.success() {
-        let mut err = String::new();
-        if let Some(mut e) = child.stderr.take() {
-            let _ = e.read_to_string(&mut err);
-        }
-        bail!("{}", err.trim().lines().last().unwrap_or("the Steam list helper failed"));
+        let err = errs.join().unwrap_or_default();
+        bail!("{}", err.trim().lines().last().unwrap_or("the Steam helper failed"));
     }
-    parse(&out)
+    Ok(out)
 }
 
 /// The helper's output: Steam's DLL prints its own lines first, the list is the last one.
@@ -74,11 +93,18 @@ fn parse(out: &str) -> Result<Vec<Server>> {
 /// In PZMM's exe before anything else: when started as the helper, list and say the exit code.
 pub fn child() -> Option<i32> {
     let mut args = std::env::args_os().skip(1);
-    if args.next()? != CHILD_ARG {
+    let which = args.next()?;
+    if which != CHILD_ARG && which != UGC_ARG {
         return None;
     }
     let game = std::path::PathBuf::from(args.next().unwrap_or_default());
-    Some(match in_process(&game).and_then(|l| Ok(serde_json::to_string(&l)?)) {
+    let got = if which == UGC_ARG {
+        let (how, id) = (args.next().unwrap_or_default(), args.next().unwrap_or_default());
+        id.to_str().and_then(|i| i.parse::<u64>().ok()).context("a Workshop item id").and_then(|id| ugc(&game, how == "sub", id)).map(|()| String::new())
+    } else {
+        in_process(&game).and_then(|l| Ok(serde_json::to_string(&l)?))
+    };
+    Some(match got {
         Ok(json) => {
             println!("{json}");
             0
@@ -152,6 +178,87 @@ fn server(i: &Item) -> Option<Server> {
 }
 
 #[cfg(not(windows))]
+fn ugc(_game: &Path, _on: bool, _id: u64) -> Result<()> {
+    bail!("subscribing through the Steam client works on Windows only")
+}
+
+/// `RemoteStorageSubscribePublishedFileResult_t` / `...Unsubscribe...`: an `EResult`, then the item (8-byte aligned).
+#[repr(C)]
+struct UgcResult {
+    result: i32,
+    item: u64,
+}
+
+#[cfg(windows)]
+fn ugc(game: &Path, on: bool, id: u64) -> Result<()> {
+    use std::ffi::c_void;
+    let dll = game.join("steam_api64.dll");
+    if !dll.is_file() {
+        bail!("the game's steam_api64.dll isn't in {}", game.display());
+    }
+    // SAFETY: the game's own Steam API DLL; every symbol is called with its documented flat signature
+    unsafe {
+        let lib = libloading::Library::new(&dll).with_context(|| format!("loading {}", dll.display()))?;
+        init(&lib)?;
+        let shutdown = lib.get::<unsafe extern "C" fn()>(b"SteamAPI_Shutdown\0")?;
+        let got = (|| -> Result<()> {
+            // the newest interface the game's DLL has (an older game branch ships an older DLL)
+            let first = |names: &[&[u8]]| names.iter().find_map(|n| lib.get::<unsafe extern "C" fn() -> *mut c_void>(n).ok());
+            let old = || anyhow::anyhow!("this game version's Steam API is too old to subscribe from PZMM: subscribe on the Workshop page");
+            let ugc = first(&[b"SteamAPI_SteamUGC_v021\0", b"SteamAPI_SteamUGC_v020\0", b"SteamAPI_SteamUGC_v018\0", b"SteamAPI_SteamUGC_v017\0", b"SteamAPI_SteamUGC_v016\0", b"SteamAPI_SteamUGC_v015\0", b"SteamAPI_SteamUGC_v014\0"]).ok_or_else(old)?();
+            let utils = first(&[b"SteamAPI_SteamUtils_v010\0", b"SteamAPI_SteamUtils_v009\0"]).ok_or_else(old)?();
+            if ugc.is_null() || utils.is_null() {
+                bail!("Steam's Workshop interface isn't there");
+            }
+            let name: &[u8] = if on { b"SteamAPI_ISteamUGC_SubscribeItem\0" } else { b"SteamAPI_ISteamUGC_UnsubscribeItem\0" };
+            let call = lib.get::<unsafe extern "C" fn(*mut c_void, u64) -> u64>(name)?(ugc, id);
+            let done = lib.get::<unsafe extern "C" fn(*mut c_void, u64, *mut bool) -> bool>(b"SteamAPI_ISteamUtils_IsAPICallCompleted\0")?;
+            let result = lib.get::<unsafe extern "C" fn(*mut c_void, u64, *mut c_void, i32, i32, *mut bool) -> bool>(b"SteamAPI_ISteamUtils_GetAPICallResult\0")?;
+            let run = lib.get::<unsafe extern "C" fn()>(b"SteamAPI_RunCallbacks\0")?;
+            let end = Instant::now() + PUMP;
+            let mut failed = false;
+            while !done(utils, call, &mut failed) {
+                if Instant::now() > end {
+                    bail!("Steam didn't answer in time");
+                }
+                run();
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            let mut r = UgcResult { result: 0, item: 0 };
+            // k_iSteamRemoteStorageCallbacks + 13 (subscribe) / + 15 (unsubscribe)
+            let expected = if on { 1313 } else { 1315 };
+            if !result(utils, call, (&mut r as *mut UgcResult).cast(), size_of::<UgcResult>() as i32, expected, &mut failed) || failed {
+                bail!("Steam couldn't do it");
+            }
+            // EResult 1 is OK
+            if r.result != 1 {
+                bail!("Steam said no (EResult {})", r.result);
+            }
+            Ok(())
+        })();
+        shutdown();
+        got
+    }
+}
+
+/// Start the Steam API from the game's DLL (the app id comes from the environment, see [`helper`]).
+#[cfg(windows)]
+unsafe fn init(lib: &libloading::Library) -> Result<()> {
+    // SAFETY: the caller's DLL; the documented flat signatures
+    unsafe {
+        if let Ok(init) = lib.get::<unsafe extern "C" fn(*mut [u8; 1024]) -> i32>(b"SteamAPI_InitFlat\0") {
+            let mut msg = [0u8; 1024];
+            if init(&mut msg) != 0 {
+                bail!("Steam isn't available: {}", text(&msg));
+            }
+        } else if !lib.get::<unsafe extern "C" fn() -> bool>(b"SteamAPI_Init\0")?() {
+            bail!("Steam isn't available: is it running and signed in?");
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
 fn in_process(_game: &Path) -> Result<Vec<Server>> {
     bail!("asking the Steam client for servers works on Windows only")
 }
@@ -188,14 +295,7 @@ fn in_process(game: &Path) -> Result<Vec<Server>> {
     // SAFETY: the game's own Steam API DLL; every symbol is called with its documented flat signature
     unsafe {
         let lib = libloading::Library::new(&dll).with_context(|| format!("loading {}", dll.display()))?;
-        if let Ok(init) = lib.get::<unsafe extern "C" fn(*mut [u8; 1024]) -> i32>(b"SteamAPI_InitFlat\0") {
-            let mut msg = [0u8; 1024];
-            if init(&mut msg) != 0 {
-                bail!("Steam isn't available: {}", text(&msg));
-            }
-        } else if !lib.get::<unsafe extern "C" fn() -> bool>(b"SteamAPI_Init\0")?() {
-            bail!("Steam isn't available: is it running and signed in?");
-        }
+        init(&lib)?;
         // from here Steam shows the player in the game: keep it to the one request
         let shutdown = lib.get::<unsafe extern "C" fn()>(b"SteamAPI_Shutdown\0")?;
         let got = (|| -> Result<Vec<Server>> {
@@ -240,6 +340,11 @@ fn in_process(game: &Path) -> Result<Vec<Server>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ugc_result_layout() {
+        assert_eq!((size_of_val(&UgcResult { result: 0, item: 0 }), std::mem::offset_of!(UgcResult, item)), (16, 8));
+    }
 
     #[test]
     fn gameserveritem_layout() {

@@ -30,3 +30,7 @@ A PZMM companion Workshop mod that replaces the game's own mod screen and the in
 6. [ ] **Profiles from the game:** pick a PZMM profile, apply it, restart into it.
 7. [ ] **In-game sandbox editor** for the current save (admins on servers), sharing presets with the app.
 8. [ ] **Workshop listing** (public: needs the owner's go-ahead), B41 and B42 layouts, translations from the app's locales.
+
+## Later (app)
+
+- [ ] **Workshop descriptions in the player's language:** ask Steam for item pages in PZMM's language, so the author's own translations show, plus a **Translate** button (Google Translate, no key) for mods without one. Asked for on the Workshop page, 2026-10-14.

@@ -4,7 +4,7 @@
   import { getVersion } from "@tauri-apps/api/app";
   import { check, type Update } from "@tauri-apps/plugin-updater";
   import { relaunch } from "@tauri-apps/plugin-process";
-  import { decodeShare, describeSource, encodeShare, isOurs, removable, WINDOWS, type ModDetails, type Snapshot } from "$lib/api";
+  import { decodeShare, describeSource, encodeShare, isOurs, removable, WINDOWS, type HistoryRecord, type ModDetails, type Snapshot } from "$lib/api";
   import { arrowPick, isTyping, trap } from "$lib/ui";
   import { api, modeOf, VIEWPOINT, zbReady, type Mode, type ModRow, type NotifyKind, type Row, type View, type ZbStatus } from "$lib/api";
   import Details from "$lib/Details.svelte";
@@ -16,14 +16,21 @@
   import Links from "$lib/Links.svelte";
   import Icon from "$lib/Icon.svelte";
   import ActivityLog from "$lib/ActivityLog.svelte";
-  import Feed from "$lib/Feed.svelte";
+  import Feed, { forgetFeed } from "$lib/Feed.svelte";
   import Home, { glance } from "$lib/Home.svelte";
   import Authoring from "$lib/Authoring.svelte";
   import Menu, { type MenuItem } from "$lib/Menu.svelte";
   import type { IconName } from "$lib/Icon.svelte";
-  import { answer, ask, asking, confirmed } from "$lib/ask.svelte";
-  import { fmtDateTime, fmtNum, fmtTime, javaSummary, modChanges } from "$lib/format";
+  import { answer, ask, askChecked, asking, confirmed } from "$lib/ask.svelte";
+  import { background, classify, type LogEntry } from "$lib/activity.svelte";
+  import WhatsNew, { NOTES_FOR } from "$lib/WhatsNew.svelte";
+  import ActivityModal from "$lib/ActivityModal.svelte";
+  import DownloadHistory from "$lib/DownloadHistory.svelte";
+  import { fmtDateTime, fmtNum, fmtTime, modChanges, workshopUrl } from "$lib/format";
   import Findings from "$lib/Findings.svelte";
+  import CheckSetup from "$lib/CheckSetup.svelte";
+  import GameLog from "$lib/GameLog.svelte";
+  import { isServer, severity, type Fixes } from "$lib/findings";
   import CollectionImport from "$lib/CollectionImport.svelte";
   import Settings from "$lib/Settings.svelte";
   import { applyPrefs, prefs } from "$lib/prefs.svelte";
@@ -33,7 +40,7 @@
   import WindowControls from "$lib/WindowControls.svelte";
   import ProfilePicker from "$lib/ProfilePicker.svelte";
   import ServerSetup from "$lib/ServerSetup.svelte";
-  import type { Categories, Finding, GameServer, LogReport, Marks, Overlap, Pack, Preset, Save, SettingsView, SetupItem, Stats } from "$lib/api";
+  import type { Categories, FeedEntry, Finding, GameServer, LogReport, Marks, Overlap, Pack, Preset, Save, SettingsView, SetupItem, Stats } from "$lib/api";
   import { intlLang, keyedError, t, th, type Vars } from "$lib/i18n.svelte";
   /** Names in a sentence, separated the way the player's language does ("A, B, C"; "A、B、C"). */
   const listed = (items: string[]) => new Intl.ListFormat(intlLang(), { type: "unit" }).format(items);
@@ -41,6 +48,22 @@
   let tab = $state<"home" | "mods" | "feed" | "workshop" | "maps" | "servers" | "saves" | "zb" | "authoring" | "settings">("home");
   /** Workshop mods updated since you last played (the What's new tab's count). */
   let feedCount = $state(0);
+  /** What's new's count: updates not seen in the tab yet (an entry seen counts again once its mod updates again). */
+  const FEED_SEEN = "pzmm.feedSeen";
+  const feedKey = (e: FeedEntry) => `${e.item}:${e.updated}`;
+  function feedUnseen(entries: FeedEntry[]) {
+    let seen: string[] = [];
+    try {
+      seen = JSON.parse(localStorage.getItem(FEED_SEEN) ?? "[]");
+    } catch {}
+    return entries.filter((e) => !seen.includes(feedKey(e))).length;
+  }
+  function feedSeen(entries: FeedEntry[]) {
+    feedCount = 0;
+    try {
+      localStorage.setItem(FEED_SEEN, JSON.stringify(entries.map(feedKey)));
+    } catch {}
+  }
   /** A pzmm://join link to show in the Servers tab's details (it asks before joining). */
   let joinLink = $state<{ url: string } | null>(null);
   const openLink = (url: string) => {
@@ -69,6 +92,21 @@
   // --- PZMM's own updates (signed releases on GitHub) ---
   let appVersion = $state("");
   let appUpdate = $state.raw<Update | null>(null);
+  /** The version just updated to, while its patch notes show. */
+  let whatsNew = $state("");
+  /** After an update (not a first install), show what changed once. */
+  async function whatsNewCheck(firstRun: boolean) {
+    const key = "pzmm.lastVersion";
+    const now = await getVersion();
+    let last: string | null = null;
+    try {
+      last = localStorage.getItem(key);
+      localStorage.setItem(key, now);
+    } catch {}
+    // no version noted: a first install, or an update from before PZMM noted it (it had made a profile by then);
+    // and only with notes written for this version (a release that didn't update them shows none, not old ones)
+    if ((last ? last !== now : !firstRun) && now === NOTES_FOR) whatsNew = now;
+  }
   let appProgress = $state<number | null>(null); // 0..100 while downloading
 
   async function checkAppUpdate(manual = false) {
@@ -124,6 +162,8 @@
     if (tab === "servers") serversSeen = true;
   });
   let zb = $state<ZbStatus | null>(null);
+  /** The Workshop tab is waiting on Steam: the activity bar says so. */
+  let workshopLoading = $state(false);
   /** A folder set by hand (or by an environment variable) that isn't there or isn't right. */
   const folderTrouble = $derived(!!cfg?.folders.some((f) => (f.custom || f.overridden) && f.status !== "found"));
   const zbNeeded = $derived(!!zb && zb.required_by.length > 0 && !zbReady(zb));
@@ -171,10 +211,12 @@
   const busy = $derived(pending > 0);
   let busyLabel = $state("");
   /** `time`: when it was said (ms); `url`: a page it links to (an update's change notes). */
-  let log = $state<{ text: string; en: string; error: boolean; time: number; url?: string }[]>([]);
+  let log = $state<LogEntry[]>([]);
   /** Workshop items a download has finished, of how many, while it runs (Cancel stops it). */
   let progress = $state<[number, number] | null>(null);
   let logOpen = $state(false);
+  /** The activity's large views: every line with what it's about, or the download history. */
+  let activityView = $state<"" | "expand" | "history">("");
   // search, filters and sort start as they were left (kept in prefs)
   let search = $state(prefs.modsSearch);
   type Filter = "all" | "on" | "off" | "fav" | "hidden" | "problems";
@@ -319,9 +361,10 @@
   }
 
   // --- actions ---
-  /** An activity line: a key from the locale files, or text as is. Its English text picks the icon. */
+  /** An activity line: a key from the locale files, or text as is (`key` null in the entry). */
   function say(key: string, vars: Vars = {}, error = false, url?: string) {
-    log.push({ text: t(key, vars), en: t(key, vars, "en"), error, time: Date.now(), url });
+    const keyed = /^[a-z][\w-]*(\.[\w-]+)+$/i.test(key);
+    log.push({ text: t(key, vars), key: keyed ? key : null, vars, ...classify(keyed ? key : null, vars, error), time: Date.now(), url });
     if (log.length > 1000) log.splice(0, log.length - 1000); // the newest thousand lines
     if (error) logOpen = true;
   }
@@ -360,6 +403,7 @@
     if (view && v.profile !== view.profile) {
       snapList = null;
       findings = null; // the last profile's check
+      checkOpen = false;
       logs = [];
       answer(-1);
       modePlan = null;
@@ -375,7 +419,7 @@
   let loadError = $state("");
   async function loadView() {
     const ok = await run(t("busy.loading"), api.load);
-    loadError = ok ? "" : (log.findLast((l) => l.error)?.text ?? "");
+    loadError = ok ? "" : (log.findLast((l) => l.kind === "error")?.text ?? "");
     return ok;
   }
 
@@ -451,16 +495,16 @@
       c = await categories();
     } catch (e) {
       // no tags (offline, rate-limited): still fix the load rules
-      if (await commitList(sortLoadOrder(list))) say("log.tagsFailedSorted", { error: t(...keyedError(e)) }, true);
+      if (await commitList(sortLoadOrder(list, loadable))) say("log.tagsFailedSorted", { error: t(...keyedError(e)) }, true);
       return;
     }
-    if (await commitList(autosort(list, c.of, c.order))) say("log.autosorted");
+    if (await commitList(autosort(list, c.of, c.order, loadable))) say("log.autosorted");
   }
 
   /** Put the load order A-Z: loadFirst / loadLast mods at the ends, requirements and load rules still first. */
   async function sortAz() {
     if (!(await snapshot("sortAz"))) return;
-    if (await commitList(sortByName(list))) say("log.sortedAz");
+    if (await commitList(sortByName(list, loadable))) say("log.sortedAz");
   }
 
   /** Group the library into one section per category. `record` keeps it undoable (and asks before replacing your own sections). */
@@ -491,7 +535,7 @@
 
   /** Enable disabled requirements and reorder the load order so requirements and load hints hold. */
   function fixLoadOrder() {
-    commitList(sortLoadOrder(list));
+    commitList(sortLoadOrder(list, loadable));
   }
 
   async function checkUpdates() {
@@ -547,6 +591,7 @@
     const had = ids.filter((id) => updates.has(id));
     if (await run(ids.length === 1 ? t("busy.updatingOne", { name: ids[0] }) : t("busy.updatingMany", { count: ids.length }), () => api.updateMods(ids), { showLog: true })) {
       updates = new Set([...updates].filter((u) => !ids.includes(u)));
+      forgetFeed(); // What's new marks which updates wait: read afresh
       // what changed: each updated Workshop mod links to its change notes
       for (const id of had) {
         const item = mods.get(id)?.source.match(/^workshop:(\d+)$/)?.[1];
@@ -576,7 +621,31 @@
     return ok;
   }
 
+  /** Steam downloads (or deletes) in the background: look again once it has had a moment, unless an edit started meanwhile. */
+  const reloadSoon = () => setTimeout(() => !busy && api.load().then((v) => !busy && show(v)).catch(() => {}), 10_000);
   const installWorkshop = (id: string) => installAndSettle(t("busy.installingWorkshop", { id }), () => api.install([id]));
+  /** Put back a Workshop item from the activity or the download history: installed as PZMM's copy, or subscribed in Steam again. */
+  const reinstall = async (item: string, steam: boolean) =>
+    editBusy ? false : steam ? run(t("busy.subscribing", { name: item }), () => api.workshopSubscribe(item, true), { showLog: true }).then((ok) => (ok && reloadSoon(), ok)) : installWorkshop(item);
+  /** The download history's Remove: PZMM's copy removed (asking first), or the Steam subscription ended. */
+  async function removeRecord(r: HistoryRecord) {
+    if (editBusy) return;
+    const m = mods.get(r.id);
+    if (m && removable(m)) return removeMods([r.id]);
+    const item = r.source.match(/^steam:(\d+)$/)?.[1] ?? (m?.source.match(/^steam:(\d+)$/)?.[1]);
+    if (!item) return;
+    if (m) return subscribe(m.id, false);
+    if ((await ask(t("confirm.unsubscribeTitle", { name: r.name || item }), [t("confirm.unsubscribeLine")], [{ label: t("confirm.unsubscribe"), icon: "x" }])) === 0) return run(t("busy.unsubscribing", { name: r.name || item }), () => api.workshopSubscribe(item, false), { showLog: true });
+  }
+
+  /** Browse Workshop's Uninstall: PZMM's copies are removed (asking first, as Remove does); a Steam
+   * subscription is ended in Steam. The Installed marks and My mods follow the library either way. */
+  function uninstallWorkshop(item: string) {
+    const all = [...mods.values()].filter((m) => !m.missing && m.source.match(/^(?:workshop|steam):(\d+)$/)?.[1] === item);
+    const ours = all.filter(removable);
+    if (ours.length) return removeMods(ours.map((m) => m.id));
+    if (all.length) return subscribe(all[0].id, false);
+  }
 
   async function installMissing() {
     let unresolved: string[] = [];
@@ -686,6 +755,7 @@
     try {
       await api.launchGame();
       feedCount = 0; // you're playing them now
+      forgetFeed();
     } catch (e) {
       say("log.playFailed", { error: t(...keyedError(e)) }, true);
     }
@@ -694,7 +764,7 @@
   /** Before joining a server: the launch check; going on plays the mods too (What's new starts over). */
   async function joinCheck() {
     const ok = await preflight(true);
-    if (ok) feedCount = 0;
+    if (ok) (feedCount = 0), forgetFeed();
     return ok;
   }
   /** Setup check findings that don't stop the game but go wrong in it: asked about before playing. */
@@ -707,12 +777,13 @@
     const go = t(join ? "launch.joinAnyway" : "launch.anyway");
     pending++;
     busyLabel = t("busy.checking");
-    const [found, java] = await Promise.all([api.doctor().catch((e) => (say("log.checkSetupFailed", { error: t(...keyedError(e)) }, true), [] as Finding[])), zb?.enabled ? api.javaMods().catch(() => []) : []]).finally(() => {
+    const found = await api.doctor().catch((e) => (say("log.checkSetupFailed", { error: t(...keyedError(e)) }, true), [] as Finding[])).finally(() => {
       pending--;
       if (!pending) busyLabel = "";
     });
     // what stops a mod loading (game version, Java files) and the code scans' warnings; servers aren't launched here
-    const more = found.filter((f) => !f.subject.endsWith(".ini") && !LIST_KEYS.has(f.key) && (f.level === "error" || f.key.startsWith("java") || !!f.action?.dismiss || PLAY_WARNINGS.has(f.key)));
+    // what stops the game or could harm you (Check setup's Broken and Risk), and the map clashes
+    const more = found.filter((f) => !f.hidden && !isServer(f) && !LIST_KEYS.has(f.key) && (["broken", "risk"].includes(severity(f)) || PLAY_WARNINGS.has(f.key)));
     const line = (f: Finding) => `${mods.get(f.subject)?.name || f.subject}: ${t(`doctor.${f.key}`, f.vars)}`;
     const errors = more.filter((f) => !PLAY_WARNINGS.has(f.key));
     const lines = [
@@ -729,10 +800,41 @@
     } catch {}
     const warn = warnings.length && warnSet !== seen ? warnings.map(line) : [];
     if (lines.length || warn.length) {
-      // the Java tab sets up ZombieBuddy's agent and shows Leaf
-      const zbFix = errors.some((f) => ["zbAgent", "javaNoLeaf", "javaLeafOff"].includes(f.key)) && !problems.size;
+      // fixes PZMM can make here, then the check runs again
+      const has = (...keys: string[]) => errors.some((f) => keys.includes(f.key));
+      const trust = [...new Set(errors.flatMap((f) => (f.action?.dismiss ? [f.action.dismiss] : [])))];
+      const autoFix = [
+        ...(has("zbAgent") ? [() => run(t("busy.zbSetup"), () => api.zbInstall(false), { showLog: true })] : []),
+        ...(has("viewpoint41") ? [() => run(t("busy.saving"), () => api.setBuild(42))] : []),
+      ];
+      const tooNew = [...new Set(errors.filter((f) => ["versionMin", "versionMax", "only41"].includes(f.key)).map((f) => f.subject))];
+      // a newer game fixes a version limit; a Build 41-only mod it doesn't
+      const gameUpdate = has("versionMin", "versionMax");
+      // Leaf is set up by hand in the Java tab
+      const leafFix = has("javaNoLeaf", "javaLeafOff") && !autoFix.length && !problems.size;
+      const again = () => (refreshZb(), preflight(join));
       const choices = [
-        ...(missingReqs.size || fixable || zbFix ? [{ label: t("launch.fix"), icon: "wand" as IconName, act: () => (zbFix ? (tab = "zb") : fixProblems()) }] : []),
+        ...(autoFix.length ? [{ label: t("launch.fixAndPlay"), icon: "wand" as IconName, act: async () => {
+          for (const fix of autoFix) if (!(await fix())) return false;
+          return again();
+        } }] : []),
+        ...(has("javaBlocked") ? [{ label: t("check.fix.allow"), icon: "check" as IconName, act: async () => {
+          await Promise.all(errors.filter((f) => f.key === "javaBlocked" && f.vars.sha).map((f) => api.zbUnblock(f.vars.sha)));
+          return again();
+        } }] : []),
+        // trusting flagged Java files is never folded into a general fix
+        ...(trust.length ? [{ label: t("launch.trustFiles", { count: trust.length }), icon: "check" as IconName, act: async () => {
+          await Promise.all(trust.map((sha) => api.scanDismiss(sha)));
+          return again();
+        } }] : []),
+        ...(tooNew.length ? [{ label: t("launch.turnOff", { count: tooNew.length }), icon: "x" as IconName, act: async () => {
+          const ids = await withDependants(tooNew);
+          return !!ids && (await setMods(ids, false)) && again();
+        } }] : []),
+        ...(gameUpdate ? [{ label: t("launch.updateGame"), icon: "steam" as IconName, act: () => api.openUrl("steam://nav/games/details/108600") }] : []),
+        // a Build 42-only mod on a Build 41 profile: switching is the player's call (their save may be a 41 game)
+        ...(has("only42") ? [{ label: t("check.fix.switchBuild", { build: "42" }), icon: "swap" as IconName, act: async () => (await run(t("busy.saving"), () => api.setBuild(42))) && again() }] : []),
+        ...(missingReqs.size || fixable || leafFix ? [{ label: t("launch.fix"), icon: "wand" as IconName, act: () => (leafFix ? (tab = "zb") : fixProblems()) }] : []),
         ...(warnings.some((f) => f.key.startsWith("map")) ? [{ label: t("launch.arrangeMaps"), icon: "layers" as IconName, act: () => (tab = "maps") }] : []),
         { label: go, icon: "play" as IconName, act: () => true },
         // only warnings: playing with them can be the player's call for good
@@ -744,23 +846,23 @@
         } }] : []),
       ];
       const title = lines.length ? t("launch.title", { count: lines.length }) : t("launch.warnTitle", { count: warn.length });
-      const i = await ask(title, [...lines, ...warn], choices);
-      if (i < 0 || (await choices[i].act()) !== true) return false;
+      const hint = gameUpdate && view?.steam_branch ? [t("launch.branchHint", { branch: view.steam_branch })] : [];
+      const i = await ask(title, [...lines, ...warn, ...hint], choices);
+      try {
+        if (i < 0 || (await choices[i].act()) !== true) return false;
+      } catch (e) {
+        say(...keyedError(e), true);
+        return false;
+      }
     }
-    // ZombieBuddy asks about each new or changed Java file: show what PZMM knows about them first
-    const asks = java.filter((j) => j.sha256 && j.approved === null && j.signature !== "invalid");
-    if (asks.length) {
-      const i = await ask(t("launch.javaTitle", { count: asks.length }), asks.map((j) => `${j.name || j.id}: ${javaSummary(j)}`), [{ label: t("launch.review"), icon: "eye" }, { label: go, icon: "play" }]);
-      if (i === 0) tab = "zb";
-      if (i !== 1) return false;
-    }
+    // ZombieBuddy doesn't ask about the enabled Java mods: starting the game allows them (their scans' warnings are above)
     return true;
   }
 
   /** Install what's missing and fix the order, then list what's left. */
   async function fixProblems() {
     if (missingReqs.size) await installMissing();
-    else if (fixable) await commitList(sortLoadOrder(list));
+    else if (fixable) await commitList(sortLoadOrder(list, loadable));
     await tick();
     tab = "mods";
     filter = problemCount ? "problems" : "all";
@@ -848,16 +950,74 @@
 
   /** A check setup running (its button says so); its findings show only on the profile it checked. */
   let checkingSetup = $state(false);
-  async function checkSetup() {
+  /** The Check setup window, and the game log opened from it. */
+  let checkOpen = $state(false);
+  let readingLog = $state(false);
+  /** The window opens at once with the last results (or "Checking"), and fills in as the check answers. */
+  function openCheck() {
+    checkOpen = true;
+    checkSetup();
+  }
+
+  /** The game can load this mod on the build played (Build 42 skips a mod built for 41 only). */
+  const loadable = (r: ModRow) => !(view?.build !== 41 && r.only41);
+
+  const failed = (e: unknown) => say(...keyedError(e), true);
+
+  /** What Check setup's fixes do here. */
+  const fixes: Fixes = {
+    isMod: (id) => mods.has(id),
+    canLoad: (id) => !!mods.get(id) && loadable(mods.get(id)!),
+    itemOf: (id) => mods.get(id)?.source.match(/^(?:workshop|steam):(\d+)$/)?.[1] ?? "",
+    install: (id, by) => installRequirement(id, by),
+    // turning off asks first about the enabled mods that need them, as the list's own toggle does
+    setMods: async (ids, on) => {
+      const turning = on ? ids : await withDependants(ids);
+      return turning && setMods(turning, on);
+    },
+    uninstall: async (ids) => {
+      const ours = ids.filter((id) => mods.get(id) && removable(mods.get(id)!));
+      const steam = ids.filter((id) => !ours.includes(id) && mods.get(id)?.source.startsWith("steam:"));
+      if (ours.length) await removeMods(ours);
+      for (const id of steam) await subscribe(id, false);
+    },
+    sort: () => commitList(sortLoadOrder(list, loadable)),
+    trust: (sha) => api.scanDismiss(sha).catch(failed),
+    setBuild: (b) => run(t("busy.saving"), () => api.setBuild(b)),
+    zbSetup: () => run(t("busy.zbSetup"), () => api.zbInstall(false), { showLog: true }),
+    zbRemove: () => run(t("busy.zbRemove"), api.zbUninstall, { showLog: true }),
+    update: (ids) => updateMods(ids),
+    // the Workshop's own search, for the same name tagged Build 42
+    findB42: async (id) => api.openUrl(`https://steamcommunity.com/workshop/browse/?appid=108600&searchtext=${encodeURIComponent(mods.get(id)?.name || id)}&requiredtags[]=Build+42`),
+    unblock: (sha) => api.zbUnblock(sha).catch(failed),
+    folderAuto: (key) => api.folderSet(key, "", false).then(loadView, failed),
+    installItem: (item) => installWorkshop(item),
+    unsubscribe: async (items) => {
+      for (const item of items) await run(t("busy.unsubscribing", { name: item }), () => api.workshopSubscribe(item, false), { showLog: true });
+    },
+    go: (to) => ((checkOpen = false), (tab = to)),
+    openUrl: (url) => api.openUrl(url),
+    launch: () => launch(),
+  };
+  /** Findings only the online check makes (the Workshop's view of items): a local re-check keeps them. */
+  const ONLINE = new Set(["workshopGone", "workshopBanned", "workshopHidden", "workshopUnlisted", "notOriginal"]);
+  let checkSeq = 0;
+  async function checkSetup(online = true) {
     const profile = view?.profile;
+    const seq = ++checkSeq;
+    const current = () => seq === checkSeq && view?.profile === profile;
     checkingSetup = true;
     try {
+      // the local checks answer at once; the Workshop's (online) follow
+      const local = await api.doctor(false);
+      if (current()) findings = [...local, ...(findings ?? []).filter((f) => ONLINE.has(f.key))];
+      if (!online) return;
       const got = await Promise.all([api.doctor(true), api.logReports().catch(() => [])]);
-      if (view?.profile === profile) [findings, logs] = got;
+      if (current()) [findings, logs] = got;
     } catch (e) {
       say("log.checkSetupFailed", { error: t(...keyedError(e)) }, true);
     } finally {
-      checkingSetup = false;
+      if (seq === checkSeq) checkingSetup = false;
     }
   }
 
@@ -1128,6 +1288,9 @@
   function globalKey(e: KeyboardEvent) {
     // the WebView's own reload, print and find aren't PZMM's (a reload would drop what's running)
     if (e.key === "F5" || ((e.ctrlKey || e.metaKey) && ["r", "p", "f"].includes(e.key.toLowerCase()))) return e.preventDefault();
+    // a box or window over the page: its shortcuts (Ctrl+Z, /, Ctrl+A) stay off the list behind; Escape closes a box
+    const box = asking.now || importText !== null || snapList || modePlan;
+    if ((checkOpen || activityView || whatsNew || readingLog || pack || box) && !(e.key === "Escape" && box)) return;
     const typing = isTyping(e);
     if (e.key === "/" && !typing && tab === "mods") {
       e.preventDefault();
@@ -1167,6 +1330,35 @@
     const ids = on ? [id] : await withDependants([id]);
     if (!ids) return false;
     return commit(rows.map((r) => (r.kind === "mod" && ids.includes(r.id) ? { ...r, on } : r)), on ? placeAll([id]) : order);
+  }
+
+  /** Subscribe to a mod's Workshop item in Steam (Steam keeps it updated), or unsubscribe (Steam deletes its files).
+   * Without the Steam client, its Workshop page opens instead. */
+  async function subscribe(id: string, on: boolean) {
+    const m = mods.get(id);
+    const item = m?.source.split(":")[1];
+    if (!m || !item || editBusy) return;
+    if (!on && (await ask(t("confirm.unsubscribeTitle", { name: m.name || id }), [t("confirm.unsubscribeLine")], [{ label: t("confirm.unsubscribe"), icon: "x" }])) !== 0) return;
+    if (!(await run(t(on ? "busy.subscribing" : "busy.unsubscribing", { name: m.name || id }), () => api.workshopSubscribe(item, on, m.id, m.name), { showLog: true }))) return api.openUrl(workshopUrl(item));
+    // Steam downloads (or deletes) it in the background: look again once it has had a moment
+    reloadSoon();
+  }
+
+  /** A row's checkbox, Space or menu: every picked mod when the row is one of several picked. */
+  const toggleRow = async (id: string) => {
+    const on = !mods.get(id)?.on;
+    if (on && !(await buildFor(batch(id)))) return false;
+    return batch(id).length > 1 ? bulkSet(on) : toggle(id);
+  };
+
+  /** Before turning on `ids` while playing Build 41: offer Build 42 to the ones only it loads. False when the player cancelled. */
+  async function buildFor(ids: string[]) {
+    const only42 = ids.filter((id) => rows.some((r) => r.kind === "mod" && r.id === id && r.only42));
+    if (view?.build !== 41 || !only42.length) return true;
+    const i = await ask(t("confirm.needs42Title", { count: only42.length }), only42.map((id) => mods.get(id)?.name || id),
+      [{ label: t("confirm.switch42"), icon: "swap" }, { label: t("confirm.keep41"), icon: "check" }]);
+    if (i === 0) return run(t("busy.saving"), () => api.setBuild(42));
+    return i === 1;
   }
 
   /** Before turning `ids` off: when enabled mods need them, ask whether to turn those off too.
@@ -1325,17 +1517,21 @@
     if (!rowMenu || !m) return [];
     const { id, d } = rowMenu;
     const at = order.indexOf(id);
+    const ids = batch(id);
+    const many = ids.length > 1;
     const src = describeSource(m.source);
     const github = src.label === "GitHub"; // i18n-ignore: a source kind, not text
     return [
-      { label: t(m.on ? "common.disable" : "common.enable"), icon: m.on ? "x" : "check", run: () => toggle(id), disabled: editBusy },
-      { label: t("menu.toTop"), icon: "chevron-up", run: () => moveInOrder(at, 0), disabled: editBusy || at <= 0 },
-      { label: t("menu.toBottom"), icon: "chevron-down", run: () => moveInOrder(at, order.length), disabled: editBusy || at < 0 || at === order.length - 1 },
-      ...(m.pinned ? [{ label: t("menu.unpin"), icon: "lock" as IconName, run: () => pin(id, false), disabled: editBusy }]
+      { label: t(m.on ? "common.disable" : "common.enable"), icon: m.on ? "x" : "check", run: () => toggleRow(id), disabled: editBusy },
+      ...(many ? [{ label: t("menu.toTop"), icon: "chevron-up" as IconName, run: () => bulkMove("top"), disabled: editBusy || filtering },
+          { label: t("menu.toBottom"), icon: "chevron-down" as IconName, run: () => bulkMove("bottom"), disabled: editBusy || filtering }]
+        : [{ label: t("menu.toTop"), icon: "chevron-up" as IconName, run: () => moveInOrder(at, 0), disabled: editBusy || at <= 0 },
+          { label: t("menu.toBottom"), icon: "chevron-down" as IconName, run: () => moveInOrder(at, order.length), disabled: editBusy || at < 0 || at === order.length - 1 }]),
+      ...(many ? [] : m.pinned ? [{ label: t("menu.unpin"), icon: "lock" as IconName, run: () => pin(id, false), disabled: editBusy }]
         : at >= 0 ? [{ label: t("menu.pin"), icon: "lock" as IconName, run: () => pin(id, true), disabled: editBusy || order.length < 2 }] : []),
       null,
-      { label: t(favourites.has(id) ? "menu.unfavourite" : "menu.favourite"), icon: "star", run: () => mark(id, "favourite", !favourites.has(id)) },
-      { label: t(hidden.has(id) ? "menu.unhide" : "menu.hide"), icon: hidden.has(id) ? "eye" : "eye-off", run: () => mark(id, "hidden", !hidden.has(id)) },
+      { label: t(favourites.has(id) ? "menu.unfavourite" : "menu.favourite"), icon: "star", run: () => markAll(ids, "favourite", !favourites.has(id)) },
+      { label: t(hidden.has(id) ? "menu.unhide" : "menu.hide"), icon: hidden.has(id) ? "eye" : "eye-off", run: () => markAll(ids, "hidden", !hidden.has(id)) },
       null,
       { label: t("details.showFiles"), icon: "folder", run: () => d && api.openPath(d.dir), disabled: !d },
       ...(src.url ? [{ label: t(github ? "details.githubPage" : "details.workshopPage"), icon: (github ? "external" : "steam") as IconName, run: () => api.openUrl(src.url!) }] : []),
@@ -1353,6 +1549,10 @@
     } catch (e) {
       say(...keyedError(e), true);
     }
+  }
+
+  async function markAll(ids: string[], kind: "favourite" | "hidden", on: boolean) {
+    for (const id of ids) await mark(id, kind, on);
   }
 
   /** Pin a mod between its neighbours in the load order (Mod Load Order Sorter's rules file, which Autosort reads too), or unpin it. */
@@ -1400,12 +1600,15 @@
     anchor = ids[0] ?? null;
   }
 
+  /** The mods an action on `id` applies to: every picked mod when `id` is one of several picked, else just `id`. */
+  const batch = (id: string) => (picked.size > 1 && picked.has(id) ? [...picked] : [id]);
+
   async function bulkSet(on: boolean) {
     let ids = [...picked].filter((id) => !(skipFavourites && favourites.has(id)));
     if (!on) ids = (await withDependants(ids)) ?? [];
     const set = new Set(ids);
     const turning = rows.flatMap((r) => (r.kind === "mod" && set.has(r.id) && r.on !== on ? [r.id] : []));
-    if (turning.length) commit(rows.map((r) => (r.kind === "mod" && set.has(r.id) ? { ...r, on } : r)), on ? placeAll(turning) : order);
+    return turning.length ? commit(rows.map((r) => (r.kind === "mod" && set.has(r.id) ? { ...r, on } : r)), on ? placeAll(turning) : order) : false;
   }
 
   /** Set a mod's own tags (PZMM keeps them for every profile). */
@@ -1441,11 +1644,11 @@
     // other profiles lose them too
     const others = Object.keys(await api.profilesUsing(ids).catch(() => ({})));
     const usedBy = others.length ? [t("confirm.removeUsedBy", { count: others.length, profiles: listed(others) })] : [];
-    if (!(await confirmed(t(key, { count: ids.length, name: ids[0] }), { label: t("common.remove"), icon: "trash" }, [...notes, ...usedBy], false, true))) return;
+    if (!(await confirmed(t(key, { count: ids.length, name: ids[0] }), { label: t("common.remove"), icon: "trash" }, [...notes, ...usedBy]))) return;
     let extra = s?.remove_requirements === "never" ? [] : orphanedRequirements(ids, [...mods.values()]).filter((id) => isOurs(mods.get(id)!));
     if (extra.length && s?.remove_requirements !== "always") {
       const n = extra.length;
-      const i = await ask(t("confirm.alsoRemove", { count: n, ids: listed(extra) }), [], [{ label: t("confirm.removeToo", { count: n }), icon: "trash" }, { label: t("confirm.keepThem", { count: n }), icon: "check" }], false, true);
+      const i = await ask(t("confirm.alsoRemove", { count: n, ids: listed(extra) }), [], [{ label: t("confirm.removeToo", { count: n }), icon: "trash" }, { label: t("confirm.keepThem", { count: n }), icon: "check" }]);
       if (i < 0) return;
       if (i === 1) extra = [];
     }
@@ -1498,7 +1701,7 @@
     if (busy && edits) return;
     if (e.key === " " && r.kind === "mod") {
       e.preventDefault();
-      toggle(r.id);
+      toggleRow(r.id);
     } else if ((e.key === "ArrowUp" || e.key === "ArrowDown") && e.altKey && !filtering) {
       e.preventDefault();
       const to = e.key === "ArrowUp" ? i - 1 : i + 2;
@@ -1537,6 +1740,10 @@
   });
 
   onMount(() => {
+    // the splash plays at least this long; the slow first loads start behind it
+    const started = Date.now();
+    const lift = () => api.splashDone().catch(() => {}); // the splash window closes, this one shows
+    setTimeout(lift, 8000); // whatever is still loading carries on in the activity bar
     // the backend's lines: the ones PZMM words come with a key (backend.<key>) to show in the UI's language
     const unlisten = listen<{ text: string; key: string | null; vars: Vars }>("log", ({ payload: l }) => {
       say(l.key ? `backend.${l.key}` : l.text, l.vars, l.text.startsWith("error:"));
@@ -1549,6 +1756,23 @@
     // a Maps check downloads with SteamCMD too: its progress isn't an install's
     const unlistenProgress = listen<[number, number]>("progress", (e) => longJobs && (progress = e.payload));
     // closing with servers PZMM runs: stop them, or leave them running (PZMM finds them again next time)
+    // the window's close button: quit or the tray, unless Settings already say which
+    const unlistenClose = listen("close-ask", async () => {
+      const { i, checked } = await askChecked(t("close.title"), [t("close.line"), t("close.settingsHint")], [{ label: t("close.tray"), icon: "minimize" }, { label: t("close.quit"), icon: "x" }], t("close.dontAsk"));
+      if (i < 0) return;
+      if (checked) {
+        try {
+          const s = $state.snapshot(cfg) ?? (await api.settingsGet());
+          s.settings.close_ask = false; // and tray says which
+          s.settings.tray = i === 0;
+          await api.settingsSet(s.settings);
+          cfg = s;
+        } catch (e) {
+          say(...keyedError(e), true);
+        }
+      }
+      api.appClose(i === 0).catch((e) => say(...keyedError(e), true));
+    });
     const unlistenQuit = listen<string[]>("servers-running", async ({ payload: names }) => {
       const choices = [{ label: t("hosting.quit.stop"), icon: "x" as IconName }, { label: t("hosting.quit.leave"), icon: "external" as IconName }];
       const i = await ask(t("hosting.quit.title", { count: names.length }), [t("hosting.quit.line", { count: names.length, names: listed(names) })], choices);
@@ -1562,14 +1786,18 @@
       });
     });
     const settings = api.settingsGet().catch(() => null);
-    loadView().then(async () => {
+    loadView().then(async (loaded) => {
+      setTimeout(lift, Math.max(0, 2000 - (Date.now() - started)));
+      workshopSeen = true; // the Workshop tab loads its first page now (for the build just read), so it opens at once
+      api.feed(true).catch(() => {}); // What's new: its change notes, kept on disk for when the tab opens
+      if (loaded) whatsNewCheck(!!view?.created); // a first load that failed can't tell a first install
       refreshStats();
       if (kind) pickKind(kind); // a kind filter left on: its kinds come with the Workshop tags
       resumeBisect();
       cfg = await settings;
       if (cfg?.settings.update_check !== "off") {
         autoCheck();
-        glance().then((f) => (feedCount = f.entries.length)).catch(() => {});
+        glance().then((f) => (feedCount = feedUnseen(f.entries))).catch(() => {});
       }
       if (cfg?.settings.app_updates !== false) checkAppUpdate();
     });
@@ -1580,6 +1808,7 @@
       unlistenProgress.then((f) => f());
       unlistenLink.then((f) => f());
       unlistenQuit.then((f) => f());
+      unlistenClose.then((f) => f());
     };
   });
 </script>
@@ -1610,6 +1839,8 @@
         <button class="quiet" onpointerdown={(e) => shareAt && e.stopPropagation()} disabled={busy} title={t("app.shareTip")} aria-label={t("app.share")} aria-haspopup="menu" aria-expanded={!!shareAt}
           onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); shareAt = shareAt ? null : { x: r.left, y: r.bottom + 4 }; }}><Icon name="share" size={14} /><span class="lbl">{t("app.share")}</span></button>
         <button class="quiet" onclick={openImport} disabled={busy || !!profileLock} title={profileLock || t("app.importTip")} aria-label={t("common.import")}><Icon name="upload" size={14} /><span class="lbl">{t("common.import")}</span></button>
+        <!-- mods subscribed or copied in while PZMM was open -->
+        <button class="quiet" onclick={() => { refreshLists(); loadView(); }} disabled={busy} title={t("app.rescanTip")} aria-label={t("app.rescan")}><Icon name="refresh" size={14} /><span class="lbl">{t("app.rescan")}</span></button>
       {/if}
     </div>
 
@@ -1666,7 +1897,8 @@
   {/snippet}
 
   {#if importText !== null}
-    <form class="strip" onsubmit={importProfile} use:trap={{ cycle: false }}>
+    <div class="backdrop" onclick={() => (importText = null)} aria-hidden="true"></div>
+    <form class="strip boxed" onsubmit={importProfile} use:trap>
       <label for="import-code">{@html th("app.importIntro")}</label>
       <div class="row">
         <textarea id="import-code" rows="1" bind:value={importText} onkeydown={(e) => { if (e.key === "Escape") importText = null; else if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }} placeholder={t("app.importPlaceholder")} spellcheck="false" style="flex: 1"></textarea>
@@ -1693,11 +1925,13 @@
   {/if}
 
   {#if asking.now}
-    {#if asking.now.modal}<div class="backdrop" onclick={() => answer(-1)} aria-hidden="true"></div>{/if}
-    <div class="strip asking" class:modal={asking.now.modal} role="alertdialog" aria-modal={asking.now.modal || undefined} aria-label={asking.now.title} use:trap={{ focus: !asking.now.background }}>
+    <!-- a box in the middle, over everything (the app's windows too) -->
+    <div class="backdrop asking-backdrop" onclick={() => answer(-1)} aria-hidden="true"></div>
+    <div class="strip boxed asking" role="alertdialog" aria-modal="true" aria-label={asking.now.title} use:trap={{ focus: !asking.now.background }}>
       <p><strong>{asking.now.title}</strong></p>
       {#if asking.now.lines.length}<ul class="mono">{#each asking.now.lines as l}<li>{l}</li>{/each}</ul>{/if}
       <div class="row">
+        {#if asking.now.check}<label class="check"><input type="checkbox" bind:checked={asking.now.checked} />{asking.now.check}</label>{/if}
         {#each asking.now.choices as c, i}
           <button class={i === 0 ? "primary" : ""} onclick={() => answer(i)}><Icon name={c.icon} size={14} />{c.label}</button>
         {/each}
@@ -1707,7 +1941,8 @@
   {/if}
 
   {#if snapList}
-    <div class="strip" role="region" aria-label={t("snapshots.title", { profile: view?.profile ?? "" })} use:trap={{ cycle: false }}>
+    <div class="backdrop" onclick={() => (snapList = null)} aria-hidden="true"></div>
+    <div class="strip boxed" role="dialog" aria-modal="true" aria-label={t("snapshots.title", { profile: view?.profile ?? "" })} use:trap>
       <p><strong>{t("snapshots.title", { profile: view?.profile ?? "" })}</strong> {t("snapshots.intro")}</p>
       {#if snapList.length}
         <ul class="snaps">
@@ -1726,7 +1961,8 @@
   {/if}
 
   {#if modePlan}
-    <div class="strip" role="region" aria-label={t("app.switchGameLabel")}>
+    <div class="backdrop" onclick={() => (modePlan = null)} aria-hidden="true"></div>
+    <div class="strip boxed" role="dialog" aria-modal="true" aria-label={t("app.switchGameLabel")} use:trap>
       {#if modePlan.error}
         <p class="error" role="alert">{modePlan.error}</p>
         <button class="quiet" onclick={() => (modePlan = null)}><Icon name="x" size={14} />{t("common.close")}</button>
@@ -1796,7 +2032,7 @@
   </div>
 
   {#if workshopSeen}
-    <Workshop hidden={tab !== "workshop"} busy={editBusy} defaultBuild={view?.build ?? null} installed={installedItems} onInstall={installWorkshop} onCollection={previewCollection} viewpoint={view?.mode === "viewpoint"} />
+    <Workshop onLoading={(l) => (workshopLoading = l)} hidden={tab !== "workshop"} busy={editBusy} defaultBuild={view?.build ?? null} installed={installedItems} onInstall={installWorkshop} onUninstall={uninstallWorkshop} onCollection={previewCollection} viewpoint={view?.mode === "viewpoint"} />
   {/if}
   <!-- kept mounted once opened, so a server's setup (a long SteamCMD download) and its Stop survive another tab -->
   {#if serversSeen}
@@ -1819,9 +2055,9 @@
       installedIds={[...mods.values()].filter((m) => !m.missing).map((m) => m.id)} onUseProfile={(p) => run(t("busy.switchingProfile"), () => api.profileUse(p))}
       onSetup={setupServer}
       onCheck={joinCheck} onOpenLink={openLink}
-      onCheckSetup={() => { tab = "mods"; checkSetup(); }} />
+      onCheckSetup={openCheck} />
   {:else if tab === "feed"}
-    <Feed {mods} {order} {busy} onShowMod={(id) => { selected = id; tab = "mods"; }} onUpdate={(ids) => updateMods(ids)} onCount={(n) => (feedCount = n)} />
+    <Feed {mods} {order} {busy} onShowMod={(id) => { selected = id; tab = "mods"; }} onUpdate={(ids) => updateMods(ids)} onCount={feedSeen} />
   {:else if tab === "maps"}
     <!-- one profile's view: a switch starts it afresh (its map order is that profile's) -->
     {#key view?.profile}
@@ -1891,7 +2127,7 @@
     {#if picked.size >= 2}
       <span class="bulk" role="group" aria-label={t("mods.selectedLabel")}>
         <strong>{t("mods.selected", { count: picked.size })}</strong>
-        <button onclick={() => bulkSet(true)} disabled={editBusy}><Icon name="check" size={14} />{t("common.enable")}</button>
+        <button onclick={async () => (await buildFor([...picked])) && bulkSet(true)} disabled={editBusy}><Icon name="check" size={14} />{t("common.enable")}</button>
         <button onclick={() => bulkSet(false)} disabled={editBusy}><Icon name="x" size={14} />{t("common.disable")}</button>
         {#if favourites.size}
           <label class="skip" title={t("mods.skipFavouritesTip")}><input type="checkbox" bind:checked={skipFavourites} />{t("mods.skipFavourites")}</label>
@@ -1913,7 +2149,7 @@
     {#if filtering}
       <button class="quiet" onclick={clearFilters} title={t("mods.hintFiltering")}><Icon name="x" size={14} /><span class="lbl">{t("mods.clearFilters")}</span></button>
     {/if}
-    <button class="quiet" onclick={checkSetup} disabled={busy || checkingSetup} title={t("mods.checkSetupTip")}><Icon name="pulse" size={14} /><span class="lbl">{checkingSetup ? t("app.checking") : t("mods.checkSetup")}</span></button>
+    <button class="quiet" onclick={openCheck} disabled={busy || checkingSetup} title={t("mods.checkSetupTip")}><Icon name="pulse" size={14} /><span class="lbl">{checkingSetup ? t("app.checking") : t("mods.checkSetup")}</span></button>
     {#if !selected && rows.length}
       <button class="quiet icon narrow-only" aria-pressed={orderOpen} onclick={() => (orderOpen = !orderOpen)} title={t("loadOrder.title")} aria-label={t("loadOrder.title")}><Icon name="layers" size={16} /></button>
     {/if}
@@ -1924,9 +2160,8 @@
     </span>
   </div>
 
-  <Findings {findings} {logs} {bisect} {busy} lock={!!profileLock} names={(id) => mods.get(id)?.name || id} onClose={() => (findings = null)} onSelect={(id) => (selected = id)} onInstall={installRequirement} onDisable={disableMod}
-    onDismiss={(sha) => api.scanDismiss(sha).then(checkSetup, (e) => say(...keyedError(e), true))}
-    onBisectStart={bisectStart} onBisectAnswer={bisectAnswer} onBisectStop={bisectStop} />
+  <!-- the search for a broken mod's rounds (Check setup itself is the window above) -->
+  <Findings {bisect} {busy} onBisectAnswer={bisectAnswer} onBisectStop={bisectStop} />
   <main class:with-details={selected} class:with-panel={!selected && rows.length} class:order-open={orderOpen}>
     <div class="list blueprint">
       {#if !view}
@@ -1938,7 +2173,7 @@
         </div>
       {:else}
         <ModTable {rows} {order} {visible} {sectionOf} {filtering} busy={editBusy} build={view?.build ?? null} {stats} {overlaps} {problems} {updates} {favourites} fresh={freshHere} {hidden} kinds={cats?.kinds ?? {}} neededBy={needed} tags={marks.tags}
-          {collapsed} {picked} {selected} bind:dragFrom bind:editingSep onRowClick={rowClick} onRowKey={rowKey} onToggle={toggle} onMenu={openMenu}
+          {collapsed} {picked} {selected} bind:dragFrom bind:editingSep onRowClick={rowClick} onRowKey={rowKey} onToggle={toggleRow} onSubscribe={subscribe} onMenu={openMenu}
           onToggleSection={toggleSection} onDrop={dropOn} onRename={renameSep} onRemoveSep={removeSep} />
       {/if}
     </div>
@@ -1956,7 +2191,18 @@
   </section>
   {/if}
 
-  <ActivityLog {log} {busy} {busyLabel} {progress} bind:open={logOpen} onCancel={api.installStop} onCopy={copyLog} />
+  {#if whatsNew}<WhatsNew version={whatsNew} onClose={() => (whatsNew = "")} />{/if}
+  <ActivityLog {log} busy={busy || workshopLoading || background.jobs > 0} busyLabel={busyLabel || (workshopLoading ? t("workshop.loadingWorkshop") : "")} {progress} bind:open={logOpen} onCancel={api.installStop} onCopy={copyLog}
+    onExpand={() => (activityView = "expand")} onHistory={() => (activityView = "history")} />
+  <!-- Check setup opens over any tab (Home's pill, My mods' button) -->
+  {#if checkOpen}
+    <CheckSetup findings={findings ?? []} {logs} onSelect={(id) => ((checkOpen = false), (tab = "mods"), (selected = id))} failed={!findings && !checkingSetup} checking={checkingSetup} busy={editBusy} {fixes} names={(id) => mods.get(id)?.name || id} onHide={(f, on) => api.findingHide(f, on).catch((e) => say(...keyedError(e), true))}
+      onRecheck={() => checkSetup(false)} onReadLog={() => (readingLog = true)} onFindBroken={() => ((checkOpen = false), bisectStart([...new Set(logs.flatMap((l) => [...(l.first?.ids ?? []), ...l.mods.flatMap((m) => (m.id ? [m.id] : []))]))]))}
+      onClose={() => (checkOpen = false)} />
+  {/if}
+  {#if readingLog}<GameLog names={(id) => mods.get(id)?.name || id} onSelect={(id) => ((readingLog = checkOpen = false), (tab = "mods"), (selected = id))} onClose={() => (readingLog = false)} onBisect={busy || bisect ? undefined : bisectStart} />{/if}
+  {#if activityView === "expand"}<ActivityModal {log} installed={installedItems} onReinstall={reinstall} onClose={() => (activityView = "")} />{/if}
+  {#if activityView === "history"}<DownloadHistory installed={installedItems} onReinstall={reinstall} onRemove={removeRecord} onClose={() => (activityView = "")} />{/if}
 </div>
 
 <style>
@@ -2095,11 +2341,6 @@
     background: var(--panel);
     border-bottom: 1px solid var(--line);
   }
-  /* above side panels (a question can come from the Workshop item panel) */
-  .asking {
-    position: relative;
-    z-index: 22;
-  }
   .strip p {
     margin: 0 0 6px;
   }
@@ -2109,24 +2350,33 @@
     z-index: 30;
     background: rgb(0 0 0 / 0.45);
   }
-  .asking.modal {
+  /* above the app's windows (z-index 31) */
+  .asking-backdrop {
+    z-index: 40;
+  }
+  /* questions and short forms: a box in the middle over the dimmed window */
+  .strip.boxed {
     position: fixed;
     z-index: 31;
     top: 50%;
     left: 50%;
     translate: -50% -50%;
-    width: min(480px, calc(100vw - 32px));
+    width: min(560px, calc(100vw - 32px));
     max-height: calc(100vh - 64px);
     overflow: auto;
+    margin: 0;
     padding: 20px 22px;
     border: 0;
     border-radius: 10px;
     box-shadow: var(--shadow);
   }
-  .asking.modal p {
+  .strip.asking {
+    z-index: 41;
+  }
+  .boxed p {
     margin-bottom: 10px;
   }
-  .asking.modal .row {
+  .boxed .row {
     justify-content: flex-end;
   }
   .strip ul {
@@ -2136,7 +2386,16 @@
   }
   .strip .row {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
+  }
+  /* a "don't ask again" box sits at the start of the buttons' row */
+  .strip .row .check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: auto;
   }
   .strip .snaps {
     list-style: none;

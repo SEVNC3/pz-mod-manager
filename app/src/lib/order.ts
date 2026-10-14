@@ -89,8 +89,8 @@ export function findProblems(rows: Row[]): Map<string, Problem> {
  * (a stable topological sort: ties keep the current order; a cycle keeps its order).
  * Separators and disabled mods stay where they are; enabled mods refill the same slots.
  */
-export function sortLoadOrder(rows: Row[]): Row[] {
-  const next = enableRequirements(rows);
+export function sortLoadOrder(rows: Row[], canLoad: (r: ModRow) => boolean = () => true): Row[] {
+  const next = enableRequirements(rows, canLoad);
 
   const slots: number[] = [];
   const enabled: ModRow[] = [];
@@ -125,7 +125,8 @@ export function sortLoadOrder(rows: Row[]): Row[] {
 }
 
 /** A copy with the disabled requirements of enabled mods turned on (and theirs, and so on). */
-function enableRequirements(rows: Row[]): Row[] {
+/** `canLoad`: a requirement the game can't load on this build (a B41-only mod on B42) stays off. */
+function enableRequirements(rows: Row[], canLoad: (r: ModRow) => boolean): Row[] {
   const next: Row[] = rows.map((r) => ({ ...r }));
   const byId = new Map(next.filter(isMod).map((r) => [r.id, r]));
   for (let changed = true; changed; ) {
@@ -134,7 +135,7 @@ function enableRequirements(rows: Row[]): Row[] {
       if (!isMod(r) || !r.on) continue;
       for (const req of r.requires ?? []) {
         const dep = byId.get(req);
-        if (dep && !dep.on && !dep.missing) {
+        if (dep && !dep.on && !dep.missing && canLoad(dep)) {
           dep.on = true;
           changed = true;
         }
@@ -202,8 +203,8 @@ export function groupByCategory(rows: Row[], of: Record<string, string>, order: 
  * loadLast ("on": the whole list, "category": within its tier), then satisfy every require /
  * loadModAfter / loadModBefore rule while keeping your order everywhere else.
  */
-export function autosort(list: Row[], of: Record<string, string>, order: string[]): Row[] {
-  const next = enableRequirements(list);
+export function autosort(list: Row[], of: Record<string, string>, order: string[], canLoad: (r: ModRow) => boolean = () => true): Row[] {
+  const next = enableRequirements(list, canLoad);
   const tier = tiers(of, order);
   const edge = (m: ModRow, scope: string) => (m.load_first === scope ? 0 : m.load_last === scope ? 2 : 1);
   const rank = (m: ModRow) => edge(m, "on") * 100 + tier(m.id) * 10 + edge(m, "category");
@@ -365,13 +366,13 @@ export function dependants(ids: string[], needed: Map<string, string[]>): string
 }
 
 /** The load list A-Z by name (loadFirst mods above, loadLast below), then moved only as far as requirements and load rules need. */
-export function sortByName(list: ModRow[]): Row[] {
+export function sortByName(list: ModRow[], canLoad: (r: ModRow) => boolean = () => true): Row[] {
   const rank = (m: ModRow) => (m.load_first === "on" ? 0 : m.load_last === "on" ? 2 : 1);
   const name = (m: ModRow) => (m.name || m.id).toLowerCase();
   // in the app's language (the page's lang), not the system's
   const { compare } = new Intl.Collator(globalThis.document?.documentElement.lang || undefined);
   const on = list.filter((m) => m.on).sort((a, b) => rank(a) - rank(b) || compare(name(a), name(b)));
-  return sortLoadOrder([...on, ...list.filter((m) => !m.on)]);
+  return sortLoadOrder([...on, ...list.filter((m) => !m.on)], canLoad);
 }
 
 /** A server's mods against the installed ones: how many it needs that aren't installed (`get`), out of

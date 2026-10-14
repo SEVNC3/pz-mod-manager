@@ -1,4 +1,13 @@
+<script lang="ts" module>
+  import type { Feed as FeedData } from "./api";
+  /** The last feed read, kept while PZMM runs: the tab opens on it at once, asking Steam again after a few minutes. */
+  let kept: { at: number; feed: FeedData } | null = null;
+  /** A launch starts the feed over (it lists updates since the last one). */
+  export const forgetFeed = () => (kept = null);
+</script>
+
 <script lang="ts">
+  import { track } from "./activity.svelte";
   import { onMount, tick } from "svelte";
   import { api, type Feed, type FeedEntry, type ModRow } from "./api";
   import { bbcode, markdown } from "./bbcode";
@@ -15,11 +24,11 @@
     busy: boolean;
     onShowMod: (id: string) => void;
     onUpdate: (ids: string[]) => Promise<unknown>;
-    /** How many updates the feed lists (the tab's count). */
-    onCount: (n: number) => void;
+    /** The updates the feed lists (seen now: the tab's count clears). */
+    onCount: (entries: FeedEntry[]) => void;
   } = $props();
 
-  let feed = $state<Feed | null>(null);
+  let feed = $state<Feed | null>(kept?.feed ?? null);
   let error = $state("");
   let loading = $state(false);
   let enabledOnly = $state(false);
@@ -34,14 +43,20 @@
     loading = true;
     error = "";
     try {
+      // which mods updated is one Steam call; their change notes are a page each: show the list first
+      if (!feed) {
+        feed = await api.feed(false);
+        onCount(feed.entries);
+      }
       feed = await api.feed(true);
-      onCount(feed.entries.length);
+      kept = { at: Date.now(), feed };
+      onCount(feed.entries);
     } catch (e) {
       error = t(...keyedError(e));
     }
     loading = false;
   }
-  onMount(load);
+  onMount(() => (kept && Date.now() - kept.at < 5 * 60_000 ? onCount(kept.feed.entries) : load()));
   /** Update an entry's mods, then read the feed again: what's installed now isn't offered again. */
   const update = (ids: string[]) => onUpdate(ids).then(load);
 
@@ -86,6 +101,10 @@
       .trim();
   }
 
+  // the activity bar moves while this tab works
+  $effect(() => {
+    if (loading) return track();
+  });
 </script>
 
 <section class="feed blueprint" aria-label={t("feed.title")}>
@@ -125,7 +144,7 @@
               <span>{fmtDate(e.updated, "long")}</span>{#if e.from}<span class="mono">{e.from} → {e.to}</span>{/if}{#if !enabled(e)}<span>{t("common.disabled")}</span>{/if}
             </p>
             {#if !e.loaded}
-              <p class="excerpt muted">{t("feed.notLoaded")}</p>
+              <p class="excerpt muted">{t(loading ? "feed.loading" : "feed.notLoaded")}</p>
             {:else if text}
               <p class="excerpt">{text}</p>
             {:else}
@@ -177,7 +196,7 @@
                 {:else}
                   <p class="ids mono">{new Intl.ListFormat(intlLang(), { type: "unit" }).format(e.mods)}{#if e.risks.length} · <span class="why">{e.risks.map((r) => t(`feed.risk.${r}`)).join(" ")}</span>{/if}</p>
                   {#if !e.loaded}
-                    <p class="hint">{t("feed.notLoaded")}</p>
+                    <p class="hint">{t(loading ? "feed.loading" : "feed.notLoaded")}</p>
                   {:else if e.notes.length}
                     <ol class="notes">
                       {#each more ? e.notes : e.notes.slice(0, SHOWN) as n}<li><strong>{fmtDate(n.time, "long")}</strong><p>{n.text || t("feed.emptyNote")}</p></li>{/each}
@@ -299,6 +318,8 @@
     padding: 0;
     margin: 0;
     display: grid;
+    /* one column the card's width: a long one-line preview ellipsizes instead of widening it */
+    grid-template-columns: minmax(0, 1fr);
     gap: 6px;
   }
   .entries > li {

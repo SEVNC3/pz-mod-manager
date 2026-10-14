@@ -42,6 +42,9 @@ pub struct Settings {
     /// Closing the window keeps PZMM running in the tray, so server schedules, update checks and
     /// crash watch go on; the tray's Quit ends it.
     pub tray: bool,
+    /// Closing the window asks whether to quit or go to the tray (false: `tray` decides). Unset (a
+    /// settings file from before it): asks, unless `tray` already said closing goes to the tray.
+    pub close_ask: Option<bool>,
     /// While a game PZMM started runs, back up the saves played every this many minutes (0: off).
     pub save_backup_every: u32,
     /// The server browser shows countries, asking api.country.is with the servers' addresses (see `pz::geoip`).
@@ -72,6 +75,7 @@ impl Default for Settings {
             save_backup_exit: true,
             save_backup_keep: 5,
             tray: false,
+            close_ask: None,
             save_backup_every: 0,
             countries: false,
             autostart: false,

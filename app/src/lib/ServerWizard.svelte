@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { track } from "./activity.svelte";
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import { api, type HostView, type ServerLines } from "./api";
@@ -174,6 +175,11 @@
     }
     const unlisten = listen<[number, number]>("progress", (e) => creating && (progress = e.payload[0]));
     return () => unlisten.then((f) => f());
+  });
+
+  // the activity bar moves while this tab works
+  $effect(() => {
+    if (loading) return track();
   });
 </script>
 

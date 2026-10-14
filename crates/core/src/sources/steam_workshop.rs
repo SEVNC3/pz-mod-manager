@@ -273,7 +273,7 @@ fn browse_url(app: &str, q: &Query) -> String {
 
 /// Search or browse the Workshop for `app`.
 pub fn browse(app: &str, q: &Query) -> Result<Page> {
-    parse_browse(&String::from_utf8_lossy(&super::http_get(&browse_url(app, q))?))
+    parse_browse(&String::from_utf8_lossy(&cached_get(&browse_url(app, q))?))
 }
 
 /// Steam renders the browse page server-side and embeds its data as JSON
@@ -327,7 +327,34 @@ fn parse_browse(html: &str) -> Result<Page> {
     Ok(page.unwrap_or_default())
 }
 
+/// Steam answers kept for a few minutes: paging back and forth, reopening an item or a big
+/// collection's details would otherwise ask Steam again and run into its rate limit (HTTP 429).
+fn cached(key: String, fetch: impl FnOnce() -> Result<Vec<u8>>) -> Result<Vec<u8>> {
+    use std::time::{Duration, Instant};
+    const KEEP: Duration = Duration::from_secs(5 * 60);
+    // ponytail: in memory for the session only; persist to disk if restarts still hit 429s
+    type Answers = std::collections::HashMap<String, (Instant, Vec<u8>)>;
+    static CACHE: std::sync::Mutex<Option<Answers>> = std::sync::Mutex::new(None);
+    if let Some((_, hit)) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|c| c.get(&key)).filter(|(at, _)| at.elapsed() < KEEP) {
+        return Ok(hit.clone());
+    }
+    let got = fetch()?;
+    let mut c = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    let c = c.get_or_insert_with(Default::default);
+    c.retain(|_, (at, _)| at.elapsed() < KEEP);
+    if c.len() >= 64 && let Some(oldest) = c.iter().min_by_key(|(_, (at, _))| *at).map(|(k, _)| k.clone()) {
+        c.remove(&oldest);
+    }
+    c.insert(key, (Instant::now(), got.clone()));
+    Ok(got)
+}
+
+fn cached_get(url: &str) -> Result<Vec<u8>> {
+    cached(url.to_string(), || super::http_get(url))
+}
+
 fn post_form(url: &str, body: &str) -> Result<Value> {
+    // not cached: update checks and installs need what Steam says now
     let bytes = super::polite(url, || {
         super::agent()
             .post(url)
@@ -423,7 +450,7 @@ pub fn required_items(id: &str) -> Result<Vec<String>> {
     if let Some(hit) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|c| c.get(id)) {
         return Ok(hit.clone());
     }
-    let html = String::from_utf8_lossy(&super::http_get(&format!("https://steamcommunity.com/sharedfiles/filedetails/?id={id}"))?).into_owned();
+    let html = String::from_utf8_lossy(&cached_get(&format!("https://steamcommunity.com/sharedfiles/filedetails/?id={id}"))?).into_owned();
     let req = parse_required(&html);
     CACHE.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(Default::default).insert(id.to_string(), req.clone());
     Ok(req)
@@ -444,7 +471,7 @@ pub fn item_page(id: &str) -> Result<ItemPage> {
     if !valid_id(id) {
         bail!("not a Workshop id: {id}");
     }
-    let html = String::from_utf8_lossy(&super::http_get(&format!("https://steamcommunity.com/sharedfiles/filedetails/?id={id}"))?).into_owned();
+    let html = String::from_utf8_lossy(&cached_get(&format!("https://steamcommunity.com/sharedfiles/filedetails/?id={id}"))?).into_owned();
     Ok(parse_item_page(&html))
 }
 
@@ -498,7 +525,7 @@ pub fn change_notes(id: &str, page: u32) -> Result<Vec<ChangeNote>> {
         bail!("not a Workshop id: {id}");
     }
     let url = format!("https://steamcommunity.com/sharedfiles/filedetails/changelog/{id}?p={}", page.max(1));
-    Ok(parse_change_notes(&String::from_utf8_lossy(&super::http_get(&url)?)))
+    Ok(parse_change_notes(&String::from_utf8_lossy(&cached_get(&url)?)))
 }
 
 /// The change notes newer than `since` (Unix seconds: the installed version), newest first.
@@ -581,7 +608,7 @@ pub fn author_items(app: &str, creator: &str, page: u32) -> Result<(u64, Vec<Str
         bail!("not a Steam id: {creator}");
     }
     let url = format!("https://steamcommunity.com/profiles/{creator}/myworkshopfiles/?appid={app}&section=readytouseitems&p={}", page.max(1));
-    Ok(parse_author_items(&String::from_utf8_lossy(&super::http_get(&url)?)))
+    Ok(parse_author_items(&String::from_utf8_lossy(&cached_get(&url)?)))
 }
 
 fn parse_author_items(html: &str) -> (u64, Vec<String>) {

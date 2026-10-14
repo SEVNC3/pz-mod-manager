@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { track } from "./activity.svelte";
   import { onMount, tick, untrack } from "svelte";
   import { api, type Dossier, type People, type ServerCard, type WorldGrid } from "./api";
   import { fmtDateTime } from "./format";
@@ -243,6 +244,11 @@
       if (view === "map" && ++ticks % 2 === 0) loadPeople();
     }, 15000);
     return () => clearInterval(timer);
+  });
+
+  // the activity bar moves while this tab works
+  $effect(() => {
+    if (working) return track();
   });
 </script>
 

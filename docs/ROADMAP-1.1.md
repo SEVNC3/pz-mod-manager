@@ -73,7 +73,7 @@ All verified in the code. None have been reported as hitting a user yet.
 **Open questions:**
 - **Client-only?** Viewpoint says you can join "about any online server … as long as its modlist is compatible", which suggests it's client-side. If so, server export should leave Viewpoint (and ZombieBuddy?) out of `Mods=`. Needs confirming with its author or Discord.
 - **Updates.** Viewpoint hotfixes often, and its page suggests re-subscribing on issues. Prefer the Steam subscription over a PZMM copy so Steam keeps it current. Installs also need a fix: today a PZMM copy in `Zomboid/mods` can shadow the newer subscription.
-- **ZombieBuddy policy.** Some 3D mods' guides tell users to set `policy=allow-all`. PZMM keeps ZombieBuddy's default "prompt" policy and never sets allow-all on its own.
+- **ZombieBuddy policy.** Some 3D mods' guides tell users to set `policy=allow-all`. PZMM keeps ZombieBuddy's default "prompt" policy and never sets allow-all. Since 1.2.6 it does approve each enabled Java mod's current jar in `mod_approvals.json` when you press Play: enabling it in PZMM is the yes. A "no" you gave in ZombieBuddy stays.
 
 **Effort:** M (about 1–2 days): the core mode table and profile field, the header switch, the first-run setup dialog reusing the ZombieBuddy and install code, the subscription preference, and server-export filtering once client-only is confirmed.
 

@@ -82,7 +82,10 @@ pub(crate) fn polite<T>(url: &str, mut send: impl FnMut() -> Result<T, ureq::Err
         }
         match send() {
             Ok(v) => return Ok(v),
-            Err(ureq::Error::StatusCode(429)) if wait > 0 => std::thread::sleep(Duration::from_secs(wait)),
+            Err(ureq::Error::StatusCode(429)) if wait > 0 => {
+                crate::say!("steamWait", "Steam is limiting requests: trying again in {seconds} s", seconds = wait);
+                std::thread::sleep(Duration::from_secs(wait))
+            }
             Err(ureq::Error::StatusCode(429)) => {
                 REFUSED.lock().unwrap_or_else(|e| e.into_inner()).push((host(url).into(), Instant::now()));
                 bail!("{LIMITED}")

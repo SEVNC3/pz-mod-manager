@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api, describeSource, type ModRow, type Overlap, type Row, type Stats } from "./api";
+  import { describeSource, type ModRow, type Overlap, type Row, type Stats } from "./api";
   import { fmtDate, fmtNum, fmtSize } from "./format";
   import { t } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
@@ -35,6 +35,7 @@
     onRowKey,
     onToggle,
     onToggleSection,
+    onSubscribe,
     onDrop,
     onRename,
     onRemoveSep,
@@ -74,6 +75,8 @@
     onRowKey: (e: KeyboardEvent, i: number, r: Row) => void;
     onToggle: (id: string) => void;
     onToggleSection: (name: string) => void;
+    /** The Workshop chip: subscribe to the mod's item in Steam (`on`), or unsubscribe from it. */
+    onSubscribe: (id: string, on: boolean) => void;
     /** A row (or a separator with its section) dropped before row `to`. */
     onDrop: (from: number, to: number) => void;
     onRename: (i: number, name: string) => void;
@@ -224,8 +227,8 @@
               {@const kind = r.source.split(":")[0]}
               {@const hint = t(SOURCE_HINTS[kind] ?? "modTable.sourceHint.manual")}
               {#if (kind === "workshop" || kind === "steam") && src.url}
-                <button class="badge go" data-kind={kind} title="{hint} · {t('modTable.openWorkshop')}"
-                  onclick={(e) => { e.stopPropagation(); api.openUrl(src.url!); }}><Icon name={kind === "steam" ? "check" : "steam"} size={12} />{kind === "steam" ? t("source.steam") : t("source.workshop")}</button>
+                <button class="badge go" data-kind={kind} title="{hint} · {t(kind === 'steam' ? 'modTable.unsubscribeTip' : 'modTable.subscribeTip')}"
+                  onclick={(e) => { e.stopPropagation(); onSubscribe(r.id, kind !== "steam"); }}><Icon name={kind === "steam" ? "check" : "steam"} size={12} />{kind === "steam" ? t("source.steam") : t("source.workshop")}</button>
               {:else}
                 <span class="badge" data-kind="local" title={src.url ? `${hint} · ${src.url}` : hint}><Icon name="folder" size={12} />{t("source.localShort")}</span>
               {/if}

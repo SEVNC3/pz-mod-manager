@@ -151,6 +151,7 @@ pub fn install(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> 
             );
             continue;
         }
+        let mut noted = None;
         if dest.exists() && same_tree(&m.dir, &dest) {
             crate::say!("alreadyCurrent", "{id} is already up to date ({source})", id = m.id, source = source);
         } else {
@@ -180,9 +181,14 @@ pub fn install(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> 
             } else {
                 crate::say!("installed", "installed {id} ({source})", id = m.id, source = source);
             }
+            noted = Some(update);
         }
         index.insert(m.id.clone(), Entry { source: source.to_string(), installed_at: now() });
         save(paths, &index)?;
+        // noted once it's in the index
+        if let Some(update) = noted {
+            crate::history::add(paths, &m.id, &m.name, source, if update { "updated" } else { "installed" });
+        }
         ids.push(m.id);
     }
     Ok(ids)
@@ -232,7 +238,11 @@ pub fn remove(paths: &Paths, ids: &[String], recycle: bool) -> Result<Vec<String
             {
                 fs::remove_dir_all(backup)?;
             }
-            index.remove(id);
+            if let Some(e) = index.remove(id) {
+                save(paths, &index)?;
+                crate::say!("removed", "removed {id} ({source})", id = id, source = e.source);
+                crate::history::add(paths, id, "", &e.source, "removed");
+            }
         } else {
             refused.push(id.clone());
         }

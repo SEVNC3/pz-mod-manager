@@ -126,7 +126,7 @@ Every Workshop map, installed or not, on one cell grid. You see the clashes befo
 
 ### Project Viewpoint and ZombieBuddy in one click
 
-**Set up Project Viewpoint…** in the profile menu shows you every change first, then downloads [ZombieBuddy](https://github.com/zed-0xff/ZombieBuddy) and Viewpoint from the Workshop, copies ZombieBuddy's files into the game folder (on any drive), adds the launch flag and makes a Viewpoint profile. Your normal mods stay in their own profile. When a game update or Steam's "Verify integrity of game files" removes the flag, PZMM notices and fixes it in one click. You still approve Viewpoint's Java code in ZombieBuddy's own popup the first time.
+**Set up Project Viewpoint…** in the profile menu shows you every change first, then downloads [ZombieBuddy](https://github.com/zed-0xff/ZombieBuddy) and Viewpoint from the Workshop, copies ZombieBuddy's files into the game folder (on any drive), adds the launch flag and makes a Viewpoint profile. Your normal mods stay in their own profile. When a game update or Steam's "Verify integrity of game files" removes the flag, PZMM notices and fixes it in one click. Java mods you turn on in PZMM are approved in ZombieBuddy when you press Play, so the game doesn't ask again (jars with scan warnings, or not from the Workshop, still ask).
 
 <p align="center">
   <img src="docs/media/viewpoint.gif" alt="Setting up Project Viewpoint: choosing Set up Project Viewpoint from the profile menu, the new Viewpoint profile with ZombieBuddy and Project Viewpoint at the top of the load order, and the ZombieBuddy page with every setup step ticked" width="720">

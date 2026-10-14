@@ -167,3 +167,9 @@ assert.equal(ids(az), "+first +zeta +z2 +b +last -off", "beta waits for Zulu, wh
 }
 
 console.log("order-check: ok");
+
+// a requirement the build can't load (a B41-only mod on B42) isn't turned on by sorting
+const b41 = [mod("App", true, { requires: ["Old"] }), mod("Old", false)];
+assert.equal(ids(sortLoadOrder(b41, (m) => m.id !== "Old")), "+App -Old");
+assert.equal(ids(sortLoadOrder(b41)), "+Old +App", "loadable by default");
+console.log("order-check: requirements this build can't load stay off");

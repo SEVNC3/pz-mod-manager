@@ -33,7 +33,9 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    margin-left: 8px;
+    /* the bar's right end, however wide the window */
+    margin-left: auto;
+    padding-left: 8px;
   }
   button {
     display: grid;

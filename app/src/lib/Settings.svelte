@@ -10,6 +10,7 @@
 </script>
 
 <script lang="ts">
+  import { track } from "./activity.svelte";
   import { onMount, tick } from "svelte";
   import { api, type Folder, type NotifyKind, type ProfileLaunch, type SettingsView, type View } from "./api";
   import { fmtSize } from "./format";
@@ -175,6 +176,11 @@
       say("settings.diagnosticsFailed", { error: t(...keyedError(e)) }, true);
     }
   }
+
+  // the activity bar moves while this tab works
+  $effect(() => {
+    if (working) return track();
+  });
 </script>
 
 <svelte:window onpointerdown={(e) => railOpen && !rail?.contains(e.target as Node) && !toggle?.contains(e.target as Node) && closeRail(false)} />
@@ -399,6 +405,9 @@
             <option value="41">{t("settings.appearance.build41")}</option>
           </select>
         </div>
+        {#if view?.game_version || view?.steam_branch}
+          <p class="desc">{t("settings.appearance.gameVersion", { version: view?.game_version ?? "?", branch: view?.steam_branch ?? "?" })}</p>
+        {/if}
         <label class="set"><span>{t("settings.appearance.showIds")}</span><input type="checkbox" bind:checked={prefs.showIds} /></label>
         <label class="set"><span>{t("settings.appearance.favFirst")}</span><input type="checkbox" bind:checked={prefs.favFirst} /></label>
       </div>
@@ -437,9 +446,17 @@
       <div class="card">
         <h3>{t("settings.launch.trayTitle")}</h3>
         <p class="desc">{t("settings.launch.trayHint")}</p>
-        <label class="set"><span>{t("settings.launch.tray")}</span><input type="checkbox" bind:checked={cfg.settings.tray} onchange={() => cfg && (cfg.settings.autostart &&= cfg.settings.tray, save())} /></label>
-        <!-- starting in the tray needs the tray -->
-        <label class="set"><span>{t("settings.launch.autostart")}</span><input type="checkbox" bind:checked={cfg.settings.autostart} onchange={() => cfg && (cfg.settings.tray ||= cfg.settings.autostart, save())} /></label>
+        <!-- ask, or what Settings say: tray (it keeps the tray icon) or quit -->
+        <div class="set">
+          <label for="onclose">{t("settings.launch.onClose")}</label>
+          <select id="onclose" value={(cfg.settings.close_ask ?? !cfg.settings.tray) ? "ask" : cfg.settings.tray ? "tray" : "quit"}
+            onchange={(e) => { if (!cfg) return; const v = e.currentTarget.value; cfg.settings.close_ask = v === "ask"; if (v !== "ask") cfg.settings.tray = v === "tray"; save(); }}>
+            <option value="ask">{t("settings.launch.onCloseAsk")}</option>
+            <option value="tray">{t("close.tray")}</option>
+            <option value="quit">{t("close.quit")}</option>
+          </select>
+        </div>
+        <label class="set"><span>{t("settings.launch.autostart")}</span><input type="checkbox" bind:checked={cfg.settings.autostart} onchange={save} /></label>
       </div>
       <div class="card">
         <h3>{t("settings.notify.title")}</h3>

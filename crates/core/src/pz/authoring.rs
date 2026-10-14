@@ -26,7 +26,7 @@ const MEDIA_DIRS: &[&str] = &["lua", "scripts", "textures", "sound", "models", "
 const VISIBILITY: &[&str] = &["public", "friendsOnly", "private", "unlisted"];
 
 fn finding(level: Level, file: &str, key: &'static str, template: &str, vars: &[(&'static str, String)]) -> Finding {
-    Finding { level, subject: file.into(), text: crate::fill(template, vars), key, vars: vars.iter().cloned().collect(), action: None }
+    Finding { level, subject: file.into(), text: crate::fill(template, vars), key, vars: vars.iter().cloned().collect(), action: None, hidden: false }
 }
 
 /// The game or the uploader refuses it, or skips it without a word.

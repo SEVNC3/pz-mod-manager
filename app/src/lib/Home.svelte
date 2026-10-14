@@ -55,6 +55,7 @@
   import { connectOf, joinPlan, knownItems, ownJoin, WINDOWS, type ServerCard, type ServerEvent, type SetupItem } from "./api";
   import { modNeed } from "./order";
   import { fmtAgo, fmtDate, fmtNum } from "./format";
+  import { counted } from "./findings";
   import { keyedError, t } from "./i18n.svelte";
   import Icon, { type IconName } from "./Icon.svelte";
   import Menu, { type MenuItem } from "./Menu.svelte";
@@ -128,7 +129,7 @@
   const recent = $derived((launcher?.history ?? []).slice(0, 10).map(liveOf));
   const hosted = $derived((host?.servers ?? []).filter((c) => c.managed));
   /** What Check setup finds wrong with what Play starts (a server config's findings are that server's). */
-  const issues = $derived(findings?.filter((f) => f.level !== "note" && !f.subject.endsWith(".ini")).length ?? 0);
+  const issues = $derived(findings ? counted(findings).length : 0);
   /** When you last played (0: no sign of play yet). */
   const played = $derived(feed?.basis ? feed.since : 0);
   const posts = $derived(news?.news?.posts ?? []);
@@ -287,14 +288,11 @@
     api.workshopItems(ids).then((items) => items.forEach((i) => (previews[i.id] = i.preview_url)), () => {});
   });
 
-  /** Steam's list can be asked without showing you as playing. */
-  const askQuietly = () => !!launcher?.key_saved || !WINDOWS;
   async function loadPopular(fresh = false) {
     if (popularLoading) return;
     await ready;
-    // with a key (or off Windows, where no key means the game's list), Steam's list is asked every ten minutes;
-    // on Windows without one, asking shows you as playing for a moment: only when you ask (List servers, Refresh)
-    if (!fresh && (!askQuietly() || (popular && Date.now() - popular.at < 10 * MINUTES))) return void (popular && probe(popular.list));
+    // Steam's list is asked on its own, kept ten minutes (without a Web API key, Steam shows you as playing for a moment)
+    if (!fresh && popular && Date.now() - popular.at < 10 * MINUTES) return void probe(popular.list);
     popularLoading = true;
     let steam = true;
     try {
@@ -576,7 +574,7 @@
           </div>
           {#if zbNeed}{@render pill("bad", "alert", zbNeed.partial ? t("home.zb.partial") : t("home.zb.missing", { count: zbNeed.count }), t("home.health.fix"), () => onGo("zb"))}
           {:else if checkFailed}{@render pill("bad", "alert", t("home.health.failed"), t("home.health.run"), onCheckSetup)}
-          {:else if findings === null}<span class="line w30" aria-hidden="true"></span>
+          {:else if findings === null}{@render pill("idle", "refresh", t("app.checking"), "", onCheckSetup, true)}
           {:else}
             <!-- the setup check: what it found, and its action -->
             {@render pill(issues ? "bad" : "ok", issues ? "alert" : "check", issues ? t("home.health.problems", { count: issues }) : t("home.health.ok"), issues ? t("home.health.fix") : t("home.health.run"), onCheckSetup)}
@@ -691,9 +689,6 @@
                   </button>
                 </li>
               {/each}
-            {:else if !popular && launcher && !askQuietly() && !popularLoading}
-              <!-- nothing kept: Steam is asked only when you say so -->
-              <li class="none">{t("home.popularAsk")} <button class="link" onclick={() => loadPopular(true)}>{t("home.listServers")}</button></li>
             {:else if !popular}
               {#each [0, 1, 2] as i (i)}<li class="row sk" aria-hidden="true"><span class="line w60"></span></li>{/each}
             {:else}
@@ -704,8 +699,7 @@
               {:else if !popular.steam && !WINDOWS}
                 <!-- elsewhere only the Steam Web API key lists Steam's servers -->
                 <li class="none">{t("home.gameListKey")} <button class="link" onclick={() => (showInSettings("keys"), onGo("settings"))}>{t("launcher.addKey")}</button></li>
-              {:else if !popular.steam}<li class="none">{t("home.gameList")} <button class="link" onclick={() => loadPopular(true)} disabled={popularLoading}>{t("common.tryAgain")}</button></li>
-              {:else if launcher && !launcher.key_saved}<li class="none">{t("home.popularKept", { ago: fmtAgo(popular.at / 1000) })} <button class="link" onclick={() => loadPopular(true)} disabled={popularLoading}>{t("common.refresh")}</button></li>{/if}
+              {:else if !popular.steam}<li class="none">{t("home.gameList")} <button class="link" onclick={() => loadPopular(true)} disabled={popularLoading}>{t("common.tryAgain")}</button></li>{/if}
             {/if}
           </ul>
 
@@ -1352,6 +1346,13 @@
   }
   .health.idle {
     --tone: var(--muted);
+  }
+  /* no action (Checking…): the text keeps its own right edge */
+  .health .act:empty {
+    display: none;
+  }
+  .health:has(.act:empty) {
+    padding-right: 14px;
   }
   .health:hover:not(:disabled) {
     border-color: var(--tone);
