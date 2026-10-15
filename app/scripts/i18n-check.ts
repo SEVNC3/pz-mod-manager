@@ -88,7 +88,8 @@ for (const f of sources) {
 const rustDirs = ["../../crates/core/src/", "../src-tauri/src/"].map((d) => new URL(d, import.meta.url));
 const lit = String.raw`"((?:\\.|[^"\\])*)"`;
 const used = new Set<string>(); // keys the backend sends
-const prefixes: string[] = [];
+// the in-game manager's strings: scripts/ingame-i18n.ts takes them to the game
+const prefixes: string[] = ["ingame."];
 const english = (k: string, text: string, where: string) => {
   used.add(k);
   if (!(k in en)) errors.push(`${where}: en.json has no ${k} ("${text}")`);

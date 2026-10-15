@@ -11,6 +11,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
+    /// settings.json couldn't be read: an empty stand-in, never saved over it.
+    #[serde(skip)]
+    pub unread: bool,
     /// Folders set by hand, by key (see `pz::folders`); a missing key means autodetect.
     pub folders: BTreeMap<String, PathBuf>,
     /// When to look for mod updates: "off", "start", "1h" or "3h" (on start, then every N hours).
@@ -60,6 +63,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Settings {
+            unread: false,
             folders: BTreeMap::new(),
             update_check: "start".into(),
             update_action: "notify".into(),
@@ -95,8 +99,19 @@ pub fn load() -> Settings {
 }
 
 fn load_from(path: &Path) -> Settings {
-    // a damaged file is kept: the next save would otherwise replace it with defaults unseen
-    crate::read_json(path).unwrap_or_default()
+    // a damaged file is kept: the next save would otherwise replace it with defaults unseen. One that can't be
+    // read now: the last read stands in (or the defaults, marked so they're never saved over it)
+    static LAST: std::sync::Mutex<Option<Settings>> = std::sync::Mutex::new(None);
+    match crate::read_json::<Settings>(path) {
+        Ok(s) => {
+            *LAST.lock().unwrap_or_else(|e| e.into_inner()) = Some(s.clone());
+            s
+        }
+        Err(e) => {
+            crate::log!("error: {e:#}");
+            LAST.lock().unwrap_or_else(|e| e.into_inner()).clone().unwrap_or(Settings { unread: true, ..Default::default() })
+        }
+    }
 }
 
 pub fn save(s: &Settings) -> Result<()> {
@@ -104,6 +119,9 @@ pub fn save(s: &Settings) -> Result<()> {
 }
 
 fn save_to(path: &Path, s: &Settings) -> Result<()> {
+    if s.unread {
+        anyhow::bail!("couldn't read {}, so it wasn't saved over: try again", path.display());
+    }
     if let Some(d) = path.parent() {
         fs::create_dir_all(d)?;
     }

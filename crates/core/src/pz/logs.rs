@@ -479,7 +479,7 @@ LOG  : General a normal line -- file: nothing | MOD: not a trace
         profile::apply(&paths, &profile::Profile::from_ids("Own", []), None).unwrap();
         std::fs::write(paths.zomboid.join("console.txt"), "x").unwrap();
         let own = profile::own_game_folder(&paths, "Own");
-        profile::set_launch(&paths, "Own", &profile::Launch { args: String::new(), cache_dir: Some(own.clone()) }).unwrap();
+        profile::set_launch(&paths, "Own", &profile::Launch { args: String::new(), cache_dir: Some(own.clone()), kept: None }).unwrap();
         std::fs::write(own.join("console.txt"), "y").unwrap();
         assert_eq!(files(&paths)[..2], [own.join("console.txt"), paths.zomboid.join("console.txt")]);
     }

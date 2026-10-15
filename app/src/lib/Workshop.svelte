@@ -146,6 +146,7 @@
   /** Every Home row at once; a row that fails shows its own retry instead of hiding the others. */
   async function loadHome() {
     const mine = ++seq;
+    loading = false;
     error = "";
     await Promise.all(HOME_ROWS.filter(([title]) => !rows[title]).map(([title, over]) => loadRow(mine, title, over)));
   }

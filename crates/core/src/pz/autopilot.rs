@@ -230,6 +230,8 @@ pub struct Watch {
     status_text: String,
     last_players_ask: u64,
     players: Option<usize>,
+    /// A stop or restore asked for while a restart may be under way: it doesn't start the server again.
+    stop_asked: bool,
 }
 
 impl Watch {
@@ -238,6 +240,11 @@ impl Watch {
     /// warn, restart, back up, check for updates, save, post messages.
     pub fn step(&mut self, a: &Auto, now: u64, next_planned: Option<u64>, players: Option<usize>) -> Vec<Do> {
         let mut out = vec![];
+        // first: a restart (or a warning that fails) ends the round, and the backup mustn't be lost with it
+        if a.backup_hours > 0 && now >= self.last_backup + a.backup_hours as u64 * 3600 {
+            out.push(Do::Backup);
+            self.last_backup = now;
+        }
         let lead = a.warn_minutes.iter().max().copied().unwrap_or(0) as u64 * 60;
         if self.restart_at.is_none() {
             if let Some(at) = next_planned.filter(|at| *at <= now + lead && self.skip != Some(*at)) {
@@ -263,10 +270,6 @@ impl Watch {
                 self.restart_at = None;
                 self.warned.clear();
             }
-        }
-        if a.backup_hours > 0 && now >= self.last_backup + a.backup_hours as u64 * 3600 {
-            out.push(Do::Backup);
-            self.last_backup = now;
         }
         if a.check_minutes > 0 && now >= self.last_check + a.check_minutes as u64 * 60 {
             out.push(Do::Check);
@@ -458,15 +461,20 @@ pub fn check_updates(paths: &Paths, name: &str) -> Result<Vec<String>> {
     Ok(updated)
 }
 
-/// Back up (when updates are waiting), stop and start a server. The Restart button and the countdowns use it.
+/// Stop a server, back it up (when updates are waiting) and start it. The Restart button and the countdowns use it.
 pub fn restart(paths: &Paths, name: &str) -> Result<()> {
     let s = host::find(paths, name).with_context(|| format!("PZMM doesn't manage a server named {name}"))?;
-    if !pending(name).0.is_empty() {
-        server_backup::create(paths, &s, "update")?;
-    }
     notify(&s, "restarting", "Restarting now.", None);
     let updates = pending(name).0;
     host::stop(paths, name, Duration::from_secs(90))?;
+    // a Stop or Restore came in meanwhile: the server stays stopped
+    if with(name, |w| std::mem::take(&mut w.stop_asked)) {
+        return Ok(());
+    }
+    // taken stopped, so the world in it is whole
+    if !updates.is_empty() {
+        server_backup::create(paths, &s, "update")?;
+    }
     host::start(paths, name, None)?;
     with(name, |w| {
         w.updated.clear();
@@ -477,11 +485,22 @@ pub fn restart(paths: &Paths, name: &str) -> Result<()> {
     Ok(())
 }
 
+/// A Stop or Restore of `name` is coming: a restart under way leaves it stopped.
+/// The Restart button: a Stop from before it doesn't count, one during it does.
+pub fn restart_asked(paths: &Paths, name: &str) -> Result<()> {
+    with(name, |w| w.stop_asked = false);
+    restart(paths, name)
+}
+
+pub fn stop_asked(name: &str) {
+    with(name, |w| w.stop_asked = true);
+}
+
 /// The errors Check setup finds in server `name`'s config (those the Start button asks about), as
 /// one line; empty when there are none or the mods can't be read. Planned and update restarts
 /// don't start a config with errors.
 fn config_errors(paths: &Paths, name: &str) -> String {
-    let Ok(mods) = crate::store::scan(paths) else { return String::new() };
+    let Ok(mods) = crate::store::rows(paths) else { return String::new() };
     let errors: Vec<String> = super::doctor::check_server(paths, name, &mods).into_iter().filter(|f| f.level == super::doctor::Level::Error).map(|f| f.text).collect();
     errors.join(" ")
 }
@@ -603,6 +622,9 @@ fn tick_one(paths: &Paths, s: &Server, now: u64, offset: i64) -> Result<()> {
             (w.pid, w.seq) = (pid, 0);
             w.online.clear();
             w.updated.clear();
+            // a countdown ends with the run it was for: it mustn't fire as the next one starts
+            w.restart_at = None;
+            w.warned.clear();
         }
         match (w.status, status) {
             (Some(Status::Starting), Status::Running) => events.push(("started", "The server is up.".to_string())),
@@ -663,6 +685,10 @@ fn tick_one(paths: &Paths, s: &Server, now: u64, offset: i64) -> Result<()> {
         let n = w.players.take();
         w.step(a, now, next_planned(a, s.started, now, offset), n)
     });
+    // a restart is decided: a Stop from before (one that failed) no longer counts, one from now on does
+    if todo.iter().any(|d| matches!(d, Do::Restart)) {
+        with(name, |w| w.stop_asked = false);
+    }
     for d in todo {
         match d {
             Do::Warn(m) => {
@@ -694,7 +720,10 @@ fn tick_one(paths: &Paths, s: &Server, now: u64, offset: i64) -> Result<()> {
             Do::Backup => {
                 let _ = host::send(paths, name, "save");
                 std::thread::sleep(Duration::from_secs(5));
-                server_backup::create(paths, s, "scheduled")?;
+                // the restart queued after it still happens (players were warned)
+                if let Err(e) = server_backup::create(paths, s, "scheduled") {
+                    crate::log!("error: {name}: the scheduled backup failed: {e:#}");
+                }
             }
             Do::Check => {
                 check_updates(paths, name)?;
@@ -821,6 +850,14 @@ mod tests {
         assert_eq!(w.step(&a, 1000 + 1800, None, None), [Do::Check]);
         assert_eq!(w.step(&a, 1000 + 6 * 3600, None, None), [Do::Backup, Do::Check]);
         assert_eq!(w.step(&a, 1000 + 6 * 3600 + 60, None, None), []);
+    }
+
+    #[test]
+    fn a_due_backup_comes_before_a_restart() {
+        let a = Auto { backup_hours: 6, check_minutes: 0, ..Default::default() };
+        let mut w = Watch { last_backup: 1000, restart_at: Some(1000 + 6 * 3600), why: Why::Admin, ..Default::default() };
+        // the restart ends the round: the backup must already have run
+        assert_eq!(w.step(&a, 1000 + 6 * 3600, None, None), [Do::Backup, Do::Restart]);
     }
 
     #[test]

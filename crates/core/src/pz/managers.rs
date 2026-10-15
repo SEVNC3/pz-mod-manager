@@ -30,7 +30,9 @@ const HIDDEN: &str = "mmHidden";
 const GAME_FAVOURITES: &str = "!fav!";
 
 fn file(paths: &Paths, name: &str) -> PathBuf {
-    paths.zomboid.join("Lua").join(name)
+    // the Lua folder of the Zomboid folder the game plays in (the active profile's own, if it has one)
+    let pzmm = super::bridge::dir(paths);
+    pzmm.parent().map_or_else(|| paths.zomboid.join("Lua"), std::path::Path::to_path_buf).join(name)
 }
 
 /// One of the game's Lua files: missing is empty; one that can't be read is an error (a write
@@ -266,6 +268,14 @@ pub struct Rule {
     pub load_last: String,
     /// The Sorter's own category for the mod (coreRequirement, tweaks, resource, map, ...).
     pub category: String,
+    /// The block's other `key=value` lines (keys PZMM doesn't use: the Sorter's or the game's), written back as they were.
+    #[serde(skip)]
+    pub other: Vec<String>,
+}
+
+/// A key [`Rule::add`] reads.
+fn known_key(k: &str) -> bool {
+    matches!(k.trim().to_ascii_lowercase().as_str(), "loadafter" | "loadmodafter" | "loadbefore" | "loadmodbefore" | "incompatiblemods" | "incompatible" | "loadfirst" | "loadlast" | "category")
 }
 
 /// A `loadFirst=` / `loadLast=` value as the Sorter reads it: true/0 mean "on".
@@ -312,7 +322,8 @@ fn parse_rules(text: &str) -> BTreeMap<String, Rule> {
             out.entry(id.clone()).or_default();
             current = Some(id);
         } else if let (Some((k, v)), Some(id)) = (l.split_once('='), &current) {
-            out.entry(id.clone()).or_default().add(k, v);
+            let r = out.entry(id.clone()).or_default();
+            if known_key(k) { r.add(k, v) } else { r.other.push(l.to_string()) }
         }
     }
     out
@@ -332,6 +343,9 @@ fn write_rules(rules: &BTreeMap<String, Rule>) -> String {
                 out += &format!("{k}={v}\r\n");
             }
         }
+        for l in &r.other {
+            out += &format!("{l}\r\n");
+        }
     }
     out
 }
@@ -344,7 +358,10 @@ pub fn rules(paths: &Paths) -> BTreeMap<String, Rule> {
 /// Set one mod's rule (an empty one removes it), keeping the others.
 pub fn set_rule(paths: &Paths, id: &str, rule: Rule) -> Result<()> {
     let mut all = parse_rules(&try_read(paths, RULES)?);
-    all.insert(id.trim_start_matches('\\').to_string(), rule);
+    let id = id.trim_start_matches('\\').to_string();
+    // the block's keys PZMM doesn't edit stay (the UI never sees them)
+    let other = all.get(&id).map(|r| r.other.clone()).unwrap_or_default();
+    all.insert(id, Rule { other, ..rule });
     write(paths, RULES, &write_rules(&all))
 }
 
@@ -423,14 +440,19 @@ mod tests {
         assert_eq!(r["Core"], Rule { load_first: "on".into(), ..Default::default() });
         assert_eq!(
             r["Patch"],
-            Rule { load_after: s(&["Core", "Big"]), load_before: s(&["Late"]), incompatible: s(&["Old"]), load_last: "category".into(), category: "tweaks".into(), ..Default::default() }
+            Rule { load_after: s(&["Core", "Big"]), load_before: s(&["Late"]), incompatible: s(&["Old"]), load_last: "category".into(), category: "tweaks".into(), other: s(&["weird=1"]), ..Default::default() }
         );
         set_rule(&paths, "New", Rule { load_after: s(&["Patch"]), ..Default::default() }).unwrap();
         set_rule(&paths, "Core", Rule::default()).unwrap();
         assert_eq!(
             fs::read_to_string(file(&paths, RULES)).unwrap(),
-            "[New]\r\nloadAfter=Patch\r\n[Patch]\r\nloadAfter=Core,Big\r\nloadBefore=Late\r\nincompatibleMods=Old\r\nloadLast=category\r\ncategory=tweaks\r\n"
+            "[New]\r\nloadAfter=Patch\r\n[Patch]\r\nloadAfter=Core,Big\r\nloadBefore=Late\r\nincompatibleMods=Old\r\nloadLast=category\r\ncategory=tweaks\r\nweird=1\r\n"
         );
         assert_eq!(rules(&paths)["Patch"], r["Patch"], "what PZMM writes reads back the same");
+        // the game edits it too (LF, any key order, keys PZMM doesn't know): those keys survive PZMM's write
+        write(&paths, RULES, "[Kept]\nsomeFutureKey=1\nloadAfter=Core\n").unwrap();
+        set_rule(&paths, "Kept", Rule { load_after: s(&["Core", "Big"]), ..Default::default() }).unwrap();
+        let r = rules(&paths);
+        assert_eq!((r["Kept"].load_after.clone(), r["Kept"].other.clone()), (s(&["Core", "Big"]), s(&["someFutureKey=1"])));
     }
 }

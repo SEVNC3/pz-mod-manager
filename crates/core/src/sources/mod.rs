@@ -168,7 +168,7 @@ pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
         }
         // Steam wouldn't show these items' pages: what their mod.info files require comes from
         // the mod ID index instead, and so on for what that adds
-        let mut provided: HashSet<String> = store::scan(paths).unwrap_or_default().into_keys().collect();
+        let mut provided: HashSet<String> = store::ids(paths).unwrap_or_default();
         let mut needs = vec![];
         for f in &out {
             let page_unread = workshop_item(&f.source).is_some_and(|i| unchecked.iter().any(|u| u == i));
@@ -220,7 +220,8 @@ fn fetch_workshop(paths: &Paths, mut items: Vec<String>, out: &mut Vec<Fetched>)
     if let Some(ws) = pz::workshop_dir() {
         items.retain(|id| {
             let root = ws.join(id);
-            if !steam_workshop::valid_id(id) || !root.is_dir() {
+            // an unsubscribe can leave the item's folder behind, empty: that's no subscription
+            if !steam_workshop::valid_id(id) || pz::find_mods(&root, 8).is_empty() {
                 return true;
             }
             report(Ok(Fetched { source: format!("steam:{id}"), root, _temp: None, subscribed: true }));
@@ -271,12 +272,17 @@ fn from_index(needs: &[(String, String)], provided: &HashSet<String>, by_id: &st
     (found, unknown)
 }
 
-/// Copy fetched mods into Zomboid/mods. Returns the installed mod ids.
-pub fn install_fetched(paths: &Paths, fetched: &[Fetched]) -> Vec<String> {
+/// Copy fetched mods into Zomboid/mods (as an `update`: see [`store::update`]). Returns the installed mod ids.
+pub fn install_fetched(paths: &Paths, fetched: &[Fetched], update: bool) -> Vec<String> {
     let mut ids = vec![];
     for f in fetched {
         if f.subscribed {
             let found: Vec<String> = pz::find_mods(&f.root, 8).into_iter().map(|m| m.id).collect();
+            // nothing left in Steam's folder: PZMM's own copy stays
+            if found.is_empty() {
+                crate::log!("error: {}: no mod.info found", f.source);
+                continue;
+            }
             crate::say!("subscribedCopy", "{source}: you're subscribed in Steam, which keeps it updated; using that copy ({ids})", source = f.source, ids = found.join(", "));
             // a copy PZMM installed before the subscription would shadow Steam's newer one (core 10)
             let item = format!("workshop:{}", f.source.trim_start_matches("steam:"));
@@ -287,13 +293,13 @@ pub fn install_fetched(paths: &Paths, fetched: &[Fetched]) -> Vec<String> {
             ids.extend(found);
             continue;
         }
-        match store::install(paths, &f.root, &f.source) {
+        match if update { store::update(paths, &f.root, &f.source) } else { store::install(paths, &f.root, &f.source) } {
             Ok(v) => ids.extend(v),
             Err(e) => crate::log!("error: {e:#}"),
         }
     }
     let cap = crate::settings::load().backup_cap_mb << 20;
-    if cap > 0 && let Err(e) = store::prune_backups(paths, cap) {
+    if cap > 0 && let Err(e) = store::prune_backups(paths, cap, &ids) {
         crate::say!("pruneFailed", "error: pruning backups: {error}", error = format!("{e:#}"));
     }
     ids
@@ -301,7 +307,12 @@ pub fn install_fetched(paths: &Paths, fetched: &[Fetched]) -> Vec<String> {
 
 /// Download and install in one go (the CLI; the app splits the two to keep its lock short).
 pub fn install(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<String> {
-    install_fetched(paths, &fetch(paths, sources, resolve))
+    install_fetched(paths, &fetch(paths, sources, resolve), false)
+}
+
+/// [`install`] as an update of what PZMM installed.
+pub fn update(paths: &Paths, sources: &[Source]) -> Vec<String> {
+    install_fetched(paths, &fetch(paths, sources, false), true)
 }
 
 /// The Workshop item a mod comes from: "steam:<id>" (a subscription) or "workshop:<id>" (PZMM's install).
@@ -316,9 +327,12 @@ pub fn workshop_available(paths: &Paths) -> HashSet<String> {
         .into_iter()
         .flatten()
         .flatten()
+        .filter(|e| std::fs::read_dir(e.path().join("mods")).is_ok_and(|mut d| d.next().is_some()))
         .map(|e| e.file_name().to_string_lossy().into_owned())
         .collect();
-    have.extend(store::load(paths).unwrap_or_default().into_values().filter_map(|e| e.source.strip_prefix("workshop:").map(String::from)));
+    // only copies still in Zomboid/mods (a folder deleted by hand isn't available)
+    let index = store::load(paths).unwrap_or_default();
+    have.extend(index.into_iter().filter(|(id, _)| paths.mods().join(id).is_dir()).filter_map(|(_, e)| e.source.strip_prefix("workshop:").map(String::from)));
     have
 }
 
@@ -326,30 +340,48 @@ pub fn workshop_available(paths: &Paths) -> HashSet<String> {
 /// game can't already load. Also returns the items whose pages Steam didn't show (said once in
 /// the log), whose requirements weren't checked.
 pub fn expand_workshop(paths: &Paths, ids: Vec<String>) -> (Vec<String>, Vec<String>) {
-    let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
-    let collections = steam_workshop::collections(&refs).unwrap_or_else(|e| {
-        crate::say!("collectionsFailed", "error: couldn't check for Workshop collections: {error}", error = format!("{e:#}"));
-        Default::default()
-    });
     let mut queue = std::collections::VecDeque::new();
-    for id in ids {
-        match collections.get(&id) {
-            Some(items) => {
-                crate::say!("collection", "collection {id}: {count} item(s)", id = id, count = items.len());
-                queue.extend(items.iter().cloned());
+    // collections inside collections are opened too (a few levels deep)
+    let (mut pending, mut opened) = (ids, HashSet::new());
+    for depth in 0..4 {
+        let refs: Vec<&str> = pending.iter().map(String::as_str).collect();
+        let collections = if depth == 3 {
+            Default::default()
+        } else {
+            steam_workshop::collections(&refs).unwrap_or_else(|e| {
+                crate::say!("collectionsFailed", "error: couldn't check for Workshop collections: {error}", error = format!("{e:#}"));
+                Default::default()
+            })
+        };
+        let mut inner = vec![];
+        for id in std::mem::take(&mut pending) {
+            match collections.get(&id) {
+                Some(items) if opened.insert(id.clone()) => {
+                    crate::say!("collection", "collection {id}: {count} item(s)", id = id, count = items.len());
+                    inner.extend(items.iter().cloned());
+                }
+                Some(_) => {}
+                None => queue.push_back(id),
             }
-            None => queue.push_back(id),
         }
+        if inner.is_empty() {
+            break;
+        }
+        pending = inner;
     }
     let have = workshop_available(paths);
     let mut seen = HashSet::new();
-    let (mut out, mut unchecked, mut error) = (vec![], vec![], None);
+    let (mut out, mut unchecked, mut error, mut dropped) = (vec![], vec![], None, 0);
     while let Some(id) = queue.pop_front() {
         // a big collection reads hundreds of pages: Stop ends it with nothing to download
         if STOP.load(std::sync::atomic::Ordering::SeqCst) {
             return (vec![], vec![]);
         }
-        if !seen.insert(id.clone()) || out.len() >= 500 {
+        if !seen.insert(id.clone()) {
+            continue;
+        }
+        if out.len() >= 500 {
+            dropped += 1;
             continue;
         }
         crate::progress(seen.len() - 1, seen.len() + queue.len());
@@ -366,6 +398,9 @@ pub fn expand_workshop(paths: &Paths, ids: Vec<String>) -> (Vec<String>, Vec<Str
                 unchecked.push(id);
             }
         }
+    }
+    if dropped > 0 {
+        crate::say!("tooManyItems", "error: {count} more Workshop item(s) left out: at most 500 are added at once", count = dropped);
     }
     if let Some(error) = error {
         crate::say!("requiresUnchecked", "error: couldn't check the Workshop pages of {count} item(s) for what they require ({error}): {ids}", count = unchecked.len(), error = error, ids = unchecked.join(", "));
@@ -395,7 +430,7 @@ pub fn check_updates(paths: &Paths) -> Result<Vec<String>> {
         .collect();
     let items: Vec<&str> = ours.iter().map(|o| o.1).collect::<HashSet<_>>().into_iter().collect();
     let updated: std::collections::HashMap<String, u64> =
-        steam_workshop::details(&items)?.into_iter().map(|i| (i.id, i.time_updated)).collect();
+        items.chunks(100).map(steam_workshop::details).collect::<Result<Vec<_>>>()?.concat().into_iter().map(|i| (i.id, i.time_updated)).collect();
     Ok(ours.into_iter().filter(|(_, item, at)| updated.get(*item).is_some_and(|t| t > at)).map(|(id, ..)| id.clone()).collect())
 }
 
@@ -568,6 +603,16 @@ mod tests {
         std::fs::create_dir_all(&out).unwrap();
         let _ = unzip(buf.get_ref(), &out); // may error on the bad entry; must not write outside
         assert!(!t.path().join("escaped.txt").exists());
+    }
+
+    #[test]
+    fn workshop_available_needs_the_folder() {
+        let (_t, paths) = store::tests::temp_paths();
+        std::fs::create_dir_all(paths.mods().join("Here")).unwrap();
+        let entry = |item: &str| store::Entry { source: format!("workshop:{item}"), installed_at: 1 };
+        store::save(&paths, &[("Here".to_string(), entry("90000000001")), ("Gone".to_string(), entry("90000000002"))].into()).unwrap();
+        let have = workshop_available(&paths);
+        assert!(have.contains("90000000001") && !have.contains("90000000002"));
     }
 
     #[test]

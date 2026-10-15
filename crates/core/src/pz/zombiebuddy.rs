@@ -46,7 +46,11 @@ pub fn official_source(source: &str) -> bool {
 /// ZombieBuddy Workshop item's libs folder), given a mod scan.
 pub fn locate(mods: &std::collections::BTreeMap<String, crate::store::Row>) -> (Option<PathBuf>, Option<PathBuf>) {
     let launcher = game_dir().and_then(|g| launcher_dir(&g));
-    let libs = mods.get(MOD_ID).filter(|m| official_source(&m.source)).and_then(|m| libs_dir(&m.dir));
+    let libs = mods.get(MOD_ID).filter(|m| official_source(&m.source)).and_then(|m| libs_dir(&m.dir)).or_else(|| {
+        // a local copy named ZombieBuddy wins the scan: the subscribed one is still there
+        let ws = super::workshop_dir()?;
+        super::workshop_mods(&ws).into_iter().find(|m| m.id == MOD_ID && m.dir.starts_with(ws.join(WORKSHOP_ID))).and_then(|m| libs_dir(&m.dir))
+    });
     (launcher, libs)
 }
 
@@ -125,11 +129,19 @@ pub fn install(launcher: &Path, libs: &Path, dry_run: bool) -> Result<Vec<String
         let dst = launcher.join(f);
         let new = fs::read(&src).with_context(|| format!("ZombieBuddy's {f} wasn't found in {}", libs.display()))?;
         if fs::read(&dst).is_ok_and(|old| old == new) {
+            if *f == "ZombieBuddy.jar" && !dry_run {
+                // current already: one staged earlier would replace it at the next launch
+                let _ = fs::remove_file(launcher.join("ZombieBuddy.jar.new"));
+            }
             continue;
         }
         if dry_run {
             changes.push(crate::keyed!("zbCopy", "copy {file} to {dir}", file = f, dir = launcher.display()));
         } else if crate::write_atomic(&dst, &new).is_ok() {
+            if *f == "ZombieBuddy.jar" {
+                // an older one staged while the game ran would replace this one at the next launch
+                let _ = fs::remove_file(launcher.join("ZombieBuddy.jar.new"));
+            }
             changes.push(crate::keyed!("zbCopied", "copied {file} to {dir}", file = f, dir = launcher.display()));
         } else if *f == "ZombieBuddy.jar" {
             // the game has it open: zbNative swaps in ZombieBuddy.jar.new on next launch

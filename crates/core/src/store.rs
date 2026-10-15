@@ -44,7 +44,33 @@ pub fn load(paths: &Paths) -> Result<Index> {
 pub fn save(paths: &Paths, index: &Index) -> Result<()> {
     fs::create_dir_all(&paths.data)?;
     crate::write_atomic(&index_path(paths), serde_json::to_string_pretty(index)?)?;
+    installed_for_game(paths, index);
     Ok(())
+}
+
+/// When PZMM installed each mod, for the PZMM - Client mod's "Date installed" sort: `Zomboid/Lua/pzmm/installed.txt`,
+/// a `<mod id>\t<seconds>` line per mod, where that folder is.
+pub fn installed_for_game(paths: &Paths, index: &Index) {
+    let dir = pz::bridge::dir(paths);
+    if dir.is_dir() {
+        // and its Workshop item (empty when it isn't from one): the game sees no Workshop ID for a mod in Zomboid/mods
+        let text: String = index
+            .iter()
+            .map(|(id, e)| format!("{id}\t{}\t{}\n", crate::sources::installed_at(paths, id, e), e.source.strip_prefix("workshop:").unwrap_or("")))
+            .collect();
+        pz::bridge::write_for_game(&dir.join("installed.txt"), &text);
+    }
+}
+
+/// The player's tags for the PZMM - Client mod: `Zomboid/Lua/pzmm/tags.txt`, a `<mod id>\t<tag>;<tag>` line per mod
+/// (tags never hold `;` or tabs there), where that folder is.
+pub fn tags_for_game(paths: &Paths, tags: &Tags) {
+    let dir = pz::bridge::dir(paths);
+    if dir.is_dir() {
+        let one = |t: &str| t.replace([';', '\t', '\r', '\n'], " ");
+        let text: String = tags.iter().map(|(id, list)| format!("{id}\t{}\n", list.iter().map(|t| one(t)).collect::<Vec<_>>().join(";"))).collect();
+        pz::bridge::write_for_game(&dir.join("tags.txt"), &text);
+    }
 }
 
 /// The mod's folder in `Zomboid/mods`. Refuses ids that can't be a single safe folder
@@ -118,19 +144,78 @@ fn same_tree(a: &Path, b: &Path) -> bool {
     }
 }
 
+/// Copy one mod's files into `dest`: staged next to it and swapped in, the folder it replaces kept
+/// as the rollback backup. Returns whether it replaced a version already there.
+fn swap_in(paths: &Paths, m: &pz::FoundMod, dest: &Path) -> Result<bool> {
+    // staged beside Zomboid/mods (on its drive, even through a link: one rename into place,
+    // never a copy) and outside it, so the game never sees a half-copied mod
+    let mods = fs::canonicalize(paths.mods()).unwrap_or_else(|_| paths.mods());
+    let staging = mods.parent().unwrap_or(&paths.zomboid).join(".pzmm-staging").join(&m.id);
+    if staging.exists() {
+        fs::remove_dir_all(&staging)?;
+    }
+    if let Err(e) = copy_dir(&m.dir, &staging) {
+        let _ = fs::remove_dir_all(&staging);
+        return Err(e).with_context(|| format!("copying {} into {}", m.id, paths.mods().display()));
+    }
+    let update = dest.exists();
+    if update {
+        // renamed aside on its own drive (a rename is whole or nothing), the new copy swapped in, then the
+        // old one moved to the backups, which may be on another drive (a copy there can stop halfway)
+        let aside = staging.with_file_name(format!("{}.old", m.id));
+        if aside.exists() {
+            fs::remove_dir_all(&aside)?;
+        }
+        let backup = backup_dir(paths, &m.id)?;
+        fs::rename(dest, &aside).with_context(|| format!("moving {} aside (close the game and try again)", dest.display()))?;
+        if let Err(e) = fs::rename(&staging, dest) {
+            let _ = fs::rename(&aside, dest);
+            return Err(e).with_context(|| format!("moving {} into place", m.id));
+        }
+        // the version before this one was the backup: replaced now the new one is in
+        if backup.exists()
+            && let Err(e) = fs::remove_dir_all(&backup)
+        {
+            crate::log!("error: replacing the backup of {}: {e:#}", m.id);
+        }
+        if let Err(e) = move_dir(&aside, &backup) {
+            crate::log!("error: keeping the old version of {} as a backup: {e:#}", m.id);
+            // a copy cut short is no version to roll back to
+            let _ = fs::remove_dir_all(&backup);
+            let _ = fs::remove_dir_all(&aside);
+        }
+    } else {
+        move_dir(&staging, dest).with_context(|| format!("moving {} into place", m.id))?;
+    }
+    let _ = fs::remove_dir(staging.parent().unwrap_or(&staging)); // when empty
+    Ok(update)
+}
+
 /// Copy every mod found under `root` into the game's mods folder. A mod already there is
 /// replaced only if PZMM installed it; its previous version becomes the rollback backup
 /// (kept as is when the new copy is identical). Each mod is staged next to its final
 /// folder and swapped in, then recorded, so a failure never leaves a half-copied mod.
 /// Mods that can't be installed are logged and skipped. Returns the installed ids.
 pub fn install(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> {
+    put_in(paths, root, source, false)
+}
+
+/// [`install`] as an update: a mod of the item the player removed (its newest record) stays out.
+pub fn update(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> {
+    put_in(paths, root, source, true)
+}
+
+fn put_in(paths: &Paths, root: &Path, source: &str, update: bool) -> Result<Vec<String>> {
     let found = pz::find_mods(root, 8);
+    let history = if update { crate::history::list(paths) } else { vec![] };
     if found.is_empty() {
         bail!("{source}: no mod.info found");
     }
     let mut index = load(paths)?;
     let mut ids: Vec<String> = vec![];
-    for m in found {
+    let mut local: Option<Vec<pz::FoundMod>> = None; // read once, when a fresh install needs it
+    let mods = paths.mods();
+    for m in &found {
         if ids.contains(&m.id) {
             crate::say!("duplicateId", "{source}: skipped a second mod with the id {id}", source = source, id = m.id);
             continue;
@@ -142,54 +227,106 @@ pub fn install(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> 
                 continue;
             }
         };
-        if dest.exists() && !index.contains_key(&m.id) {
+        // Windows folders ignore case: an author changing only the id's case is still this entry
+        let known = index.keys().find(|k| k.eq_ignore_ascii_case(&m.id)).cloned();
+        if known.is_none() && history.iter().find(|r| r.id.eq_ignore_ascii_case(&m.id)).is_some_and(|r| r.action == "removed" && r.source == source) {
+            crate::say!("removedStays", "{id} stays out: you removed it ({source})", id = m.id, source = source);
+            continue;
+        }
+        if dest.exists() && known.is_none() {
             crate::say!(
                 "notOursInMods",
                 "error: {id} is already in {dir} and wasn't installed by PZMM; left it alone. Remove that folder to install this copy.",
                 id = m.id,
-                dir = paths.mods().display()
+                dir = mods.display()
             );
+            continue;
+        }
+        // two Workshop items shipping the same id: the one installed first keeps it (a GitHub or
+        // local install is the player's own pick, so it may replace)
+        if let Some(had) = known.as_ref().map(|k| &index[k].source)
+            && had != source
+            && had.starts_with("workshop:")
+            && source.starts_with("workshop:")
+        {
+            crate::say!("otherSource", "error: {id} was installed from {had}; left it alone instead of replacing it with {source}'s copy", id = m.id, had = had, source = source);
+            continue;
+        }
+        if let Some(had) = known.as_ref().map(|k| &index[k].source)
+            && !had.starts_with("workshop:")
+            && source.starts_with("workshop:")
+        {
+            crate::say!("otherSource", "error: {id} was installed from {had}; left it alone instead of replacing it with {source}'s copy", id = m.id, had = had, source = source);
+            continue;
+        }
+        // a fresh install beside a hand-installed folder declaring the same id would load it twice
+        if known.is_none() {
+            let local = local.get_or_insert_with(|| pz::local_mods(paths));
+            let folder = |l: &pz::FoundMod| l.dir.strip_prefix(&mods).ok().and_then(|r| r.iter().next()).map(|f| f.to_string_lossy().into_owned());
+            if let Some(other) = local.iter().filter(|l| l.id.eq_ignore_ascii_case(&m.id)).find_map(|l| folder(l).filter(|f| *f != m.id)) {
+                crate::say!("sameIdElsewhere", "error: {id} is already in {dir}, which PZMM didn't install; left it alone. Remove that folder to install this copy.", id = m.id, dir = mods.join(other).display());
+                continue;
+            }
+        }
+        // where folders do mind case, the old spelling's folder becomes the new one, so it's updated, not doubled
+        if let Some(k) = known.as_ref().filter(|k| **k != m.id && !dest.exists())
+            && let Ok(old) = mod_dir(paths, k)
+            && old.exists()
+            && let Err(e) = fs::rename(&old, &dest)
+        {
+            crate::log!("error: {source}: renaming {} to {}: {e:#}", old.display(), m.id);
             continue;
         }
         let mut noted = None;
         if dest.exists() && same_tree(&m.dir, &dest) {
             crate::say!("alreadyCurrent", "{id} is already up to date ({source})", id = m.id, source = source);
         } else {
-            // staged beside Zomboid/mods (on its drive, even through a link: one rename into place,
-            // never a copy) and outside it, so the game never sees a half-copied mod
-            let mods = fs::canonicalize(paths.mods()).unwrap_or_else(|_| paths.mods());
-            let staging = mods.parent().unwrap_or(&paths.zomboid).join(".pzmm-staging").join(&m.id);
-            if staging.exists() {
-                fs::remove_dir_all(&staging)?;
-            }
-            if let Err(e) = copy_dir(&m.dir, &staging) {
-                let _ = fs::remove_dir_all(&staging);
-                return Err(e).with_context(|| format!("copying {} into {}", m.id, paths.mods().display()));
-            }
-            let update = dest.exists();
-            if update {
-                let backup = backup_dir(paths, &m.id)?;
-                if backup.exists() {
-                    fs::remove_dir_all(&backup)?;
+            match swap_in(paths, m, &dest) {
+                Ok(update) => {
+                    if update {
+                        crate::say!("updated", "updated {id} ({source})", id = m.id, source = source);
+                    } else {
+                        crate::say!("installed", "installed {id} ({source})", id = m.id, source = source);
+                    }
+                    noted = Some(update);
                 }
-                move_dir(&dest, &backup)?;
+                Err(e) => {
+                    // the mods before it are in and indexed: they're still returned
+                    crate::log!("error: {source}: {e:#}");
+                    continue;
+                }
             }
-            move_dir(&staging, &dest).with_context(|| format!("moving {} into place", m.id))?;
-            let _ = fs::remove_dir(staging.parent().unwrap_or(&staging)); // when empty
-            if update {
-                crate::say!("updated", "updated {id} ({source})", id = m.id, source = source);
-            } else {
-                crate::say!("installed", "installed {id} ({source})", id = m.id, source = source);
-            }
-            noted = Some(update);
+        }
+        if let Some(k) = &known {
+            index.remove(k);
         }
         index.insert(m.id.clone(), Entry { source: source.to_string(), installed_at: now() });
-        save(paths, &index)?;
+        if let Err(e) = save(paths, &index) {
+            crate::log!("error: {source}: recording {}: {e:#}", m.id);
+            continue;
+        }
         // noted once it's in the index
         if let Some(update) = noted {
             crate::history::add(paths, &m.id, &m.name, source, if update { "updated" } else { "installed" });
         }
-        ids.push(m.id);
+        ids.push(m.id.clone());
+    }
+    // a mod the source no longer ships (dropped or renamed) would be flagged for update forever: its
+    // time moves with the source's, and its files stay
+    if !ids.is_empty() {
+        let gone: Vec<String> =
+            index.iter().filter(|(id, e)| e.source == source && !found.iter().any(|m| m.id.eq_ignore_ascii_case(id))).map(|(id, _)| id.clone()).collect();
+        for id in &gone {
+            if let Some(e) = index.get_mut(id) {
+                e.installed_at = now();
+            }
+            crate::say!("noLongerInSource", "{id} is no longer in {source}; its files were left in place", id = id, source = source);
+        }
+        if !gone.is_empty()
+            && let Err(e) = save(paths, &index)
+        {
+            crate::log!("error: {source}: recording {}: {e:#}", gone.join(", "));
+        }
     }
     Ok(ids)
 }
@@ -209,13 +346,48 @@ pub fn rollback(paths: &Paths, id: &str) -> Result<()> {
         bail!("{id}: no previous version to restore");
     }
     let dest = mod_dir(paths, id)?;
-    let tmp = paths.data.join("backups").join(format!("{id}.swap"));
-    if dest.exists() {
-        move_dir(&dest, &tmp)?;
-    }
-    move_dir(&backup, &dest)?;
+    // aside on the mod's own drive: a rename, never a copy that can stop halfway
+    let mods = fs::canonicalize(paths.mods()).unwrap_or_else(|_| paths.mods());
+    let tmp = mods.parent().unwrap_or(&paths.zomboid).join(".pzmm-staging").join(format!("{id}.swap"));
     if tmp.exists() {
-        move_dir(&tmp, &backup)?; // rolling back again re-applies the update
+        bail!("{id}: an earlier rollback didn't finish; the newer version is in {}", tmp.display());
+    }
+    if dest.exists() {
+        fs::create_dir_all(tmp.parent().unwrap_or(&tmp))?;
+        fs::rename(&dest, &tmp).with_context(|| format!("moving {} aside (close the game and try again)", dest.display()))?;
+    }
+    if let Err(e) = move_dir(&backup, &dest) {
+        // the version in use goes back where it was
+        let _ = fs::remove_dir_all(&dest);
+        let _ = fs::rename(&tmp, &dest);
+        return Err(e);
+    }
+    if tmp.exists()
+        && let Err(e) = move_dir(&tmp, &backup)
+    {
+        // rolling back again would re-apply the update: a copy cut short can't
+        let _ = fs::remove_dir_all(&backup);
+        return Err(e).with_context(|| format!("{id} is rolled back; the newer version is in {}", tmp.display()));
+    }
+    let _ = fs::remove_dir(tmp.parent().unwrap_or(&tmp)); // when empty
+    // the update only changed the id's case: the entry (and, where folders mind case, the folders) go back to the old one
+    if let Some(old) = pz::find_mods(&dest, 8).into_iter().map(|m| m.id).find(|o| o != id && o.eq_ignore_ascii_case(id)) {
+        let rekey = || -> Result<()> {
+            for (from, to) in [(dest, mod_dir(paths, &old)?), (backup, backup_dir(paths, &old)?)] {
+                if from.exists() && !to.exists() {
+                    fs::rename(&from, &to).with_context(|| format!("renaming {} to {old}", from.display()))?;
+                }
+            }
+            let mut index = load(paths)?;
+            if let Some(e) = index.remove(id) {
+                index.insert(old.clone(), e);
+                save(paths, &index)?;
+            }
+            Ok(())
+        };
+        if let Err(e) = rekey() {
+            crate::log!("error: {id} is rolled back, but not yet known by its old id: {e:#}");
+        }
     }
     Ok(())
 }
@@ -285,9 +457,11 @@ pub fn backups_size(paths: &Paths) -> u64 {
     backups(paths).iter().map(|(_, s)| s.size).sum()
 }
 
-/// Delete the oldest backups until all of them fit in `cap` bytes. Returns how many went.
-pub fn prune_backups(paths: &Paths, cap: u64) -> Result<usize> {
+/// Delete the oldest backups until all of them fit in `cap` bytes, never those of `keep` (just made: their
+/// files keep the author's old times, so they'd rank oldest). Returns how many went.
+pub fn prune_backups(paths: &Paths, cap: u64, keep: &[String]) -> Result<usize> {
     let mut all = backups(paths);
+    all.retain(|(dir, _)| !keep.iter().any(|id| backup_dir(paths, id).is_ok_and(|b| b == *dir)));
     all.sort_by_key(|(_, s)| s.modified);
     let mut total: u64 = all.iter().map(|(_, s)| s.size).sum();
     let mut gone = 0;
@@ -339,6 +513,7 @@ pub fn set_tags(paths: &Paths, id: &str, list: &[String]) -> Result<Tags> {
     }
     fs::create_dir_all(&paths.data)?;
     crate::write_atomic(&paths.data.join("tags.json"), serde_json::to_string_pretty(&all)?)?;
+    tags_for_game(paths, &all);
     Ok(all)
 }
 
@@ -400,6 +575,36 @@ pub fn scan(paths: &Paths) -> Result<BTreeMap<String, Row>> {
     scan_in(paths, pz::workshop_dir().as_deref(), true)
 }
 
+/// [`scan`]'s rows, changing nothing (a PZMM copy of a subscribed item isn't removed): outside the data lock.
+pub fn rows(paths: &Paths) -> Result<BTreeMap<String, Row>> {
+    let index = load(paths)?;
+    let mut out: BTreeMap<String, Row> = pz::workshop_dir().as_deref().map(|ws| workshop_rows(ws).map(|r| (r.id.clone(), r)).collect()).unwrap_or_default();
+    for m in pz::local_mods(paths) {
+        let source = index.get(&m.id).map_or("manual".to_string(), |e| e.source.clone());
+        out.insert(m.id.clone(), Row::from_found(m, source));
+    }
+    add_staged(paths, &mut out);
+    Ok(out)
+}
+
+/// The mods staged for upload (see [`pz::staged_mods`]) that nothing else provides: "staged", which PZMM never
+/// removes or updates.
+fn add_staged(paths: &Paths, out: &mut BTreeMap<String, Row>) {
+    for m in pz::staged_mods(paths) {
+        if !out.contains_key(&m.id) {
+            out.insert(m.id.clone(), Row::from_found(m, "staged".into()));
+        }
+    }
+}
+
+/// [`scan`]'s mod ids, changing nothing: for callers outside the data lock.
+pub fn ids(paths: &Paths) -> Result<std::collections::HashSet<String>> {
+    let mut out: std::collections::HashSet<String> = pz::workshop_dir().as_deref().map(|ws| workshop_rows(ws).map(|r| r.id).collect()).unwrap_or_default();
+    out.extend(pz::local_mods(paths).into_iter().map(|m| m.id));
+    out.extend(pz::staged_mods(paths).into_iter().map(|m| m.id));
+    Ok(out)
+}
+
 fn scan_in(paths: &Paths, ws: Option<&Path>, recycle: bool) -> Result<BTreeMap<String, Row>> {
     let index = load(paths)?;
     let mut out = BTreeMap::new();
@@ -416,6 +621,7 @@ fn scan_in(paths: &Paths, ws: Option<&Path>, recycle: bool) -> Result<BTreeMap<S
         }
         out.insert(m.id.clone(), Row::from_found(m, source));
     }
+    add_staged(paths, &mut out);
     Ok(out)
 }
 
@@ -516,6 +722,115 @@ name=B");
     }
 
     #[test]
+    fn a_failing_mod_keeps_the_others() {
+        let (t, paths) = temp_paths();
+        for id in ["A", "B", "C"] {
+            mod_tree(t.path(), &format!("src/{id}"), &format!("id={id}
+"));
+        }
+        // B's staging spot is taken by a file, so B alone fails
+        fs::create_dir_all(paths.zomboid.join(".pzmm-staging")).unwrap();
+        fs::write(paths.zomboid.join(".pzmm-staging/B"), "x").unwrap();
+        let mut ids = install(&paths, &t.path().join("src"), "workshop:1").unwrap();
+        ids.sort();
+        assert_eq!(ids, ["A", "C"]);
+        assert!(load(&paths).unwrap().contains_key("C"));
+    }
+
+    #[test]
+    fn other_items_and_hand_copies_keep_their_id() {
+        let (t, paths) = temp_paths();
+        mod_tree(t.path(), "one/X", "id=X
+name=one
+");
+        mod_tree(t.path(), "two/X", "id=X
+name=two
+");
+        install(&paths, &t.path().join("one"), "workshop:1").unwrap();
+        assert!(install(&paths, &t.path().join("two"), "workshop:2").unwrap().is_empty(), "another item's copy is skipped");
+        assert_eq!(load(&paths).unwrap()["X"].source, "workshop:1");
+        assert_eq!(install(&paths, &t.path().join("two"), "local:two").unwrap(), ["X"], "the player's own pick replaces");
+        assert!(install(&paths, &t.path().join("one"), "workshop:1").unwrap().is_empty(), "a Workshop copy doesn't replace it back");
+        // a hand-installed folder of another name declaring the id
+        mod_tree(&paths.mods(), "Folder", "id=y
+");
+        mod_tree(t.path(), "dl/Y", "id=Y
+");
+        assert!(install(&paths, &t.path().join("dl"), "workshop:3").unwrap().is_empty());
+        assert!(!paths.mods().join("Y").exists());
+        assert!(!load(&paths).unwrap().contains_key("Y"));
+    }
+
+    #[test]
+    fn case_only_id_change_updates_the_entry() {
+        let (t, paths) = temp_paths();
+        mod_tree(t.path(), "v1/modx", "id=modx
+name=v1
+");
+        mod_tree(t.path(), "v2/ModX", "id=ModX
+name=v2
+");
+        install(&paths, &t.path().join("v1"), "workshop:1").unwrap();
+        assert_eq!(install(&paths, &t.path().join("v2"), "workshop:1").unwrap(), ["ModX"]);
+        let index = load(&paths).unwrap();
+        assert!(index.contains_key("ModX") && !index.contains_key("modx"));
+        assert!(fs::read_to_string(paths.mods().join("ModX/mod.info")).unwrap().contains("v2"));
+        // rolled back: the old id is the entry again
+        rollback(&paths, "ModX").unwrap();
+        let index = load(&paths).unwrap();
+        assert!(index.contains_key("modx") && !index.contains_key("ModX"));
+        assert!(fs::read_to_string(mod_dir(&paths, "modx").unwrap().join("mod.info")).unwrap().contains("v1"));
+    }
+
+    #[test]
+    fn a_staged_mod_counts_as_installed() {
+        let (_t, paths) = temp_paths();
+        mod_tree(&paths.zomboid, "Workshop/MyItem/Contents/mods/Mine/42", "id=Mine
+");
+        mod_tree(&paths.zomboid, "Workshop/MyItem/Contents/mods/Both/42", "id=Both
+");
+        mod_tree(&paths.mods(), "Both", "id=Both
+");
+        let rows = scan_in(&paths, None, false).unwrap();
+        assert_eq!(rows["Mine"].source, "staged");
+        assert_eq!(rows["Both"].source, "manual", "a copy in mods wins");
+        assert!(ids(&paths).unwrap().contains("Mine"));
+    }
+
+    #[test]
+    fn an_update_leaves_out_a_removed_mod() {
+        let (t, paths) = temp_paths();
+        mod_tree(t.path(), "dl/A", "id=A
+");
+        mod_tree(t.path(), "dl/B", "id=B
+");
+        install(&paths, &t.path().join("dl"), "workshop:7").unwrap();
+        remove(&paths, &["A".to_string()], false).unwrap();
+        assert_eq!(update(&paths, &t.path().join("dl"), "workshop:7").unwrap(), ["B"], "the update skips A");
+        assert!(!paths.mods().join("A").exists());
+        assert_eq!(install(&paths, &t.path().join("dl"), "workshop:7").unwrap(), ["A", "B"], "a reinstall brings it back");
+    }
+
+    #[test]
+    fn a_dropped_mod_stops_waiting_for_updates() {
+        let (t, paths) = temp_paths();
+        mod_tree(t.path(), "v1/A", "id=A
+");
+        mod_tree(t.path(), "v1/B", "id=B
+");
+        mod_tree(t.path(), "v2/A", "id=A
+name=v2
+");
+        install(&paths, &t.path().join("v1"), "workshop:5").unwrap();
+        let mut index = load(&paths).unwrap();
+        index.get_mut("B").unwrap().installed_at = 1;
+        save(&paths, &index).unwrap();
+        install(&paths, &t.path().join("v2"), "workshop:5").unwrap();
+        assert!(load(&paths).unwrap()["B"].installed_at > 1);
+        assert!(paths.mods().join("B/mod.info").exists(), "its files stay");
+    }
+
+    #[test]
     fn prunes_oldest_backups_first() {
         let (_t, paths) = temp_paths();
         let old = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000);
@@ -529,8 +844,8 @@ name=B");
             }
         }
         assert_eq!(backups_size(&paths), 1100);
-        assert_eq!(prune_backups(&paths, 2000).unwrap(), 0, "under the cap: nothing goes");
-        assert_eq!(prune_backups(&paths, 1000).unwrap(), 1);
+        assert_eq!(prune_backups(&paths, 2000, &[]).unwrap(), 0, "under the cap: nothing goes");
+        assert_eq!(prune_backups(&paths, 1000, &[]).unwrap(), 1);
         assert!(!paths.data.join("backups/Old").exists() && paths.data.join("backups/New").exists());
         clear_backups(&paths).unwrap();
         assert_eq!(backups_size(&paths), 0);

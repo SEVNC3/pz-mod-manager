@@ -156,7 +156,7 @@
               <!-- svelte-ignore a11y_autofocus -->
               <input class="tape-edit" type="text" value={r.name} autofocus aria-label={t("modTable.sepNameLabel")}
                 onblur={(e) => onRename(i, e.currentTarget.value)}
-                onkeydown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") editingSep = null; /* i18n-ignore: key names */ }} />
+                onkeydown={(e) => { if (e.key === "Enter" || e.key === "Escape") e.stopPropagation(); if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") editingSep = null; /* i18n-ignore: key names */ }} />
             {:else}
               <button class="quiet fold" aria-expanded={!collapsed.has(r.name)} aria-label={t(collapsed.has(r.name) ? "modTable.expandLabel" : "modTable.collapseLabel", { name: r.name })}
                 onclick={(e) => { e.stopPropagation(); onToggleSection(r.name); }}><Icon name={collapsed.has(r.name) ? "chevron-right" : "chevron-down"} size={14} /></button>

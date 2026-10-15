@@ -150,13 +150,37 @@ struct State {
     /// Profiles imported from a share code: someone else picked their mods.
     #[serde(default)]
     imported: std::collections::BTreeSet<String>,
+    /// state.json couldn't be read: this is an empty stand-in, never saved over it.
+    #[serde(skip)]
+    unread: bool,
 }
 
 /// The player picked this profile's mods themselves: it wasn't set up from a server's list or
 /// imported from someone's share code (whose Java mods ZombieBuddy should still ask about).
 pub fn picked_by_player(paths: &Paths, name: &str) -> bool {
     let s = state(paths);
-    s.kinds.get(name).is_none_or(|k| k != SERVER_KIND) && !s.imported.contains(name)
+    // unknown (state.json unreadable): not the player's, so ZombieBuddy still asks
+    !s.unread && s.kinds.get(name).is_none_or(|k| k != SERVER_KIND) && !s.imported.contains(name)
+}
+
+/// A mod whose id changed only in case (its author renamed `modx` to `ModX`): the profile's lines take the
+/// installed spelling, so the game still finds it.
+pub fn follow_case(p: &mut Profile, installed: &std::collections::BTreeMap<String, crate::store::Row>) {
+    for l in &mut p.lines {
+        if let Line::Mod { id, .. } = l
+            && !installed.contains_key(id.as_str())
+            && let Some(real) = installed.keys().find(|k| k.eq_ignore_ascii_case(id))
+        {
+            *id = real.clone();
+        }
+    }
+    for id in &mut p.order {
+        if !installed.contains_key(id.as_str())
+            && let Some(real) = installed.keys().find(|k| k.eq_ignore_ascii_case(id))
+        {
+            *id = real.clone();
+        }
+    }
 }
 
 /// The default profile kind: plain Project Zomboid.
@@ -207,6 +231,7 @@ const SERVER_KIND: &str = "server";
 /// that name is taken (public servers often share default names). While the server lists the same
 /// mods as last time, its profile stays as the player left it (mods they turned off stay off).
 pub fn for_server(paths: &Paths, name: &str, key: &str, ids: Vec<String>, maps: &[String]) -> Result<Profile> {
+    state_to_change(paths)?;
     let key = &own_server_key(paths, key);
     let s = state(paths);
     let base = pz::launcher::profile_name(name);
@@ -261,6 +286,9 @@ pub fn for_save(paths: &Paths, from: &str, name: &str, ids: Vec<String>, maps: &
     let source = launch_of(paths, from);
     let mut l = if existed { launch_of(paths, &p.name) } else { source.clone() };
     l.cache_dir = source.cache_dir;
+    if !existed {
+        l.kept = None; // the source profile's own folder, switched off: still its
+    }
     if l != launch_of(paths, &p.name) {
         set_launch(paths, &p.name, &l)?;
     }
@@ -280,7 +308,8 @@ pub fn server_of(paths: &Paths, name: &str) -> Option<String> {
 pub fn unused_server_profiles(paths: &Paths) -> Vec<String> {
     let s = state(paths);
     let seen = pz::launcher::state(paths);
-    let hosted: Vec<String> = pz::host::load(paths).into_iter().map(|h| format!("ini:{}", h.name)).collect();
+    // PZMM's servers and the configs in Zomboid/Server (Use as profile)
+    let hosted: Vec<String> = pz::host::load(paths).into_iter().map(|h| h.name).chain(pz::server::list(paths)).map(|n| format!("ini:{n}")).collect();
     let active = active_name(paths);
     list(paths)
         .into_iter()
@@ -331,6 +360,9 @@ pub struct Launch {
     pub args: String,
     /// The folder the game uses instead of `Zomboid` (None: the usual one).
     pub cache_dir: Option<PathBuf>,
+    /// Its own folder while it's switched off: still its (its saves), so no other profile is given it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kept: Option<PathBuf>,
 }
 
 fn launch_file(paths: &Paths, name: &str) -> PathBuf {
@@ -349,7 +381,11 @@ pub fn own_game_folder(paths: &Paths, name: &str) -> PathBuf {
     if clean != name {
         clean = format!("{clean}-{}", &pz::javamods::sha256(name.as_bytes())[..8]);
     }
-    paths.data.join("game-folders").join(clean)
+    // a renamed profile keeps its folder: a new profile of its old name mustn't share it (its saves)
+    let long = |p: &std::path::Path| fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf()).to_string_lossy().to_lowercase();
+    let taken: Vec<String> = list(paths).iter().filter(|n| !n.eq_ignore_ascii_case(name)).flat_map(|n| { let l = launch_of(paths, n); [l.cache_dir, l.kept] }).flatten().map(|d| long(&d)).collect();
+    let base = paths.data.join("game-folders");
+    std::iter::once(base.join(&clean)).chain((2..).map(|i| base.join(format!("{clean}-{i}")))).find(|d| !taken.contains(&long(d))).unwrap_or_else(|| base.join(clean))
 }
 
 /// Existing path `d`'s short (8.3) form, as Windows names it for programs that can't take spaces
@@ -500,9 +536,14 @@ pub fn with_list(paths: &Paths, name: &str, ids: Vec<String>) -> Result<Profile>
 pub fn save(paths: &Paths, profile: &Profile) -> Result<()> {
     valid_name(&profile.name)?;
     let d = dir(paths).join(&profile.name);
+    let new = !d.exists();
     fs::create_dir_all(&d)?;
     crate::write_atomic(&d.join("modlist.txt"), profile.to_text())?;
     crate::write_atomic(&d.join("loadorder.txt"), profile.enabled().iter().map(|id| format!("{id}\n")).collect::<String>())?;
+    if new {
+        // a new profile (listed once its modlist.txt is there): the game's list of them follows
+        profiles_for_game(paths);
+    }
     Ok(())
 }
 
@@ -583,6 +624,7 @@ pub fn delete(paths: &Paths, name: &str) -> Result<()> {
 /// case only goes through a temporary name, since the folder is the same one on Windows.
 /// Folders are renamed, never copied and deleted, so a failure leaves the profile as it was.
 pub fn rename(paths: &Paths, from: &str, to: &str) -> Result<()> {
+    state_to_change(paths)?;
     valid_name(from)?;
     valid_name(to)?;
     if !exists(paths, from) {
@@ -620,17 +662,24 @@ pub fn rename(paths: &Paths, from: &str, to: &str) -> Result<()> {
     if active {
         s.active = to.into();
     }
-    save_state(paths, &s)
+    save_state(paths, &s)?;
+    // the game's copy names the profile
+    if active && let Ok(p) = load(paths, to) {
+        library_for_game(paths, &p);
+    }
+    Ok(())
 }
 
 /// A copy of profile `from` (library, load order, map order, launch options, kind) named `to`. A copy of a
 /// server's profile is a plain one: it isn't that server's (joining it again won't pick it).
 pub fn duplicate(paths: &Paths, from: &str, to: &str) -> Result<()> {
+    state_to_change(paths)?;
     valid_name(to)?;
     if exists(paths, to) {
         bail!(crate::keyed!("profileExists", "a profile named \"{name}\" already exists", name = to));
     }
     let p = load(paths, from)?;
+    let picked = picked_by_player(paths, from);
     let maps = read_map_order(paths, &p.name)?;
     let kind = Some(kind_of(paths, &p.name)).filter(|k| k != SERVER_KIND).unwrap_or_else(|| DEFAULT_KIND.into());
     save(paths, &Profile { name: to.into(), ..p })?;
@@ -643,9 +692,17 @@ pub fn duplicate(paths: &Paths, from: &str, to: &str) -> Result<()> {
         if l.cache_dir.is_some() {
             l.cache_dir = Some(own_game_folder(paths, to));
         }
+        l.kept = None; // the original's
         set_launch(paths, to, &l)?;
     }
-    set_kind(paths, to, &kind)
+    set_kind(paths, to, &kind)?;
+    // someone else picked its mods: ZombieBuddy still asks about the copy's Java mods
+    if !picked {
+        let mut s = state(paths);
+        s.imported.insert(to.into());
+        save_state(paths, &s)?;
+    }
+    Ok(())
 }
 
 /// maporder.txt for snapshots and copies: missing is empty, unreadable is an error (an empty
@@ -752,13 +809,44 @@ pub fn restore(paths: &Paths, name: &str, id: &str) -> Result<Profile> {
 }
 
 fn state(paths: &Paths) -> State {
-    crate::read_json(&paths.data.join("state.json")).unwrap_or_default()
+    crate::read_json(&paths.data.join("state.json")).unwrap_or_else(|e| {
+        crate::log!("error: {e:#}");
+        State { unread: true, ..Default::default() }
+    })
+}
+
+/// The state, for a change: an error when state.json can't be read (before anything is written).
+fn state_to_change(paths: &Paths) -> Result<State> {
+    let s = state(paths);
+    if s.unread {
+        bail!("couldn't read {}: try again", paths.data.join("state.json").display());
+    }
+    Ok(s)
 }
 
 fn save_state(paths: &Paths, s: &State) -> Result<()> {
+    if s.unread {
+        bail!("couldn't read {}, so it wasn't saved over: try again", paths.data.join("state.json").display());
+    }
     fs::create_dir_all(&paths.data)?;
     crate::write_atomic(&paths.data.join("state.json"), serde_json::to_string_pretty(s)?)?;
+    profiles_for_game(paths);
     Ok(())
+}
+
+/// The profiles for the PZMM - Client mod's in-game screen: `Zomboid/Lua/pzmm/profiles.txt`, `active\t<name>`
+/// then a `<name>\t<kind>` line per profile. Written with every profile change, where that folder is.
+pub fn profiles_for_game(paths: &Paths) {
+    let dir = crate::pz::bridge::dir(paths);
+    if !dir.is_dir() {
+        return;
+    }
+    let s = state(paths);
+    let mut text = format!("active\t{}\n", active_name(paths));
+    for n in list(paths) {
+        text += &format!("{n}\t{}\n", s.kinds.get(&n).map_or(DEFAULT_KIND, String::as_str));
+    }
+    crate::pz::bridge::write_for_game(&dir.join("profiles.txt"), text);
 }
 
 pub fn active_name(paths: &Paths) -> String {
@@ -791,6 +879,7 @@ pub fn peek(paths: &Paths) -> Profile {
 /// Load the active profile (creating "Default" from the game's list on first run) and
 /// adopt any changes made in-game. Returns the profile and whether it adopted changes.
 pub fn sync(paths: &Paths) -> Result<(Profile, bool)> {
+    state_to_change(paths)?;
     let name = active_name(paths);
     // a profile that exists but can't be read is an error: starting empty would replace it with the game's list
     let mut p = if dir(paths).join(&name).join("modlist.txt").exists() { load(paths, &name)? } else { Profile { name, ..Default::default() } };
@@ -814,11 +903,61 @@ pub fn sync(paths: &Paths) -> Result<(Profile, bool)> {
     {
         snapshot(paths, &p.name, "adopt")?;
     }
-    let changed = game.is_some_and(|game| p.adopt(&game.mods));
+    // the game's Maps order (its mod screen, or PZMM - Client's) is the profile's, once it has arranged one
+    // (never arranged, it starts from default.txt's order anyway). Only when the game wrote default.txt after
+    // PZMM did: PZMM's own write puts newly enabled maps in, which isn't the game arranging them.
+    let modified = |f: PathBuf| fs::metadata(f).and_then(|m| m.modified()).ok();
+    let ours = dir(paths).join(on_disk(paths, &p.name));
+    let saved = [modified(ours.join("loadorder.txt")), modified(ours.join("maporder.txt"))].into_iter().flatten().max();
+    let by_game = match (modified(paths.default_txt()), saved) {
+        (Some(game), Some(ours)) => game.duration_since(ours).is_ok_and(|d| d > std::time::Duration::from_secs(2)),
+        _ => false,
+    };
+    if let Some(g) = &game
+        && by_game
+        && !map_order(paths, &p.name).is_empty()
+        && set_map_order(paths, &p.name, &g.map_folders())?
+    {
+        crate::say!("mapOrderAdopted", "Took the map order arranged in the game.");
+    }
+    let took = game_sections(paths, &mut p);
+    let changed = game.is_some_and(|game| p.adopt(&game.mods)) || took;
     if changed || !dir(paths).join(&p.name).exists() {
         save(paths, &p)?;
+        // the game's copy of the sections follows (mods it turned on join them)
+        library_for_game(paths, &p);
     }
     Ok((p, changed))
+}
+
+/// Sections made in the game before PZMM knew it (PZMM - Client writes "# PZMM profile: In game" to
+/// library.txt without the app): `p`, if it has none, takes them and their order; its mods the game didn't
+/// list follow after a break. Returns whether it did.
+fn game_sections(paths: &Paths, p: &mut Profile) -> bool {
+    let named = |p: &Profile| p.lines.iter().any(|l| matches!(l, Line::Separator(s) if !s.is_empty()));
+    let text = fs::read_to_string(crate::pz::bridge::dir(paths).join("library.txt")).unwrap_or_default();
+    let Some(body) = text.strip_prefix("# PZMM profile: In game\n") else { return false };
+    let game = Profile::parse("In game", body);
+    if named(p) || !named(&game) {
+        return false;
+    }
+    let on: std::collections::HashMap<&String, bool> = p.lines.iter().filter_map(|l| if let Line::Mod { id, on } = l { Some((id, *on)) } else { None }).collect();
+    let mut lines: Vec<Line> = game
+        .lines
+        .iter()
+        .map(|l| match l {
+            Line::Mod { id, on: o } => Line::Mod { id: id.clone(), on: *on.get(id).unwrap_or(o) },
+            sep => sep.clone(),
+        })
+        .collect();
+    let listed: HashSet<&String> = game.lines.iter().filter_map(|l| if let Line::Mod { id, .. } = l { Some(id) } else { None }).collect();
+    let rest: Vec<Line> = p.lines.iter().filter(|l| matches!(l, Line::Mod { id, .. } if !listed.contains(id))).cloned().collect();
+    if !rest.is_empty() {
+        lines.push(Line::Separator(String::new()));
+        lines.extend(rest);
+    }
+    p.lines = lines;
+    true
 }
 
 /// Whether the game's mod list isn't `p`'s (the game emptied it, or it's missing): the game
@@ -893,6 +1032,19 @@ fn reset_release(jar: &std::path::Path) -> Option<String> {
 /// With the "keep favourites and hidden mods" setting, this runs on every profile made or switched
 /// to, except a server's (its list is the server's, which a favourite or hidden mod would break).
 pub fn apply(paths: &Paths, profile: &Profile, mods: Option<&std::collections::BTreeMap<String, crate::store::Row>>) -> Result<()> {
+    let before = state_to_change(paths)?;
+    // a switch: what the game changed in the profile being left is kept first
+    let leaving = Some(before.active).filter(|a| !a.is_empty() && *a != profile.name && exists(paths, a));
+    // the running game stays in its folder: a switch to a profile that plays in another would cut it off from PZMM
+    if leaving.is_some() && pz::host::game_running() && !pz::bridge::same_dir(&pz::bridge::dir_for(paths, &profile.name), &pz::bridge::game_dir(paths)) {
+        bail!(crate::keyed!("profileOtherFolder", "{name} plays in another game folder: quit the game first, then Play from PZMM", name = profile.name));
+    }
+    if leaving.is_some()
+        && let Err(e) = sync(paths)
+    {
+        // the profile being left can't be read: switching away from it must still work
+        crate::log!("error: {e:#}");
+    }
     let mut s = state(paths);
     let mut profile = profile.clone();
     let server = s.kinds.get(&profile.name).is_some_and(|k| k == SERVER_KIND);
@@ -925,29 +1077,52 @@ pub fn apply(paths: &Paths, profile: &Profile, mods: Option<&std::collections::B
     save(paths, profile)?;
     let maps = mods.map(|m| game_maps(paths, profile, m, if b41.unwrap_or(false) { 41 } else { 42 }));
     pz::write_default(&paths.default_txt(), &profile.enabled(), b41, maps.as_deref())?;
-    library_for_game(paths, profile);
     let kind = s.kinds.get(&profile.name).cloned().unwrap_or_else(|| DEFAULT_KIND.into());
     s.last.insert(kind, profile.name.clone());
-    save_state(paths, &State { active: profile.name.clone(), ..s })
+    save_state(paths, &State { active: profile.name.clone(), ..s })?;
+    // once it's active: its own game folder, if it has one, is the bridge now
+    library_for_game(paths, profile);
+    Ok(())
 }
 
 /// The active profile's library (its sections and mods, as My mods shows them) for the PZMM - Client
 /// mod's in-game mod screen: `Zomboid/Lua/pzmm/library.txt`, where that folder is (the mod or the app's start makes it).
-fn library_for_game(paths: &Paths, p: &Profile) {
-    let dir = paths.zomboid.join("Lua").join("pzmm");
+pub fn library_for_game(paths: &Paths, p: &Profile) {
+    let dir = crate::pz::bridge::dir(paths);
     if dir.is_dir() {
-        let _ = crate::write_atomic(&dir.join("library.txt"), format!("# PZMM profile: {}\n{}", p.name, p.to_text()));
+        crate::pz::bridge::write_for_game(&dir.join("library.txt"), format!("# PZMM profile: {}\n{}", p.name, p.to_text()));
+        // the load order (library.txt only says on or off): the game's "Use PZMM's mods" takes PZMM's places too
+        crate::pz::bridge::write_for_game(&dir.join("order.txt"), p.enabled().iter().map(|id| format!("{id}\n")).collect::<String>());
     }
 }
 
-/// Tell the PZMM - Client mod the app is installed: `Zomboid/Lua/pzmm/app.txt` (game Lua can only
-/// read under `Zomboid/Lua`), written at each start. Plain `key=value` lines, which Lua reads easily.
+/// Tell the PZMM - Client mod the app is installed and running: `Zomboid/Lua/pzmm/app.txt` (game Lua can
+/// only read under `Zomboid/Lua`), written every few seconds while PZMM runs, so a `running_at` more than
+/// 15 s old means it's closed. Plain `key=value` lines, which Lua reads easily.
 pub fn app_for_game(paths: &Paths, version: &str) {
-    let lua = paths.zomboid.join("Lua");
-    if lua.is_dir() {
-        let dir = lua.join("pzmm");
+    let dir = crate::pz::bridge::dir(paths);
+    // where the game has run (its Lua folder): the folder for PZMM - Client is made here
+    if dir.parent().is_some_and(std::path::Path::is_dir) {
         let _ = std::fs::create_dir_all(&dir);
-        let _ = crate::write_atomic(&dir.join("app.txt"), format!("version={version}\nstarted={}\n", crate::store::now()));
+        let name = active_name(paths);
+        // busy: the game's requests are still being handled (queued, or a question about one is open), so its
+        // sorting edits wait for PZMM rather than giving up. default_rev: when default.txt last changed, so the game
+        // can tell PZMM changed the mod list since its screen opened.
+        let busy = crate::pz::bridge::GAME_BUSY.load(std::sync::atomic::Ordering::Relaxed) || dir.join("requests.queue").exists();
+        let rev = fs::metadata(paths.default_txt()).and_then(|m| m.modified()).ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs());
+        let (accent, theme) = crate::pz::bridge::LOOK.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let text = format!(
+            "version={version}\nproto=1\nrunning_at={}\nprofile={name}\nkind={}\nbusy={}\ndefault_rev={rev}\naccent={accent}\ntheme={theme}\n",
+            crate::store::now(),
+            kind_of(paths, &name),
+            u8::from(busy)
+        );
+        let _ = crate::write_atomic(&dir.join("app.txt"), text);
+        // a folder made since PZMM started (a profile's own game folder, on its first run): what the game reads from it
+        if !dir.join("library.txt").exists() {
+            library_for_game(paths, &peek(paths));
+            profiles_for_game(paths);
+        }
     }
 }
 
@@ -1004,10 +1179,12 @@ pub fn export(paths: &Paths, mods: &std::collections::BTreeMap<String, crate::st
 
 /// Workshop items a shared profile needs that aren't installed (`mods`: the current scan).
 pub fn import_needs(shared: &Shared, mods: &std::collections::BTreeMap<String, crate::store::Row>) -> Vec<crate::sources::Source> {
+    // only what the sender has on (their list names every mod they have, most of them off)
+    let on: std::collections::HashSet<String> = Profile::parse("", &shared.list).enabled().into_iter().collect();
     let mut items: Vec<&String> = shared
         .workshop
         .iter()
-        .filter(|(id, item)| !mods.contains_key(*id) && crate::sources::steam_workshop::valid_id(item))
+        .filter(|(id, item)| on.contains(*id) && !mods.contains_key(*id) && crate::sources::steam_workshop::valid_id(item))
         .map(|(_, item)| item)
         .collect();
     items.sort();
@@ -1048,7 +1225,8 @@ mod tests {
         assert!(!file.exists(), "no game run yet: nothing written");
         std::fs::create_dir_all(paths.zomboid.join("Lua")).unwrap();
         app_for_game(&paths, "1.2.7");
-        assert!(std::fs::read_to_string(&file).unwrap().starts_with("version=1.2.7\nstarted="));
+        let text = std::fs::read_to_string(&file).unwrap();
+        assert!(text.starts_with("version=1.2.7\nproto=1\nrunning_at=") && text.contains("\nprofile=Default\n"), "{text}");
     }
 
     #[test]
@@ -1097,10 +1275,10 @@ mod tests {
         let old: Shared = serde_json::from_str(r#"{"name":"Old","list":"+A\n"}"#).unwrap();
         assert!(old.maps.is_empty() && import(&paths, &old).is_ok());
         let needs = import_needs(
-            &Shared { workshop: [("X".into(), "123".into()), ("Y".into(), "+bad".into())].into(), ..back },
+            &Shared { list: "+X\n+Y\n-Z\n".into(), workshop: [("X".into(), "123".into()), ("Y".into(), "+bad".into()), ("Z".into(), "456".into())].into(), ..back },
             &Default::default(),
         );
-        assert_eq!(needs, [crate::sources::Source::Workshop("123".into())]);
+        assert_eq!(needs, [crate::sources::Source::Workshop("123".into())], "only what the sender has on, from a real item");
     }
     use crate::store::tests::temp_paths;
 
@@ -1114,7 +1292,7 @@ mod tests {
         assert!(own_game_folder(&paths, "Server_A").ends_with("game-folders/Server_A"));
         assert_ne!(own_game_folder(&paths, "Server A"), own_game_folder(&paths, "Server_A"));
         assert_ne!(own_game_folder(&paths, "Друзья"), own_game_folder(&paths, "Сервер"));
-        set_launch(&paths, "server our place", &Launch { args: " -debug ".into(), cache_dir: Some(folder.clone()) }).unwrap();
+        set_launch(&paths, "server our place", &Launch { args: " -debug ".into(), cache_dir: Some(folder.clone()), kept: None }).unwrap();
         let (args, dir) = launch_args(&paths, "Server Our place").unwrap();
         assert_eq!((args, dir.as_ref()), (format!("-debug -cachedir={}", folder.display()), Some(&folder)));
         assert_eq!(pz::read_default(&folder.join("mods/default.txt")).mods, ["A"], "the game finds the profile's mods there");
@@ -1130,9 +1308,9 @@ mod tests {
         // follows a rename (it lives in the profile's folder)
         rename(&paths, "Server Our place", "Ours").unwrap();
         assert_eq!(launch_of(&paths, "Ours").args, " -debug ");
-        assert!(set_launch(&paths, "Ours", &Launch { args: String::new(), cache_dir: Some("relative".into()) }).is_err());
+        assert!(set_launch(&paths, "Ours", &Launch { args: String::new(), cache_dir: Some("relative".into()), kept: None }).is_err());
         // a folder with spaces goes by its short name, where the drive keeps them
-        match set_launch(&paths, "Ours", &Launch { args: String::new(), cache_dir: Some(paths.data.join("with space")) }) {
+        match set_launch(&paths, "Ours", &Launch { args: String::new(), cache_dir: Some(paths.data.join("with space")), kept: None }) {
             Ok(()) => assert!(!launch_of(&paths, "Ours").cache_dir.unwrap().to_string_lossy().contains(' ')),
             Err(e) => assert!(e.to_string().contains("without spaces") && path_form(&paths.data, false).is_none(), "{e}"),
         }
@@ -1308,11 +1486,11 @@ mod tests {
         assert_eq!((load(&paths, "Copy").unwrap().to_text(), kind_of(&paths, "Copy")), ("# --- S\n+A\n".to_string(), "viewpoint".to_string()));
         assert_eq!(map_order(&paths, "Copy"), map_order(&paths, "SOLO"));
         assert_eq!(active_name(&paths), "Main", "duplicating doesn't switch");
-        set_launch(&paths, "SOLO", &Launch { args: "-debug".into(), cache_dir: None }).unwrap();
+        set_launch(&paths, "SOLO", &Launch { args: "-debug".into(), cache_dir: None, kept: None }).unwrap();
         duplicate(&paths, "SOLO", "Copy 2").unwrap();
-        assert_eq!(launch_of(&paths, "Copy 2"), Launch { args: "-debug".into(), cache_dir: None }, "launch options come along");
+        assert_eq!(launch_of(&paths, "Copy 2"), Launch { args: "-debug".into(), cache_dir: None, kept: None }, "launch options come along");
         // its own game folder: the copy gets one of its own
-        set_launch(&paths, "SOLO", &Launch { args: String::new(), cache_dir: Some(own_game_folder(&paths, "SOLO")) }).unwrap();
+        set_launch(&paths, "SOLO", &Launch { args: String::new(), cache_dir: Some(own_game_folder(&paths, "SOLO")), kept: None }).unwrap();
         duplicate(&paths, "SOLO", "Copy 3").unwrap();
         let own = launch_of(&paths, "Copy 3").cache_dir.unwrap();
         let long = |p: PathBuf| path_form(&p, true).unwrap_or(p); // the temp dir may itself be an 8.3 path (CI)
@@ -1487,6 +1665,58 @@ mod tests {
     }
 
     #[test]
+    fn sync_takes_sections_made_in_game_once() {
+        let (_t, paths) = temp_paths();
+        let lua = paths.zomboid.join("Lua/pzmm");
+        fs::create_dir_all(&lua).unwrap();
+        fs::write(lua.join("library.txt"), "# PZMM profile: In game\n# --- Maps\n+B\n-C\n# --- Gameplay\n+A\n").unwrap();
+        pz::write_default(&paths.default_txt(), &ids(&["A", "B", "D"]), None, None).unwrap();
+        let (p, _) = sync(&paths).unwrap();
+        assert_eq!(p.to_text(), "# --- Maps\n+B\n-C\n# --- Gameplay\n+A\n# --- \n+D\n");
+        assert!(fs::read_to_string(lua.join("library.txt")).unwrap().starts_with("# PZMM profile: Default\n"), "the game's copy is the profile's now");
+        // a profile with sections of its own keeps them
+        let mut q = Profile::parse("Default", "# --- Mine\n+A\n");
+        fs::write(lua.join("library.txt"), "# PZMM profile: In game\n# --- Maps\n+A\n").unwrap();
+        assert!(!game_sections(&paths, &mut q));
+    }
+
+    #[test]
+    fn sync_takes_the_games_map_order_once_arranged() {
+        let (_t, paths) = temp_paths();
+        apply(&paths, &Profile::from_ids("Default", ids(&["A"]))).unwrap();
+        pz::write_default(&paths.default_txt(), &ids(&["A"]), None, Some(&ids(&["Town B", "Town A"]))).unwrap();
+        // the game wrote it after PZMM's last save
+        // when PZMM last wrote its load order and map order
+        let saved = |ago: u64| {
+            for f in ["loadorder.txt", "maporder.txt"] {
+                if let Ok(ours) = fs::File::options().write(true).open(dir(&paths).join("Default").join(f)) {
+                    ours.set_modified(std::time::SystemTime::now() - std::time::Duration::from_secs(ago)).unwrap();
+                }
+            }
+        };
+        saved(10);
+        sync(&paths).unwrap();
+        assert!(map_order(&paths, "Default").is_empty(), "never arranged: nothing saved");
+        set_map_order(&paths, "Default", &ids(&["Town A", "Town B"])).unwrap();
+        // PZMM saved after default.txt was written
+        saved(0);
+        sync(&paths).unwrap();
+        assert_eq!(map_order(&paths, "Default")[..2], ids(&["Town A", "Town B"]), "default.txt as PZMM left it (written with its save): not the game's arranging");
+        saved(10);
+        sync(&paths).unwrap();
+        assert_eq!(map_order(&paths, "Default")[..2], ids(&["Town B", "Town A"]));
+    }
+
+    #[test]
+    fn renaming_the_active_profile_renames_the_games_copy() {
+        let (_t, paths) = temp_paths();
+        fs::create_dir_all(paths.zomboid.join("Lua/pzmm")).unwrap();
+        apply(&paths, &Profile::from_ids("Default", ids(&["A"]))).unwrap();
+        rename(&paths, "Default", "Mine").unwrap();
+        assert!(fs::read_to_string(paths.zomboid.join("Lua/pzmm/library.txt")).unwrap().starts_with("# PZMM profile: Mine\n"));
+    }
+
+    #[test]
     fn unreadable_default_txt_keeps_the_profile() {
         let (_t, paths) = temp_paths();
         apply(&paths, &Profile::from_ids("Default", ids(&["A", "B"]))).unwrap();
@@ -1625,15 +1855,15 @@ mod tests {
         let (_t, paths) = temp_paths();
         apply(&paths, &Profile::from_ids("Mine", ids(&["A"]))).unwrap();
         let folder = own_game_folder(&paths, "Mine");
-        set_launch(&paths, "Mine", &Launch { args: "-debug".into(), cache_dir: Some(folder.clone()) }).unwrap();
+        set_launch(&paths, "Mine", &Launch { args: "-debug".into(), cache_dir: Some(folder.clone()), kept: None }).unwrap();
         let p = for_save(&paths, "Mine", "Save World", ids(&["Viewpoint", "B"]), &ids(&["Town", "Muldraugh, KY"])).unwrap();
         assert_eq!(p.enabled(), ids(&["Viewpoint", "B"]));
-        assert_eq!(launch_of(&paths, "Save World"), Launch { args: "-debug".into(), cache_dir: Some(folder) });
+        assert_eq!(launch_of(&paths, "Save World"), Launch { args: "-debug".into(), cache_dir: Some(folder), kept: None });
         assert_eq!((map_order(&paths, "Save World"), kind_of(&paths, "Save World")), (ids(&["Town", "Muldraugh, KY"]), "viewpoint".to_string()));
         // again from a profile in the main folder: its own arguments stay, the folder follows the save
         set_launch(&paths, "Save World", &Launch { args: "-nosteam".into(), ..launch_of(&paths, "Save World") }).unwrap();
         for_save(&paths, "Default", "Save World", ids(&["B"]), &[]).unwrap();
-        assert_eq!(launch_of(&paths, "Save World"), Launch { args: "-nosteam".into(), cache_dir: None });
+        assert_eq!(launch_of(&paths, "Save World"), Launch { args: "-nosteam".into(), cache_dir: None, kept: None });
     }
 
     #[test]

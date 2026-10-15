@@ -38,7 +38,7 @@
     <ul class="list">
       {#each latest as r (r.id)}
         {@const it = item(r)}
-        {@const have = it ? installed.has(it) : r.action !== "removed"}
+        {@const have = r.action !== "removed" && (!it || installed.has(it))}
         <li>
           <div class="what">
             <strong>{r.name || r.id}</strong>

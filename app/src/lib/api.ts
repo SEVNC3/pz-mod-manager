@@ -146,7 +146,7 @@ export type AuthoringReport = { upload: boolean; findings: Finding[]; draft: Upl
 export type Built = { folder: string; skipped: string[]; findings: Finding[] };
 /** Project Zomboid's official Steam posts (see pz::news); `error`: why this is an older copy. */
 export type News = { fetched: number; posts: { title: string; date: number; excerpt: string; build: string; url: string; image: string }[]; error: string };
-export type Feed = { since: number; basis: "launch" | "save" | ""; entries: FeedEntry[]; unloaded: number; error: string };
+export type Feed = { since: number; basis: "launch" | "save" | ""; entries: FeedEntry[]; unloaded: number; error: string; seen: number };
 export type Comments = { total: number; comments: { author: string; time: number; text: string }[] };
 export type Browse = { total: number; items: WorkshopItem[] };
 /** Autosort's sections in list order, and each mod's section. */
@@ -328,9 +328,10 @@ type External = { kind: "linuxgsm" | "docker"; folder: string; run: string[] };
 export type FoundServer = { name: string; data: string; install: string | null; external: External };
 export type ServerBackup = { file: string; time: number; size: number; reason: string; label: string };
 /** A request from the game (PZMM - Client writes them; the core checks them). */
-export type GameRequest = { action: "install"; ids: string[] } | { action: "backup"; mode: string; name: string } | { action: "check" } | { action: "open"; tab: string };
+export type GameRequest = { id: string; profile: string } & ({ action: "install"; ids: string[] } | { action: "backup"; mode: string; name: string } | { action: "check" } | { action: "library"; lines: string[] } | { action: "open"; tab: string } | { action: "place"; mod: string; section: string; before: string | null } | { action: "profile"; name: string } | { action: "tags"; mod: string; tags: string[] } | { action: "fix"; fix: string } | { action: "restore"; mode: string; name: string; file: string }
+  | { action: "section"; op: "add" | "rename" | "remove" | "move"; name: string; to: string | null });
 /** What the game last reported: the mods it loaded, at the menu or in a game. */
-export type GameReport = { client: string; game: string; state: string; at: number; mods: string[]; save: string | null; server: string | null };
+export type GameReport = { client: string; game: string; state: string; at: number; mods: string[]; save: string | null; server: string | null; zomboid: string; elsewhere: boolean };
 export type BackupView = { backups: ServerBackup[]; empty_cells: string[]; game_on_start: boolean; game_count: string; game_dir: string };
 /** A form field from a server file's own comments (core pz/server_config.rs). */
 export type Setting = {
@@ -662,7 +663,8 @@ export const api = {
     invoke<Candidate[]>("find_requirement", { modId, neededBy }),
   installMissing: () => invoke<[View, string[]]>("install_missing"),
   checkUpdates: () => invoke<string[]>("check_updates"),
-  updateMods: (ids: string[]) => invoke<View>("update_mods", { ids }),
+  /** The view, and the ids that did install. */
+  updateMods: (ids: string[]) => invoke<[View, string[]]>("update_mods", { ids }),
   modStats: () => invoke<Record<string, Stats>>("mod_stats"),
   categories: () => invoke<Categories>("categories"),
   conflictSummary: () => invoke<Record<string, Overlap>>("conflict_summary"),
@@ -676,14 +678,26 @@ export const api = {
   profileLaunchSet: (args: string, ownFolder: boolean) => invoke<ProfileLaunch>("profile_launch_set", { args, ownFolder }),
   /** Run PZ_Optimization's installer (or its uninstall); resolves to what it printed. */
   pzoptRun: (uninstall: boolean) => invoke<string>("pzopt_run", { uninstall }),
-  saveDetails: (mode: string, name: string) => invoke<SaveDetails>("save_details", { mode, name }),
+  saveDetails: (mode: string, name: string, game = false) => invoke<SaveDetails>("save_details", { mode, name, game }),
   /** A `slot` name keeps the backup until it's deleted. */
   saveBackup: (mode: string, name: string, slot: string) => invoke<void>("save_backup", { mode, name, slot }),
   /** What the game asked PZMM to do since the last look (PZMM - Client), taken: each comes once. */
   gameRequests: () => invoke<GameRequest[]>("game_requests"),
+  /** What became of the game's requests (`why` when not done): the game's sorting edits settle on these. */
+  gameAck: (acks: { id: string; ok: boolean; why: string }[]) => invoke<void>("game_ack", { acks }),
   /** What the game last reported (PZMM - Client's game.json). */
+  gameSettings: () => invoke<Record<string, boolean> | null>("game_settings"),
+  gameSettingsSet: (set: Record<string, boolean>) => invoke<void>("game_settings_set", { set }),
+  gameLook: (accent: string, theme: string) => invoke<void>("game_look", { accent, theme }),
+  gameBusy: (on: boolean) => invoke<void>("game_busy", { on }),
+  gameActivityAdd: (lines: { at: number; kind: string; text: string }[]) => invoke<void>("game_activity_add", { lines }),
+  gameActivity: () => invoke<{ at: number; kind: "info" | "error" | "install" | "update" | "remove"; text: string }[]>("game_activity"),
+  gameFindings: (lines: string[]) => invoke<void>("game_findings", { lines }),
+  feedSeen: (at: number) => invoke<void>("feed_seen", { at }),
   gameReport: () => invoke<GameReport | null>("game_report"),
   saveRestore: (mode: string, name: string, file: string) => invoke<void>("save_restore", { mode, name, file }),
+  saveRestoreFromGame: (mode: string, name: string, file: string) => invoke<void>("save_restore_from_game", { mode, name, file }),
+  saveBackupFromGame: (mode: string, name: string) => invoke<void>("save_backup_from_game", { mode, name }),
   saveBackupDelete: (mode: string, name: string, file: string) => invoke<void>("save_backup_delete", { mode, name, file }),
   saveRepair: (mode: string, name: string) => invoke<number>("save_repair", { mode, name }),
   /** Give the save the active profile's mods. */

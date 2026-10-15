@@ -215,7 +215,9 @@
       await api.hostSend(s.name, `servermsg ${q(t(what === "stop" ? "hosting.warnStopMsg" : "hosting.warnRestartMsg"))}`);
       warned[s.name] = window.setTimeout(() => {
         delete warned[s.name];
-        run(s, what);
+        // only the run players were warned about: not one stopped, or started again, meanwhile
+        const cur = host?.servers.find((c) => c.name === s.name);
+        if (cur?.status === "running" && cur.started === s.started) run(cur, what);
       }, 60000);
     } catch (e) {
       error = t(...keyedError(e));
@@ -230,6 +232,11 @@
 
   async function run(s: ServerCard, what: "start" | "stop" | "restart") {
     error = "";
+    if (what === "start") {
+      // a warned stop or restart was for the run before
+      clearTimeout(warned[s.name]);
+      delete warned[s.name];
+    }
     acting[s.name] = true;
     try {
       await (what === "start" ? api.hostStart(s.name) : what === "stop" ? api.hostStop(s.name) : api.hostRestart(s.name));

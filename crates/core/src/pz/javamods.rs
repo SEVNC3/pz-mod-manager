@@ -78,7 +78,8 @@ pub fn read_approvals(file: &Path) -> Approvals {
 pub fn approve(file: &Path, mods: &[&Row], trusted: &HashSet<String>) -> anyhow::Result<Vec<String>> {
     let mut v: serde_json::Value = match std::fs::read_to_string(file) {
         Ok(t) => serde_json::from_str(&t)?, // unreadable: an error rather than saving over the player's answers
-        Err(_) => serde_json::json!({"formatVersion": 2, "mods": []}),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => serde_json::json!({"formatVersion": 2, "mods": []}),
+        Err(e) => return Err(anyhow::Error::from(e).context(format!("reading {}", file.display()))),
     };
     let known = read_approvals(file);
     let mut added = vec![];
@@ -136,7 +137,8 @@ fn jar_of(m: &Row) -> Option<(String, PathBuf)> {
         .find_map(|i| super::read_info(i).remove("javaJarFile").filter(|s| !s.is_empty()))?;
     // a mod.info in common/ names a jar inside a version folder (42/, 42.13/...): the newest that has it
     let mut versions: Vec<PathBuf> = std::fs::read_dir(&m.dir).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.is_dir() && p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("42"))).collect();
-    versions.sort();
+    let number = |p: &PathBuf| p.file_name().map(|n| n.to_string_lossy().split('.').map(|x| x.parse::<u32>().unwrap_or(0)).collect::<Vec<_>>()).unwrap_or_default();
+    versions.sort_by_key(number);
     let found = std::iter::once(base.to_path_buf()).chain(versions.into_iter().rev()).chain([m.dir.clone()]).map(|d| d.join(&rel)).find(|p| p.is_file());
     Some((rel.clone(), found.unwrap_or_else(|| base.join(&rel))))
 }

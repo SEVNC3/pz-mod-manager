@@ -7,6 +7,8 @@
   const MINUTES = 60_000;
 
   let feedAsked: { at: number; p: Promise<Feed> } | null = null;
+  /** After updates or a launch: the next glance asks again. */
+  export const forgetGlance = () => (feedAsked = null);
   /** Your Workshop mods updated since you last played (without their notes), asked at most every five
    * minutes: What's new's count comes from here too. */
   export function glance(): Promise<Feed> {
@@ -454,7 +456,7 @@
   <div class="stat"><span class="slabel">{label}</span><span class="svalue {tone}" title={tip}>{value}</span></div>
 {/snippet}
 
-<svelte:window onkeydown={(e) => e.key === "Escape" && sel.kind !== "home" && !menuAt && !(e.target as HTMLElement).closest?.("input, textarea, [role=dialog], [role=menu]") && pick({ kind: "home" })} />
+<svelte:window onkeydown={(e) => e.key === "Escape" && sel.kind !== "home" && !menuAt && !(e.target as HTMLElement).closest?.("input, textarea, [role=dialog], [role=alertdialog], [role=menu]") && pick({ kind: "home" })} />
 
 <section class="home" aria-label={t("tabs.home")}>
   <div class="page blueprint">
@@ -501,7 +503,7 @@
         <div class="split">
           <button class="primary big" onclick={() => server && joinServer(server)} disabled={busy || !!working || (!!server.mod_count && !!lock)} title={lock || [server.password ? t("home.passwordTip") : "", server.mod_count ? t("home.joinTip") : ""].filter(Boolean).join("\n")}>
             <Icon name={server.password ? "lock" : "play"} size={18} />{t("launcher.join")}</button>
-          <button class="primary caret" aria-haspopup="menu" aria-expanded={!!menuAt} aria-label={t("home.more")} onclick={openMenu}><Icon name="chevron-down" size={14} /></button>
+          <button class="primary caret" aria-haspopup="menu" aria-expanded={!!menuAt} aria-label={t("home.more")} onpointerdown={(e) => menuAt && e.stopPropagation()} onclick={openMenu}><Icon name="chevron-down" size={14} /></button>
         </div>
         <div class="stat"><span class="slabel">{t("home.stat.players")}</span>
           <span class="svalue">{#if server.probed}{server.players}/{server.max_players}<span class="bar" aria-hidden="true"><span style="width: {server.max_players ? Math.min(100, (server.players / server.max_players) * 100) : 0}%"></span></span>{:else}—{/if}</span></div>
@@ -530,7 +532,7 @@
           {:else}
             <button class="primary big" onclick={() => card && start(card)} disabled={!!working || card.status !== "stopped" && card.status !== "crashed" || !!card.remote || !!card.external}><Icon name="play" size={18} />{t("hosting.start")}</button>
           {/if}
-          <button class="primary caret" aria-haspopup="menu" aria-expanded={!!menuAt} aria-label={t("home.more")} onclick={openMenu}><Icon name="chevron-down" size={14} /></button>
+          <button class="primary caret" aria-haspopup="menu" aria-expanded={!!menuAt} aria-label={t("home.more")} onpointerdown={(e) => menuAt && e.stopPropagation()} onclick={openMenu}><Icon name="chevron-down" size={14} /></button>
         </div>
         <div class="stat"><span class="slabel">{t("home.stat.players")}</span><span class="svalue">{card.status === "running" && card.players !== null ? String(card.players) : "—"}</span></div>
         <!-- the hosted server's state: port and build, then whether it's running -->
@@ -545,7 +547,7 @@
       {:else}
         <div class="split">
           <button class="primary big" onclick={onLaunch} disabled={busy}><Icon name="play" size={18} />{t("home.playButton")}</button>
-          <button class="primary caret" aria-haspopup="menu" aria-expanded={!!menuAt} aria-label={t("home.more")} onclick={openMenu}><Icon name="chevron-down" size={14} /></button>
+          <button class="primary caret" aria-haspopup="menu" aria-expanded={!!menuAt} aria-label={t("home.more")} onpointerdown={(e) => menuAt && e.stopPropagation()} onclick={openMenu}><Icon name="chevron-down" size={14} /></button>
         </div>
         <!-- the server you last played, a click away -->
         {@const last = recent[0]}

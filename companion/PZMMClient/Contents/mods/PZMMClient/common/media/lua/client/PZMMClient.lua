@@ -23,7 +23,8 @@ local function write(state)
             '"client":' .. json(VERSION),
             '"game":' .. json(getCore():getVersion()),
             '"state":' .. json(state),
-            '"at":' .. tostring(os.time()),
+            '"at":' .. tostring(math.floor(os.time())),
+            '"zomboid":' .. json(Core.getMyDocumentFolder()),
             '"mods":[' .. table.concat(ids, ",") .. ']',
         }
         if state ~= "menu" then
@@ -46,4 +47,6 @@ local function write(state)
 end
 
 Events.OnMainMenuEnter.Add(function() write("menu") end)
+-- a save loading is not the menu (game.json says "loading" until the game starts)
+if Events.OnInitWorld then Events.OnInitWorld.Add(function() write("loading") end) end
 Events.OnGameStart.Add(function() write("game") end)

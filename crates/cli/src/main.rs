@@ -233,13 +233,18 @@ fn run(cli: Cli) -> Result<()> {
         }
         Cmd::Enable { ids } => {
             let mods = store::scan(&paths)?;
+            let mut done = 0;
             for id in &ids {
                 if mods.contains_key(id) {
                     p.set(id, true);
+                    done += 1;
                 } else {
                     let like = mods.keys().find(|k| k.eq_ignore_ascii_case(id)).map(|k| format!(" (did you mean {k}?)")).unwrap_or_default();
                     eprintln!("{id}: not installed, skipped{like}");
                 }
+            }
+            if done == 0 {
+                bail!("nothing enabled");
             }
             apply(&paths, &p)?;
         }
@@ -254,6 +259,9 @@ fn run(cli: Cli) -> Result<()> {
             let refused = store::remove(&paths, &ids, pzmm_core::settings::load().recycle)?;
             for id in &refused {
                 eprintln!("{id}: not installed by PZMM (Workshop subscription or manual install); left alone");
+            }
+            if refused.len() == ids.len() {
+                bail!("nothing removed");
             }
             ids.iter().filter(|i| !refused.contains(i)).for_each(|i| p.forget(i));
             apply(&paths, &p)?;
@@ -272,7 +280,7 @@ fn run(cli: Cli) -> Result<()> {
                 return Ok(());
             }
             profile::snapshot(&paths, &p.name, "update")?;
-            if sources::install(&paths, &all, false).is_empty() {
+            if sources::update(&paths, &all).is_empty() {
                 bail!("nothing was updated");
             }
             apply(&paths, &p)?; // updates can add or rename map folders
@@ -339,6 +347,9 @@ fn run(cli: Cli) -> Result<()> {
             match found.first() {
                 Some(best) if install && best.sure() => {
                     let ids = sources::install(&paths, &[Source::Workshop(best.item.id.clone())], true);
+                    if ids.is_empty() {
+                        bail!("couldn't install workshop:{}", best.item.id);
+                    }
                     ids.iter().for_each(|i| p.set(i, true));
                     apply(&paths, &p)?;
                 }
@@ -745,9 +756,13 @@ fn host(paths: &Paths, action: &str, name: &str, command: &str, json: bool, mut 
             }
         }
         "console" => {
+            let failed = std::cell::Cell::new(false);
             let run = |cmd: &str| match host::send(paths, name, cmd) {
                 Ok(reply) => println!("{}", reply.unwrap_or_default().trim_end()),
-                Err(e) => eprintln!("error: {e:#}"),
+                Err(e) => {
+                    eprintln!("error: {e:#}");
+                    failed.set(true);
+                }
             };
             if command.is_empty() {
                 for line in std::io::stdin().lock().lines().map_while(Result::ok).filter(|l| !l.trim().is_empty()) {
@@ -755,6 +770,9 @@ fn host(paths: &Paths, action: &str, name: &str, command: &str, json: bool, mut 
                 }
             } else {
                 run(command);
+            }
+            if failed.get() {
+                bail!("a command failed");
             }
         }
         "log" => {

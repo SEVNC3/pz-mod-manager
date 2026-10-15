@@ -41,8 +41,9 @@
   let comments = $state<Comments | null>(null);
   let commentsStart = $state(0);
 
+  const itemId = $derived(item.id);
   $effect(() => {
-    const id = item.id;
+    const id = itemId;
     info = null;
     errors = { about: "", changes: "", comments: "" };
     tab = "about";
