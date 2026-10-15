@@ -9,7 +9,7 @@
   <a href="#install"><b>Install</b></a> · <a href="../../releases/latest">Download</a> · <a href="https://discord.com/invite/6URUy6mNzu">Discord</a> · <a href="docs/FEATURES.md">Everything it does</a>
 </p>
 
-<p align="center"><img src="docs/media/hero.gif" alt="PZMM: dragging a mod into place, renaming a group, then Autosort sorting the load order" width="900"></p>
+<p align="center"><a href="https://youtu.be/MpBnMMRV-tM"><img src="docs/media/hero.gif" alt="PZMM: sorting a load order, browsing the Workshop and setting up Project Viewpoint" width="900"></a><br><a href="https://youtu.be/MpBnMMRV-tM">Watch the 2-minute video</a></p>
 
 I made PZMM because of [Project Viewpoint](https://steamcommunity.com/sharedfiles/filedetails/?id=3809306528). Getting it running means two Workshop items, a jar and a DLL in the game folder and a launch flag, and the next game update can wipe the flag again. PZMM does all of that from one menu.
 
