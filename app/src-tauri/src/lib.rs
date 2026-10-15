@@ -2030,6 +2030,10 @@ fn tray_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
 }
 
 fn show_window(app: &AppHandle) {
+    // still loading behind the splash: lifting it shows the window (it hides the splash first)
+    if app.get_webview_window("splash").is_some_and(|s| s.is_visible().unwrap_or(false)) {
+        return;
+    }
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
         let _ = w.unminimize();
@@ -2104,6 +2108,18 @@ fn notify(app: AppHandle, text: String) -> Res<()> {
 
 /// With favourites' notifications on, look at them every two minutes and say in the activity log
 /// which came online with room (the UI turns the line into a notification too).
+/// The game's requests (PZMM - Client), taken off it as they come: PZMM comes to the front and the UI
+/// acts on them. The game sees them taken, so it only starts PZMM (a pzmm://game link) when it isn't running.
+fn watch_game(app: &AppHandle) {
+    loop {
+        if pz::bridge::queue_requests(&Paths::detect()) {
+            show_window(app);
+            let _ = app.emit("game-requests", ());
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+}
+
 fn watch_favourites() {
     let mut before = None;
     loop {
@@ -2241,6 +2257,19 @@ fn game_closed() -> anyhow::Result<()> {
         anyhow::bail!("the game is running: quit it first, so it doesn't write over the save");
     }
     Ok(())
+}
+
+/// What the game asked PZMM to do since the last look (PZMM - Client's requests.txt), taken: each is
+/// handled once. The UI asks before acting on any that change something.
+#[tauri::command]
+async fn game_requests() -> Res<Vec<pz::bridge::Request>> {
+    Ok(pz::bridge::take_requests(&Paths::detect()))
+}
+
+/// What the game last reported (PZMM - Client's game.json): the mods it loaded, at the menu or in a game.
+#[tauri::command]
+async fn game_report() -> Res<Option<pz::bridge::GameReport>> {
+    Ok(pz::bridge::game_report(&Paths::detect()))
 }
 
 /// Back a save up now; a `slot` name keeps it until it's deleted.
@@ -3675,8 +3704,9 @@ pub fn run() {
             });
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
-                // an AppImage has no installer to register pzmm:// links
-                #[cfg(target_os = "linux")]
+                // an AppImage has no installer to register pzmm:// links; a dev build takes them over
+                // from the installed PZMM so the game's links reach it (reinstalling gives them back)
+                #[cfg(any(target_os = "linux", all(windows, debug_assertions)))]
                 if let Err(e) = app.deep_link().register_all() {
                     pzmm_core::log!("pzmm:// links: {e}");
                 }
@@ -3721,6 +3751,10 @@ pub fn run() {
                 });
             }
             std::thread::spawn(watch_favourites);
+            let handle = app.handle().clone();
+            std::thread::spawn(move || watch_game(&handle));
+            // the PZMM - Client mod reads this to know the app is installed
+            profile::app_for_game(&Paths::detect(), &app.package_info().version.to_string());
             // the built-in mod ID and map indexes parse once (a moment, seconds in a debug build): now,
             // rather than on the first server's mods
             std::thread::spawn(|| {
@@ -3792,7 +3826,7 @@ pub fn run() {
             details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, mod_changes, feed, news, authoring_check, authoring_poster, authoring_build, workshop_comments, workshop_author, workshop_items, zb_status, zb_preview, zb_install, zb_uninstall, java_mods, workshop_subscribe,
             find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_preview, server_check, server_export, server_import, save_use,
             perf_view, game_running, perf_memory_set, perf_jvm_set, profile_launch, profile_launch_set, pzopt_run, save_sandbox, save_sandbox_write, save_sandbox_preset, save_details, save_backup, save_restore, save_backup_delete, save_repair, save_set_mods, save_players,
-            save_backup_name, save_thumb, save_reset, save_clone, save_databases, save_table,
+            game_requests, game_report, save_backup_name, save_thumb, save_reset, save_clone, save_databases, save_table,
             host_view, host_ports, host_create, host_preflight, host_start, host_stop, host_restart, host_log, host_send, host_players, host_lines, host_lines_from_profile,
             host_lines_from_collection, host_check, host_lines_with, host_people, host_catalog, host_remote_add, host_remote_forget, host_preview, host_write, host_adopt, host_forget, app_quit, app_close, splash_done, history_list, history_clear, finding_hide, zb_unblock,
             host_auto_set, host_tag, host_tag_set, host_check_updates, host_backups, host_backup, host_restore, host_config, host_ini_write, host_sandbox_write, host_spawn_write, host_preset, host_preset_save,

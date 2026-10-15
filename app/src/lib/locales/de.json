@@ -3278,6 +3278,7 @@
     "changelogTip": "Alle Änderungsnotizen im Workshop",
     "notLoaded": "Änderungsnotizen noch nicht geladen.",
     "emptyNote": "(kein Text)",
+    "withoutNotes": "Keine Änderungsnotizen",
     "fewer": "Weniger zeigen",
     "more": {
       "one": "{count} ältere Notiz zeigen",
@@ -3598,5 +3599,13 @@
       "hide": "Passt so",
       "unhide": "Wieder zeigen"
     }
+  },
+  "game": {
+    "installAsk": "Das Spiel bittet PZMM, diese Workshop-Objekte zu installieren:",
+    "install": "Installieren",
+    "backupAsk": "Das Spiel bittet PZMM, {name} zu sichern.",
+    "backup": "Sichern",
+    "backedUp": "{name} gesichert, wie vom Spiel gewünscht.",
+    "notApplied": "Das Spiel hat eine andere Modliste geladen als dieses Profil ({missing} fehlen, {extra} zusätzlich). Starte das Spiel über PZMM oder prüfe den Mod-Bildschirm des Spiels."
   }
 }

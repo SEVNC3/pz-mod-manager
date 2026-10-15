@@ -327,6 +327,10 @@ export type ServerAuto = {
 type External = { kind: "linuxgsm" | "docker"; folder: string; run: string[] };
 export type FoundServer = { name: string; data: string; install: string | null; external: External };
 export type ServerBackup = { file: string; time: number; size: number; reason: string; label: string };
+/** A request from the game (PZMM - Client writes them; the core checks them). */
+export type GameRequest = { action: "install"; ids: string[] } | { action: "backup"; mode: string; name: string } | { action: "check" } | { action: "open"; tab: string };
+/** What the game last reported: the mods it loaded, at the menu or in a game. */
+export type GameReport = { client: string; game: string; state: string; at: number; mods: string[]; save: string | null; server: string | null };
 export type BackupView = { backups: ServerBackup[]; empty_cells: string[]; game_on_start: boolean; game_count: string; game_dir: string };
 /** A form field from a server file's own comments (core pz/server_config.rs). */
 export type Setting = {
@@ -675,6 +679,10 @@ export const api = {
   saveDetails: (mode: string, name: string) => invoke<SaveDetails>("save_details", { mode, name }),
   /** A `slot` name keeps the backup until it's deleted. */
   saveBackup: (mode: string, name: string, slot: string) => invoke<void>("save_backup", { mode, name, slot }),
+  /** What the game asked PZMM to do since the last look (PZMM - Client), taken: each comes once. */
+  gameRequests: () => invoke<GameRequest[]>("game_requests"),
+  /** What the game last reported (PZMM - Client's game.json). */
+  gameReport: () => invoke<GameReport | null>("game_report"),
   saveRestore: (mode: string, name: string, file: string) => invoke<void>("save_restore", { mode, name, file }),
   saveBackupDelete: (mode: string, name: string, file: string) => invoke<void>("save_backup_delete", { mode, name, file }),
   saveRepair: (mode: string, name: string) => invoke<number>("save_repair", { mode, name }),

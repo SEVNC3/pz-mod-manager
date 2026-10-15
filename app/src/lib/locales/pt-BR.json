@@ -3278,6 +3278,7 @@
     "changelogTip": "Todas as notas de alteração no Workshop",
     "notLoaded": "Notas de alteração ainda não carregadas.",
     "emptyNote": "(sem texto)",
+    "withoutNotes": "Sem notas de alteração",
     "fewer": "Mostrar menos",
     "more": {
       "one": "Mostrar {count} nota mais antiga",
@@ -3598,5 +3599,13 @@
       "hide": "Está tudo bem",
       "unhide": "Mostrar de novo"
     }
+  },
+  "game": {
+    "installAsk": "O jogo pede ao PZMM para instalar estes itens da Oficina:",
+    "install": "Instalar",
+    "backupAsk": "O jogo pede ao PZMM para fazer backup de {name}.",
+    "backup": "Fazer backup",
+    "backedUp": "Backup de {name} feito, como o jogo pediu.",
+    "notApplied": "O jogo carregou uma lista de mods diferente deste perfil ({missing} faltando, {extra} a mais). Inicie o jogo pelo PZMM ou confira a tela de mods do jogo."
   }
 }

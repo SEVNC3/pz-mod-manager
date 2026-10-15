@@ -9,6 +9,7 @@ use anyhow::{Context, Result};
 
 pub mod a2s;
 pub mod authoring;
+pub mod bridge;
 pub mod autopilot;
 pub mod catalog;
 pub mod category;

@@ -40,7 +40,7 @@
   import WindowControls from "$lib/WindowControls.svelte";
   import ProfilePicker from "$lib/ProfilePicker.svelte";
   import ServerSetup from "$lib/ServerSetup.svelte";
-  import type { Categories, FeedEntry, Finding, GameServer, LogReport, Marks, Overlap, Pack, Preset, Save, SettingsView, SetupItem, Stats } from "$lib/api";
+  import type { Categories, FeedEntry, Finding, GameRequest, GameServer, LogReport, Marks, Overlap, Pack, Preset, Save, SettingsView, SetupItem, Stats } from "$lib/api";
   import { intlLang, keyedError, t, th, type Vars } from "$lib/i18n.svelte";
   /** Names in a sentence, separated the way the player's language does ("A, B, C"; "A、B、C"). */
   const listed = (items: string[]) => new Intl.ListFormat(intlLang(), { type: "unit" }).format(items);
@@ -67,9 +67,16 @@
   /** A pzmm://join link to show in the Servers tab's details (it asks before joining). */
   let joinLink = $state<{ url: string } | null>(null);
   const openLink = (url: string) => {
+    // pzmm://game: the game started PZMM for its requests (they say what to open)
+    if (url.startsWith("pzmm://game")) return void gameAsked();
     tab = "servers";
     joinLink = { url };
   };
+  /** The game asked something (PZMM came to the front): act on it once nothing else is running. */
+  function gameAsked() {
+    if (busy) setTimeout(gameAsked, 2000);
+    else fromGame();
+  }
   let updates = $state<Set<string>>(new Set());
   /** settings.json, folders and the rest of the Settings tab (null until read). */
   let cfg = $state<SettingsView | null>(null);
@@ -343,6 +350,62 @@
   let lastFocusLoad = 0;
   /** When the window last lost focus: a quick look at another window (under 10 s) reloads nothing. */
   let blurredAt = 0;
+  // --- the game (PZMM - Client): its requests, and whether it loaded this profile's mods ---
+  /** The game report already looked at (its time): only a newer one is compared. */
+  let gameSeen = 0;
+  /** Act on what the game asked: tabs and Check setup at once; installs and backups only after asking
+   * (any mod can write the game's request file). */
+  async function fromGame() {
+    // every focus (not only when the lists reload), but not twice at once
+    if (takingRequests) return;
+    takingRequests = true;
+    try {
+      await takeRequests();
+    } finally {
+      takingRequests = false;
+    }
+  }
+  let takingRequests = false;
+  async function takeRequests() {
+    let reqs: GameRequest[] = [];
+    try {
+      reqs = await api.gameRequests();
+    } catch {
+      return;
+    }
+    for (const r of reqs) {
+      if (r.action === "open") tab = r.tab as typeof tab;
+      else if (r.action === "check") openCheck();
+      else if (r.action === "install") {
+        // titles, not bare IDs: any mod can write the request, so show what's being installed
+        const titles = new Map((await api.workshopItems(r.ids).catch(() => [])).map((i) => [i.id, i.title]));
+        if (!(await confirmed(t("game.installAsk"), { label: t("game.install"), icon: "download" }, r.ids.map((id) => (titles.has(id) ? `${titles.get(id)} (${id})` : id))))) continue;
+        await installAndSettle(r.ids.length === 1 ? t("busy.installingOne", { name: r.ids[0] }) : t("busy.installingMany", { count: r.ids.length }), () => api.install(r.ids), r.ids.length > 1);
+      } else if (r.action === "backup") {
+        if (!(await confirmed(t("game.backupAsk", { name: r.name }), { label: t("game.backup"), icon: "copy" }))) continue;
+        try {
+          await api.saveBackup(r.mode, r.name, "");
+          say("game.backedUp", { name: r.name });
+        } catch (e) {
+          say(...keyedError(e), true);
+        }
+      }
+    }
+  }
+  /** A new report from the game's main menu with a different mod list than this profile: say so. */
+  async function checkGame(first = false) {
+    const g = await api.gameReport().catch(() => null);
+    if (!g || g.at <= gameSeen) return;
+    gameSeen = g.at;
+    if (first || g.state !== "menu") return;
+    const loaded = new Set(g.mods);
+    const want = new Set(order);
+    // only mods the game could load: installed, and for the build played
+    const missing = order.filter((id) => { const m = mods.get(id); return m && !m.missing && loadable(m) && !loaded.has(id); }).length;
+    const extra = g.mods.filter((id) => !want.has(id)).length;
+    if (missing || extra) say("game.notApplied", { missing, extra });
+  }
+
   async function refreshOnFocus() {
     if (busy || dragFrom !== null || editingSep !== null || Date.now() - lastFocusLoad < 3000 || Date.now() - blurredAt < 10_000) return;
     lastFocusLoad = Date.now();
@@ -357,6 +420,7 @@
         undoStack = redoStack = [];
         say("log.adopted", { profile: v.profile });
       }
+      checkGame();
     } catch {}
   }
 
@@ -1752,7 +1816,11 @@
     // pzmm://join links: the one PZMM started with, then any opened while it runs
     api.joinLinks().then((l) => l[0] && openLink(l[0])).catch(() => {});
     refreshLists();
+    // what the game asked while PZMM was closed; its last report is the starting point, not news
+    checkGame(true);
+    fromGame();
     const unlistenLink = listen<string[]>("join-link", ({ payload }) => payload[0] && openLink(payload[0]));
+    const unlistenGame = listen("game-requests", gameAsked);
     // a Maps check downloads with SteamCMD too: its progress isn't an install's
     const unlistenProgress = listen<[number, number]>("progress", (e) => longJobs && (progress = e.payload));
     // closing with servers PZMM runs: stop them, or leave them running (PZMM finds them again next time)
@@ -1807,13 +1875,14 @@
       unlisten.then((f) => f());
       unlistenProgress.then((f) => f());
       unlistenLink.then((f) => f());
+      unlistenGame.then((f) => f());
       unlistenQuit.then((f) => f());
       unlistenClose.then((f) => f());
     };
   });
 </script>
 
-<svelte:window onkeydown={globalKey} onfocus={refreshOnFocus} onblur={() => (blurredAt = Date.now())}
+<svelte:window onkeydown={globalKey} onfocus={() => (refreshOnFocus(), busy || fromGame())} onblur={() => (blurredAt = Date.now())}
   oncontextmenu={(e) => !(e.target as HTMLElement).closest?.("input:is([type=text], [type=search], [type=url], [type=number], [type=password], :not([type])), textarea, [contenteditable]") && e.preventDefault()} />
 
 <div class="app">

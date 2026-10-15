@@ -3278,6 +3278,7 @@
     "changelogTip": "Tutte le sue note di aggiornamento sul Workshop",
     "notLoaded": "Note di aggiornamento non ancora caricate.",
     "emptyNote": "(nessun testo)",
+    "withoutNotes": "Nessuna nota di modifica",
     "fewer": "Mostra meno",
     "more": {
       "one": "Mostra {count} nota precedente",
@@ -3598,5 +3599,13 @@
       "hide": "Va bene così",
       "unhide": "Mostra di nuovo"
     }
+  },
+  "game": {
+    "installAsk": "Il gioco chiede a PZMM di installare questi elementi del Workshop:",
+    "install": "Installa",
+    "backupAsk": "Il gioco chiede a PZMM di fare un backup di {name}.",
+    "backup": "Backup",
+    "backedUp": "Backup di {name} fatto, come chiesto dal gioco.",
+    "notApplied": "Il gioco ha caricato un elenco di mod diverso da questo profilo ({missing} mancanti, {extra} in più). Avvia il gioco da PZMM o controlla la schermata mod del gioco."
   }
 }

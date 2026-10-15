@@ -93,13 +93,24 @@ pub struct Entry {
     pub pending: bool,
 }
 
+impl Entry {
+    /// It has change notes with text, or the mod's own changelog.
+    fn has_notes(&self) -> bool {
+        self.notes.iter().any(|n| !n.text.trim().is_empty()) || self.bundled.as_ref().is_some_and(|b| !b.entries.is_empty())
+    }
+    /// Its notes are loaded and there's nothing in them (one not loaded yet may still have some).
+    fn nothing_to_read(&self) -> bool {
+        self.loaded && !self.has_notes()
+    }
+}
+
 #[derive(Debug, Default, Serialize)]
 pub struct Feed {
     /// Updates after this time are shown: when you last played, else the last week.
     pub since: u64,
     /// How `since` was found: "launch", "save" or "" (the last week).
     pub basis: &'static str,
-    /// Newest update first.
+    /// Updates with notes, then those without; newest first within each.
     pub entries: Vec<Entry>,
     /// Entries whose notes aren't loaded yet.
     pub unloaded: usize,
@@ -165,11 +176,43 @@ pub fn feed(paths: &Paths, mods: &BTreeMap<String, store::Row>, notes: bool) -> 
         e.updated = d.time_updated;
         out.entries.push(e);
     }
+    // updates with something to read (or not loaded yet) first, newest first within each
+    out.entries.sort_by_key(Entry::nothing_to_read);
     out.error = error;
     // forget items you no longer have
     state.notes.retain(|k, _| items.contains_key(k.as_str()));
     save(paths, &state)?;
+    if notes {
+        for_game(paths, &out);
+    }
     Ok(out)
+}
+
+/// What's new for the PZMM - Client mod's in-game screen: `Zomboid/Lua/pzmm/feed.txt`, where that
+/// folder is. Game Lua reads lines easily (no JSON): `since=`, `basis=`, then per entry a tab-separated
+/// `entry` line (item, updated, pending, risks, from, to, title, loaded), `mods`, and its `note`s (time, text)
+/// or the mod's own changelog as `log`s (title, text); newlines in text as `\n`.
+fn for_game(paths: &Paths, f: &Feed) {
+    let dir = paths.zomboid.join("Lua").join("pzmm");
+    if dir.is_dir() {
+        let _ = crate::write_atomic(&dir.join("feed.txt"), game_text(f));
+    }
+}
+
+fn game_text(f: &Feed) -> String {
+    let flat = |s: &str| s.replace('\\', "\\\\").replace('\r', "").replace('\n', "\\n").replace('\t', " ");
+    let mut out = format!("since={}\nbasis={}\n", f.since, f.basis);
+    for e in &f.entries {
+        out += &format!("entry\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n", e.item, e.updated, u8::from(e.pending), e.risks.join(","), flat(&e.from), flat(&e.to), flat(&e.title), u8::from(e.loaded));
+        out += &format!("mods\t{}\n", e.mods.join(","));
+        for n in &e.notes {
+            out += &format!("note\t{}\t{}\n", n.time, flat(&n.text));
+        }
+        for l in e.bundled.iter().flat_map(|b| &b.entries) {
+            out += &format!("log\t{}\t{}\n", flat(&l.title), flat(&l.text));
+        }
+    }
+    out
 }
 
 /// An entry's notes and risks from `all` (newer than `since`, then possibly the one before).
@@ -354,6 +397,37 @@ fn parse_changelog(text: &str, ext: &str) -> Changelog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn notes_or_a_changelog_count_as_something_to_read() {
+        let note = |text: &str| Entry { notes: vec![ChangeNote { time: 1, text: text.into() }], ..Default::default() };
+        assert!(note("fixed things").has_notes());
+        assert!(!note(" \n").has_notes());
+        assert!(!Entry::default().has_notes());
+        assert!(!Entry { bundled: Some(Changelog::default()), ..Default::default() }.has_notes(), "an empty changelog");
+        assert!(!Entry::default().nothing_to_read(), "not loaded yet: it may have notes");
+        assert!(Entry { loaded: true, ..Default::default() }.nothing_to_read());
+    }
+
+    #[test]
+    fn the_client_mod_reads_whats_new_as_lines() {
+        let f = Feed {
+            since: 10,
+            basis: "launch",
+            entries: vec![Entry {
+                item: "42".into(),
+                title: "Cool\tMod".into(),
+                mods: vec!["A".into(), "B".into()],
+                updated: 20,
+                notes: vec![ChangeNote { time: 15, text: "fixed\r\nthings \\o/".into() }],
+                risks: vec!["map", "notes"],
+                pending: true,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        assert_eq!(game_text(&f), "since=10\nbasis=launch\nentry\t42\t20\t1\tmap,notes\t\t\tCool Mod\t0\nmods\tA,B\nnote\t15\tfixed\\nthings \\\\o/\n");
+    }
 
     #[test]
     fn notes_risks_and_versions() {

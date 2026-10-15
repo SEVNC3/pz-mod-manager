@@ -3119,6 +3119,7 @@
     "changelogTip": "창작마당의 모든 변경 사항",
     "notLoaded": "변경 사항을 아직 불러오지 않았습니다.",
     "emptyNote": "(내용 없음)",
+    "withoutNotes": "변경 사항 없음",
     "fewer": "접기",
     "more": {
       "other": "이전 변경 사항 {count}개 보기"
@@ -3424,5 +3425,13 @@
       "hide": "괜찮음",
       "unhide": "다시 보기"
     }
+  },
+  "game": {
+    "installAsk": "게임이 PZMM에 이 창작마당 항목 설치를 요청했습니다:",
+    "install": "설치",
+    "backupAsk": "게임이 PZMM에 {name} 백업을 요청했습니다.",
+    "backup": "백업",
+    "backedUp": "게임 요청대로 {name}을(를) 백업했습니다.",
+    "notApplied": "게임이 이 프로필과 다른 모드 목록을 불러왔습니다 ({missing}개 없음, {extra}개 추가). PZMM에서 게임을 시작하거나 게임의 모드 화면을 확인하세요."
   }
 }

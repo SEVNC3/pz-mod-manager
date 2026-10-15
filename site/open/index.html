@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Opening PZMM</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #121212; color: #e8e8e6; font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 440px; padding: 32px 16px; text-align: center; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  p { color: #9b9b97; margin: 0 0 20px; }
+  a.button { display: inline-block; padding: 10px 22px; border-radius: 6px; background: #6e080c; border: 1px solid #6e080c; color: #fff; text-decoration: none; font-weight: 600; }
+  a.button:hover { background: #8a1418; }
+  small { display: block; margin-top: 24px; color: #9b9b97; }
+  small a { color: #d0484e; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Opening PZMM</h1>
+  <p>Project Zomboid asked the PZMM Mod Manager app to do something. If your browser asks, let it open PZMM, then you can close this tab.</p>
+  <a class="button" href="pzmm://game">Open PZMM</a>
+  <small>Don't have it? <a href="https://github.com/SEVNC3/pz-mod-manager/releases/latest">Download PZMM</a></small>
+</main>
+<script>
+  // the game opens only https pages: this one hands its request to the app (the game's request file says what)
+  location.href = "pzmm://game";
+</script>
+</body>
+</html>

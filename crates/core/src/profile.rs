@@ -925,9 +925,30 @@ pub fn apply(paths: &Paths, profile: &Profile, mods: Option<&std::collections::B
     save(paths, profile)?;
     let maps = mods.map(|m| game_maps(paths, profile, m, if b41.unwrap_or(false) { 41 } else { 42 }));
     pz::write_default(&paths.default_txt(), &profile.enabled(), b41, maps.as_deref())?;
+    library_for_game(paths, profile);
     let kind = s.kinds.get(&profile.name).cloned().unwrap_or_else(|| DEFAULT_KIND.into());
     s.last.insert(kind, profile.name.clone());
     save_state(paths, &State { active: profile.name.clone(), ..s })
+}
+
+/// The active profile's library (its sections and mods, as My mods shows them) for the PZMM - Client
+/// mod's in-game mod screen: `Zomboid/Lua/pzmm/library.txt`, where that folder is (the mod or the app's start makes it).
+fn library_for_game(paths: &Paths, p: &Profile) {
+    let dir = paths.zomboid.join("Lua").join("pzmm");
+    if dir.is_dir() {
+        let _ = crate::write_atomic(&dir.join("library.txt"), format!("# PZMM profile: {}\n{}", p.name, p.to_text()));
+    }
+}
+
+/// Tell the PZMM - Client mod the app is installed: `Zomboid/Lua/pzmm/app.txt` (game Lua can only
+/// read under `Zomboid/Lua`), written at each start. Plain `key=value` lines, which Lua reads easily.
+pub fn app_for_game(paths: &Paths, version: &str) {
+    let lua = paths.zomboid.join("Lua");
+    if lua.is_dir() {
+        let dir = lua.join("pzmm");
+        let _ = std::fs::create_dir_all(&dir);
+        let _ = crate::write_atomic(&dir.join("app.txt"), format!("version={version}\nstarted={}\n", crate::store::now()));
+    }
 }
 
 /// Turn on the `installed` favourites and turn off the hidden mods (hidden wins over favourite).
@@ -1017,6 +1038,29 @@ mod tests {
 
     fn apply(paths: &Paths, p: &Profile) -> Result<()> {
         super::apply(paths, p, super::maps_scan(crate::store::scan(paths)).as_ref())
+    }
+
+    #[test]
+    fn the_client_mod_hears_the_app_is_installed() {
+        let (_t, paths) = temp_paths();
+        let file = paths.zomboid.join("Lua/pzmm/app.txt");
+        app_for_game(&paths, "1.2.7");
+        assert!(!file.exists(), "no game run yet: nothing written");
+        std::fs::create_dir_all(paths.zomboid.join("Lua")).unwrap();
+        app_for_game(&paths, "1.2.7");
+        assert!(std::fs::read_to_string(&file).unwrap().starts_with("version=1.2.7\nstarted="));
+    }
+
+    #[test]
+    fn the_client_mod_gets_the_library_once_it_has_its_folder() {
+        let (_t, paths) = temp_paths();
+        let p = Profile::parse("Solo", "# --- Frameworks & libraries\n+A\n-B\n");
+        let file = paths.zomboid.join("Lua/pzmm/library.txt");
+        apply(&paths, &p).unwrap();
+        assert!(!file.exists(), "no folder made for players without the mod");
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        apply(&paths, &p).unwrap();
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "# PZMM profile: Solo\n# --- Frameworks & libraries\n+A\n-B\n");
     }
 
     #[test]

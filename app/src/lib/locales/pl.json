@@ -3604,6 +3604,7 @@
     "changelogTip": "Wszystkie notatki o zmianach w Warsztacie",
     "notLoaded": "Notatki o zmianach jeszcze się nie wczytały.",
     "emptyNote": "(brak tekstu)",
+    "withoutNotes": "Brak listy zmian",
     "fewer": "Pokaż mniej",
     "more": {
       "one": "Pokaż {count} starszą notatkę",
@@ -3954,5 +3955,13 @@
       "hide": "Jest OK",
       "unhide": "Pokaż ponownie"
     }
+  },
+  "game": {
+    "installAsk": "Gra prosi PZMM o zainstalowanie tych przedmiotów z Warsztatu:",
+    "install": "Zainstaluj",
+    "backupAsk": "Gra prosi PZMM o kopię zapasową {name}.",
+    "backup": "Utwórz kopię",
+    "backedUp": "Utworzono kopię {name} na prośbę gry.",
+    "notApplied": "Gra wczytała inną listę modów niż ten profil ({missing} brakuje, {extra} nadmiarowych). Uruchom grę z PZMM albo sprawdź ekran modów w grze."
   }
 }

@@ -1,0 +1,29 @@
+# 0.2.0
+- **What's new puts updates you can read first.** Mods whose updates have change notes or a changelog fill the scraps of paper and the top of the history. Updates with nothing to read go to the bottom, under No change notes.
+- **Two rows of notes.** The What's new board keeps to two rows of scraps; the rest are in the history below.
+- **The What's new count clears** once you open it, and comes back only for newer updates.
+- **We're sorry.** Without the app, What's new explains why it's empty, with links to download PZMM and join the Discord.
+- **PZMM in the main menu.** This box: the latest patch notes for the in-game mod manager and the desktop app, each in its own tab, with a red ! when there's a new patch. Long notes scroll inside the box.
+- **A cleaner main menu.** ZombieBuddy's loaded watermark and the Project Zomboid logo no longer cover the main menu.
+- **Top bar actions.** Copy your enabled mods as a preset the game's Presets > Add takes, rescan mods, and open the mods folder, from the top right of My mods.
+- **Tooltips everywhere.** Hover a button, tab, link, checkbox or star for what it does, and a May break saves stamp for why.
+- **Every tab from the app.** Home, Browse Workshop, Maps, Servers, Saves, Java mods, Make a mod and Settings join My mods and What's new.
+- **Home.** Project Zomboid's banner across the screen (Project Viewpoint's art and logo when Viewpoint is on), with the community links on a tilted scrap of paper. Under it, a bar with Continue for your latest save, and your profile, mods, problems and updates at a glance.
+- **Maps.** Your maps' load order with Up and Down, and which maps clash. Accept saves it.
+- **Saves.** Every save with its picture, mode, map and mods, with Play, Folder and Delete, and the mods a save needs that you don't have.
+- **Servers.** Your saved servers, and the game's server browser to join.
+- **Java mods.** Whether ZombieBuddy is running, and every mod that ships Java.
+- **PZMM Settings.** Turn the logo and watermark hiding, the patch notes box and tooltips on or off.
+- **What needs the app.** Browse Workshop and Make a mod explain why they only work in the app; the other tabs list what's only in the app at the top.
+- **Steam's download state.** Mods Steam is still downloading, or has an update waiting for, are marked in My mods, so you don't load a save with a half-updated mod.
+- **Missing requirements.** Enabled mods that need a mod you don't have are marked and listed under Problems. Pick one to see each requirement (on, off or not installed) and Subscribe to the Workshop items it needs.
+- **Turning off a mod others need asks first,** as the app does: turn those off too, or only this one.
+- **Use its mods and Give it my mods.** On Saves, put a save's mods into My mods, or give a save your mods as they are now.
+- **What's new without the app.** Your Workshop mods Steam updated since you last played, each with a link to its change notes on the Workshop.
+- **Questions in the app's style.** Saving on Back, turning off a needed mod, Give it my mods and Delete ask in a box like the app's, over a dimmed screen, with Cancel.
+- **Right-click a mod** to turn it on or off, favourite it, copy its ID, open its Workshop page or show its files.
+- **Mod details buttons.** Turn on or off, Workshop page, Show files and Close, as in the app.
+- **Status line.** Copy mod list, Rescan and the save actions say what they did in the footer instead of popping up a box.
+- **Empty My mods** says why: no match for your search, nothing in this tab, or no mods at all.
+- **Links that open.** GitHub, Discord, Ko-fi and Reddit links open through Steam's "You are leaving Steam" page: the game itself only opens Steam and The Indie Stone's own sites.
+- **Hand off to the app.** With PZMM installed, ask it from the game to install a Workshop item a mod needs, back up a save, run Check setup, or open Browse Workshop or Make a mod. PZMM comes to the front on the right page, and starts first if it isn't running (your browser asks to open it). It asks before it installs or backs anything up.

@@ -3278,6 +3278,7 @@
     "changelogTip": "All its change notes on the Workshop",
     "notLoaded": "Change notes not loaded yet.",
     "emptyNote": "(no text)",
+    "withoutNotes": "No change notes",
     "fewer": "Show fewer",
     "more": {
       "one": "Show {count} older note",
@@ -3598,5 +3599,13 @@
       "hide": "It's fine",
       "unhide": "Show again"
     }
+  },
+  "game": {
+    "installAsk": "The game asks PZMM to install these Workshop items:",
+    "install": "Install",
+    "backupAsk": "The game asks PZMM to back up {name}.",
+    "backup": "Back up",
+    "backedUp": "Backed up {name}, as the game asked.",
+    "notApplied": "The game loaded a different mod list than this profile ({missing} missing, {extra} extra). Start the game from PZMM, or check the game's mod screen."
   }
 }

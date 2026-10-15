@@ -1,10 +1,11 @@
 -- PZMM - Client: tells the PZMM app what the game is doing.
 -- Game Lua can only write files under Zomboid/Lua, so the app reads Zomboid/Lua/pzmm/game.json
--- (message format v1; the app watches the folder, so it hears each write at once).
+-- (message format v1; the app reads it on start and when you switch to it).
 local VERSION = "0.1.0"
 
 local function json(s)
-    return '"' .. tostring(s):gsub('[%c"\]', function(c) return string.format("\u%04x", c:byte()) end) .. '"'
+    -- control characters, quotes and backslashes as \u escapes (doubled: Lua reads "\\" as one backslash)
+    return '"' .. tostring(s):gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end) .. '"'
 end
 
 -- optional facts: a function the game doesn't have on this build just leaves its field out

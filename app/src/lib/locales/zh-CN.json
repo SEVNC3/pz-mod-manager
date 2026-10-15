@@ -3119,6 +3119,7 @@
     "changelogTip": "在创意工坊查看全部更新说明",
     "notLoaded": "更新说明尚未加载。",
     "emptyNote": "（无内容）",
+    "withoutNotes": "无更新说明",
     "fewer": "收起",
     "more": {
       "other": "显示 {count} 条更早的说明"
@@ -3424,5 +3425,13 @@
       "hide": "没问题",
       "unhide": "重新显示"
     }
+  },
+  "game": {
+    "installAsk": "游戏请求 PZMM 安装这些创意工坊物品：",
+    "install": "安装",
+    "backupAsk": "游戏请求 PZMM 备份 {name}。",
+    "backup": "备份",
+    "backedUp": "已按游戏请求备份 {name}。",
+    "notApplied": "游戏加载的模组列表与此配置不同（缺少 {missing} 个，多出 {extra} 个）。请从 PZMM 启动游戏，或检查游戏的模组界面。"
   }
 }
