@@ -9,7 +9,7 @@
   <a href="#install"><b>Install</b></a> · <a href="../../releases/latest">Download</a> · <a href="https://discord.com/invite/6URUy6mNzu">Discord</a> · <a href="docs/FEATURES.md">Everything it does</a>
 </p>
 
-https://github.com/user-attachments/assets/d7037934-046d-4854-9984-eab824669963
+<p align="center"><img src="docs/media/hero.gif" alt="PZMM: dragging a mod into place, renaming a group, then Autosort sorting the load order" width="900"></p>
 
 I made PZMM because of [Project Viewpoint](https://steamcommunity.com/sharedfiles/filedetails/?id=3809306528). Getting it running means two Workshop items, a jar and a DLL in the game folder and a launch flag, and the next game update can wipe the flag again. PZMM does all of that from one menu.
 
@@ -100,10 +100,10 @@ Your library and the load order are two separate lists, like Mod Organizer 2. Ar
 
 ### Find the broken mod
 
-The game crashes and the log won't say why. **Find the broken mod** turns off half your mods, you test, it halves again. 100 mods takes about 7 launches, which is still fewer than it takes to find car keys in Muldraugh. It starts with the mods the log blames, and puts your list back when you're done.
+The game crashes and the log won't say why. **Find the broken mod** turns off half your mods, you test, it halves again until it's found. It starts with the mods the log blames, and puts your list back when you're done.
 
 <p align="center">
-  <img src="docs/media/find-broken-mod.gif" alt="Find the broken mod in progress: round 2 with 9 suspects left, then round 4 with 2 suspects, with buttons for The problem still happens and The problem is gone" width="720">
+  <img src="docs/media/find-broken-mod.jpg" alt="Find the broken mod in progress: the mods being tested this round, with buttons for The problem still happens and The problem is gone" width="900">
 </p>
 
 **Check setup** catches a lot before you get that far: wrong-build mods, missing or late requirements, conflicts, broken Lua, duplicate mod IDs and Workshop items that have vanished.
@@ -157,10 +157,6 @@ Once it's up you get a live console with errors, chat and mod lines picked out a
 </p>
 
 When a mod updates, PZMM can warn players in game (15, 5 and 1 minutes before), save, update and start the server again, or wait until nobody's on. There are daily restart times, scheduled saves and backups, and crash restarts. Leave PZMM in the tray and all of that keeps running with the window closed.
-
-<p align="center">
-  <img src="docs/media/servers-automation.jpg" alt="The Automation page: what to do when a mod updates on the Workshop, minutes to warn players before a restart, a daily restart time, backup schedule and crash watch" width="900">
-</p>
 
 For Discord there are webhook alerts (started, stopped, crashed with the last log lines, mods updated, joins and leaves), a live status message, optional bot commands for a role you pick, and an optional two-way relay between the game's general chat and a Discord channel.
 
