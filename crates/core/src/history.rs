@@ -35,7 +35,8 @@ static WRITING: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 pub fn add(paths: &Paths, id: &str, name: &str, source: &str, action: &str) {
     let _one = WRITING.lock().unwrap_or_else(|e| e.into_inner());
-    let mut all = list(paths);
+    // unreadable now: not written over with this one record
+    let Ok(mut all) = crate::read_json::<Vec<Record>>(&file(paths)) else { return };
     let name = if name.is_empty() { all.iter().find(|r| r.id == id).map(|r| r.name.clone()).unwrap_or_default() } else { name.to_string() };
     all.insert(0, Record { id: id.into(), name, source: source.into(), action: action.into(), at: crate::store::now() });
     all.truncate(KEEP);
@@ -45,7 +46,7 @@ pub fn add(paths: &Paths, id: &str, name: &str, source: &str, action: &str) {
 /// Forget the records of `ids`, or all of them.
 pub fn clear(paths: &Paths, ids: Option<&[String]>) -> Vec<Record> {
     let _one = WRITING.lock().unwrap_or_else(|e| e.into_inner());
-    let mut all = list(paths);
+    let Ok(mut all) = crate::read_json::<Vec<Record>>(&file(paths)) else { return list(paths) };
     match ids {
         Some(ids) => all.retain(|r| !ids.contains(&r.id)),
         None => all.clear(),

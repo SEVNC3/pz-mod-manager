@@ -499,6 +499,9 @@ fn copy_clean(from: &Path, to: &Path, root: &Path, skipped: &mut Vec<String>) ->
             copy_clean(&p, &to.join(&name), root, skipped)?;
         } else if kind.is_file() {
             fs::copy(&p, to.join(&name))?;
+        } else {
+            // a symlink or junction: listed as left out, never dropped quietly
+            skipped.push(rel(root, &p));
         }
     }
     Ok(())

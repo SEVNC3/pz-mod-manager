@@ -191,6 +191,7 @@ pub fn restore(paths: &Paths, s: &Server, file: &Path) -> Result<()> {
         }
     }
     super::host::check_stopped(paths, s)?;
+    let _held = super::host::reserve(&s.name)?;
     let cachedir = s.cachedir(paths);
     // the server's files as they were before an earlier restore that didn't finish: never deleted here
     let old = cachedir.join(".pzmm-old");
@@ -305,9 +306,16 @@ pub fn import(paths: &Paths, s: &Server, zip_file: &Path) -> Result<Backup> {
     let result = (|| -> Result<()> {
         let mut w = zip::ZipWriter::new(fs::File::create(&tmp)?);
         let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated).large_file(true);
+        let (ini, regions) = (format!("Server/{}.ini", s.name), format!("Server/{}_spawnregions.lua", s.name));
         for (i, rel) in &items {
             w.start_file(rel.as_str(), opts)?;
-            std::io::copy(&mut z.by_index(*i)?, &mut w)?;
+            if from != s.name && (*rel == ini || *rel == regions) {
+                let mut text = String::new();
+                std::io::Read::read_to_string(&mut z.by_index(*i)?, &mut text)?;
+                std::io::Write::write_all(&mut w, own_settings(paths, s, &from, rel == &ini, &text).as_bytes())?;
+            } else {
+                std::io::copy(&mut z.by_index(*i)?, &mut w)?;
+            }
         }
         w.finish()?;
         Ok(())
@@ -319,6 +327,28 @@ pub fn import(paths: &Paths, s: &Server, zip_file: &Path) -> Result<Backup> {
     fs::rename(&tmp, &to)?;
     crate::say!("serverBackupImported", "Imported a backup for {name} from {file}", name = s.name, file = zip_file.display());
     list(paths, &s.name).into_iter().find(|b| b.file == to).context("the imported backup")
+}
+
+/// Another server's ini or spawn regions, made `s`'s: its spawn points file by `s`'s name, and its RCON port and
+/// password `s`'s own (else new ones): shared ones would send PZMM's commands for one server to the other.
+fn own_settings(paths: &Paths, s: &Server, from: &str, ini: bool, text: &str) -> String {
+    if !ini {
+        return text.replace(&format!("\"{from}_spawnpoints.lua\""), &format!("\"{}_spawnpoints.lua\"", s.name));
+    }
+    let mine = fs::read_to_string(s.ini(paths)).unwrap_or_default();
+    let keep = |key: &str, new: &dyn Fn() -> String| Some(super::server::value(&mine, key)).filter(|v| !v.is_empty()).map(String::from).unwrap_or_else(new);
+    let port = keep("RCONPort", &|| super::host::free_rcon_port(paths).to_string());
+    let password = if super::server::value(text, "RCONPassword").is_empty() { String::new() } else { keep("RCONPassword", &super::host::generate_password) };
+    let eol = if text.contains("\r\n") { "\r\n" } else { "\n" };
+    text.lines()
+        .map(|l| match l.split_once('=').map(|(k, _)| k) {
+            Some("RCONPort") => format!("RCONPort={port}"),
+            Some("RCONPassword") => format!("RCONPassword={password}"),
+            _ => l.to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join(eol)
+        + eol
 }
 
 /// What a wipe leaves out of a save: the map (chunks, vehicles, zombies, animals) and, unless kept,
@@ -346,6 +376,7 @@ fn wiped(rel: &str, keep_characters: bool, keep_zones: bool) -> bool {
 /// the files removed.
 pub fn wipe(paths: &Paths, s: &Server, keep_characters: bool, keep_zones: bool) -> Result<usize> {
     super::host::check_stopped(paths, s)?;
+    let _held = super::host::reserve(&s.name)?;
     let saves = s.cachedir(paths).join("Saves/Multiplayer");
     let save = saves.join(&s.name);
     let player = saves.join(format!("{}_player", s.name));
@@ -406,6 +437,7 @@ pub fn zones_restore(paths: &Paths, s: &Server, file: &Path) -> Result<()> {
         bail!("{} isn't one of {}'s zone backups", file.display(), s.name);
     }
     super::host::check_stopped(paths, s)?;
+    let _held = super::host::reserve(&s.name)?;
     let mut z = zip::ZipArchive::new(fs::File::open(file).with_context(|| format!("opening {}", file.display()))?)?;
     if z.len() != 1 {
         bail!("{} isn't a zone backup: nothing was changed", file.display());
@@ -476,6 +508,7 @@ pub fn to_reset<'a>(all: &'a [Chunk], areas: &[Area], inside: bool) -> Vec<&'a C
 /// them fresh from the map when they next load. Returns how many went.
 pub fn reset_chunks(paths: &Paths, s: &Server, areas: &[Area], inside: bool) -> Result<usize> {
     super::host::check_stopped(paths, s)?;
+    let _held = super::host::reserve(&s.name)?;
     if inside && areas.is_empty() {
         return Ok(0);
     }
@@ -508,8 +541,16 @@ pub fn empty_cells(save: &Path) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+
+    /// The tests that change a server's files take turns: host::reserve holds a server by its name,
+    /// and they all use "Friends".
+    static FRIENDS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    pub(crate) fn one_at_a_time() -> std::sync::MutexGuard<'static, ()> {
+        FRIENDS.lock().unwrap_or_else(|e| e.into_inner())
+    }
 
     fn server(paths: &Paths) -> Server {
         let s = Server { name: "Friends".into(), cachedir: Some(paths.zomboid.clone()), ..Default::default() };
@@ -557,6 +598,7 @@ mod tests {
 
     #[test]
     fn restore_backs_up_first_and_puts_it_back() {
+        let _one = one_at_a_time();
         let (_t, paths) = crate::store::tests::temp_paths();
         let s = Server { auto: crate::pz::autopilot::Auto { backup_keep: 1, ..Default::default() }, ..server(&paths) };
         let old = take(&paths, &s, "scheduled").unwrap().unwrap();
@@ -599,6 +641,7 @@ mod tests {
 
     #[test]
     fn restore_refuses_foreign_zips() {
+        let _one = one_at_a_time();
         let (_t, paths) = crate::store::tests::temp_paths();
         let s = server(&paths);
         let bad = dir(&paths, "Friends").join("1-manual.zip");
@@ -644,6 +687,7 @@ mod tests {
 
     #[test]
     fn zone_backups_hold_map_meta_alone() {
+        let _one = one_at_a_time();
         let (_t, paths) = crate::store::tests::temp_paths();
         let s = server(&paths);
         assert!(zones_save(&paths, &s, "manual").is_err(), "no map_meta.bin yet");
@@ -671,6 +715,7 @@ mod tests {
 
     #[test]
     fn wipes_keep_what_was_asked() {
+        let _one = one_at_a_time();
         let files = ["players.db", "WorldDictionary.bin", "map_meta.bin", "map_t.bin", "vehicles.db", "map/12/34.bin", "map_40_22.bin", "zpop_1_2.bin", "chunkdata/chunkdata_1_2.bin", "metagrid/x.bin", "map_sand.bin"];
         let left = |kc: bool, kz: bool| files.iter().filter(|f| !wiped(f, kc, kz)).copied().collect::<Vec<_>>();
         assert!(left(false, false).is_empty(), "a full wipe");
@@ -696,6 +741,7 @@ mod tests {
 
     #[test]
     fn chunk_resets_by_area() {
+        let _one = one_at_a_time();
         let (_t, paths) = crate::store::tests::temp_paths();
         let s = server(&paths);
         let save = paths.zomboid.join("Saves/Multiplayer/Friends");
@@ -715,6 +761,18 @@ mod tests {
         assert_eq!(names(chunks(&save).iter().collect()), ["map/1/1.bin", "map/2/1.bin"]);
         assert_eq!(list(&paths, "Friends")[0].reason, "chunks");
         assert_eq!(reset_chunks(&paths, &s, &[], true).unwrap(), 0);
+    }
+
+    #[test]
+    fn another_servers_settings_become_this_ones() {
+        let t = tempfile::tempdir().unwrap();
+        let paths = Paths { zomboid: t.path().into(), data: t.path().join("data") };
+        let s = server(&paths);
+        fs::write(paths.zomboid.join("Server/Friends.ini"), "RCONPort=27099\nRCONPassword=mine\n").unwrap();
+        let got = own_settings(&paths, &s, "Other", true, "PVP=false\r\nRCONPort=27015\r\nRCONPassword=theirs\r\n");
+        assert_eq!(got, "PVP=false\r\nRCONPort=27099\r\nRCONPassword=mine\r\n");
+        let regions = own_settings(&paths, &s, "Other", false, "{ name = \"x\", serverfile = \"Other_spawnpoints.lua\" }");
+        assert!(regions.contains("\"Friends_spawnpoints.lua\""));
     }
 
     #[test]

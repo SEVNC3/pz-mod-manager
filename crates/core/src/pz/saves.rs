@@ -92,6 +92,30 @@ fn root(paths: &Paths) -> PathBuf {
 /// What keeps each Zomboid folder's save backups apart (two folders can each have a `Sandbox/<name>`):
 /// `-` and a short hash of the folder, after the save's name.
 fn folder_tag(paths: &Paths) -> String {
+    // a folder inside PZMM's data (a profile's own) by its place in it: the same after the data moves
+    // (any other folder by its full path, as before: its backups keep their tag)
+    let z = match inside_data(paths) {
+        Some(r) => format!("<data>/{}", r.replace('\\', "/")),
+        None => paths.zomboid.to_string_lossy().into_owned(),
+    };
+    let z = if cfg!(windows) { z.to_lowercase() } else { z };
+    format!("-{}", &super::javamods::sha256(z.as_bytes())[..8])
+}
+
+/// The Zomboid folder's place inside PZMM's data (a profile's own game folder): by its long or short (8.3) name,
+/// in any case on Windows.
+fn inside_data(paths: &Paths) -> Option<String> {
+    let norm = |p: &Path| {
+        let s = p.to_string_lossy().replace('\\', "/").trim_end_matches('/').to_string();
+        if cfg!(windows) { s.to_lowercase() } else { s }
+    };
+    let z = norm(&paths.zomboid);
+    let datas = [Some(paths.data.clone()), crate::profile::path_form(&paths.data, false), crate::profile::path_form(&paths.data, true)];
+    datas.into_iter().flatten().find_map(|d| z.strip_prefix(&format!("{}/", norm(&d))).map(String::from))
+}
+
+/// The full-path tag a profile's own game folder had before 1.2.7 (it changed with every data move).
+fn old_folder_tag(paths: &Paths) -> String {
     let z = paths.zomboid.to_string_lossy();
     let z = if cfg!(windows) { z.to_lowercase() } else { z.into_owned() };
     format!("-{}", &super::javamods::sha256(z.as_bytes())[..8])
@@ -101,6 +125,16 @@ fn backup_dir(paths: &Paths, mode: &str, name: &str) -> Result<PathBuf> {
     dir(paths, mode, name)?;
     let parent = root(paths).join(mode);
     let to = parent.join(format!("{name}{}", folder_tag(paths)));
+    // 3: a profile's own folder's backups under the tag it had before (its full path) move to the new one
+    let before = parent.join(format!("{name}{}", old_folder_tag(paths)));
+    if !to.exists()
+        && before != to
+        && before.is_dir()
+        && let Err(e) = fs::rename(&before, &to)
+    {
+        crate::log!("couldn't move the backups in {} to {}: {e}", before.display(), to.display());
+        return Ok(before);
+    }
     // backups from before the tag are taken to be the folder's in use now
     let old = parent.join(name);
     if !to.exists()
@@ -120,14 +154,14 @@ pub fn backups(paths: &Paths, mode: &str, name: &str) -> Result<Vec<Backup>> {
 
 /// Saves that are gone but have backups: (mode, name).
 pub fn deleted_with_backups(paths: &Paths) -> Vec<(String, String)> {
-    let (mut out, tag) = (vec![], folder_tag(paths));
+    let (mut out, tag, before) = (vec![], folder_tag(paths), old_folder_tag(paths));
     // another folder's tag: `-` and 8 hex digits
     let tagged = |n: &str| n.rsplit_once('-').is_some_and(|(_, h)| h.len() == 8 && h.bytes().all(|b| b.is_ascii_hexdigit()));
     for mode in fs::read_dir(root(paths)).into_iter().flatten().flatten() {
         for save in fs::read_dir(mode.path()).into_iter().flatten().flatten() {
             let (m, n) = (mode.file_name().to_string_lossy().into_owned(), save.file_name().to_string_lossy().into_owned());
             // this folder's, or from before the tag
-            let n = match n.strip_suffix(&tag) {
+            let n = match n.strip_suffix(&tag).or_else(|| n.strip_suffix(&before)) {
                 Some(n) => n.to_string(),
                 None if !tagged(&n) => n,
                 None => continue,
@@ -159,11 +193,39 @@ const CRASHES: u32 = 3;
 
 /// The automatic backups beyond `keep` (0: no limit) and crash backups beyond [`CRASHES`] go; slots stay.
 fn prune(paths: &Paths, mode: &str, name: &str, keep: u32) -> Result<()> {
-    let (crash, auto): (Vec<Backup>, Vec<Backup>) = backups(paths, mode, name)?.into_iter().filter(|b| b.reason != "slot").partition(|b| b.reason == "crash");
+    prune_but(paths, mode, name, keep, None)
+}
+
+/// [`prune`], keeping `spare` whatever its age (the backup a restore just put back).
+fn prune_but(paths: &Paths, mode: &str, name: &str, keep: u32, spare: Option<&Path>) -> Result<()> {
+    let (crash, auto): (Vec<Backup>, Vec<Backup>) =
+        backups(paths, mode, name)?.into_iter().filter(|b| b.reason != "slot" && Some(b.file.as_path()) != spare).partition(|b| b.reason == "crash");
     for f in server_backup::prune(&auto, keep, 0).into_iter().chain(server_backup::prune(&crash, CRASHES, 0)) {
         let _ = fs::remove_file(f);
     }
+    // every backup and restore ends here
+    backups_for_game(paths);
     Ok(())
+}
+
+/// Every save's backups for the PZMM - Client mod's in-game screen: `Zomboid/Lua/pzmm/backups.txt`, a
+/// `<mode>/<save>\t<file>\t<time>\t<slot>` line per backup, newest first per save. Written whenever they change,
+/// where that folder is.
+pub fn backups_for_game(paths: &Paths) {
+    // beside the saves it lists (`paths` is the folder played), not wherever the active profile points now
+    let to = paths.zomboid.join("Lua").join("pzmm");
+    if !to.is_dir() {
+        return;
+    }
+    let mut saves: Vec<(String, String)> = list(paths).into_iter().map(|s| (s.mode, s.name)).collect();
+    saves.extend(deleted_with_backups(paths));
+    let mut text = String::new();
+    for (mode, name) in saves {
+        for b in backups(paths, &mode, &name).unwrap_or_default() {
+            text += &format!("{mode}/{name}\t{}\t{}\t{}\n", b.file.display(), b.time, b.label);
+        }
+    }
+    super::bridge::write_for_game(&to.join("backups.txt"), text);
 }
 
 /// Back a save up now. With a `slot` name it's kept until the player deletes it; otherwise the
@@ -200,6 +262,7 @@ pub fn name_backup(paths: &Paths, mode: &str, name: &str, file: &Path, slot: &st
     } else {
         fs::rename(&b.file, &to).with_context(|| format!("renaming {}", b.file.display()))?;
     }
+    backups_for_game(paths);
     backups(paths, mode, name)?.into_iter().find(|b| b.file == to).context("the named backup")
 }
 
@@ -255,7 +318,8 @@ pub fn restore(paths: &Paths, mode: &str, name: &str, file: &Path, keep: u32) ->
     fs::rename(&new, &save).with_context(|| format!("moving the restored save into place: the save as it was is in {}", old.display()))?;
     let _ = fs::remove_dir_all(&old);
     crate::say!("saveRestored", "Restored save {name} from {file}", name = name, file = file.display());
-    prune(paths, mode, name, keep)
+    // never the backup just restored: it may be wanted again
+    prune_but(paths, mode, name, keep, Some(file))
 }
 
 /// Whether `a` and `b` are on one drive (so a folder renames from one to the other).
@@ -293,7 +357,9 @@ pub fn delete_backup(paths: &Paths, mode: &str, name: &str, file: &Path) -> Resu
     if file.parent() != Some(backup_dir(paths, mode, name)?.as_path()) || file.extension().is_none_or(|x| x != "zip") {
         bail!("{} isn't one of {name}'s backups", file.display());
     }
-    fs::remove_file(file).with_context(|| format!("deleting {}", file.display()))
+    fs::remove_file(file).with_context(|| format!("deleting {}", file.display()))?;
+    backups_for_game(paths);
+    Ok(())
 }
 
 /// A map file the game rebuilds from the map when it's missing: named by its cell or chunk
@@ -390,7 +456,7 @@ pub fn reset(paths: &Paths, mode: &str, name: &str, what: &str, keep: u32) -> Re
 
 /// Copy the save as `<name>_modded` (`_modded 2`... when taken) and give the copy these mods and
 /// maps (see `set_mods`); the original stays as it is. The copy's name.
-pub fn clone_with_mods(paths: &Paths, mode: &str, name: &str, ids: &[String], maps: &[String]) -> Result<String> {
+pub fn clone_with_mods(paths: &Paths, mode: &str, name: &str, ids: &[String], maps: &[String], b41: bool) -> Result<String> {
     let from = dir(paths, mode, name)?;
     if !from.join("mods.txt").is_file() {
         bail!("save {mode}/{name} not found");
@@ -398,7 +464,7 @@ pub fn clone_with_mods(paths: &Paths, mode: &str, name: &str, ids: &[String], ma
     let base = format!("{name}_modded");
     let to = std::iter::once(base.clone()).chain((2..).map(|i| format!("{base} {i}"))).find(|n| dir(paths, mode, n).is_ok_and(|d| !d.exists())).context("a free name")?;
     crate::store::copy_dir(&from, &dir(paths, mode, &to)?).with_context(|| format!("copying {name} (is the game running?)"))?;
-    set_mods(paths, mode, &to, ids, maps)?;
+    set_mods(paths, mode, &to, ids, maps, b41)?;
     Ok(to)
 }
 
@@ -421,12 +487,13 @@ pub fn thumb(paths: &Paths, mode: &str, name: &str, file: Option<&Path>) -> Resu
 /// Give the save these mods, and the `maps` they add (in arranged order) that it lacks: the
 /// maps it has stay, in their order (its world was made with them). Its mods.txt as it was
 /// before stays as `mods.txt.prev` (and before PZMM's first change, `mods.txt.bak`).
-pub fn set_mods(paths: &Paths, mode: &str, name: &str, ids: &[String], maps: &[String]) -> Result<()> {
+pub fn set_mods(paths: &Paths, mode: &str, name: &str, ids: &[String], maps: &[String], b41: bool) -> Result<()> {
     let file = dir(paths, mode, name)?.join("mods.txt");
     let old = super::try_read_default(&file).with_context(|| format!("can't read {} (is the game running?)", file.display()))?;
     super::server_config::keep_prev(&file)?;
     let maps = super::server::merge_order(maps, &old.map_folders());
-    super::write_default(&file, ids, None, Some(&maps))
+    // a save without mods doesn't show its build: the build played (`b41`) says how to write them
+    super::write_default(&file, ids, Some(if old.mods.is_empty() { b41 } else { old.b41 }), Some(&maps))
 }
 
 /// A character in `players.db`.
@@ -774,6 +841,12 @@ mod tests {
         let left = backups(&paths, m, n).unwrap();
         assert_eq!(left.iter().map(|b| b.reason.as_str()).collect::<Vec<_>>(), ["exit", "slot"], "keep 1 automatic; the slot stays");
         assert!(back_up(&paths, m, n, "manual", "a/b", 1).is_err());
+        // the game's list of them (PZMM - Client's backups.txt) follows every change
+        std::fs::create_dir_all(paths.zomboid.join("Lua/pzmm")).unwrap();
+        delete_backup(&paths, m, n, &newest.file).unwrap();
+        let listed = std::fs::read_to_string(paths.zomboid.join("Lua/pzmm/backups.txt")).unwrap();
+        assert_eq!(listed, format!("{m}/{n}\t{}\t{}\tBefore the raid\n", slot.file.display(), slot.time));
+        let newest = back_up(&paths, m, n, "exit", "", 1).unwrap();
 
         // play on: a new cell, a changed file; then go back to the slot
         fs::write(s.join("map/12/35.bin"), "new").unwrap();
@@ -785,6 +858,10 @@ mod tests {
         assert_eq!(after.iter().map(|b| b.reason.as_str()).collect::<Vec<_>>(), ["restore", "slot"], "the state before the restore is kept");
         assert!(!newest.file.exists());
         assert!(restore(&paths, m, n, &s.join("map_t.bin"), 1).is_err(), "only its own backups");
+        // an automatic backup restored with room for one: the new "restore" backup doesn't push it out
+        let auto = after[0].clone();
+        restore(&paths, m, n, &auto.file, 1).unwrap();
+        assert!(auto.file.exists(), "the backup just restored stays");
         assert!(fs::read_dir(s.parent().unwrap()).unwrap().flatten().all(|e| !e.file_name().to_string_lossy().contains(".pzmm-")), "nothing left beside it");
 
         // the save as it was, left by a restore cut short: a restore never deletes it; at startup
@@ -867,8 +944,8 @@ mod tests {
         assert!(reset(&paths, m, n, "players", 5).is_err());
 
         // a copy with other mods; the original keeps its own
-        assert_eq!(clone_with_mods(&paths, m, n, &["ModB".into()], &[]).unwrap(), format!("{n}_modded"));
-        assert_eq!(clone_with_mods(&paths, m, n, &["ModC".into()], &[]).unwrap(), format!("{n}_modded 2"));
+        assert_eq!(clone_with_mods(&paths, m, n, &["ModB".into()], &[], false).unwrap(), format!("{n}_modded"));
+        assert_eq!(clone_with_mods(&paths, m, n, &["ModC".into()], &[], false).unwrap(), format!("{n}_modded 2"));
         assert_eq!(read_default(&s.join("mods.txt")).mods, ["ModA"]);
         assert_eq!(read_default(&dir(&paths, m, &format!("{n}_modded")).unwrap().join("mods.txt")).mods, ["ModB"]);
 
@@ -906,17 +983,17 @@ mod tests {
     fn changes_a_saves_mods_and_keeps_its_maps() {
         let (_t, paths) = crate::store::tests::temp_paths();
         let s = save(&paths);
-        set_mods(&paths, "Sandbox", "2026-10-10_12-00-00", &["ModB".into(), "ModC".into()], &[]).unwrap();
+        set_mods(&paths, "Sandbox", "2026-10-10_12-00-00", &["ModB".into(), "ModC".into()], &[], false).unwrap();
         let now = read_default(&s.join("mods.txt"));
         assert_eq!(now.mods, ["ModB", "ModC"]);
         assert_eq!(now.map_folders(), ["Muldraugh, KY"]);
         assert_eq!(read_default(&s.join("mods.txt.prev")).mods, ["ModA"]);
         // the profile's maps the save lacks join it, before Muldraugh; the ones it has keep their place
         let maps = |v: &[&str]| v.iter().map(|m| m.to_string()).collect::<Vec<_>>();
-        set_mods(&paths, "Sandbox", "2026-10-10_12-00-00", &["ModB".into()], &maps(&["Town", "Fort"])).unwrap();
-        set_mods(&paths, "Sandbox", "2026-10-10_12-00-00", &["ModB".into()], &maps(&["Fort", "Lake", "Town"])).unwrap();
+        set_mods(&paths, "Sandbox", "2026-10-10_12-00-00", &["ModB".into()], &maps(&["Town", "Fort"]), false).unwrap();
+        set_mods(&paths, "Sandbox", "2026-10-10_12-00-00", &["ModB".into()], &maps(&["Fort", "Lake", "Town"]), false).unwrap();
         assert_eq!(read_default(&s.join("mods.txt")).map_folders(), ["Town", "Fort", "Lake", "Muldraugh, KY"]);
-        assert!(set_mods(&paths, "Sandbox", "missing", &[], &[]).is_err());
+        assert!(set_mods(&paths, "Sandbox", "missing", &[], &[], false).is_err());
     }
 
     #[test]

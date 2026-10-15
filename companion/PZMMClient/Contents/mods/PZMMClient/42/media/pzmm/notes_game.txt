@@ -1,0 +1,62 @@
+# 0.2.0
+- **Get the desktop app.** If you don't have PZMM yet, download it free from github.com/SEVNC3/pz-mod-manager (Windows and Linux). This screen does most of what it does; the app does the rest, and the two work together.
+- **A massive update.** We've worked hard to fully replicate the desktop app in the game: the same tabs, the same look and the same way of working, from your mod list and load order to maps, saves, servers and Check setup.
+- **Sync across both.** If you have the app too, the two now stay in sync: your profile, sections, load order, settings, accent colour and theme, and one activity list of what each did. Change your mods in the app while this screen is open and Use PZMM's mods takes them here.
+- **Made for using both.** With the app installed, the game hands it what it can't do itself (installs, save backups, Workshop browsing, Check setup's fixes), and Open in PZMM takes you to the same tab in the app.
+- **What's new puts updates you can read first.** Mods whose updates have change notes or a changelog fill the scraps of paper and the top of the history. Updates with nothing to read go to the bottom, under No change notes.
+- **Two rows of notes.** The What's new board keeps to two rows of scraps; the rest are in the history below.
+- **The What's new count clears** once you open it, and comes back only for newer updates.
+- **We're sorry.** Without the app, What's new explains why it's empty, with links to download PZMM and join the Discord.
+- **PZMM in the main menu.** This box: the latest patch notes for the in-game mod manager and the desktop app, each in its own tab, with a red ! when there's a new patch. Long notes scroll inside the box.
+- **A cleaner main menu.** ZombieBuddy's loaded watermark and the Project Zomboid logo no longer cover the main menu.
+- **Top bar actions.** Copy your enabled mods as a preset the game's Presets > Add takes, rescan mods, and open the mods folder, from the top right of My mods.
+- **Tooltips everywhere.** Hover a button, tab, link, checkbox or star for what it does, and a May break saves stamp for why.
+- **Every tab from the app.** Home, Browse Workshop, Maps, Servers, Saves, Java mods, Make a mod and Settings join My mods and What's new.
+- **Home.** Project Zomboid's banner across the screen (Project Viewpoint's art and logo when Viewpoint is on), with the community links on a tilted scrap of paper. Under it, a bar with Continue for your latest save, and your profile, mods, problems and updates at a glance.
+- **Maps.** Your maps' load order with Up and Down, and which maps clash. Accept saves it.
+- **Saves.** Every save with its picture, mode, map and mods, with Play, Folder and Delete, and the mods a save needs that you don't have.
+- **Servers.** Your saved servers, and the game's server browser to join.
+- **Java mods.** Whether ZombieBuddy is running, and every mod that ships Java.
+- **PZMM Settings.** Turn the logo and watermark hiding, the patch notes box and tooltips on or off.
+- **What needs the app.** Browse Workshop and Make a mod explain why they only work in the app; the other tabs list what's only in the app at the top.
+- **Steam's download state.** Mods Steam is still downloading, or has an update waiting for, are marked in My mods, so you don't load a save with a half-updated mod.
+- **Missing requirements.** Enabled mods that need a mod you don't have are marked and listed under Problems. Pick one to see each requirement (on, off or not installed) and Subscribe to the Workshop items it needs.
+- **Turning off a mod others need asks first,** as the app does: turn those off too, or only this one.
+- **Use its mods and Give it my mods.** On Saves, put a save's mods into My mods, or give a save your mods as they are now.
+- **What's new without the app.** Your Workshop mods Steam updated since you last played, each with a link to its change notes on the Workshop.
+- **Questions in the app's style.** Saving on Back, turning off a needed mod, Give it my mods and Delete ask in a box like the app's, over a dimmed screen, with Cancel.
+- **Right-click a mod** to turn it on or off, favourite it, copy its ID, open its Workshop page or show its files.
+- **Mod details buttons.** Turn on or off, Workshop page, Show files and Close, as in the app.
+- **Load order beside My mods.** With no mod picked, the right panel lists your enabled mods in the order the game loads them; pick one for its details. A mod's picture now fills the details panel.
+- **Sections, with or without the app.** Drag a mod by its handle within or between sections, and right-click a section to add, rename or remove one. Without the app the game keeps your sections; with it they're your PZMM profile's, and PZMM saves each change without coming to the front.
+- **Status line.** Copy mod list, Rescan and the save actions say what they did in the footer instead of popping up a box.
+- **Empty My mods** says why: no match for your search, nothing in this tab, or no mods at all.
+- **Links that open.** GitHub, Discord, Ko-fi and Reddit links open through Steam's "You are leaving Steam" page: the game itself only opens Steam and The Indie Stone's own sites.
+- **Hand off to the app.** With PZMM installed, ask it from the game to install a Workshop item a mod needs, back up a save, run Check setup, or open Browse Workshop or Make a mod. PZMM comes to the front on the right page, and starts first if it isn't running (your browser asks to open it). It asks before it installs or backs anything up.
+- **The game and PZMM keep in step.** The game knows when PZMM is running and which profile it's on. A section change shows at once and settles when PZMM confirms it; if PZMM couldn't make it, the footer says why. If PZMM closes first, the change is kept and PZMM makes it next time it starts. PZMM no longer jumps to the front for a request over a minute old.
+- **My mods' toolbar, as in the app.** Group by category, Filters (Favourites), Sort (library order, name, enabled first, problems first), New section, Clear filters, and Undo and Redo for list changes. Group by category uses the Workshop tags PZMM read when it last ran, else each mod's own category and name. With PZMM: Check setup, and every change reaches your profile too.
+- **Dragging looks like the app's.** What you drag fades in place and a see-through copy follows the mouse; a red glow shows where it lands. Drag a whole section by its handle. Hovered and picked mods are lit as in the app.
+- **Edit the load order, as in the app.** Drag mods in the Load order panel, or press Autosort (needed mods on, frameworks first, translations last, every load rule kept), Fix load order, or A to Z. Mods with an order problem get a red ! with the reason. Accept saves it; Undo takes it back.
+- **More in a mod's details.** Its version, category and when it was last updated; the mods that need it and the ones it can't run with, by name. Click any of them, or a requirement, to see it. Long details scroll.
+- **Check setup in game.** What can't load and why, missing or turned-off requirements, mods that clash, the load order and Steam's downloads, each with its fix. With PZMM, its own last check shows too, with its fixes.
+- **Presets.** Load a preset, save what's on as one, add one a friend sent you, copy or delete one.
+- **Maps: Autosort, titles and Top.** Maps show their names; Autosort puts each map before the maps it builds on; Muldraugh stays last.
+- **Saves: Characters, Rename and Recovery.** Pick who a save loads as or start a new character, rename it, or reset its zombies, clock and weather, or animals. A "Mods differ" mark shows when a save's mods aren't the ones on now. With PZMM, a reset or a delete can back the save up first, and More restores a backup.
+- **Filters, Hide and picking several.** Filter by favourites, hidden mods or category; search finds authors; hide mods (Mod Manager and PZMM hide them too). Ctrl- or Shift-click several mods to enable, disable, move or hide them together.
+- **Browse Workshop.** Search the Workshop in Steam, or look up any item or collection by its ID or link: its size, when it was updated, whether you have it, and a collection's items.
+- **Servers.** Find servers on the Internet with each one's mods checked against yours, join one straight away or by address, and give a server you host your mods and maps.
+- **Mods that share files.** A mod's details list the mods it replaces Lua or script files of, and the ones that replace its.
+- **Java mods** shows a mod whose jar is missing.
+- **Your Workshop items.** In PZMM Settings: open your own mods' files and upload an update.
+- **With PZMM:** switch profile from the profile button, Update buttons for waiting updates in What's new, and PZMM's Settings for this screen.
+- **Tidier tabs.** Home, My mods, Saves, Maps, Servers, What's new, Java mods, Browse Workshop. What's only in the app is one line at the top of a tab.
+- **Keyboard.** Esc goes back, the arrows and Enter pick and turn on mods, Page Up and Down change tabs, Ctrl+Z and Ctrl+Y undo and redo, Ctrl+F searches. A controller opens the game's own mod screen for now.
+- **Larger text** in PZMM Settings.
+- **Back and Game's mod screen** sit at the top right, where the app's window buttons are.
+- **Activity, as in the app.** The bar at the bottom shows the latest thing that happened; open it for the whole list with times, and Copy it. It has what you did here, what PZMM did for the game (its lines start with PZMM), when PZMM starts, closes, switches profile or changes your sections, and why PZMM said no to something.
+- **In your language.** This screen follows the game's language, in 10 of them.
+- **The app's look, light or dark.** It takes PZMM's accent colour and theme when you have the app.
+- **What's missing, in one place.** A short note at the top of a tab says some features are only in the app; View lists them.
+- **Knox County on the Maps grid.** The game's own map in grey, with your map mods over it in yellow, so you see what each one changes.
+- **The same numbers as the app.** With PZMM, Problems, Overridden and the load order Use PZMM's mods brings are worked out the same way on both sides.
+- **Fixes.** Only this one turns off just that mod. Back's Don't save keeps your load order, and favourites count as changes. Rescan keeps what isn't saved yet. Continue forgets a save you deleted, and Play says why a save can't load. What's new uses Steam's list until PZMM brings change notes. No more ZombieBuddy errors in the log when it isn't installed. Translated text no longer slows the Servers tab. Times show in your time zone. Pasting into search filters the list. The Maps tab keeps its footer, Back and Accept.

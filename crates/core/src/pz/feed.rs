@@ -59,7 +59,8 @@ pub fn record_launch(paths: &Paths) -> Result<()> {
 /// joined a server), "save" (a save's last write) or "" (no sign of play: 0).
 pub fn last_played(paths: &Paths) -> (u64, &'static str) {
     let joined = launcher::state(paths).joins.values().flatten().map(|j| j.time).max().unwrap_or(0);
-    let launch = load(paths).last_launch.max(joined);
+    // a game started without PZMM: PZMM - Client notes it in `played.txt`
+    let launch = load(paths).last_launch.max(joined).max(game_number(paths, "played.txt"));
     let save = saves::list(paths).first().map_or(0, |s| s.modified);
     match (launch, save) {
         (0, 0) => (0, ""),
@@ -93,18 +94,44 @@ pub struct Entry {
     pub pending: bool,
 }
 
+impl Entry {
+    /// It has change notes with text, or the mod's own changelog.
+    fn has_notes(&self) -> bool {
+        self.notes.iter().any(|n| !n.text.trim().is_empty()) || self.bundled.as_ref().is_some_and(|b| !b.entries.is_empty())
+    }
+    /// Its notes are loaded and there's nothing in them (one not loaded yet may still have some).
+    fn nothing_to_read(&self) -> bool {
+        self.loaded && !self.has_notes()
+    }
+}
+
 #[derive(Debug, Default, Serialize)]
 pub struct Feed {
     /// Updates after this time are shown: when you last played, else the last week.
     pub since: u64,
     /// How `since` was found: "launch", "save" or "" (the last week).
     pub basis: &'static str,
-    /// Newest update first.
+    /// Updates with notes, then those without; newest first within each.
     pub entries: Vec<Entry>,
     /// Entries whose notes aren't loaded yet.
     pub unloaded: usize,
     /// Why notes stopped loading (Steam refused or failed), if they did.
     pub error: String,
+    /// The newest update seen in the game's What's new (PZMM - Client's `feedseen.txt`): older ones are seen.
+    pub seen: u64,
+}
+
+/// A number PZMM - Client keeps in `Zomboid/Lua/pzmm/<name>` (0 when there's none).
+fn game_number(paths: &Paths, name: &str) -> u64 {
+    std::fs::read_to_string(crate::pz::bridge::dir(paths).join(name)).ok().and_then(|t| t.trim().parse::<f64>().ok()).filter(|n| n.is_finite() && *n > 0.0).map_or(0, |n| n as u64)
+}
+
+/// What's new was read up to the update at `at` (in the app): the game's badge clears too.
+pub fn set_seen(paths: &Paths, at: u64) {
+    let dir = crate::pz::bridge::dir(paths);
+    if dir.is_dir() && at > game_number(paths, "feedseen.txt") {
+        super::bridge::write_for_game(&dir.join("feedseen.txt"), at.to_string());
+    }
 }
 
 /// The Workshop items among `mods` updated since you last played. With `notes`, also their
@@ -128,7 +155,7 @@ pub fn feed(paths: &Paths, mods: &BTreeMap<String, store::Row>, notes: bool) -> 
     let index = store::load(paths)?;
     let mut state = load(paths);
     let (mut fetched, mut error) = (0, String::new());
-    let mut out = Feed { since, basis, ..Default::default() };
+    let mut out = Feed { since, basis, seen: game_number(paths, "feedseen.txt"), ..Default::default() };
     for d in updated {
         let rows = &items[d.id.as_str()];
         let cached = state.notes.get(&d.id).filter(|c| c.updated == d.time_updated && c.since <= since).map(|c| c.notes.clone());
@@ -165,11 +192,42 @@ pub fn feed(paths: &Paths, mods: &BTreeMap<String, store::Row>, notes: bool) -> 
         e.updated = d.time_updated;
         out.entries.push(e);
     }
+    // updates with something to read (or not loaded yet) first, newest first within each
+    out.entries.sort_by_key(Entry::nothing_to_read);
     out.error = error;
     // forget items you no longer have
     state.notes.retain(|k, _| items.contains_key(k.as_str()));
     save(paths, &state)?;
+    for_game(paths, &out);
     Ok(out)
+}
+
+/// What's new for the PZMM - Client mod's in-game screen: `Zomboid/Lua/pzmm/feed.txt`, where that
+/// folder is, on every feed load. Game Lua reads lines easily (no JSON): `since=`, `basis=`, `at=` (when it was
+/// written), then per entry a tab-separated
+/// `entry` line (item, updated, pending, risks, from, to, title, loaded), `mods`, and its `note`s (time, text)
+/// or the mod's own changelog as `log`s (title, text); newlines in text as `\n`.
+fn for_game(paths: &Paths, f: &Feed) {
+    let dir = crate::pz::bridge::dir(paths);
+    if dir.is_dir() {
+        super::bridge::write_for_game(&dir.join("feed.txt"), game_text(f));
+    }
+}
+
+fn game_text(f: &Feed) -> String {
+    let flat = |s: &str| s.replace('\\', "\\\\").replace('\r', "").replace('\n', "\\n").replace('\t', " ");
+    let mut out = format!("since={}\nbasis={}\nat={}\n", f.since, f.basis, store::now());
+    for e in &f.entries {
+        out += &format!("entry\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n", e.item, e.updated, u8::from(e.pending), e.risks.join(","), flat(&e.from), flat(&e.to), flat(&e.title), u8::from(e.loaded));
+        out += &format!("mods\t{}\n", e.mods.join(","));
+        for n in &e.notes {
+            out += &format!("note\t{}\t{}\n", n.time, flat(&n.text));
+        }
+        for l in e.bundled.iter().flat_map(|b| &b.entries) {
+            out += &format!("log\t{}\t{}\n", flat(&l.title), flat(&l.text));
+        }
+    }
+    out
 }
 
 /// An entry's notes and risks from `all` (newer than `since`, then possibly the one before).
@@ -201,7 +259,10 @@ fn version_in(text: &str) -> Option<String> {
         }
         let len = b[i..].iter().take_while(|c| c.is_ascii_digit() || **c == b'.').count();
         let v = text[i..i + len].trim_end_matches('.');
-        if v.contains('.') && !v.contains("..") {
+        // a date (10.01.2025) or the game's build ("build 42.13") isn't the mod's version
+        let date = v.split('.').any(|p| p.len() == 4);
+        let build = text[..i].trim_end().to_ascii_lowercase().ends_with("build");
+        if v.contains('.') && !v.contains("..") && !date && !build {
             return Some(v.to_string());
         }
     }
@@ -356,6 +417,40 @@ mod tests {
     use super::*;
 
     #[test]
+    fn notes_or_a_changelog_count_as_something_to_read() {
+        let note = |text: &str| Entry { notes: vec![ChangeNote { time: 1, text: text.into() }], ..Default::default() };
+        assert!(note("fixed things").has_notes());
+        assert!(!note(" \n").has_notes());
+        assert!(!Entry::default().has_notes());
+        assert!(!Entry { bundled: Some(Changelog::default()), ..Default::default() }.has_notes(), "an empty changelog");
+        assert!(!Entry::default().nothing_to_read(), "not loaded yet: it may have notes");
+        assert!(Entry { loaded: true, ..Default::default() }.nothing_to_read());
+    }
+
+    #[test]
+    fn the_client_mod_reads_whats_new_as_lines() {
+        let f = Feed {
+            since: 10,
+            basis: "launch",
+            entries: vec![Entry {
+                item: "42".into(),
+                title: "Cool\tMod".into(),
+                mods: vec!["A".into(), "B".into()],
+                updated: 20,
+                notes: vec![ChangeNote { time: 15, text: "fixed\r\nthings \\o/".into() }],
+                risks: vec!["map", "notes"],
+                pending: true,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let text = game_text(&f);
+        let (head, rest) = text.split_once("entry").unwrap();
+        assert!(head.starts_with("since=10\nbasis=launch\nat="), "{head}");
+        assert_eq!(format!("entry{rest}"), "entry\t42\t20\t1\tmap,notes\t\t\tCool Mod\t0\nmods\tA,B\nnote\t15\tfixed\\nthings \\\\o/\n");
+    }
+
+    #[test]
     fn notes_risks_and_versions() {
         let note = |time, text: &str| ChangeNote { time, text: text.into() };
         let e = assess(vec![note(30, "v2.0.1\n- needs a NEW GAME"), note(20, "Version 2.0"), note(10, "v1.4.3 hotfix")], 15, false);
@@ -367,6 +462,8 @@ mod tests {
         assert_eq!((e.risks.clone(), e.from.as_str(), e.to.as_str()), (vec!["map"], "1.4", "1.5"), "a minor bump is no risk; maps are");
         assert!(major_jump("0.9", "0.10") && !major_jump("", "2.0") && !major_jump("3.1", "3.9"));
         assert_eq!(version_in("Update for B42.13: fixed 2 bugs"), None, "the game build is not the mod version");
+        assert_eq!(version_in("Update 10.01.2025: fixes"), None, "nor is a date");
+        assert_eq!(version_in("Works on build 42.13 now, v1.4.2"), Some("1.4.2".into()));
         assert_eq!(version_in("fixed bug2.0x and 1. items"), None);
     }
 
@@ -449,5 +546,20 @@ The [b]first[/b] line names it.
         assert_eq!(last_played(&paths).1, "save");
         save(&paths, &State { last_launch: store::now() + 60, ..Default::default() }).unwrap();
         assert_eq!(last_played(&paths).1, "launch");
+        // a game started from the game itself (PZMM - Client's played.txt; its os.time() may have a fraction)
+        std::fs::create_dir_all(paths.zomboid.join("Lua/pzmm")).unwrap();
+        std::fs::write(paths.zomboid.join("Lua/pzmm/played.txt"), format!("{}.5", store::now() + 120)).unwrap();
+        assert_eq!(last_played(&paths), (store::now() + 120, "launch"));
+    }
+
+    #[test]
+    fn whats_new_seen_is_shared_with_the_game() {
+        let (_t, paths) = store::tests::temp_paths();
+        set_seen(&paths, 50);
+        assert_eq!(game_number(&paths, "feedseen.txt"), 0, "no PZMM - Client folder: nothing written");
+        std::fs::create_dir_all(paths.zomboid.join("Lua/pzmm")).unwrap();
+        set_seen(&paths, 50);
+        set_seen(&paths, 40);
+        assert_eq!(game_number(&paths, "feedseen.txt"), 50, "only ever forward");
     }
 }

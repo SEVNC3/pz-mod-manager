@@ -110,15 +110,30 @@
   });
   const byCell = $derived(new Map(grid.map((c) => [`${c.x},${c.y}`, c])));
   const vanillaSet = $derived(new Set((data?.vanilla ?? []).map(key)));
-  /** Per map (shown or not): the shown maps it shares cells with (and which cells), and its cells over vanilla. */
+  /** Per cell, the shown maps on it: hidden ones too (hiding one from the grid doesn't stop it loading). */
+  const shownOn = $derived.by(() => {
+    const out = new Map<string, string[]>();
+    for (const m of shown)
+      for (const f of m.maps)
+        for (const c of f.cells) {
+          const on = out.get(key(c));
+          if (!on) out.set(key(c), [m.id]);
+          else if (!on.includes(m.id)) on.push(m.id);
+        }
+    return out;
+  });
+  /** Per map (shown or not): the shown maps it shares cells with (and which cells), and its cells over vanilla.
+   * A map built on another (one requires the other) isn't in conflict with it, as Check setup has it. */
   const clashes = $derived.by(() => {
     const out = new Map<string, { with: Map<string, Cell[]>; over: number }>();
     for (const m of all) {
       const e = { with: new Map<string, Cell[]>(), over: 0 };
+      const needs = allRequires(m);
+      const related = (id: string) => needs.includes(id) || (!!mapById.get(id) && allRequires(mapById.get(id)!).includes(m.id));
       for (const f of m.maps)
         for (const c of f.cells) {
           if (vanillaSet.has(key(c))) e.over++;
-          for (const id of byCell.get(key(c))?.maps ?? []) if (id !== m.id) e.with.set(id, [...(e.with.get(id) ?? []), c]);
+          for (const id of shownOn.get(key(c)) ?? []) if (id !== m.id && !related(id)) e.with.set(id, [...(e.with.get(id) ?? []), c]);
         }
       out.set(m.id, e);
     }

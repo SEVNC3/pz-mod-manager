@@ -164,7 +164,7 @@ pub fn items(paths: &Paths, input: &str) -> Result<(String, Vec<String>)> {
 /// Sandbox presets it ships are read, not saved (see [`save_presets`]). Mods in `skip` are left out; of an
 /// item's alternative versions (mods incompatible with each other), the first one left stays.
 pub fn read(paths: &Paths, title: &str, items: &[String], build: u8, skip: &[String], stop: &AtomicBool) -> Result<Pack> {
-    let installed = store::scan(paths).unwrap_or_default();
+    let installed = store::rows(paths).unwrap_or_default();
     let rows = |item: &str| -> Vec<&store::Row> {
         installed.values().filter(|r| sources::workshop_item(&r.source) == Some(item) && if build == 41 { r.supports_41 } else { r.supports_42 }).collect()
     };
@@ -250,8 +250,40 @@ pub fn read(paths: &Paths, title: &str, items: &[String], build: u8, skip: &[Str
         maps.extend(read.maps);
         presets.extend(read.presets);
     }
+    // requirements already installed are turned on with it (one installed but not listed would stay off)
+    let mut skip_more: Vec<String> = vec![];
+    loop {
+        let more: Vec<Found> = all
+            .iter()
+            .flat_map(|m| &m.requires)
+            .filter(|r| !all.iter().any(|o| &o.id == *r) && !skip.contains(*r) && !skip_more.contains(*r))
+            .filter_map(|r| installed.get(r))
+            .filter(|r| if build == 41 { r.supports_41 } else { r.supports_42 })
+            .map(|r| Found { id: r.id.clone(), requires: r.requires.clone(), incompatible: r.incompatible.clone() })
+            .collect();
+        if more.is_empty() {
+            break;
+        }
+        let before = all.len();
+        for m in more {
+            if all.iter().any(|o| o.id == m.id) {
+                continue;
+            }
+            if let Some(o) = all.iter().find(|o| o.incompatible.contains(&m.id) || m.incompatible.contains(&o.id)) {
+                pack.notes.push(format!("{} left out: it's incompatible with {}", m.id, o.id));
+                skip_more.push(m.id.clone());
+                continue;
+            }
+            all.push(m);
+        }
+        if all.len() == before {
+            break;
+        }
+    }
     for m in &all {
-        for r in m.requires.iter().filter(|r| !all.iter().any(|o| &o.id == *r) && !installed.contains_key(*r)) {
+        // one installed that doesn't load on this build counts as missing
+        let loads = |r: &String| installed.get(r).is_some_and(|i| if build == 41 { i.supports_41 } else { i.supports_42 });
+        for r in m.requires.iter().filter(|r| !all.iter().any(|o| &o.id == *r) && !loads(r)) {
             pack.notes.push(format!("{} needs {r}, which the collection doesn't include", m.id));
         }
     }

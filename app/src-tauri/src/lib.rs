@@ -85,11 +85,34 @@ async fn blocking<T: Send + 'static, E: std::fmt::Display>(f: impl FnOnce() -> R
 
 /// Download outside the lock (it can take minutes), then install under it.
 fn fetch_then<T>(sources: &[Source], resolve: bool, then: impl FnOnce(&Paths, Vec<String>) -> anyhow::Result<T>) -> Res<T> {
+    fetch_then_as(sources, resolve, false, then)
+}
+
+/// [`fetch_then`], as an `update` (see `store::update`).
+fn fetch_then_as<T>(sources: &[Source], resolve: bool, update: bool, then: impl FnOnce(&Paths, Vec<String>) -> anyhow::Result<T>) -> Res<T> {
     let fetched = sources::fetch(&Paths::detect(), sources, resolve);
-    locked(|paths| {
-        let ids = sources::install_fetched(paths, &fetched);
+    let done = locked(|paths| {
+        let ids = sources::install_fetched(paths, &fetched, update);
         then(paths, ids)
-    })
+    });
+    // installs and updates change what's installed: the game's categories follow
+    if done.is_ok() && !sources.is_empty() {
+        categories_for_game();
+    }
+    done
+}
+
+/// The game's Group by category uses PZMM's categories (Workshop tags), when PZMM - Client is there. In a
+/// thread of its own: it asks Steam for the tags, outside the lock.
+fn categories_for_game() {
+    std::thread::spawn(|| {
+        let paths = Paths::detect();
+        if pz::bridge::dir(&paths).is_dir()
+            && let Ok(mods) = reading(scan)
+        {
+            pz::bridge::categories_for_game(&paths, &pz::category::categorize(&mods));
+        }
+    });
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -345,11 +368,14 @@ async fn install(sources: Vec<String>) -> Res<View> {
     blocking(move || {
         let parsed: Vec<Source> = sources.iter().map(|s| Source::parse(s)).collect();
         fetch_then(&parsed, true, |paths, ids| {
-            if !ids.is_empty() {
-                let mut p = active(paths)?;
-                enable_compatible(&mut p, &scan(paths)?, &ids);
-                apply(paths, &p)?;
+            if ids.is_empty() && !parsed.is_empty() {
+                anyhow::bail!(pzmm_core::keyed!("nothingInstalled", "nothing was installed: see the activity log"));
             }
+            let mut p = active(paths)?;
+            let mods = scan(paths)?;
+            profile::follow_case(&mut p, &mods);
+            enable_compatible(&mut p, &mods, &ids);
+            apply(paths, &p)?;
             view(paths)
         })
     })
@@ -376,8 +402,10 @@ fn rollback(id: String) -> Res<View> {
     locked(|paths| {
         store::rollback(paths, &id)?;
         pzmm_core::say!("rolledBack", "{id}: restored the previous version", id = id);
-        // the old version may add other map folders
-        apply(paths, &active(paths)?)?;
+        // the old version may add other map folders, or spell its id in another case
+        let mut p = active(paths)?;
+        profile::follow_case(&mut p, &scan(paths)?);
+        apply(paths, &p)?;
         view(paths)
     })
 }
@@ -390,6 +418,8 @@ fn profile_new(name: String) -> Res<View> {
         }
         // empty, for the same game as the active one (Duplicate copies a profile)
         let viewpoint = profile::kind_of(paths, &active(paths)?.name) == vp::KIND;
+        // a new profile plays in Zomboid
+        same_folder_while_playing(paths, &name, &paths.zomboid.join("Lua").join("pzmm"))?;
         let p = if viewpoint { vp::fresh(&name) } else { Profile::parse(&name, "") };
         profile::save(paths, &p)?;
         profile::set_kind(paths, &name, if viewpoint { vp::KIND } else { profile::DEFAULT_KIND })?;
@@ -399,10 +429,23 @@ fn profile_new(name: String) -> Res<View> {
     })
 }
 
+/// The running game stays in its own folder: a change that moves PZMM's side to another (`to`) would leave it talking to a
+/// folder PZMM no longer reads, and its Accept would write the old mods into the new profile.
+fn same_folder_while_playing(paths: &Paths, name: &str, to: &std::path::Path) -> anyhow::Result<()> {
+    if pz::host::game_running() && !pz::bridge::same_dir(to, &pz::bridge::game_dir(paths)) {
+        anyhow::bail!(pzmm_core::keyed!("profileOtherFolder", "{name} plays in another game folder: quit the game first, then Play from PZMM", name = name));
+    }
+    Ok(())
+}
+
 #[tauri::command(async)]
 fn profile_use(name: String) -> Res<View> {
     locked(|paths| {
+        // (apply keeps what the game changed in the profile being left)
         let p = profile::load(paths, &name)?;
+        // the running game stays in its own folder: switching to a profile that plays in another would leave it
+        // talking to a folder PZMM no longer reads, and its Accept would write the old mods into the new profile
+        same_folder_while_playing(paths, &p.name, &pz::bridge::dir_for(paths, &p.name))?;
         apply(paths, &p)?;
         pzmm_core::say!("profileUsed", "Switched to the profile \"{name}\".", name = p.name);
         view(paths)
@@ -964,9 +1007,9 @@ async fn check_updates() -> Res<Vec<String>> {
     blocking(|| sources::check_updates(&Paths::detect())).await
 }
 
-/// Re-download specific mods PZMM installed.
+/// Re-download specific mods PZMM installed. Also returns the ids that did install (failures are only logged).
 #[tauri::command]
-async fn update_mods(ids: Vec<String>) -> Res<View> {
+async fn update_mods(ids: Vec<String>) -> Res<(View, Vec<String>)> {
     blocking(move || {
         let index = locked(store::load)?;
         let mut seen = std::collections::HashSet::new();
@@ -976,10 +1019,12 @@ async fn update_mods(ids: Vec<String>) -> Res<View> {
             .filter(|e| seen.insert(e.source.clone()))
             .filter_map(|e| Source::from_index(&e.source))
             .collect();
-        fetch_then(&todo, false, |paths, _| {
-            // an update can add or rename map folders
-            apply(paths, &active(paths)?)?;
-            view(paths)
+        fetch_then_as(&todo, false, true, |paths, installed| {
+            // an update can add or rename map folders, or change a mod id's case
+            let mut p = active(paths)?;
+            profile::follow_case(&mut p, &scan(paths)?);
+            apply(paths, &p)?;
+            Ok((view(paths)?, installed))
         })
     })
     .await
@@ -1030,7 +1075,9 @@ struct Categories {
 async fn categories() -> Res<Categories> {
     blocking(|| -> Res<_> {
         let mods = reading(scan)?;
-        Ok(Categories { order: pz::category::ORDER, of: pz::category::categorize(&mods), kinds: pz::category::kinds(&mods) })
+        let of = pz::category::categorize(&mods);
+        pz::bridge::categories_for_game(&Paths::detect(), &of);
+        Ok(Categories { order: pz::category::ORDER, of, kinds: pz::category::kinds(&mods) })
     })
     .await
 }
@@ -1043,7 +1090,9 @@ async fn conflict_summary() -> Res<std::collections::HashMap<String, pz::files::
             let mods = scan(paths)?;
             Ok(active(paths)?.enabled().into_iter().filter_map(|id| mods.get(&id).map(|m| (id, m.dir.clone()))).collect())
         })?;
-        Ok(pz::files::overlaps(&order))
+        let found = pz::files::overlaps(&order);
+        pz::bridge::overlaps_for_game(&Paths::detect(), &found);
+        Ok(found)
     })
     .await
 }
@@ -1074,8 +1123,8 @@ fn servers_and_saves() -> Res<ServersAndSaves> {
             servers: pz::server::list(paths),
             server_dir: pz::server::dir(paths).display().to_string(),
             saves: pz::saves::list(&played),
-            // gone from both folders (backups are kept by mode and name, whichever folder it was in)
-            deleted: pz::saves::deleted_with_backups(paths).into_iter().filter(|d| pz::saves::deleted_with_backups(&played).contains(d)).collect(),
+            // gone from the folder played (its backups are kept under that folder's tag)
+            deleted: pz::saves::deleted_with_backups(&played),
             own_folder: (played.zomboid != paths.zomboid).then(|| played.zomboid.display().to_string()),
         })
     })
@@ -1211,6 +1260,7 @@ async fn host_start(name: String) -> Res<()> {
 #[tauri::command]
 async fn host_stop(name: String) -> Res<()> {
     blocking(move || {
+        pz::autopilot::stop_asked(&name); // a restart under way mustn't start it again
         pz::host::stop(&Paths::detect(), &name, std::time::Duration::from_secs(90))?;
         pzmm_core::say!("serverStopped", "Stopped {name}.", name = name);
         Ok::<_, anyhow::Error>(())
@@ -1222,7 +1272,7 @@ async fn host_stop(name: String) -> Res<()> {
 async fn host_restart(name: String) -> Res<()> {
     blocking(move || {
         // a backup first when Workshop updates are waiting
-        pz::autopilot::restart(&Paths::detect(), &name)
+        pz::autopilot::restart_asked(&Paths::detect(), &name)
     })
     .await
 }
@@ -1547,6 +1597,7 @@ async fn host_restore(name: String, file: String) -> Res<()> {
     blocking(move || {
         let paths = Paths::detect();
         let s = server_of(&paths, &name)?;
+        pz::autopilot::stop_asked(&name); // a restart under way mustn't start it again
         if s.external.is_none() && pz::host::state(&s).0 != pz::host::Status::Stopped {
             pz::host::stop(&paths, &name, std::time::Duration::from_secs(90))?;
         }
@@ -1581,6 +1632,7 @@ async fn host_zones_restore(name: String, file: String) -> Res<()> {
     blocking(move || {
         let paths = Paths::detect();
         let s = server_of(&paths, &name)?;
+        pz::autopilot::stop_asked(&name); // a restart under way mustn't start it again
         if s.external.is_none() && pz::host::state(&s).0 != pz::host::Status::Stopped {
             pz::host::stop(&paths, &name, std::time::Duration::from_secs(90))?;
         }
@@ -1936,12 +1988,17 @@ fn host_clone(from: String, to: String) -> Res<()> {
 
 #[tauri::command(async)]
 fn host_coop_worlds() -> Vec<String> {
-    pz::host::coop_worlds(&Paths::detect())
+    let paths = Paths::detect();
+    pz::host::coop_worlds(&paths, &played(&paths).zomboid)
 }
 
 #[tauri::command]
 async fn host_migrate(name: String, world: String) -> Res<()> {
-    blocking(move || pz::host::migrate(&Paths::detect(), &name, &world)).await
+    blocking(move || {
+        let paths = Paths::detect();
+        pz::host::migrate(&paths, &name, &world, &played(&paths).zomboid)
+    })
+    .await
 }
 
 /// Write a start script for the server into `dir`; returns its path.
@@ -2030,6 +2087,10 @@ fn tray_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
 }
 
 fn show_window(app: &AppHandle) {
+    // still loading behind the splash: lifting it shows the window (it hides the splash first)
+    if app.get_webview_window("splash").is_some_and(|s| s.is_visible().unwrap_or(false)) {
+        return;
+    }
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
         let _ = w.unminimize();
@@ -2104,6 +2165,99 @@ fn notify(app: AppHandle, text: String) -> Res<()> {
 
 /// With favourites' notifications on, look at them every two minutes and say in the activity log
 /// which came online with room (the UI turns the line into a notification too).
+/// The game's requests (PZMM - Client), taken off it as they come: PZMM comes to the front (at most every
+/// few seconds) and the UI acts on them. Every 5 s it tells the game it's running and which profile is
+/// active (app.txt), and while it's in front a change to the game's mod list (default.txt) reloads it.
+/// PZMM's version, for app.txt written outside the watcher.
+static VERSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+fn watch_game(app: &AppHandle) {
+    let version = app.package_info().version.to_string();
+    let _ = VERSION.set(version.clone());
+    let (mut there, mut running, mut heard_in) = (false, false, None::<std::path::PathBuf>);
+    let (mut tick, mut fronted, mut listed, mut acted) = (0u32, None::<std::time::Instant>, None, None);
+    // the bridge folder written to, and the one before it (a profile with its own game folder moves it) since when
+    let (mut bridge, mut earlier) = (None::<std::path::PathBuf>, None::<(std::path::PathBuf, std::time::Instant)>);
+    loop {
+        // a round that panics (a bug) is logged by the panic hook, and the next one runs
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let paths = Paths::detect();
+            if tick % 5 == 0 {
+                profile::app_for_game(&paths, &version);
+            }
+            tick = tick.wrapping_add(1);
+            // at the start, and when the bridge moves: everything the game reads, written there (the feed follows on its
+            // next load, Check setup's findings with the UI's next check)
+            let now_in = pz::bridge::dir(&paths);
+            let appeared = !there && now_in.is_dir();
+            there = now_in.is_dir();
+            if bridge.as_ref() != Some(&now_in) || appeared {
+                // first: a write that panics isn't tried again every second
+                earlier = bridge.replace(now_in.clone()).map(|d| (d, std::time::Instant::now()));
+                profile::app_for_game(&paths, &version);
+                profile::profiles_for_game(&paths);
+                profile::library_for_game(&paths, &profile::peek(&paths));
+                pz::saves::backups_for_game(&played(&paths));
+                pz::launcher::servers_for_game(&paths, &pz::launcher::state(&paths));
+                if let Ok(index) = store::load(&paths) {
+                    store::installed_for_game(&paths, &index);
+                }
+                store::tags_for_game(&paths, &store::tags(&paths));
+                categories_for_game();
+                // the UI's part: Check setup's findings and the feed, written there again
+                let _ = app.emit("game-bridge", ());
+            }
+            // a game may still be open in the folder left: heard for 10 more minutes
+            let left = earlier.as_ref().filter(|(d, at)| *d != now_in && at.elapsed() < std::time::Duration::from_secs(600)).and_then(|(d, _)| pz::bridge::queue_requests_in(&paths, d));
+            // a game started from Steam while the profile has its own folder plays in another: while its report is
+            // fresh (10 minutes), its requests are heard there and it's told PZMM is running (the active folder's app.txt)
+            let report = pz::bridge::game_report(&paths).filter(|g| !g.zomboid.is_empty());
+            let away = report.as_ref().map(|g| (g.at, std::path::Path::new(&g.zomboid).join("Lua").join("pzmm"))).filter(|(_, d)| d.is_dir() && !pz::bridge::same_dir(d, &now_in));
+            if away.is_some() && tick % 5 == 0 {
+                running = pz::host::game_running();
+            }
+            let elsewhere = away.filter(|(at, _)| pzmm_core::store::now().saturating_sub(*at) < 600 || running).map(|(_, d)| d);
+            if let Some(d) = elsewhere.as_ref()
+                && heard_in.as_ref() != Some(d)
+                && let Some(z) = d.parent().and_then(|l| l.parent())
+            {
+                heard_in = Some(d.clone());
+                pz::saves::backups_for_game(&Paths { zomboid: z.to_path_buf(), data: paths.data.clone() });
+            }
+            let heard = elsewhere.as_ref().and_then(|d| {
+                // just after app_for_game's write (every 5 s)
+                if tick % 5 == 1
+                    && let Ok(text) = std::fs::read_to_string(now_in.join("app.txt"))
+                {
+                    let text = if d.join("requests.queue").exists() { text.replace("busy=0", "busy=1") } else { text };
+                    pz::bridge::write_for_game(&d.join("app.txt"), text);
+                    pz::bridge::mirror(&now_in, d);
+                }
+                pz::bridge::queue_requests_in(&paths, d)
+            });
+            if let Some(front) = pz::bridge::queue_requests(&paths).into_iter().chain(left).chain(heard).reduce(|a, b| a || b) {
+                if front && fronted.is_none_or(|t| t.elapsed() >= std::time::Duration::from_secs(5)) {
+                    fronted = Some(std::time::Instant::now());
+                    show_window(app);
+                }
+                let _ = app.emit("game-requests", ());
+            }
+            let changed = std::fs::metadata(paths.default_txt()).and_then(|m| m.modified()).ok();
+            if listed.is_some() && changed != listed && app.get_webview_window("main").is_some_and(|w| w.is_focused().unwrap_or(false)) {
+                let _ = app.emit("game-list", ());
+            }
+            listed = changed;
+            // the game's own activity: the UI shows its new lines
+            let did = std::fs::metadata(pz::bridge::dir(&paths).join("activity_game.txt")).and_then(|m| m.modified()).ok();
+            if did.is_some() && did != acted {
+                let _ = app.emit("game-activity", ());
+            }
+            acted = did;
+        }));
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+}
+
 fn watch_favourites() {
     let mut before = None;
     loop {
@@ -2191,6 +2345,7 @@ async fn app_quit(app: AppHandle, stop: bool) -> Res<()> {
         if stop {
             let paths = Paths::detect();
             for name in pz::host::attached_running() {
+                pz::autopilot::stop_asked(&name); // a restart under way mustn't start it again
                 pz::host::stop(&paths, &name, std::time::Duration::from_secs(90))?;
             }
         }
@@ -2223,9 +2378,10 @@ struct SaveDetails {
 
 /// A save's backups and broken files (walks the save, so off the UI thread).
 #[tauri::command]
-async fn save_details(mode: String, name: String) -> Res<SaveDetails> {
+async fn save_details(mode: String, name: String, game: Option<bool>) -> Res<SaveDetails> {
     blocking(move || {
-        let paths = played(&Paths::detect());
+        // for a request from the game: the folder it plays in
+        let paths = if game == Some(true) { game_played(&Paths::detect()) } else { played(&Paths::detect()) };
         let dir = pz::saves::dir(&paths, &mode, &name)?;
         Ok::<_, anyhow::Error>(SaveDetails {
             backups: pz::saves::backups(&paths, &mode, &name)?,
@@ -2243,10 +2399,145 @@ fn game_closed() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// What the game asked PZMM to do since the last look (PZMM - Client's requests.txt), taken: each is
+/// handled once. The UI asks before acting on any that change something.
+#[tauri::command]
+async fn game_requests() -> Res<Vec<pz::bridge::Stamped>> {
+    Ok(pz::bridge::take_requests(&Paths::detect()))
+}
+
+/// Tell the game what became of its requests: its sorting edits settle on these.
+#[tauri::command]
+async fn game_ack(acks: Vec<pz::bridge::Ack>) -> Res<()> {
+    pz::bridge::ack(&Paths::detect(), &acks);
+    Ok(())
+}
+
+/// The app's activity lines that concern the game (PZMM - Client's activity_app.txt).
+#[tauri::command]
+async fn game_activity_add(lines: Vec<pz::bridge::Activity>) -> Res<()> {
+    pz::bridge::activity_for_game(&Paths::detect(), &lines);
+    Ok(())
+}
+
+/// The UI is (or no longer is) handling the game's requests: app.txt says busy, at once.
+#[tauri::command]
+async fn game_busy(on: bool) -> Res<()> {
+    pz::bridge::GAME_BUSY.store(on, std::sync::atomic::Ordering::Relaxed);
+    let paths = Paths::detect();
+    profile::app_for_game(&paths, &VERSION.get().cloned().unwrap_or_default());
+    Ok(())
+}
+
+/// The app's accent and theme, for the in-game manager to match (app.txt).
+#[tauri::command]
+async fn game_look(accent: String, theme: String) -> Res<()> {
+    let ok = |s: &str, max: usize| s.len() <= max && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '#');
+    if ok(&accent, 7) && ok(&theme, 5) {
+        *pz::bridge::LOOK.lock().unwrap_or_else(|e| e.into_inner()) = (accent, theme);
+        profile::app_for_game(&Paths::detect(), &VERSION.get().cloned().unwrap_or_default());
+    }
+    Ok(())
+}
+
+/// The game's own activity lines (PZMM - Client's activity_game.txt), oldest first.
+#[tauri::command]
+async fn game_activity() -> Res<Vec<pz::bridge::Activity>> {
+    Ok(pz::bridge::game_activity(&Paths::detect()))
+}
+
+/// Check setup's findings, as the UI words them, for the game's Problems (PZMM - Client's findings.txt).
+#[tauri::command]
+async fn game_findings(lines: Vec<String>) -> Res<()> {
+    pz::bridge::findings_for_game(&Paths::detect(), &lines);
+    Ok(())
+}
+
+/// PZMM - Client's options (its Settings tab), shared: None before the mod has run in the game.
+#[tauri::command]
+async fn game_settings() -> Res<Option<std::collections::BTreeMap<String, bool>>> {
+    Ok(pz::bridge::client_settings(&Paths::detect()))
+}
+
+#[tauri::command]
+async fn game_settings_set(set: std::collections::BTreeMap<String, bool>) -> Res<()> {
+    pz::bridge::set_client_settings(&Paths::detect(), &set).map_err(|e| format!("{e:#}"))
+}
+
+/// What's new was read up to the update at `at`: the game's badge clears too (PZMM - Client's feedseen.txt).
+#[tauri::command]
+async fn feed_seen(at: u64) -> Res<()> {
+    pz::feed::set_seen(&Paths::detect(), at);
+    Ok(())
+}
+
+/// Launch arguments as a shell splits them: a "quoted span" (with spaces) stays one argument, quotes dropped.
+fn split_args(s: &str) -> Vec<String> {
+    let (mut out, mut cur, mut quoted, mut any) = (vec![], String::new(), false, false);
+    for c in s.chars() {
+        match c {
+            '"' => (quoted, any) = (!quoted, true),
+            c if c.is_whitespace() && !quoted => {
+                if any {
+                    out.push(std::mem::take(&mut cur));
+                }
+                any = false;
+            }
+            c => (cur.push(c), any = true).0,
+        }
+    }
+    if any {
+        out.push(cur);
+    }
+    out
+}
+
+/// What the game last reported (PZMM - Client's game.json): the mods it loaded, at the menu or in a game.
+#[tauri::command]
+async fn game_report() -> Res<Option<pz::bridge::GameReport>> {
+    Ok(pz::bridge::game_report(&Paths::detect()))
+}
+
 /// Back a save up now; a `slot` name keeps it until it's deleted.
 #[tauri::command]
 async fn save_backup(mode: String, name: String, slot: String) -> Res<()> {
     blocking(move || pz::saves::back_up(&played(&Paths::detect()), &mode, &name, "manual", &slot, settings::load().save_backup_keep).map(|_| ())).await
+}
+
+/// The Zomboid folder the game asking is in: the one its fresh report names (a game started from Steam while the
+/// profile has its own), else the one the active profile plays in.
+fn game_played(paths: &Paths) -> Paths {
+    let fresh = pz::bridge::game_report(paths).filter(|g| !g.zomboid.is_empty() && pzmm_core::store::now().saturating_sub(g.at) < 6 * 3600);
+    match fresh.map(|g| std::path::PathBuf::from(g.zomboid)).filter(|z| z.join("Lua").join("pzmm").is_dir()) {
+        Some(zomboid) => Paths { zomboid, data: paths.data.clone() },
+        None => played(paths),
+    }
+}
+
+/// A restore the game asked for: the game is running, so it must be at its main menu (no save open).
+#[tauri::command]
+async fn save_restore_from_game(mode: String, name: String, file: String) -> Res<()> {
+    blocking(move || {
+        let paths = Paths::detect();
+        if pz::bridge::game_report(&paths).is_none_or(|g| g.state != "menu") {
+            anyhow::bail!("the game has a save open: go back to its main menu first");
+        }
+        pz::saves::restore(&game_played(&paths), &mode, &name, std::path::Path::new(&file), settings::load().save_backup_keep)
+    })
+    .await
+}
+
+/// A backup the game asked for: like a restore, only at its main menu, so the save isn't zipped while the game writes it.
+#[tauri::command]
+async fn save_backup_from_game(mode: String, name: String) -> Res<()> {
+    blocking(move || {
+        let paths = Paths::detect();
+        if pz::bridge::game_report(&paths).is_none_or(|g| g.state != "menu") {
+            anyhow::bail!("the game has a save open: go back to its main menu first");
+        }
+        pz::saves::back_up(&game_played(&paths), &mode, &name, "manual", "", settings::load().save_backup_keep).map(|_| ())
+    })
+    .await
 }
 
 #[tauri::command]
@@ -2287,7 +2578,7 @@ fn save_clone(mode: String, name: String) -> Res<String> {
     locked(|paths| {
         let p = active(paths)?;
         let maps = profile::game_maps(paths, &p, &scan(paths)?, profile::effective_build(paths));
-        pz::saves::clone_with_mods(&played(paths), &mode, &name, &p.enabled(), &maps)
+        pz::saves::clone_with_mods(&played(paths), &mode, &name, &p.enabled(), &maps, profile::effective_build(paths) == 41)
     })
 }
 
@@ -2313,7 +2604,7 @@ fn save_set_mods(mode: String, name: String) -> Res<()> {
     locked(|paths| {
         let p = active(paths)?;
         let maps = profile::game_maps(paths, &p, &scan(paths)?, profile::effective_build(paths));
-        pz::saves::set_mods(&played(paths), &mode, &name, &p.enabled(), &maps)
+        pz::saves::set_mods(&played(paths), &mode, &name, &p.enabled(), &maps, profile::effective_build(paths) == 41)
     })
 }
 
@@ -3116,7 +3407,7 @@ fn start_game(app: &AppHandle, args: &str) -> anyhow::Result<Paths> {
     let args = format!("{} {own} {args}", settings::load().launch_args);
     let game = pz::zombiebuddy::game_dir().filter(|g| g.is_dir() && !pz::folders::steam_copy(g));
     if let Some(exe) = game.as_ref().and_then(|g| ["ProjectZomboid64.exe", "ProjectZomboid64", "projectzomboid.sh"].iter().map(|e| g.join(e)).find(|e| e.is_file())) {
-        if let Err(e) = std::process::Command::new(&exe).args(args.split_whitespace()).current_dir(exe.parent().unwrap_or(std::path::Path::new("."))).spawn() {
+        if let Err(e) = std::process::Command::new(&exe).args(split_args(&args)).current_dir(exe.parent().unwrap_or(std::path::Path::new("."))).spawn() {
             pzmm_core::say!("launchFailed", "error: couldn't start the game ({url}): {error} (is Steam installed?)", url = exe.display(), error = e);
             anyhow::bail!("couldn't start {}: {e}", exe.display());
         }
@@ -3161,8 +3452,14 @@ fn profile_launch() -> Res<ProfileLaunch> {
 fn profile_launch_set(args: String, own_folder: bool) -> Res<ProfileLaunch> {
     locked(|paths| {
         let name = profile::active_name(paths);
-        let cache_dir = own_folder.then(|| profile::launch_of(paths, &name).cache_dir.unwrap_or_else(|| profile::own_game_folder(paths, &name)));
-        profile::set_launch(paths, &name, &profile::Launch { args, cache_dir })
+        let was = profile::launch_of(paths, &name);
+        // its own folder, switched off, stays its: on again, it's the same folder (its saves)
+        let own = was.cache_dir.clone().or(was.kept);
+        let (cache_dir, kept) = if own_folder { (Some(own.unwrap_or_else(|| profile::own_game_folder(paths, &name))), None) } else { (None, own) };
+        if cache_dir != was.cache_dir {
+            same_folder_while_playing(paths, &name, &cache_dir.clone().unwrap_or_else(|| paths.zomboid.clone()).join("Lua").join("pzmm"))?;
+        }
+        profile::set_launch(paths, &name, &profile::Launch { args, cache_dir, kept })
     })?;
     profile_launch()
 }
@@ -3285,9 +3582,13 @@ async fn server_mods(server: launcher::Server) -> Res<ServerMods> {
         items.sort();
         items.dedup();
         let details = items.chunks(100).map(sources::steam_workshop::details).collect::<anyhow::Result<Vec<_>>>().map(|d| d.concat());
-        let details = details.unwrap_or_else(|e| {
+        let mut details = details.unwrap_or_else(|e| {
             pzmm_core::say!("detailsFailed", "error: couldn't read the Workshop details of the server's mods: {error}", error = format!("{e:#}"));
             vec![]
+        });
+        // an item picked for a mod ID that's for the other build: one that fits the server's takes its place
+        launcher::fit_build(&Paths::detect(), &mut found, server_build, &within, &mut details, |ids| {
+            ids.chunks(100).map(sources::steam_workshop::details).collect::<anyhow::Result<Vec<_>>>().map(|d| d.concat()).unwrap_or_default()
         });
         launcher::add_details(&mut found, &details);
         let maps = full.map_or_else(|| launcher::map_folders(&server.map), |t| t.maps.clone());
@@ -3500,6 +3801,8 @@ async fn folder_set(key: String, path: String, move_data: bool) -> Res<SettingsV
         *SCAN.lock().unwrap_or_else(|e| e.into_inner()) = None;
         let path = Some(path.trim()).filter(|p| !p.is_empty()).map(std::path::PathBuf::from);
         pz::folders::set(&key, path, move_data)?;
+        // backups.txt names each backup by its full path: after a move, where they are now
+        pz::saves::backups_for_game(&played(&Paths::detect()));
         settings_view()
     })
     .await
@@ -3675,8 +3978,9 @@ pub fn run() {
             });
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
-                // an AppImage has no installer to register pzmm:// links
-                #[cfg(target_os = "linux")]
+                // an AppImage has no installer to register pzmm:// links; a dev build takes them over
+                // from the installed PZMM so the game's links reach it (reinstalling gives them back)
+                #[cfg(any(target_os = "linux", all(windows, debug_assertions)))]
                 if let Err(e) = app.deep_link().register_all() {
                     pzmm_core::log!("pzmm:// links: {e}");
                 }
@@ -3721,6 +4025,8 @@ pub fn run() {
                 });
             }
             std::thread::spawn(watch_favourites);
+            let handle = app.handle().clone();
+            std::thread::spawn(move || watch_game(&handle));
             // the built-in mod ID and map indexes parse once (a moment, seconds in a debug build): now,
             // rather than on the first server's mods
             std::thread::spawn(|| {
@@ -3792,7 +4098,7 @@ pub fn run() {
             details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, mod_changes, feed, news, authoring_check, authoring_poster, authoring_build, workshop_comments, workshop_author, workshop_items, zb_status, zb_preview, zb_install, zb_uninstall, java_mods, workshop_subscribe,
             find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_preview, server_check, server_export, server_import, save_use,
             perf_view, game_running, perf_memory_set, perf_jvm_set, profile_launch, profile_launch_set, pzopt_run, save_sandbox, save_sandbox_write, save_sandbox_preset, save_details, save_backup, save_restore, save_backup_delete, save_repair, save_set_mods, save_players,
-            save_backup_name, save_thumb, save_reset, save_clone, save_databases, save_table,
+            game_requests, game_ack, game_busy, game_look, game_activity_add, game_activity, game_findings, save_restore_from_game, save_backup_from_game, feed_seen, game_settings, game_settings_set, game_report, save_backup_name, save_thumb, save_reset, save_clone, save_databases, save_table,
             host_view, host_ports, host_create, host_preflight, host_start, host_stop, host_restart, host_log, host_send, host_players, host_lines, host_lines_from_profile,
             host_lines_from_collection, host_check, host_lines_with, host_people, host_catalog, host_remote_add, host_remote_forget, host_preview, host_write, host_adopt, host_forget, app_quit, app_close, splash_done, history_list, history_clear, finding_hide, zb_unblock,
             host_auto_set, host_tag, host_tag_set, host_check_updates, host_backups, host_backup, host_restore, host_config, host_ini_write, host_sandbox_write, host_spawn_write, host_preset, host_preset_save,
@@ -3811,6 +4117,12 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn launch_arguments_keep_their_quoted_spans() {
+        assert_eq!(super::split_args(r#" -nosteam  -cachedir="D:\PZ Data" -debug"#), ["-nosteam", r"-cachedir=D:\PZ Data", "-debug"]);
+        assert_eq!(super::split_args(r#""" x"#), ["", "x"], "an empty quoted argument stays");
+    }
+
     use super::{Row, Running, launch_url};
 
     #[test]

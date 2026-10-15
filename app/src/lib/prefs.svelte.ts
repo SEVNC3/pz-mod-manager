@@ -61,12 +61,15 @@ const onAccent = (hex: string) => {
 /** Apply and remember the preferences (run it in an effect: it reads every one). */
 export function applyPrefs() {
   const root = document.documentElement;
-  if (prefs.theme === "system") delete root.dataset.theme;
-  else root.dataset.theme = prefs.theme;
-  root.style.setProperty("--accent", prefs.accent);
-  root.style.setProperty("--on-accent", onAccent(prefs.accent));
-  root.classList.toggle("compact", prefs.compact);
-  root.lang = lang();
+  // only what changed: every write is an attribute change the Maps grid redraws for
+  if (prefs.theme === "system") {
+    if (root.dataset.theme !== undefined) delete root.dataset.theme;
+  } else if (root.dataset.theme !== prefs.theme) root.dataset.theme = prefs.theme;
+  const set = (k: string, v: string) => root.style.getPropertyValue(k) !== v && root.style.setProperty(k, v);
+  set("--accent", prefs.accent);
+  set("--on-accent", onAccent(prefs.accent));
+  if (root.classList.contains("compact") !== prefs.compact) root.classList.toggle("compact", prefs.compact);
+  if (root.lang !== lang()) root.lang = lang();
   try {
     localStorage.setItem("pzmm.theme", prefs.theme);
     localStorage.setItem("pzmm.lang", prefs.lang);

@@ -9,6 +9,7 @@ use anyhow::{Context, Result};
 
 pub mod a2s;
 pub mod authoring;
+pub mod bridge;
 pub mod autopilot;
 pub mod catalog;
 pub mod category;
@@ -268,6 +269,12 @@ pub fn local_mods(paths: &Paths) -> Vec<FoundMod> {
     find_mods(&paths.mods(), 3)
 }
 
+/// Mods a mod author staged for upload (`Zomboid/Workshop/<item>/Contents/mods/<Mod>/[42/]mod.info`): the game
+/// loads them as installed.
+pub fn staged_mods(paths: &Paths) -> Vec<FoundMod> {
+    find_mods(&paths.zomboid.join("Workshop"), 6)
+}
+
 /// Mods inside a Steam Workshop content folder (`<ws>/<item>/mods/<Mod>/[42/]mod.info`).
 pub fn workshop_mods(workshop_dir: &Path) -> Vec<FoundMod> {
     find_mods(workshop_dir, 5)
@@ -367,7 +374,12 @@ pub fn write_default(path: &Path, ids: &[String], b41: Option<bool>, maps: Optio
         }
         None => old.maps,
     };
-    crate::write_atomic(path, format!("VERSION = 1,\n\nmods\n{{\n{body}}}\n\nmaps\n{{{maps}}}\n"))?;
+    let text = format!("VERSION = 1,\n\nmods\n{{\n{body}}}\n\nmaps\n{{{maps}}}\n");
+    // unchanged: not written (its time is what tells the game PZMM changed the mod list)
+    if fs::read_to_string(path).is_ok_and(|t| t == text) {
+        return Ok(());
+    }
+    crate::write_atomic(path, text)?;
     Ok(())
 }
 

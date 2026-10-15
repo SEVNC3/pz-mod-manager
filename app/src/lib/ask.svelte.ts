@@ -10,6 +10,8 @@ export const asking = $state<{ now: Ask | null }>({ now: null });
 /** Show `lines` with a button per choice (the first is the main one) and Cancel; resolves to the choice, -1 for Cancel.
  * `background`: nobody just asked for it (a scheduled job), so focus stays where it is (a key meant elsewhere doesn't answer it). */
 export function ask(title: string, lines: string[], choices: Choice[], background = false): Promise<number> {
+  // a scheduled question never cancels the one the player has open: it's asked again next time
+  if (background && asking.now) return Promise.resolve(-1);
   asking.now?.done(-1);
   return new Promise((done) => (asking.now = { title, lines, choices, background, done }));
 }

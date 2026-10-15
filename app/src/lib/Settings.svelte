@@ -123,6 +123,11 @@
   });
 
   const NOTIFY: NotifyKind[] = ["crash", "restart", "downloads", "favourites"];
+  /** PZMM - Client's own options (the in-game manager's Settings tab), shared both ways: null before it has run. */
+  let inGame = $state<Record<string, boolean> | null>(null);
+  $effect(() => {
+    if (section === "appearance") api.gameSettings().then((s) => (inGame = s)).catch(() => {});
+  });
   const save = () => cfg && api.settingsSet($state.snapshot(cfg.settings)).catch((e) => say("settings.saveFailed", { error: t(...keyedError(e)) }, true));
 
   let token = $state("");
@@ -411,6 +416,16 @@
         <label class="set"><span>{t("settings.appearance.showIds")}</span><input type="checkbox" bind:checked={prefs.showIds} /></label>
         <label class="set"><span>{t("settings.appearance.favFirst")}</span><input type="checkbox" bind:checked={prefs.favFirst} /></label>
       </div>
+      {#if inGame}
+        <div class="card">
+          <h3>{t("settings.inGame.title")}</h3>
+          <p class="desc">{t("settings.inGame.hint")}</p>
+          {#each Object.keys(inGame) as key}
+            <label class="set"><span>{t(`settings.inGame.${key}`)}</span><input type="checkbox" bind:checked={inGame[key]}
+              onchange={() => inGame && api.gameSettingsSet({ [key]: inGame[key] }).then(() => say(inGame?.[key] ? "game.settingOn" : "game.settingOff", { name: t(`settings.inGame.${key}`) }), (e) => (inGame && (inGame[key] = !inGame[key]), say("settings.saveFailed", { error: t(...keyedError(e)) }, true)))} /></label>
+          {/each}
+        </div>
+      {/if}
     {:else if section === "launch" && cfg}
       <div class="card">
         <h3>{t("settings.launch.title")}</h3>

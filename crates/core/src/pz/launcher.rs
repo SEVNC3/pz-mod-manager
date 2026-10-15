@@ -509,6 +509,45 @@ pub fn resolve(
 
 /// Fill in title, size and update time from the items' Workshop details (one request); a mod
 /// found without an item takes the one whose description names it.
+/// An item's Build tags allow `build` (no Build tag: it doesn't say, so it does).
+pub fn fits_build(item: &crate::sources::steam_workshop::Item, build: u8) -> bool {
+    let builds: Vec<&String> = item.tags.iter().filter(|t| t.starts_with("Build ")).collect();
+    builds.is_empty() || builds.iter().any(|t| **t == format!("Build {build}"))
+}
+
+/// A mod ID several items hold went to the item most of the server's mods share, which the mod index picks without
+/// knowing builds: when that item's Build tags rule out the server's `build`, the most subscribed other holder that fits
+/// takes its place (`fetch` reads the details of those not in `details` yet, which it extends). Only outside a server's
+/// own list (`within` empty): that list names its items.
+pub fn fit_build(
+    paths: &Paths,
+    list: &mut [Resolved],
+    build: u8,
+    within: &[String],
+    details: &mut Vec<crate::sources::steam_workshop::Item>,
+    fetch: impl Fn(&[&str]) -> Vec<crate::sources::steam_workshop::Item>,
+) {
+    if !within.is_empty() {
+        return;
+    }
+    let wrong = |item: &str, details: &[crate::sources::steam_workshop::Item]| details.iter().find(|d| d.id == item).is_some_and(|d| !fits_build(d, build));
+    let by_id = super::mod_index::kept_by_id(paths);
+    let others = |r: &Resolved| -> Vec<String> { by_id.get(&r.id).into_iter().flatten().filter(|i| **i != r.item).cloned().collect() };
+    let mut ask: Vec<String> = list.iter().filter(|r| r.status == "found" && wrong(&r.item, details)).flat_map(&others).filter(|i| !details.iter().any(|d| d.id == *i)).collect();
+    ask.sort();
+    ask.dedup();
+    if !ask.is_empty() {
+        details.extend(fetch(&ask.iter().map(String::as_str).collect::<Vec<_>>()));
+    }
+    for r in list.iter_mut().filter(|r| r.status == "found") {
+        if wrong(&r.item, details)
+            && let Some(better) = others(r).into_iter().find(|i| details.iter().any(|d| d.id == *i && fits_build(d, build)))
+        {
+            r.item = better;
+        }
+    }
+}
+
 pub fn add_details(list: &mut [Resolved], details: &[crate::sources::steam_workshop::Item]) {
     for r in list {
         if r.status == "found" && r.item.is_empty()
@@ -614,7 +653,29 @@ pub fn state(paths: &Paths) -> State {
 
 fn save_state(paths: &Paths, s: &State) -> Result<()> {
     std::fs::create_dir_all(&paths.data)?;
-    Ok(crate::write_atomic(&state_file(paths), serde_json::to_string_pretty(s)?)?)
+    crate::write_atomic(&state_file(paths), serde_json::to_string_pretty(s)?)?;
+    servers_for_game(paths, s);
+    Ok(())
+}
+
+/// The servers you joined for the PZMM - Client mod's Servers tab: `Zomboid/Lua/pzmm/servers.txt`, newest first,
+/// `<name>\t<ip:game port>\t<last joined>` lines. Only where PZMM - Client is.
+pub fn servers_for_game(paths: &Paths, s: &State) {
+    let dir = crate::pz::bridge::dir(paths);
+    if !dir.is_dir() {
+        return;
+    }
+    let one = |t: &str| t.replace(['\t', '\r', '\n'], " ");
+    let text: String = s
+        .history
+        .iter()
+        .map(|v| {
+            let ip = v.addr.rsplit_once(':').map_or(v.addr.as_str(), |(ip, _)| ip);
+            let last = s.joins.get(&v.addr).and_then(|j| j.first()).map_or(0, |j| j.time);
+            format!("{}\t{ip}:{}\t{last}\n", one(&v.name), v.port)
+        })
+        .collect();
+    super::bridge::write_for_game(&dir.join("servers.txt"), text);
 }
 
 /// What's kept of a server: what the list shows (not its rules or description).
@@ -900,6 +961,10 @@ mod tests {
         assert_eq!(s.history.len(), 1);
         let joins = &s.joins["203.0.113.5:16261"];
         assert_eq!((joins.len(), joins[0].time), (10, 11), "newest first, ten kept");
+        // the game's copy (PZMM - Client's servers.txt), once its folder is there
+        std::fs::create_dir_all(paths.zomboid.join("Lua/pzmm")).unwrap();
+        record_join(&paths, &srv, None).unwrap();
+        assert_eq!(std::fs::read_to_string(paths.zomboid.join("Lua/pzmm/servers.txt")).unwrap(), "A\t203.0.113.5:16261\t11\n");
     }
 
     /// Real servers, politely (one pass, cached): `PZMM_A2S_LIVE=ip:port,ip:port cargo test -p pzmm-core live_servers -- --ignored --nocapture`.

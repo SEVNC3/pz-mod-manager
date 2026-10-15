@@ -96,9 +96,10 @@
   }
 
   async function reset(what: string) {
-    const count = view?.resets[what] ?? 0;
     if ((await ask(t(`saves.reset.${what}.title`), [t(`saves.reset.${what}.what`), t("saves.reset.backupFirst"), t("saves.closeGame")], [{ label: t("saves.reset.do"), icon: "wand" }])) !== 0) return;
-    run(() => api.saveReset(mode, name, what), t("saves.reset.done", { count }));
+    let count = 0;
+    await run(async () => (count = await api.saveReset(mode, name, what)), "");
+    if (!error) done = t("saves.reset.done", { count });
   }
 
   async function cloneWithMods() {
@@ -117,7 +118,9 @@
   async function repair() {
     const count = view?.broken.cells.length ?? 0;
     if ((await ask(t("saves.repairTitle", { count }), [t("saves.repairWhat"), t("saves.closeGame")], [{ label: t("saves.repair"), icon: "wand" }])) !== 0) return;
-    run(() => api.saveRepair(mode, name), t("saves.repaired", { count }));
+    let removed = 0;
+    await run(async () => (removed = await api.saveRepair(mode, name)), "");
+    if (!error) done = t("saves.repaired", { count: removed });
   }
 
   async function giveMods() {

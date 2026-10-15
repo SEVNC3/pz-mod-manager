@@ -236,6 +236,16 @@ pub fn set(key: &str, to: Option<PathBuf>, move_data: bool) -> Result<()> {
         if let Some(s) = super::host::load(&paths).iter().find(|s| !matches!(super::host::state(s).0, super::host::Status::Stopped | super::host::Status::Crashed)) {
             bail!(crate::keyed!("dataServerRuns", "stop {name} first: PZMM's data can't move while a server it manages runs", name = s.name));
         }
+        // a profile's own game folder is in there: the game may be writing its save
+        if super::host::game_running() {
+            bail!(crate::keyed!("dataGameRuns", "quit the game first: PZMM's data can't move while it runs"));
+        }
+        // SteamCMD downloads into it
+        let _downloads = match crate::sources::steam_workshop::STEAMCMD.try_lock() {
+            Ok(g) => g,
+            Err(std::sync::TryLockError::Poisoned(p)) => p.into_inner(),
+            Err(std::sync::TryLockError::WouldBlock) => bail!(crate::keyed!("dataDownloading", "wait for the downloads to finish: PZMM's data can't move meanwhile")),
+        };
         return move_data_dir(&paths.data, &target, save);
     }
     save()
@@ -263,7 +273,12 @@ fn move_data_dir(from: &Path, to: &Path, switch: impl FnOnce() -> Result<()>) ->
     // a profile's own game folder is kept by its short name when its path has spaces: read while it exists
     let short_from = crate::profile::path_form(from, false).filter(|s| s != from);
     match fs::rename(from, to) {
-        Ok(()) => switch()?,
+        Ok(()) => {
+            if let Err(e) = switch() {
+                let _ = fs::rename(to, from);
+                return Err(e);
+            }
+        }
         Err(e) if e.kind() == std::io::ErrorKind::CrossesDevices => {
             let lock = crate::lock_dir(from)?;
             if let Err(e) = crate::store::copy_dir(from, to).and_then(|()| switch()) {
@@ -311,9 +326,9 @@ fn repoint_json(v: &mut serde_json::Value, from: &[&Path], to: &Path) -> bool {
         serde_json::Value::Array(a) => a.iter_mut().fold(false, |changed, v| repoint_json(v, from, to) | changed),
         serde_json::Value::Object(o) => {
             let mut changed = false;
-            for (k, v) in o.iter_mut().filter(|(k, _)| ["install_dir", "cachedir", "cache_dir"].contains(&k.as_str())) {
+            for (k, v) in o.iter_mut().filter(|(k, _)| ["install_dir", "cachedir", "cache_dir", "kept"].contains(&k.as_str())) {
                 let Some(mut new) = v.as_str().and_then(|p| from.iter().find_map(|f| Path::new(p).strip_prefix(f).ok())).map(|rest| to.join(rest)) else { continue };
-                if k == "cache_dir" {
+                if k == "cache_dir" || k == "kept" {
                     // a short name from the old place: long again, then short if it has spaces (as profile::set_launch keeps it)
                     new = crate::profile::path_form(&new, true).unwrap_or(new);
                     let spaced = |p: &Path| p.to_string_lossy().contains(char::is_whitespace);

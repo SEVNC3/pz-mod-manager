@@ -1,0 +1,42 @@
+# 1.2.7
+> [!IMPORTANT]
+> **Get the in-game mod manager.** If you don't have it yet, subscribe to **[PZMM - Client on the Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3818460225)** and turn it on in the game. It replaces Project Zomboid's mod screen with PZMM's, and with this update it works hand in hand with the desktop app.
+
+This is a massive update. We've worked hard to fully replicate the desktop app inside the game: the in-game mod manager now has the same tabs, looks the same and works the same way, from your mod list and load order to maps, saves, servers and Check setup. If you use both, they now sync with each other: your profile, sections, load order, problems and settings are the same on both sides, and the game can hand off anything it can't do itself to the app.
+
+## The in-game mod manager
+
+- **Every tab from the app.** Home, My mods, Browse Workshop, Maps, Saves, Servers, What's new, Java mods and Settings, in the app's style: the same cards, buttons, icons, colours and spacing, in your accent colour and light or dark theme.
+- **My mods, as in the app.** Sections you can drag mods between, Group by category, filters, sort, search by author, favourites and hidden mods, picking several mods at once, right-click menus, and Undo and Redo.
+- **Load order, as in the app.** Drag mods in the Load order panel, or press Autosort, Fix load order or A to Z. Mods with an order problem get a red ! with the reason.
+- **Mod details.** Version, category, last updated, what it needs and what needs it, what it can't run with, and which mods' files it replaces.
+- **Check setup in game.** What can't load and why, missing or turned-off requirements, clashes, the load order and Steam's downloads, each with its fix. Problems count the same way as in the app.
+- **Maps, Saves and Servers.** Arrange your maps with Autosort; play, rename, reset or back up a save and pick its character; find servers with their mods checked against yours and join one.
+- **Presets, Browse Workshop and your own Workshop items,** right in the game.
+- **10 languages.** English, German, Spanish, French, Italian, Korean, Polish, Brazilian Portuguese, Russian and Simplified Chinese.
+- **Works without the app too.** Everything the game can do on its own works without PZMM installed. The few things only the app can do are marked "Missing some features" in the game, with a link to download the app.
+
+## The desktop app and the in-game manager, together
+
+- **One profile, both places.** The game shows your PZMM profile and can switch to another. Turning mods on or off, sorting sections and arranging maps in game changes your PZMM profile, and changes made in PZMM show up in the open game screen. Use PZMM's mods brings in PZMM's changes in PZMM's exact load order.
+- **Ask PZMM from the game.** Install a mod's missing requirements, back up or restore a save, run Check setup, or open Browse Workshop or Make a mod. PZMM comes to the front on the right page, or starts if it isn't running, and asks you first before installing or restoring anything.
+- **Shared Check setup.** PZMM's problems show in the game with the same fix buttons. Safe fixes run at once; PZMM asks before the rest.
+- **Shared numbers.** The overridden files, problems, updates and install dates you see in game are PZMM's own, so both sides agree.
+- **Shared look, settings and What's new.** The game uses your PZMM accent colour and theme, the in-game manager's options can be set from either side, and reading What's new in one clears the badge in the other.
+- **Profiles with their own game folder** work in game too: PZMM follows whichever folder the game is playing in, for your mods, saves and backups.
+- **Both sides keep in step.** PZMM confirms every change made in game, the game says when PZMM couldn't make one, and a change made while PZMM is closed is made when it next starts.
+- **PZMM in the main menu.** A box at the top right opens the latest patch notes for the app and the in-game manager, with a red ! when there's a new one.
+
+## Desktop app fixes
+
+- **Updates no longer bring back a mod you removed** from a Workshop item that ships several mods. Download history offers Reinstall for each mod.
+- **A Workshop copy never replaces your GitHub or local install** of the same mod.
+- **Collections imported as a profile** turn on the requirements you already have installed.
+- **Map presets** are one list across all your game folders, and presets you delete in game stay deleted.
+- **Server backups from another server** keep this server's RCON and spawn points when you restore them. Migrate finds co-op worlds in a profile's own game folder, and LinuxGSM and Docker servers get their real build.
+- **Rolling back** an update that only changed a mod ID's capitalisation brings the old ID back.
+- **Mods staged for upload** in Zomboid/Workshop count as installed, so they aren't flagged missing.
+- **Profiles made from a server config** aren't offered for deletion as unused.
+- Lots of smaller fixes from two full bug sweeps of the app and the in-game manager.
+
+[![Enjoying PZMM? If you're enjoying this app please upvote it on Steam!](https://raw.githubusercontent.com/SEVNC3/pz-mod-manager/main/docs/media/steam-upvote.png)](https://steamcommunity.com/sharedfiles/filedetails/?id=3818460225)

@@ -116,7 +116,7 @@ pub fn add_external(paths: &Paths, f: &super::server_detect::Found) -> Result<Se
     let port = |key, default| server::value(&text, key).parse().unwrap_or(default);
     let s = Server {
         name: f.name.clone(),
-        build: "b42".into(),
+        build: f.install.as_deref().and_then(install_build).unwrap_or("b42").into(),
         install_dir: f.install.clone().unwrap_or_default(),
         cachedir: Some(f.data.clone()),
         game_port: port("DefaultPort", 16261),
@@ -400,7 +400,7 @@ pub fn create(paths: &Paths, n: &NewServer, stop: &AtomicBool) -> Result<Server>
 
 /// The first RCON port from 27015 that no other server PZMM manages is set to (two servers on one
 /// port: the second can't take RCON, and PZMM's commands for it reach the first).
-fn free_rcon_port(paths: &Paths) -> u16 {
+pub(crate) fn free_rcon_port(paths: &Paths) -> u16 {
     let taken: Vec<u16> = load(paths)
         .iter()
         // a server without the line (or its ini) uses the game's default
@@ -438,9 +438,12 @@ pub fn update_server(paths: &Paths, name: &str, build: &str, stop: &AtomicBool) 
     let build = if build == LEGACY { LEGACY } else { "b42" };
     let all = load(paths);
     let sharing: Vec<&Server> = all.iter().filter(|o| o.install_dir == s.install_dir).collect();
-    if let Some(o) = sharing.iter().find(|o| state(o).0 != Status::Stopped) {
+    // a crashed server can't be stopped, and its Java is gone
+    if let Some(o) = sharing.iter().find(|o| reserved(&o.name) || !matches!(state(o).0, Status::Stopped | Status::Crashed)) {
         bail!(crate::keyed!("stopForUpdate", "Stop {name} first: SteamCMD can't replace the files of a running server.", name = o.name));
     }
+    // none of them starts (or has its files changed) until the update is done
+    let _held = sharing.iter().map(|o| reserve(&o.name)).collect::<Result<Vec<_>>>()?;
     if let Some(o) = sharing.iter().find(|o| o.name != name && o.build != build) {
         bail!("{} runs from the same folder on the other build: switching would change it too", o.name);
     }
@@ -511,15 +514,16 @@ pub fn clone_server(paths: &Paths, from: &str, to: &str) -> Result<Server> {
 
 /// The co-op worlds hosted from the game on this machine (`Zomboid/Saves/Multiplayer/<name>`),
 /// leaving out the servers PZMM manages there.
-pub fn coop_worlds(paths: &Paths) -> Vec<String> {
-    let managed: Vec<String> = load(paths).into_iter().filter(|s| s.cachedir(paths) == paths.zomboid).map(|s| s.name).collect();
-    let mut out: Vec<String> = std::fs::read_dir(paths.zomboid.join("Saves/Multiplayer"))
+/// `from` is the Zomboid folder the game plays in.
+pub fn coop_worlds(paths: &Paths, from: &Path) -> Vec<String> {
+    let managed: Vec<String> = load(paths).into_iter().filter(|s| super::bridge::same_dir(&s.cachedir(paths), from)).map(|s| s.name).collect();
+    let mut out: Vec<String> = std::fs::read_dir(from.join("Saves/Multiplayer"))
         .into_iter()
         .flatten()
         .flatten()
         .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
         .filter_map(|e| e.file_name().to_str().map(String::from))
-        .filter(|n| !n.ends_with("_player") && !managed.contains(n))
+        .filter(|n| !n.ends_with("_player") && !managed.iter().any(|m| m.eq_ignore_ascii_case(n)))
         .collect();
     out.sort();
     out
@@ -528,17 +532,22 @@ pub fn coop_worlds(paths: &Paths) -> Vec<String> {
 /// Make co-op world `world` server `name`'s world: its save (with the host's `_player` folder), its
 /// accounts, and the mod lines and sandbox it was played with. The server's own world is backed up
 /// first and replaced; its other settings (ports, passwords) stay.
-pub fn migrate(paths: &Paths, name: &str, world: &str) -> Result<()> {
+pub fn migrate(paths: &Paths, name: &str, world: &str, from: &Path) -> Result<()> {
     let s = find(paths, name).with_context(|| format!("PZMM doesn't manage a server named {name}"))?;
     check_stopped(paths, &s)?;
-    if !coop_worlds(paths).iter().any(|w| w == world) {
+    let _held = reserve(name)?;
+    if !coop_worlds(paths, from).iter().any(|w| w == world) {
         bail!("there's no co-op world named {world}");
     }
     // the game may be saving the co-op world mid-copy
     if !cfg!(test) && game_running() {
         bail!("close the game first: it may be saving {world}");
     }
-    let (from, to) = (&paths.zomboid, s.cachedir(paths));
+    let to = s.cachedir(paths);
+    // its own world (folders ignore case on Windows): copying it onto itself would delete it
+    if world.eq_ignore_ascii_case(name) && super::bridge::same_dir(from, &to) {
+        bail!("{world} is {name}'s own world already");
+    }
     let mp = to.join("Saves/Multiplayer");
     if [mp.join(name), mp.join(format!("{name}_player")), to.join("db").join(format!("{name}.db"))].iter().any(|p| p.exists()) {
         super::server_backup::create(paths, &s, "migrate")?;
@@ -559,6 +568,7 @@ pub fn migrate(paths: &Paths, name: &str, world: &str) -> Result<()> {
     }
     // the world needs the mods and rules it was played with
     let (coop, ini) = (from.join("Server"), s.ini(paths));
+    let _lock = crate::lock_data(paths)?; // the app's config editor writes them under the lock too
     if let Ok(l) = server::read(&coop.join(format!("{world}.ini")))
         && ini.is_file()
     {
@@ -642,7 +652,11 @@ pub fn diagnostics(paths: &Paths, name: &str) -> String {
     let tail = &lines[lines.len().saturating_sub(200)..];
     let _ = writeln!(out, "\n--- the last {} log lines ---", tail.len());
     for l in tail {
-        let _ = writeln!(out, "{}", l.text);
+        // the console echoes `adduser "name" "password"`
+        let _ = match l.text.to_ascii_lowercase().find("adduser ") {
+            Some(i) => writeln!(out, "{}adduser ********", &l.text[..i]),
+            None => writeln!(out, "{}", l.text),
+        };
     }
     super::doctor::mask_home_user(&out)
 }
@@ -691,6 +705,8 @@ pub fn forget(paths: &Paths, name: &str) -> Result<()> {
     if attached(name) || find(paths, name).is_some_and(|s| state(&s).0 == Status::Running) {
         bail!(crate::keyed!("stopFirst", "Stop {name} first.", name = name));
     }
+    // nor while it starts, updates or is restored
+    let _held = reserve(name)?;
     update(paths, |all| all.retain(|s| s.name != name))?;
     forget_admin_password(name);
     if !cfg!(test) {
@@ -1184,12 +1200,20 @@ pub struct Line {
 
 const STARTED: &str = "*** SERVER STARTED";
 const TERMINATED: &str = "Server Terminated.";
+
+/// The server's own "Server Terminated." line: its message (B42's prefix stripped), or the end of a line in
+/// another format (B41's `...> Server Terminated.`). Text a chat or servermsg echo carries isn't it.
+fn terminated(text: &str) -> bool {
+    message(text).trim() == TERMINATED || text.trim_end().ends_with(&format!("> {TERMINATED}"))
+}
 const ADMIN_PROMPT: &str = "Enter new administrator password";
 
 /// A server log line's level, and what it means when it's one PZMM knows.
 pub fn classify(text: &str) -> (Level, Option<Note>) {
     let t = text.trim_start();
-    let level = if t.starts_with("ERROR") || t.contains("Exception") || t.contains(TERMINATED) {
+    // the server's own line only: a chat message can say it too
+    let terminated = terminated(text);
+    let level = if t.starts_with("ERROR") || t.contains("Exception") || terminated {
         Level::Error
     } else if t.starts_with("WARN") {
         Level::Warn
@@ -1199,7 +1223,7 @@ pub fn classify(text: &str) -> (Level, Option<Note>) {
     let after = |pat: &str| text.split(pat).nth(1).map(|s| s.chars().take_while(|c| *c != '"' && !c.is_whitespace()).collect::<String>());
     let n = if text.contains(STARTED) {
         note("started", "The server is up: players can join.", &[])
-    } else if text.contains(TERMINATED) {
+    } else if terminated {
         note("terminated", "The server stopped on an error it can't recover from (often a mod's scripts, see the errors above), and Java hangs after it: PZMM stops Java.", &[])
     } else if text.contains("there are script load errors") {
         note("scriptErrors", "A mod's scripts failed to load: the errors just above name the file.", &[])
@@ -1351,12 +1375,34 @@ static PROCS: Mutex<BTreeMap<String, Shared>> = Mutex::new(BTreeMap::new());
 /// The servers `start` is getting ready to run (until java runs or the start fails).
 static STARTING: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
 
-struct Starting(String);
+/// Server `name` held in [`STARTING`] until dropped: see [`reserve`].
+pub struct Starting(String);
 
 impl Drop for Starting {
     fn drop(&mut self) {
         STARTING.lock().unwrap_or_else(|e| e.into_inner()).remove(&self.0);
     }
+}
+
+/// Hold server `name` while it starts or its files change (a restore, wipe, chunk reset, migrate or
+/// update), so none of those can run at once. Fails when it's held already or PZMM runs it.
+pub fn reserve(name: &str) -> Result<Starting> {
+    let mut starting = STARTING.lock().unwrap_or_else(|e| e.into_inner());
+    if starting.contains(&held_as(name)) || attached(name) {
+        bail!("{name} is already running, or busy starting or changing its files");
+    }
+    starting.insert(held_as(name));
+    Ok(Starting(held_as(name)))
+}
+
+/// Whether server `name` is held by [`reserve`].
+fn reserved(name: &str) -> bool {
+    STARTING.lock().unwrap_or_else(|e| e.into_inner()).contains(&held_as(name))
+}
+
+/// The key a hold is kept by: the name (each test, on its own thread, holds its own servers).
+fn held_as(name: &str) -> String {
+    if cfg!(test) { format!("{name}#{:?}", std::thread::current().id()) } else { name.to_string() }
 }
 const KEEP_LINES: usize = 5000;
 
@@ -1409,14 +1455,14 @@ pub fn start(paths: &Paths, name: &str, admin: Option<&str>) -> Result<()> {
         bail!("{name} is run by {}: start it there ({} in {})", e.kind, e.run.first().map_or("", |r| r.as_str()), e.folder.display());
     }
     // the name is taken before the slow part (a backup, the Workshop), so a second start can't run java too
-    let _starting = {
-        let mut starting = STARTING.lock().unwrap_or_else(|e| e.into_inner());
-        if starting.contains(name) || attached(name) || saved_java(&s).is_some() {
-            bail!("{name} is already running");
-        }
-        starting.insert(name.into());
-        Starting(name.into())
-    };
+    let _starting = reserve(name)?;
+    if saved_java(&s).is_some() {
+        bail!("{name} is already running");
+    }
+    // one started outside PZMM (or by another PZMM): unknown when the processes can't be read
+    if command_lines().is_ok_and(|c| c.iter().any(|c| runs_server(c, name))) {
+        bail!(crate::keyed!("runningOutside", "{name} is running on this machine (started outside PZMM): stop it first.", name = name));
+    }
     if s.auto.backup_on_start && std::fs::exists(s.ini(paths)).unwrap_or(false) {
         super::server_backup::create(paths, &s, "start")?;
     }
@@ -1495,7 +1541,7 @@ fn took_line(name: &str, p: &Shared, text: String) {
     if line.text.contains(STARTED) && g.status == Status::Starting {
         g.status = Status::Running;
     }
-    if line.text.contains(TERMINATED) {
+    if terminated(&line.text) {
         // it never exits on its own after this
         g.status = Status::Crashed;
         g.reason = line.note.clone();
@@ -1540,10 +1586,9 @@ fn rcon(paths: &Paths, name: &str) -> Result<super::rcon::Rcon> {
 /// log: None), else over RCON (the reply).
 pub fn send(paths: &Paths, name: &str, cmd: &str) -> Result<Option<String>> {
     super::rcon::check_command(cmd)?;
-    // the console echoes a command into its log: a password goes over RCON when that's on
-    if has_password(cmd)
-        && let Ok(mut r) = rcon(paths, name)
-    {
+    // the console echoes a command into its log: a password goes over RCON only
+    if has_password(cmd) {
+        let mut r = rcon(paths, name).context("a command with a password goes over RCON only (the console writes it into the log), and RCON isn't reachable")?;
         return r.exec(cmd).map(Some);
     }
     if let Some(p) = proc_of(name) {
@@ -1644,6 +1689,14 @@ quit
     if java_memory(pid).is_some() {
         crate::say!("serverKilled", "{name} didn't stop in time: PZMM ended Java", name = name);
         kill_pid(pid);
+        let until = Instant::now() + Duration::from_secs(10);
+        while java_memory(pid).is_some() && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(200));
+        }
+        // its pid stays saved: PZMM still sees it running
+        if java_memory(pid).is_some() {
+            bail!("{name} didn't stop, and PZMM couldn't end its Java (process {pid})");
+        }
     }
     update(paths, |all| {
         if let Some(s) = all.iter_mut().find(|s| s.name == name) {
@@ -1670,7 +1723,12 @@ pub fn state(s: &Server) -> (Status, Option<u32>) {
 /// with `-servername <name>` (a server, or the game hosting a co-op world), or the game when `s`
 /// is a config in the Zomboid folder PZMM doesn't manage (a co-op world it may be hosting).
 pub fn check_stopped(paths: &Paths, s: &Server) -> Result<()> {
-    if s.external.is_none() && !matches!(state(s).0, Status::Stopped | Status::Crashed) {
+    let running = match s.external {
+        None => reserved(&s.name) || !matches!(state(s).0, Status::Stopped | Status::Crashed),
+        // PZMM doesn't see a Docker server's process: it runs while it answers on its game port
+        Some(_) => super::a2s::Client::new(([127, 0, 0, 1], s.game_port).into(), Duration::from_millis(300)).and_then(|c| c.info()).is_ok(),
+    };
+    if running {
         bail!(crate::keyed!("stopFirst", "Stop {name} first.", name = s.name));
     }
     if command_lines().with_context(|| crate::keyed!("runningUnknown", "Couldn't check whether {name} is running: stop it first.", name = s.name))?.iter().any(|c| runs_server(c, &s.name)) {
@@ -1901,6 +1959,18 @@ pub(crate) mod tests {
     use super::*;
 
     #[test]
+    fn a_held_server_counts_as_running() {
+        let (_t, paths) = crate::store::tests::temp_paths();
+        let s = Server { name: "pzmmheld".into(), ..Default::default() };
+        let held = reserve(&s.name).unwrap();
+        assert!(reserve(&s.name).is_err(), "one hold at a time: a start can't run beside a restore");
+        assert!(check_stopped(&paths, &s).is_err(), "held: a start or file change is under way");
+        drop(held);
+        check_stopped(&paths, &s).unwrap();
+        drop(reserve(&s.name).unwrap());
+    }
+
+    #[test]
     fn required_items_follow_their_chain() {
         let pages: BTreeMap<&str, &[&str]> = [("1", &["2", "3"][..]), ("2", &["4"]), ("4", &["1", "5"]), ("9", &["3"])].into();
         let requires = |id: &str| pages.get(id).map(|r| r.iter().map(|s| s.to_string()).collect()).unwrap_or_default();
@@ -2123,9 +2193,9 @@ pub(crate) mod tests {
         w(z.join("Server/servertest_SandboxVars.lua"), "SandboxVars = {\n}\n");
         w(own.join("Server/Friends.ini"), "PVP=true\nMods=\nWorkshopItems=\n");
         w(own.join("Saves/Multiplayer/Friends/map_t.bin"), "old world");
-        assert_eq!(coop_worlds(&paths), ["servertest"]);
-        assert!(migrate(&paths, "Friends", "nope").is_err());
-        migrate(&paths, "Friends", "servertest").unwrap();
+        assert_eq!(coop_worlds(&paths, &paths.zomboid), ["servertest"]);
+        assert!(migrate(&paths, "Friends", "nope", &paths.zomboid).is_err());
+        migrate(&paths, "Friends", "servertest", &paths.zomboid).unwrap();
         assert_eq!(std::fs::read_to_string(own.join("Saves/Multiplayer/Friends/map_t.bin")).unwrap(), "coop");
         assert_eq!(std::fs::read_to_string(own.join("Saves/Multiplayer/Friends_player/players.db")).unwrap(), "host");
         assert_eq!(std::fs::read_to_string(own.join("db/Friends.db")).unwrap(), "accounts");
@@ -2175,12 +2245,26 @@ pub(crate) mod tests {
         let ini = server::path(&paths, "Friends").unwrap();
         std::fs::create_dir_all(ini.parent().unwrap()).unwrap();
         std::fs::write(&ini, "# Password for the server\nPassword=door\nRCONPassword=s3cret\nDiscordToken=abc\nPublicName=Friends\nPassword2=\n").unwrap();
+        std::fs::write(paths.zomboid.join("server-console.txt"), "LOG  : General      f:0 st:1> AddUser \"Bob\" \"hunter2\"\n").unwrap();
         let d = diagnostics(&paths, "Friends");
-        assert!(!d.contains("door") && !d.contains("s3cret") && !d.contains("abc"), "{d}");
+        assert!(!d.contains("door") && !d.contains("s3cret") && !d.contains("abc") && !d.contains("hunter2") && d.contains("adduser ********"), "{d}");
         assert!(d.contains("Password=********") && d.contains("PublicName=Friends") && d.contains("Password2=\n"));
         assert!(d.contains("Server Friends: Stopped, build b42"));
         let d = diagnostics(&paths, r"..\..\outside");
         assert!(d.starts_with("invalid server name") && !d.contains("outside.ini"), "{d}");
+    }
+
+    #[test]
+    fn a_crashed_server_can_be_updated() {
+        let (_t, paths) = crate::store::tests::temp_paths();
+        update(&paths, |all| all.push(Server { name: "pzmmcrash".into(), build: "b42".into(), install_dir: "relative".into(), ..Default::default() })).unwrap();
+        let child = Command::new(std::env::current_exe().unwrap()).arg("--list").stdout(Stdio::null()).spawn().unwrap();
+        let p = Proc { child, stdin: None, status: Status::Crashed, reason: None, lines: VecDeque::new(), seq: 0, stopping: false, players: None };
+        PROCS.lock().unwrap().insert("pzmmcrash".into(), Arc::new(Mutex::new(p)));
+        let e = update_server(&paths, "pzmmcrash", "b42", &AtomicBool::new(false)).unwrap_err().to_string();
+        let p = PROCS.lock().unwrap().remove("pzmmcrash").unwrap();
+        let _ = lock(&p).child.wait();
+        assert!(e.contains("full path"), "past the status check to SteamCMD: {e}");
     }
 
     #[test]
@@ -2283,6 +2367,14 @@ LOG  : General      f:0 st:115,572,091> Enter new administrator password:
 ERROR: General      f:0 st:114,784,292 at FluidContainerScript.load           > Sanitizing container name 'Large Bucket', name may not contain whitespaces."#;
 
     #[test]
+    fn only_the_servers_own_line_is_its_end() {
+        assert!(terminated("Server Terminated."));
+        assert!(terminated("LOG  : General     , 1690000000000> Server Terminated."), "Build 41's format");
+        assert!(!terminated("[15-10-26 12:00:00.000] LOG  : General f:0, t:1, st:2> ChatMessage{chat=General, author='x', text='Server Terminated.'}"));
+        assert!(!terminated("servermsg \"Server Terminated. Back soon\""));
+    }
+
+    #[test]
     fn log_lines_in_plain_words() {
         let got: Vec<(Level, Option<&str>)> = LOG.lines().map(classify).map(|(l, n)| (l, n.map(|n| n.key))).collect();
         use Level::*;
@@ -2307,6 +2399,9 @@ ERROR: General      f:0 st:114,784,292 at FluidContainerScript.load           > 
         assert_eq!(n.unwrap().text, "Mod ID pzmm_fake_mod_01 isn't in any of the server's Workshop items: check Mods and WorkshopItems.");
         let (_, n) = classify("Workshop: onItemNotDownloaded itemID=42 result=2");
         assert_eq!(n.unwrap().vars, [("id", "42".to_string()), ("result", "2".to_string())].into());
+        // a chat line saying it isn't the server's own
+        let (l, n) = classify("LOG  : General      f:0 st:1,234> ChatMessage{chat=General, author='Bob', text='Server Terminated.'}");
+        assert_eq!((l, n.map(|n| n.key)), (Info, None));
     }
 
     #[test]

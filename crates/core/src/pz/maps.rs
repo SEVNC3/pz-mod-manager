@@ -1297,23 +1297,89 @@ fn presets_file(paths: &Paths) -> PathBuf {
     paths.data.join("map-presets.json")
 }
 
-/// Named sets of maps (mod ids) saved from the Maps tab (none while the file can't be read).
+/// Named sets of maps (mod ids) saved from the Maps tab (none while the file can't be read), and the game's
+/// own (PZMM - Client's), as it names them: a name in both is the app's.
 pub fn presets(paths: &Paths) -> BTreeMap<String, Vec<String>> {
+    if shared_list(paths).is_some() {
+        merge_presets_once(paths);
+        return game_presets(paths);
+    }
     read_json(&presets_file(paths)).unwrap_or_else(|e| {
         crate::log!("error: {e:#}");
         BTreeMap::new()
     })
 }
 
+/// The first time the game's `map_presets.txt` is there (the game may have made it first): the app's own presets
+/// join it (a name in both keeps the game's), so none is lost. From then on that file is the one list.
+fn merge_presets_once(paths: &Paths) {
+    // once for all folders (a folder's own marker is from before they shared the list)
+    let done = paths.data.join("map-presets.merged");
+    if done.exists() || super::bridge::dir(paths).join("map_presets.merged").exists() {
+        return;
+    }
+    let Ok(mine) = read_json::<BTreeMap<String, Vec<String>>>(&presets_file(paths)) else { return };
+    let mut all = game_presets(paths);
+    for (name, ids) in mine {
+        all.entry(name).or_insert(ids);
+    }
+    let one_line = |s: &str| s.replace(['\t', '\r', '\n'], " ");
+    super::bridge::write_for_game(&super::bridge::dir(paths).join("map_presets.txt"), all.iter().map(|(n, ids)| format!("{}\t{}\n", one_line(n), ids.join(";"))).collect::<String>());
+    let _ = fs::write(done, "");
+}
+
+/// The game's map presets: PZMM - Client's `map_presets.txt`, `<name>\t<id>;<id>;...` lines.
+fn game_presets(paths: &Paths) -> BTreeMap<String, Vec<String>> {
+    presets_in(&shared_list(paths).unwrap_or_else(|| super::bridge::dir(paths)))
+}
+
+/// The game folder with the shared list: the newest `map_presets.txt` of every one (PZMM writes them all, a game
+/// only its own, so an edit made in game in another profile's folder, a delete too, stands). None before there's one.
+fn shared_list(paths: &Paths) -> Option<PathBuf> {
+    let changed = |d: &PathBuf| fs::metadata(d.join("map_presets.txt")).and_then(|m| m.modified()).ok();
+    let dirs = std::iter::once(super::bridge::dir(paths)).chain(crate::profile::list(paths).into_iter().map(|n| super::bridge::dir_for(paths, &n)));
+    // the active folder wins a tie (max_by_key keeps the last of equals, so it goes last)
+    let mut all: Vec<PathBuf> = dirs.collect();
+    all.reverse();
+    all.into_iter().filter_map(|d| Some((changed(&d)?, d))).max_by_key(|(t, _)| *t).map(|(_, d)| d)
+}
+
+/// The `map_presets.txt` in bridge folder `dir`.
+fn presets_in(dir: &Path) -> BTreeMap<String, Vec<String>> {
+    let text = fs::read_to_string(dir.join("map_presets.txt")).unwrap_or_default();
+    text.lines()
+        .filter_map(|l| l.trim_end_matches('\r').split_once('\t'))
+        .filter(|(name, _)| !name.trim().is_empty())
+        .map(|(name, ids)| (name.to_string(), ids.split(';').map(str::trim).filter(|i| !i.is_empty()).map(String::from).collect()))
+        .collect()
+}
+
 /// Save preset `name` (None deletes it). A file that can't be read is never saved over.
 pub fn set_preset(paths: &Paths, name: &str, ids: Option<Vec<String>>) -> Result<()> {
-    let mut all: BTreeMap<String, Vec<String>> = read_json(&presets_file(paths)).context("nothing was saved")?;
+    // the shared list once there is one (edits and deletes made in game stand), else the app's own
+    let shared = shared_list(paths).is_some();
+    if shared {
+        merge_presets_once(paths);
+    }
+    let mut all: BTreeMap<String, Vec<String>> = if shared { game_presets(paths) } else { read_json(&presets_file(paths)).context("nothing was saved")? };
     match ids {
         Some(ids) => all.insert(name.trim().to_string(), ids),
         None => all.remove(name),
     };
     fs::create_dir_all(&paths.data)?;
-    Ok(crate::write_atomic(&presets_file(paths), serde_json::to_vec_pretty(&all)?)?)
+    crate::write_atomic(&presets_file(paths), serde_json::to_vec_pretty(&all)?)?;
+    // the game sees them too (one deleted here goes from the game's list as well), where PZMM - Client is
+    let one_line = |s: &str| s.replace(['\t', '\r', '\n'], " ");
+    let text: String = all.iter().map(|(n, ids)| format!("{}\t{}\n", one_line(n), ids.join(";"))).collect();
+    // every game folder (each profile's own, and Zomboid's) shares the one list
+    let mut done: Vec<PathBuf> = vec![];
+    for dir in std::iter::once(super::bridge::dir(paths)).chain(crate::profile::list(paths).iter().map(|n| super::bridge::dir_for(paths, n))) {
+        if dir.is_dir() && !done.iter().any(|d| super::bridge::same_dir(d, &dir)) {
+            super::bridge::write_for_game(&dir.join("map_presets.txt"), &text);
+            done.push(dir);
+        }
+    }
+    Ok(())
 }
 
 // --- background image ---
@@ -1710,6 +1776,22 @@ mod tests {
         fs::create_dir(&file).unwrap();
         assert!(set_preset(&paths, "Other", Some(vec![])).is_err());
         assert!(file.is_dir());
+    }
+
+    #[test]
+    fn the_games_preset_list_takes_the_apps_in_once() {
+        let (_t, paths) = store::tests::temp_paths();
+        set_preset(&paths, "Mine", Some(vec!["A".into()])).unwrap();
+        // the game made its list first
+        let shared = super::super::bridge::dir(&paths).join("map_presets.txt");
+        fs::create_dir_all(shared.parent().unwrap()).unwrap();
+        fs::write(&shared, "Theirs\tB;C\n").unwrap();
+        assert_eq!(presets(&paths).into_keys().collect::<Vec<_>>(), ["Mine", "Theirs"], "none lost");
+        // from then on it's the one list: a delete in the game stands
+        fs::write(&shared, "Theirs\tB;C\n").unwrap();
+        assert_eq!(presets(&paths).into_keys().collect::<Vec<_>>(), ["Theirs"]);
+        set_preset(&paths, "New", Some(vec!["D".into()])).unwrap();
+        assert_eq!(fs::read_to_string(&shared).unwrap(), "New\tD\nTheirs\tB;C\n");
     }
 
     #[test]

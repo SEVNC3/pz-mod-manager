@@ -187,10 +187,19 @@ pub fn safe_file_name(name: &str) -> bool {
 /// (saving over it would wipe it).
 pub(crate) fn read_json<T: serde::de::DeserializeOwned + Default>(file: &std::path::Path) -> anyhow::Result<T> {
     use anyhow::Context;
-    let bytes = match std::fs::read(file) {
-        Ok(b) => b,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(T::default()),
-        Err(e) => return Err(e).with_context(|| format!("reading {}", file.display())),
+    let mut tries = 0;
+    let bytes = loop {
+        match std::fs::read(file) {
+            Ok(b) => break b,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(T::default()),
+            // a scanner on Windows holds a file a moment: read again before it counts as unreadable
+            // ERROR_SHARING_VIOLATION (32) and ERROR_LOCK_VIOLATION (33), or access denied while a scanner has it
+            Err(e) if tries < 3 && (e.kind() == std::io::ErrorKind::PermissionDenied || matches!(e.raw_os_error(), Some(32 | 33))) => {
+                tries += 1;
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            Err(e) => return Err(e).with_context(|| format!("reading {}", file.display())),
+        }
     };
     Ok(serde_json::from_slice(&bytes).unwrap_or_else(|e| {
         let bad = file.with_extension("json.bad");

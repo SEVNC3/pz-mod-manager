@@ -41,6 +41,8 @@ pub fn steam_roots() -> Vec<PathBuf> {
 
 /// `<library>/<rel>` for the first Steam library that has it, e.g. `steamapps/common/ProjectZomboid`.
 pub fn library_path(rel: &str) -> Option<PathBuf> {
+    // first a library Steam installed the game in (its manifest): an old one may still have the folder
+    let mut leftover = None;
     for root in steam_roots() {
         let vdf = std::fs::read_to_string(root.join("steamapps/libraryfolders.vdf")).unwrap_or_default();
         let libs = vdf.lines().filter_map(|l| {
@@ -50,11 +52,15 @@ pub fn library_path(rel: &str) -> Option<PathBuf> {
         for lib in std::iter::once(root.clone()).chain(libs) {
             let d = rel.split('/').fold(lib.clone(), |p, s| p.join(s));
             if d.is_dir() {
-                return Some(d);
+                let app = if rel.contains("Dedicated Server") { "380870" } else { "108600" };
+                if lib.join("steamapps").join(format!("appmanifest_{app}.acf")).is_file() {
+                    return Some(d);
+                }
+                leftover.get_or_insert(d);
             }
         }
     }
-    None
+    leftover
 }
 
 /// The SteamID64 of the account signed in to the running Steam client: Steam records its account
@@ -273,7 +279,8 @@ fn browse_url(app: &str, q: &Query) -> String {
 
 /// Search or browse the Workshop for `app`.
 pub fn browse(app: &str, q: &Query) -> Result<Page> {
-    parse_browse(&String::from_utf8_lossy(&cached_get(&browse_url(app, q))?))
+    let url = browse_url(app, q);
+    parse_browse(&String::from_utf8_lossy(&cached_if(url.clone(), || super::http_get(&url), |b| parse_browse(&String::from_utf8_lossy(b)).is_ok())?))
 }
 
 /// Steam renders the browse page server-side and embeds its data as JSON
@@ -330,6 +337,11 @@ fn parse_browse(html: &str) -> Result<Page> {
 /// Steam answers kept for a few minutes: paging back and forth, reopening an item or a big
 /// collection's details would otherwise ask Steam again and run into its rate limit (HTTP 429).
 fn cached(key: String, fetch: impl FnOnce() -> Result<Vec<u8>>) -> Result<Vec<u8>> {
+    cached_if(key, fetch, |_| true)
+}
+
+/// [`cached`], keeping only an answer `good` accepts (a busy Steam's error page isn't kept for later asks).
+fn cached_if(key: String, fetch: impl FnOnce() -> Result<Vec<u8>>, good: impl Fn(&[u8]) -> bool) -> Result<Vec<u8>> {
     use std::time::{Duration, Instant};
     const KEEP: Duration = Duration::from_secs(5 * 60);
     // ponytail: in memory for the session only; persist to disk if restarts still hit 429s
@@ -339,6 +351,9 @@ fn cached(key: String, fetch: impl FnOnce() -> Result<Vec<u8>>) -> Result<Vec<u8
         return Ok(hit.clone());
     }
     let got = fetch()?;
+    if !good(&got) {
+        return Ok(got);
+    }
     let mut c = CACHE.lock().unwrap_or_else(|e| e.into_inner());
     let c = c.get_or_insert_with(Default::default);
     c.retain(|_, (at, _)| at.elapsed() < KEEP);
@@ -450,8 +465,14 @@ pub fn required_items(id: &str) -> Result<Vec<String>> {
     if let Some(hit) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|c| c.get(id)) {
         return Ok(hit.clone());
     }
-    let html = String::from_utf8_lossy(&cached_get(&format!("https://steamcommunity.com/sharedfiles/filedetails/?id={id}"))?).into_owned();
-    let req = parse_required(&html);
+    let url = format!("https://steamcommunity.com/sharedfiles/filedetails/?id={id}");
+    // an item's own page (its title is there): an error page says nothing about what it requires
+    let page = |b: &[u8]| String::from_utf8_lossy(b).contains("workshopItemTitle");
+    let bytes = cached_if(url.clone(), || super::http_get(&url), page)?;
+    if !page(&bytes) {
+        bail!("Steam didn't show the page of workshop:{id}");
+    }
+    let req = parse_required(&String::from_utf8_lossy(&bytes));
     CACHE.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(Default::default).insert(id.to_string(), req.clone());
     Ok(req)
 }
@@ -471,7 +492,9 @@ pub fn item_page(id: &str) -> Result<ItemPage> {
     if !valid_id(id) {
         bail!("not a Workshop id: {id}");
     }
-    let html = String::from_utf8_lossy(&cached_get(&format!("https://steamcommunity.com/sharedfiles/filedetails/?id={id}"))?).into_owned();
+    // kept only when it's the item's own page (the same cache entry required_items reads)
+    let url = format!("https://steamcommunity.com/sharedfiles/filedetails/?id={id}");
+    let html = String::from_utf8_lossy(&cached_if(url.clone(), || super::http_get(&url), |b| String::from_utf8_lossy(b).contains("workshopItemTitle"))?).into_owned();
     Ok(parse_item_page(&html))
 }
 
@@ -791,7 +814,8 @@ fn finished_items(out: impl Read + Send + 'static, limit: Duration, stop: &Atomi
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) if since.elapsed() < limit && !stop.load(Relaxed) => {}
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                 kill();
-                done.extend(rx); // the output ends with the process: items finished just before count
+                // items finished just before count; bounded, as a process SteamCMD left behind may hold the pipe open
+                done.extend(std::iter::from_fn(|| rx.recv_timeout(Duration::from_secs(1)).ok()));
                 return (done, true);
             }
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return (done, false),

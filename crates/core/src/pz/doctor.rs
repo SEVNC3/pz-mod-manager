@@ -120,7 +120,8 @@ pub fn check(paths: &Paths, enabled: &[String], mods: &BTreeMap<String, Row>, bu
             items_of.entry(m.id).or_default().extend(item);
         }
     }
-    let game = super::logs::game_version(&paths.zomboid).filter(|_| build >= 42);
+    let own = crate::profile::launch_of(paths, &crate::profile::active_name(paths)).cache_dir;
+    let game = own.and_then(|z| super::logs::game_version(&z)).or_else(|| super::logs::game_version(&paths.zomboid)).filter(|_| build >= 42);
     // what ZombieBuddy knows (tests never read the real home folder)
     let (authors, approvals) = match super::javamods::zb_config_dir().filter(|_| !cfg!(test)) {
         Some(d) => (super::javamods::known_authors(mods), super::javamods::read_approvals(&d.join("mod_approvals.json"))),

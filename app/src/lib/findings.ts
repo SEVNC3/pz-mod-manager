@@ -73,7 +73,9 @@ export function remedies(f: Finding, ids: string[], x: Fixes): Remedy[] {
   switch (f.key) {
     case "notInstalled":
       return [{ label: "download", icon: "download", run: async () => {
-        for (const id of ids) await x.install(id, id); // one at a time: each places its mods in the list
+        let ok = true;
+        for (const id of ids) ok = (await x.install(id, id)) !== false && ok; // one at a time: each places its mods in the list
+        return ok;
       }, safe: true }, ...off];
     case "needsMissing":
       return [{ label: "downloadReq", vars: { req: v.req }, icon: "download", run: () => x.install(v.req, ids[0]), safe: true }, ...off];
@@ -142,7 +144,7 @@ export function remedies(f: Finding, ids: string[], x: Fixes): Remedy[] {
     case "missingSet":
     case "notPzSet":
     case "notPz":
-      return [...(v.key ? [{ label: "autodetect", icon: "refresh" as IconName, run: () => x.folderAuto(v.key) }] : []), { label: "openSettings", icon: "settings", run: () => x.go("settings") }];
+      return [...(v.key && f.key !== "notPz" ? [{ label: "autodetect", icon: "refresh" as IconName, run: () => x.folderAuto(v.key) }] : []), { label: "openSettings", icon: "settings", run: () => x.go("settings") }];
     case "missingEnv":
     case "notPzEnv":
     case "folderWarning":

@@ -76,12 +76,13 @@
   const enabled = (e: FeedEntry) => e.mods.some((id) => order.includes(id));
   const shown = $derived((feed?.entries ?? []).filter((e) => !enabledOnly || enabled(e)));
   const pinned = $derived(shown.slice(0, PINNED));
-  /** Newest day first, as the entries come. */
+  /** Newest day first, as the entries come; updates with nothing to read come last, under their own heading. */
   const days = $derived.by(() => {
     const out: [string, FeedEntry[]][] = [];
     const fmt = new Intl.DateTimeFormat(numLocale(), { weekday: "long", month: "long", day: "numeric", year: "numeric" });
     for (const e of shown) {
-      const day = fmt.format(new Date(e.updated * 1000));
+      const nothing = e.loaded && !e.notes.some((n) => n.text.trim()) && !e.bundled?.entries.length;
+      const day = !nothing ? fmt.format(new Date(e.updated * 1000)) : t("feed.withoutNotes");
       if (out.at(-1)?.[0] === day) out.at(-1)![1].push(e);
       else out.push([day, [e]]);
     }
