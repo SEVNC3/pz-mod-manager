@@ -1,4 +1,8 @@
 # 0.2.0
+- **Get the desktop app.** If you don't have PZMM yet, download it free from github.com/SEVNC3/pz-mod-manager (Windows and Linux). This screen does most of what it does; the app does the rest, and the two work together.
+- **A massive update.** We've worked hard to fully replicate the desktop app in the game: the same tabs, the same look and the same way of working, from your mod list and load order to maps, saves, servers and Check setup.
+- **Sync across both.** If you have the app too, the two now stay in sync: your profile, sections, load order, settings, accent colour and theme, and one activity list of what each did. Change your mods in the app while this screen is open and Use PZMM's mods takes them here.
+- **Made for using both.** With the app installed, the game hands it what it can't do itself (installs, save backups, Workshop browsing, Check setup's fixes), and Open in PZMM takes you to the same tab in the app.
 - **What's new puts updates you can read first.** Mods whose updates have change notes or a changelog fill the scraps of paper and the top of the history. Updates with nothing to read go to the bottom, under No change notes.
 - **Two rows of notes.** The What's new board keeps to two rows of scraps; the rest are in the history below.
 - **The What's new count clears** once you open it, and comes back only for newer updates.
@@ -50,4 +54,9 @@
 - **Larger text** in PZMM Settings.
 - **Back and Game's mod screen** sit at the top right, where the app's window buttons are.
 - **Activity, as in the app.** The bar at the bottom shows the latest thing that happened; open it for the whole list with times, and Copy it. It has what you did here, what PZMM did for the game (its lines start with PZMM), when PZMM starts, closes, switches profile or changes your sections, and why PZMM said no to something.
-- **Fixes.** Only this one turns off just that mod. Back's Don't save keeps your load order, and favourites count as changes. Rescan keeps what isn't saved yet. Continue forgets a save you deleted, and Play says why a save can't load. What's new uses Steam's list until PZMM brings change notes. No more ZombieBuddy errors in the log when it isn't installed.
+- **In your language.** This screen follows the game's language, in 10 of them.
+- **The app's look, light or dark.** It takes PZMM's accent colour and theme when you have the app.
+- **What's missing, in one place.** A short note at the top of a tab says some features are only in the app; View lists them.
+- **Knox County on the Maps grid.** The game's own map in grey, with your map mods over it in yellow, so you see what each one changes.
+- **The same numbers as the app.** With PZMM, Problems, Overridden and the load order Use PZMM's mods brings are worked out the same way on both sides.
+- **Fixes.** Only this one turns off just that mod. Back's Don't save keeps your load order, and favourites count as changes. Rescan keeps what isn't saved yet. Continue forgets a save you deleted, and Play says why a save can't load. What's new uses Steam's list until PZMM brings change notes. No more ZombieBuddy errors in the log when it isn't installed. Translated text no longer slows the Servers tab. Times show in your time zone. Pasting into search filters the list. The Maps tab keeps its footer, Back and Accept.

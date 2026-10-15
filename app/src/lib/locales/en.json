@@ -3538,7 +3538,7 @@
     "settingsHint": "You can change this later in Settings."
   },
   "whatsNew": {
-    "notes": "Batch actions now hit every selected mod\nWorkshop chips subscribe and unsubscribe in one click\nJava mods you turn on are approved in ZombieBuddy for you\nLaunch warnings come with a fix, and fewer false alarms\nCheck setup sorts problems by how bad they are, each with a fix\nDownload history of every install, update and removal\nBuild 42 only mods offer to switch builds\nFaster Workshop browsing, with a progress bar\nRescan picks up mods downloaded outside PZMM\nChoose what closing the window does",
+    "notes": "A massive update: the in-game mod manager now matches the app\nGet PZMM - Client on the Steam Workshop to use it in game\nEvery tab from the app, in game, in 10 languages\nThe app and the game sync your profile, sections and load order\nAsk PZMM from the game to install, back up or run Check setup\nProblems, overridden files and updates agree on both sides\nUpdates no longer bring back mods you removed\nWorkshop copies never replace your GitHub or local installs\nMap presets are one list across your game folders\nLots of fixes from two full bug sweeps",
     "title": "What's new in {version}",
     "enjoying": "Enjoying PZMM?",
     "upvote": "If you're enjoying this app please upvote it on Steam!",

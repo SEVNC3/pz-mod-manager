@@ -3538,7 +3538,7 @@
     "settingsHint": "Tu peux le changer plus tard dans les Réglages."
   },
   "whatsNew": {
-    "notes": "Les actions groupées s'appliquent à tous les mods sélectionnés\nLes pastilles Workshop s'abonnent et se désabonnent en un clic\nLes mods Java que tu actives sont autorisés dans ZombieBuddy pour toi\nLes alertes au lancement proposent une correction, et moins de fausses alertes\nVérifier la config trie les problèmes par gravité, chacun avec sa solution\nHistorique des téléchargements : chaque installation, mise à jour et suppression\nLes mods réservés au Build 42 proposent de changer de build\nNavigation Workshop plus rapide, avec barre de progression\nRescanner trouve les mods téléchargés hors de PZMM\nChoisis ce que fait la fermeture de la fenêtre",
+    "notes": "Une énorme mise à jour : le gestionnaire de mods en jeu reprend maintenant l’app\nInstallez PZMM - Client depuis le Steam Workshop pour l’utiliser en jeu\nTous les onglets de l’app, en jeu, en 10 langues\nL’app et le jeu synchronisent votre profil, vos sections et l’ordre de chargement\nDemandez à PZMM depuis le jeu d’installer, de sauvegarder ou de vérifier la configuration\nProblèmes, fichiers remplacés et mises à jour concordent des deux côtés\nLes mises à jour ne remettent plus les mods que vous avez retirés\nUne copie du Workshop ne remplace jamais vos installations GitHub ou locales\nLes préréglages de cartes forment une seule liste pour tous vos dossiers de jeu\nDe nombreux correctifs issus de deux chasses aux bugs complètes",
     "title": "Nouveautés de la {version}",
     "enjoying": "PZMM te plaît ?",
     "upvote": "Si l'appli te plaît, vote pour elle sur Steam !",

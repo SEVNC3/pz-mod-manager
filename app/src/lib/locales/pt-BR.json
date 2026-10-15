@@ -3538,7 +3538,7 @@
     "settingsHint": "Você pode mudar isso depois nas Configurações."
   },
   "whatsNew": {
-    "notes": "Ações em lote valem para todos os mods selecionados\nAs etiquetas do Workshop inscrevem e cancelam com um clique\nMods Java que você ativa são permitidos no ZombieBuddy por você\nAvisos ao iniciar vêm com correção, e menos alarmes falsos\nVerificar configuração ordena os problemas por gravidade, cada um com sua correção\nHistórico de cada instalação, atualização e remoção\nMods só para a Build 42 oferecem trocar de build\nWorkshop mais rápido, com barra de progresso\nReescanear encontra mods baixados fora do PZMM\nEscolha o que fechar a janela faz",
+    "notes": "Uma atualização enorme: o gerenciador de mods no jogo agora é igual ao app\nPegue o PZMM - Client na Oficina Steam para usá-lo no jogo\nTodas as abas do app, no jogo, em 10 idiomas\nO app e o jogo sincronizam seu perfil, seções e ordem de carregamento\nPeça ao PZMM pelo jogo para instalar, fazer backup ou verificar a configuração\nProblemas, arquivos sobrescritos e atualizações batem nos dois lados\nAtualizações não trazem mais de volta mods que você removeu\nCópias da Oficina nunca substituem suas instalações do GitHub ou locais\nPresets de mapas são uma lista só em todas as pastas do jogo\nMuitas correções de duas varreduras completas de bugs",
     "title": "Novidades da {version}",
     "enjoying": "Curtindo o PZMM?",
     "upvote": "Se você curte este app, vote nele no Steam!",

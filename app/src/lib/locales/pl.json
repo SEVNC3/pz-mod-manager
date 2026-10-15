@@ -3888,7 +3888,7 @@
     "settingsHint": "Możesz to później zmienić w Ustawieniach."
   },
   "whatsNew": {
-    "notes": "Akcje zbiorcze działają na wszystkie zaznaczone mody\nEtykiety Workshop subskrybują i anulują jednym kliknięciem\nWłączone mody Java są zatwierdzane w ZombieBuddy za ciebie\nOstrzeżenia przy starcie mają naprawę, i mniej fałszywych alarmów\nSprawdź konfigurację sortuje problemy według wagi, każdy z poprawką\nHistoria każdej instalacji, aktualizacji i usunięcia\nMody tylko dla Build 42 proponują zmianę builda\nSzybsze przeglądanie Workshop, z paskiem postępu\nSkanuj ponownie znajduje mody pobrane poza PZMM\nWybierz, co robi zamknięcie okna",
+    "notes": "Ogromna aktualizacja: menedżer modów w grze działa teraz jak aplikacja\nPobierz PZMM - Client z Warsztatu Steam, aby używać go w grze\nKażda karta aplikacji, w grze, w 10 językach\nAplikacja i gra synchronizują profil, sekcje i kolejność ładowania\nPoproś PZMM z gry o instalację, kopię zapasową lub sprawdzenie konfiguracji\nProblemy, nadpisane pliki i aktualizacje zgadzają się po obu stronach\nAktualizacje nie przywracają już usuniętych modów\nKopie z Warsztatu nigdy nie zastępują instalacji z GitHuba ani lokalnych\nPresety map to jedna lista dla wszystkich folderów gry\nMnóstwo poprawek z dwóch pełnych przeglądów błędów",
     "title": "Co nowego w {version}",
     "enjoying": "Podoba ci się PZMM?",
     "upvote": "Jeśli podoba ci się ta aplikacja, oceń ją na Steam!",
