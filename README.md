@@ -95,7 +95,7 @@ Your library and the load order are two separate lists, like Mod Organizer 2. Ar
 **Autosort** puts frameworks first and translations last, and satisfies every `require`, `loadModAfter` and `loadModBefore` line the mods ship with. It reads and writes Mod Load Order Sorter's rules too. Don't like what it did? Ctrl+Z.
 
 <p align="center">
-  <img src="docs/media/autosort.gif" alt="Clicking Autosort: the load order rearranges so the framework mods move to the top and the problem count drops" width="720">
+  <img src="docs/media/autosort.gif" alt="Dragging a mod into place, renaming a group to Survival, adding a favourite, then Autosort: the load order sorts itself and problems drop from 6 to 1" width="720">
 </p>
 
 ### Find the broken mod
@@ -121,7 +121,7 @@ The whole Workshop inside the app: search, tags, B41 and B42 filters, popular ov
 Every Workshop map, installed or not, on one cell grid. You see the clashes before you subscribe to anything, PZMM can pick the biggest set that fits, and it writes the map order for you (or for your server).
 
 <p align="center">
-  <img src="docs/media/maps.gif" alt="The Maps tab: a cell grid of the world with coloured map mods placed on it, the map list beside it, and two overlapping maps flagged as a conflict" width="720">
+  <img src="docs/media/maps.gif" alt="The Maps tab: ticking Constown on shows its cells on the world map, its clash with Grapeseed turns red, and Swap clears it" width="720">
 </p>
 
 ### Project Viewpoint and ZombieBuddy in one click
@@ -129,7 +129,7 @@ Every Workshop map, installed or not, on one cell grid. You see the clashes befo
 **Set up Project Viewpoint…** in the profile menu shows you every change first, then downloads [ZombieBuddy](https://github.com/zed-0xff/ZombieBuddy) and Viewpoint from the Workshop, copies ZombieBuddy's files into the game folder (on any drive), adds the launch flag and makes a Viewpoint profile. Your normal mods stay in their own profile. When a game update or Steam's "Verify integrity of game files" removes the flag, PZMM notices and fixes it in one click. Java mods you turn on in PZMM are approved in ZombieBuddy when you press Play, so the game doesn't ask again (jars with scan warnings, or not from the Workshop, still ask).
 
 <p align="center">
-  <img src="docs/media/viewpoint.gif" alt="Setting up Project Viewpoint: choosing Set up Project Viewpoint from the profile menu, the new Viewpoint profile with ZombieBuddy and Project Viewpoint at the top of the load order, and the ZombieBuddy page with every setup step ticked" width="720">
+  <img src="docs/media/viewpoint.gif" alt="The Java mods tab: a game update resets ZombieBuddy's launch flag, Repair ZombieBuddy fixes it, then Set up Project Viewpoint makes the Viewpoint profile" width="720">
 </p>
 
 Viewpoint is made by ellu and norkus, and ZombieBuddy by zed-0xff. They're their projects, not mine; PZMM only installs and manages them. Viewpoint bugs belong on [the Viewpoint Discord](https://discord.gg/g83XvPhEgQ), PZMM bugs on [mine](https://discord.com/invite/6URUy6mNzu).
