@@ -6980,6 +6980,7 @@ end
 
 PZMMNews = ISPanel:derive("PZMMNews")
 K.NEWS_W, K.NEWS_OPEN_W, K.NEWS_HEAD, K.NEWS_TABS = 280, 460, 60, H_SMALL + 19
+K.NEWS_GAP = 12 -- between the versions line and the tabs, open
 -- PZMM - Client on the Workshop: where a thumbs-up helps
 K.STEAM_PAGE = "https://steamcommunity.com/sharedfiles/filedetails/?id=3818460225"
 K.WHITE, K.PROMO_BG, K.PROMO_LINE, K.PROMO_RED, K.PROMO_TEXT = hex("ffffff"), hex("141414"), hex("2e2e2e"), hex("e0382f"), hex("e8e8e6")
@@ -7057,10 +7058,10 @@ function PZMMNews:prerender()
         lines = c.lines
         -- the notes scroll inside a capped body, so a long patch never runs off the screen
         self.bodyFull = #lines * (H_SMALL + 2)
-        local room = getCore():getScreenHeight() - 24 - 120 - (K.NEWS_HEAD + K.NEWS_TABS + 14 + H_SMALL + 28)
+        local room = getCore():getScreenHeight() - 24 - 120 - (K.NEWS_HEAD + K.NEWS_GAP + K.NEWS_TABS + 14 + H_SMALL + 28)
         self.bodyH = math.min(self.bodyFull, math.max(120, math.min(420, room)))
         self.newsScroll = math.max(0, math.min(self.newsScroll or 0, self.bodyFull - self.bodyH))
-        h = h + K.NEWS_TABS + 14 + self.bodyH + H_SMALL + 28 + K.promoH() + 12
+        h = h + K.NEWS_GAP + K.NEWS_TABS + 14 + self.bodyH + H_SMALL + 28 + K.promoH() + 12
     end
     self:setHeight(h)
     round(self, 0, 0, w, h, 10, C.panel, 0.94)
@@ -7071,24 +7072,28 @@ function PZMMNews:prerender()
     end
     image(self, K.LOGO, 10, 10, 40, 40)
     bold(self, "PZMM patch notes", 60, 10, C.text, MEDIUM)
-    local versions, fresh = {}, false
+    -- each part's name and version, in pixel gaps (this font draws a space almost no width)
+    local fresh, vx = false, 60
     for _, n in ipairs(K.NOTES) do
-        versions[#versions + 1] = (n.kind == "game" and "In game " or "App ") .. n.version
+        local name = n.kind == "game" and "In game" or "App"
+        text(self, name, vx, 12 + H_MEDIUM, C.muted)
+        vx = vx + width(name) + 6
+        text(self, n.version, vx, 12 + H_MEDIUM, C.text)
+        vx = vx + width(n.version) + 20
         fresh = fresh or self:fresh(n)
     end
-    text(self, table.concat(versions, "   "), 60, 12 + H_MEDIUM, C.muted)
     local rx = w - 14 - width("+", MEDIUM)
     text(self, self.open and "-" or "+", rx, (K.NEWS_HEAD - H_MEDIUM) / 2, C.muted, MEDIUM)
     if fresh then bang(self, rx - 32, math.floor((K.NEWS_HEAD - 20) / 2)) end
     if not self.open then return end
 
     -- the tabs, as the app's: a red wash and a white underline on the open or hovered one
-    local tx, top = 12, K.NEWS_HEAD
+    local tx, top = 12, K.NEWS_HEAD + K.NEWS_GAP
     self.tabBoxes = {}
     for _, n in ipairs(K.NOTES) do
-        local label = n.label .. "  " .. n.version
+        local label = n.label
         local mark = self:fresh(n)
-        local tw = width(label) + 28 + (mark and 28 or 0)
+        local tw = width(label) + 10 + width(n.version) + 28 + (mark and 28 or 0)
         local on = self.tab == n
         local over = mx >= tx and mx < tx + tw and my >= top and my < top + K.NEWS_TABS
         if over then
@@ -7102,8 +7107,10 @@ function PZMMNews:prerender()
             rect(self, tx + tw - 1, top + 3, 1, K.NEWS_TABS - 4, C.accent, 0.7)
             rect(self, tx, top + K.NEWS_TABS - 3, tw, 2, C.text, 1)
         end
-        text(self, label, tx + 14, top + (K.NEWS_TABS - H_SMALL) / 2, (on or over) and C.onSelected or C.muted)
-        if mark then bang(self, tx + 14 + width(label) + 8, top + math.floor((K.NEWS_TABS - 20) / 2)) end
+        local ly = top + (K.NEWS_TABS - H_SMALL) / 2
+        text(self, label, tx + 14, ly, (on or over) and C.onSelected or C.muted)
+        bold(self, n.version, tx + 14 + width(label) + 10, ly, (on or over) and C.onSelected or C.text)
+        if mark then bang(self, tx + 14 + width(label) + 10 + width(n.version) + 8, top + math.floor((K.NEWS_TABS - 20) / 2)) end
         self.tabBoxes[#self.tabBoxes + 1] = { n, tx, tw }
         tx = tx + tw + 2
     end
@@ -7176,7 +7183,8 @@ function PZMMNews:onMouseDown(x, y)
         return true
     end
     if not self.open then return true end
-    if y < K.NEWS_HEAD + K.NEWS_TABS then
+    if y < K.NEWS_HEAD + K.NEWS_GAP + K.NEWS_TABS then
+        if y < K.NEWS_HEAD + K.NEWS_GAP then return true end
         for _, t in ipairs(self.tabBoxes or {}) do
             if x >= t[2] and x < t[2] + t[3] then
                 getSoundManager():playUISound("UISelectListItem")
