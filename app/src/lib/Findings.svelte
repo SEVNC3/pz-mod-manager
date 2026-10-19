@@ -5,7 +5,7 @@
 
   // The find-the-broken-mod rounds (Check setup's results are its own window, CheckSetup.svelte).
   let { bisect, busy, onBisectAnswer, onBisectStop }: {
-    bisect: { suspects: string[]; testing: string[]; round: number } | null;
+    bisect: { suspects: string[][]; testing: string[][]; round: number } | null;
     busy: boolean;
     onBisectAnswer: (stillBroken: boolean) => void;
     onBisectStop: () => void;
@@ -16,7 +16,7 @@
   <div class="findings" role="region" aria-label={t("findings.findBroken")}>
     <p>
       <strong>{t("findings.round", { round: bisect.round })}</strong>
-      {t("findings.suspects", { count: bisect.suspects.length, testing: fmtNum(bisect.testing.length) })}
+      {t("findings.suspects", { count: bisect.suspects.flat().length, testing: fmtNum(bisect.testing.flat().length) })}
       {t("findings.testHint")}
     </p>
     <div class="row">

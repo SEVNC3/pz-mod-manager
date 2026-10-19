@@ -35,7 +35,7 @@
   import Settings from "$lib/Settings.svelte";
   import { applyPrefs, prefs } from "$lib/prefs.svelte";
   import ModTable from "$lib/ModTable.svelte";
-  import { autosort, bisectRound, dependants, findProblems, groupByCategory, loadList, moveSection, neededBy, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortByName, sortLoadOrder, syncOrder, tiers } from "$lib/order";
+  import { autosort, bisectGroups, bisectNext, bisectRound, bisectUpgrade, dependants, findProblems, groupByCategory, loadList, moveSection, neededBy, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortByName, sortLoadOrder, syncOrder, tiers } from "$lib/order";
   import LoadOrder from "$lib/LoadOrder.svelte";
   import WindowControls from "$lib/WindowControls.svelte";
   import ProfilePicker from "$lib/ProfilePicker.svelte";
@@ -1379,7 +1379,8 @@
 
   // --- find a broken mod by halving the suspects each game run ---
   /** `profile`: where it started; its test lists and the restore go there only. */
-  let bisect = $state<{ profile: string; original: Lists; suspects: string[]; testing: string[]; round: number } | null>(null);
+  /** Find the broken mod: suspects and testing are groups of mods that need each other (`bisectGroups`). */
+  let bisect = $state<{ profile: string; original: Lists; suspects: string[][]; testing: string[][]; round: number; confirm?: boolean } | null>(null);
   /** Why profile changes are blocked now ("" when they aren't): a search for a broken mod runs on this profile. */
   const profileLock = $derived(bisect && bisect.profile === view?.profile ? t("findings.finishFirst") : "");
   /** List edits wait for a job, and for a search for a broken mod (it owns the lists until it ends). */
@@ -1493,9 +1494,10 @@
     } catch {}
     if (!b || !view) return; // the mods weren't read: asked next start
     if (!view.profiles.includes(b.profile)) return setBisect(null); // its profile is gone
-    const i = await ask(t("findings.bisectLeft", { profile: b.profile }), [t("findings.bisectLeftLine", { count: b.suspects.length })],
+    b = bisectUpgrade(b, (id) => mods.get(id)?.requires ?? []); // one saved before groups
+    const i = await ask(t("findings.bisectLeft", { profile: b.profile }), [t("findings.bisectLeftLine", { count: b.suspects.flat().length })],
       [{ label: t("findings.bisectResume"), icon: "play" }, { label: t("findings.bisectRestore"), icon: "rollback" }]);
-    if (i === 0) bisect = b;
+    if (i === 0) setBisect(b);
     else if (i === 1) {
       setBisect(null);
       restoreBisected(b.original, b.profile);
@@ -1505,11 +1507,11 @@
   /** False (and said) when the search's profile isn't the active one: its lists mustn't go to another. */
   const onBisectProfile = (b: NonNullable<typeof bisect>) => b.profile === view?.profile || (say("log.bisectOtherProfile", { profile: b.profile }, true), false);
 
-  /** Enabled = everything not under suspicion + the half (or the first `count`) being tested + what those require.
-   * The search moves on only once that list is saved (else it stays where it was, and says so). */
+  /** Enabled = everything not under suspicion + the half (or the first `count`) of the groups being tested, in the
+   * original load order. The search moves on only once that list is saved (else it stays where it was, and says so). */
   async function bisectApply(b: NonNullable<typeof bisect>, count?: number) {
-    const { on, testing } = bisectRound(b.original.rows, b.suspects, (id) => mods.get(id)?.requires ?? [], count);
-    const o = placeAll([...on].filter((id) => !b.original.order.includes(id)), b.original.order); // a requirement that was off
+    const { on, testing } = bisectRound(b.original.rows, b.suspects, count, b.confirm);
+    const o = b.original.order.filter((id) => on.has(id));
     if (await commit(b.original.rows.map((r) => (r.kind === "mod" ? { ...r, on: on.has(r.id) } : r)), o, false, b.profile)) setBisect({ ...b, testing });
     else say("log.bisectSaveFailed", {}, true);
   }
@@ -1525,27 +1527,35 @@
     const kept = await snapshot("bisect");
     pending--;
     if (!kept) return;
-    const lead = first.filter((id) => enabled.includes(id));
-    const suspects = [...lead, ...enabled.filter((id) => !lead.includes(id))];
+    // groups in load order, the ones holding a mod the logs point at first
+    const groups = bisectGroups(order.filter((id) => enabled.includes(id)).concat(enabled.filter((id) => !order.includes(id))), (id) => mods.get(id)?.requires ?? []);
+    const lead = groups.filter((g) => g.some((id) => first.includes(id)));
+    const suspects = [...lead, ...groups.filter((g) => !lead.includes(g))];
     findings = null;
     undoStack = redoStack = []; // undoing into a half-disabled test list would be a trap
+    if (suspects.length < 2) {
+      say("log.bisectOneGroup", { ids: suspects.flat().join(", ") }, true);
+      return;
+    }
     bisectApply({ profile: view?.profile ?? "", original: $state.snapshot({ rows, order }), suspects, testing: [], round: 1 }, lead.length && lead.length < suspects.length ? lead.length : undefined);
   }
 
   function bisectAnswer(stillBroken: boolean) {
     if (!bisect || !onBisectProfile(bisect)) return;
-    const suspects = stillBroken ? bisect.testing : bisect.suspects.filter((s) => !bisect!.testing.includes(s));
-    if (suspects.length <= 1) {
+    const next = bisectNext(bisect, stillBroken);
+    if (!("suspects" in next)) {
       const { original, profile } = bisect;
+      const group = "found" in next ? next.found : [];
       setBisect(null);
       undoStack = redoStack = [];
       restoreBisected(original, profile);
-      say(suspects.length ? "log.bisectFound" : "log.bisectNone", { id: suspects[0] ?? "" }, !!suspects.length);
+      if (group.length > 1) say("log.bisectFoundGroup", { ids: group.join(", ") }, true);
+      else say(group.length ? "log.bisectFound" : "log.bisectNone", { id: group[0] ?? "" }, !!group.length);
       logOpen = true;
-      if (suspects.length) selected = suspects[0];
+      if (group.length) selected = group[0];
       return;
     }
-    bisectApply({ ...bisect, suspects, round: bisect.round + 1 });
+    bisectApply({ ...bisect, ...next, round: bisect.round + 1 });
   }
 
   /** The list from before the search, back; if that can't be saved, Snapshots has it. */

@@ -351,7 +351,9 @@
     "checkSetupFailed": "Impossible de vérifier la configuration : {error}",
     "bisectNeedsTwo": "Activez au moins deux mods pour rechercher un mod défectueux.",
     "bisectFound": "Trouvé : {id} cause le problème. Votre liste de mods est restaurée.",
-    "bisectNone": "Le problème n'est lié à aucun mod en particulier. Votre liste de mods est restaurée.",
+    "bisectNone": "Le problème n’a suivi aucun groupe : il faut peut-être deux mods ensemble. Votre liste de mods est restaurée.",
+    "bisectFoundGroup": "C’est dans ce groupe : {ids}. Ces mods ont besoin les uns des autres, ils ont donc été testés ensemble. Votre liste de mods est restaurée.",
+    "bisectOneGroup": "Vos mods activés ont tous besoin les uns des autres ({ids}) : la recherche ne peut pas les répartir en groupes à tester.",
     "sectionExists": "Une section nommée « {name} » existe déjà. Choisissez un autre nom.",
     "noneOurs": "Aucun des mods sélectionnés n'a été installé par PZMM ; désabonnez-vous des mods Steam dans Steam.",
     "logCopied": "Journal d'activité copié (votre nom d'utilisateur est masqué dans les chemins).",
@@ -448,6 +450,7 @@
     "unsubscribe": "Se désabonner"
   },
   "common": {
+    "imageFailed": "L’image n’a pas pu être chargée",
     "cancel": "Annuler",
     "close": "Fermer",
     "install": "Installer",

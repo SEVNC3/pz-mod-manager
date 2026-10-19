@@ -1,6 +1,7 @@
 // Self-check for src/lib/order.ts. Run: node scripts/order-check.ts
 import assert from "node:assert/strict";
-import { modNeed, keptServers, autosort, bisectRound, dependants, findProblems, neededBy, sortByName, groupByCategory, loadList, moveSection, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortLoadOrder, sortMaps, autosortMaps, solveBackground, syncOrder } from "../src/lib/order.ts";
+import { readFileSync } from "node:fs";
+import { modNeed, keptServers, autosort, bisectGroups, bisectNext, bisectRound, bisectUpgrade, dependants, findProblems, neededBy, sortByName, groupByCategory, loadList, moveSection, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortLoadOrder, sortMaps, autosortMaps, solveBackground, syncOrder } from "../src/lib/order.ts";
 import type { GameServer, ModRow, Row, ServerMods } from "../src/lib/api.ts";
 
 const mod = (id: string, on = true, extra: Partial<ModRow> = {}): Row => ({
@@ -37,16 +38,53 @@ assert.deepEqual(findProblems(inc).get("A"), { key: "problems.incompatible", id:
 const cyc = [mod("X", true, { load_after: ["Y"] }), mod("Y", true, { load_after: ["X"] })];
 assert.equal(ids(sortLoadOrder(cyc)), "+X +Y");
 
-// bisect: first half of the suspects plus their requirements; innocent mods stay on
-const list = [mod("Keep"), mod("S1", true, { requires: ["Lib"] }), mod("S2"), mod("S3"), mod("Lib")];
-const req = (id: string) => (id === "S1" ? ["Lib"] : []);
-const r1 = bisectRound(list, ["S1", "S2", "S3", "Lib"], req);
-assert.deepEqual(r1.testing, ["S1", "S2"]);
-assert.deepEqual([...r1.on].sort(), ["Keep", "Lib", "S1", "S2"]);
-// the logs' suspects go first: the first round tests just them
-const r0 = bisectRound(list, ["S3", "S1", "S2", "Lib"], req, 1);
-assert.deepEqual(r0.testing, ["S3"]);
-assert.deepEqual([...r0.on].sort(), ["Keep", "S3"]);
+// Find the broken mod: the shared fixture's groups, then whole searches for every culprit in every case
+type BisectCase = { name: string; enabled: string[]; requires: Record<string, string[]>; groups: string[][] };
+const fixture: { cases: BisectCase[] } = JSON.parse(readFileSync(new URL("../../tests/fixtures/bisect-groups.json", import.meta.url), "utf8"));
+/** A whole search, the answers given by `broken(on)`: what it ends in, after checking each round's list. */
+function search(c: BisectCase, broken: (on: Set<string>) => boolean, first: string[] = []): { found?: string[]; none?: true; rounds: number } {
+  const need = (id: string) => c.requires[id] ?? [];
+  const original = c.enabled.map((id) => mod(id, true, { requires: need(id) }));
+  const groups = bisectGroups(c.enabled, need);
+  const lead = groups.filter((g) => g.some((id) => first.includes(id)));
+  let s: { suspects: string[][]; testing: string[][]; confirm?: boolean } = { suspects: [...lead, ...groups.filter((g) => !lead.includes(g))], testing: [] };
+  if (s.suspects.length < 2) return { found: s.suspects[0], rounds: 0 }; // one group: said at the start
+  let count: number | undefined = lead.length && lead.length < s.suspects.length ? lead.length : undefined;
+  for (let round = 1; round <= 2 * c.enabled.length + 2; round++) {
+    const { on, testing } = bisectRound(original, s.suspects, count, s.confirm);
+    count = undefined;
+    // never a mod on while an enabled mod it needs is off; the load order kept
+    for (const id of on) for (const r of need(id)) assert.ok(!c.enabled.includes(r) || on.has(r), `${c.name}: ${id} on without ${r}`);
+    const order = c.enabled.filter((id) => on.has(id));
+    assert.deepEqual(order, [...on].sort((a, b) => c.enabled.indexOf(a) - c.enabled.indexOf(b)), `${c.name}: load order`);
+    const next = bisectNext({ ...s, testing }, broken(on));
+    if ("found" in next) return { found: next.found, rounds: round };
+    if ("none" in next) return { none: true, rounds: round };
+    s = { ...next, testing: [] };
+  }
+  assert.fail(`${c.name}: the search didn't end`);
+}
+for (const c of fixture.cases) {
+  assert.deepEqual(bisectGroups(c.enabled, (id) => c.requires[id] ?? []), c.groups, c.name);
+  const groupOf = (id: string) => c.groups.find((g) => g.includes(id))!;
+  // any one mod at fault (a leaf, a framework, a requirement pulled in): its group, and every round checked above
+  for (const culprit of c.enabled) {
+    assert.deepEqual(search(c, (on) => on.has(culprit)).found, groupOf(culprit), `${c.name}: ${culprit}`);
+    assert.deepEqual(search(c, (on) => on.has(culprit), [culprit]).found, groupOf(culprit), `${c.name}: ${culprit}, from the logs`);
+  }
+}
+// the reporter's chain: Viewpoint, ZombieBuddy and Viewpoint's add-ons are found together, never apart
+const vp = fixture.cases[0];
+assert.deepEqual(search(vp, (on) => on.has("BloodFXAddon")).found, ["ZombieBuddy", "Viewpoint", "ViewpointSurface", "ViewpointBloodFX", "BloodFXAddon"]);
+// two mods in different groups that break only together: said, not blamed on one group
+assert.ok(search(vp, (on) => on.has("Solo") && on.has("Ki5Car")).none, "two mods together");
+// fixed with nothing on test: never loops
+assert.ok(search(vp, () => false).none);
+// a search saved before groups (lists of ids) still loads: grouped, testing the groups it was testing
+const old = { round: 3, suspects: ["Lib", "Other", "User"], testing: ["User"] };
+const up = bisectUpgrade(old, (id) => (id === "User" ? ["Lib"] : []));
+assert.deepEqual([up.round, up.suspects, up.testing], [3, [["Lib", "User"], ["Other"]], [["Lib", "User"]]]);
+assert.equal(bisectUpgrade(up, () => []), up, "a grouped one is left as it is");
 
 // the library and the load order: the order follows the library's on/off, never its positions
 const lib: Row[] = [{ kind: "sep", name: "S" }, mod("A"), mod("B", false), mod("C"), mod("D")];

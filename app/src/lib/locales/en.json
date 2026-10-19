@@ -351,7 +351,9 @@
     "checkSetupFailed": "Couldn't check the setup: {error}",
     "bisectNeedsTwo": "Enable at least two mods to search for a broken one.",
     "bisectFound": "Found it: {id} causes the problem. Your mod list is restored.",
-    "bisectNone": "The problem didn't follow any single mod. Your mod list is restored.",
+    "bisectNone": "The problem didn't follow any single group: it may take two mods together. Your mod list is restored.",
+    "bisectFoundGroup": "It's in this group: {ids}. These mods need each other, so they were tested together. Your mod list is restored.",
+    "bisectOneGroup": "Your enabled mods all need each other ({ids}), so the search can't split them into groups to test.",
     "sectionExists": "There's already a section called \"{name}\". Pick another name.",
     "noneOurs": "None of the selected mods were installed by PZMM; unsubscribe Steam mods in Steam.",
     "logCopied": "Copied the activity log (your user name is hidden in paths).",
@@ -448,6 +450,7 @@
     "unsubscribe": "Unsubscribe"
   },
   "common": {
+    "imageFailed": "Image failed to load",
     "cancel": "Cancel",
     "close": "Close",
     "install": "Install",

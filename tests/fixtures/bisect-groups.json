@@ -1,0 +1,321 @@
+{
+  "about": "Find the broken mod bisects over dependency-closed groups. Nodes: the enabled mods, in load order. An edge joins a mod to each requirement that is also enabled (a requirement that is off is followed through to the enabled mods it needs, since turning a group on turns those on too; a requirement that is not installed adds nothing). Each connected component is one group; members keep load order; groups are ordered by their first member. Both the app (order.ts) and the game (PZMMModScreen.lua K.bisectGroups) must produce exactly these groups.",
+  "cases": [
+    {
+      "name": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "enabled": [
+        "ZombieBuddy",
+        "Viewpoint",
+        "ViewpointSurface",
+        "ViewpointBloodFX",
+        "BloodFXAddon",
+        "TsarLib",
+        "Ki5Car",
+        "ALifeFramework",
+        "ALifeNPCs",
+        "Solo"
+      ],
+      "requires": {
+        "Viewpoint": [
+          "ZombieBuddy"
+        ],
+        "ViewpointSurface": [
+          "Viewpoint"
+        ],
+        "ViewpointBloodFX": [
+          "Viewpoint"
+        ],
+        "BloodFXAddon": [
+          "ViewpointBloodFX"
+        ],
+        "Ki5Car": [
+          "TsarLib"
+        ],
+        "ALifeNPCs": [
+          "ALifeFramework"
+        ]
+      },
+      "groups": [
+        [
+          "ZombieBuddy",
+          "Viewpoint",
+          "ViewpointSurface",
+          "ViewpointBloodFX",
+          "BloodFXAddon"
+        ],
+        [
+          "TsarLib",
+          "Ki5Car"
+        ],
+        [
+          "ALifeFramework",
+          "ALifeNPCs"
+        ],
+        [
+          "Solo"
+        ]
+      ]
+    },
+    {
+      "name": "a diamond is one group",
+      "enabled": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "requires": {
+        "B": [
+          "A"
+        ],
+        "C": [
+          "A"
+        ],
+        "D": [
+          "B",
+          "C"
+        ]
+      },
+      "groups": [
+        [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        [
+          "E"
+        ]
+      ]
+    },
+    {
+      "name": "a requirement cycle is one group and terminates",
+      "enabled": [
+        "X",
+        "Y",
+        "Z"
+      ],
+      "requires": {
+        "X": [
+          "Y"
+        ],
+        "Y": [
+          "X"
+        ]
+      },
+      "groups": [
+        [
+          "X",
+          "Y"
+        ],
+        [
+          "Z"
+        ]
+      ]
+    },
+    {
+      "name": "requirements that are off or not installed add no edge",
+      "enabled": [
+        "M",
+        "N",
+        "O"
+      ],
+      "requires": {
+        "M": [
+          "NotInstalled"
+        ],
+        "N": [
+          "InstalledButOff"
+        ],
+        "O": [
+          "M",
+          "NotInstalled"
+        ]
+      },
+      "groups": [
+        [
+          "M",
+          "O"
+        ],
+        [
+          "N"
+        ]
+      ]
+    },
+    {
+      "name": "groups keep load order and follow their first member",
+      "enabled": [
+        "L1",
+        "R1",
+        "L2",
+        "R2"
+      ],
+      "requires": {
+        "L2": [
+          "L1"
+        ],
+        "R2": [
+          "R1"
+        ]
+      },
+      "groups": [
+        [
+          "L1",
+          "L2"
+        ],
+        [
+          "R1",
+          "R2"
+        ]
+      ]
+    },
+    {
+      "name": "a requirement listed before its user still joins",
+      "enabled": [
+        "Lib",
+        "Other",
+        "User"
+      ],
+      "requires": {
+        "User": [
+          "Lib",
+          "Lib"
+        ]
+      },
+      "groups": [
+        [
+          "Lib",
+          "User"
+        ],
+        [
+          "Other"
+        ]
+      ]
+    },
+    {
+      "name": "a requirement loaded after its user still joins",
+      "enabled": [
+        "User",
+        "Other",
+        "Lib"
+      ],
+      "requires": {
+        "User": [
+          "Lib"
+        ]
+      },
+      "groups": [
+        [
+          "User",
+          "Lib"
+        ],
+        [
+          "Other"
+        ]
+      ]
+    },
+    {
+      "name": "one mod",
+      "enabled": [
+        "Only"
+      ],
+      "requires": {},
+      "groups": [
+        [
+          "Only"
+        ]
+      ]
+    },
+    {
+      "name": "one giant group",
+      "enabled": [
+        "Core",
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "requires": {
+        "P1": [
+          "Core"
+        ],
+        "P2": [
+          "Core"
+        ],
+        "P3": [
+          "P1"
+        ],
+        "P4": [
+          "P2"
+        ],
+        "P5": [
+          "Core",
+          "P4"
+        ]
+      },
+      "groups": [
+        [
+          "Core",
+          "P1",
+          "P2",
+          "P3",
+          "P4",
+          "P5"
+        ]
+      ]
+    },
+    {
+      "name": "a chain through a mod that's off joins its ends",
+      "enabled": [
+        "A",
+        "Other",
+        "B"
+      ],
+      "requires": {
+        "A": [
+          "X"
+        ],
+        "X": [
+          "B"
+        ]
+      },
+      "groups": [
+        [
+          "A",
+          "B"
+        ],
+        [
+          "Other"
+        ]
+      ]
+    },
+    {
+      "name": "an off mod in a cycle terminates",
+      "enabled": [
+        "P",
+        "Q"
+      ],
+      "requires": {
+        "P": [
+          "W"
+        ],
+        "W": [
+          "V"
+        ],
+        "V": [
+          "W"
+        ]
+      },
+      "groups": [
+        [
+          "P"
+        ],
+        [
+          "Q"
+        ]
+      ]
+    }
+  ]
+}

@@ -328,7 +328,9 @@
     "checkSetupFailed": "无法检查设置：{error}",
     "bisectNeedsTwo": "至少启用两个模组才能查找出问题的模组。",
     "bisectFound": "找到了：{id} 导致了该问题。你的模组列表已恢复。",
-    "bisectNone": "该问题与任何单个模组都无关。你的模组列表已恢复。",
+    "bisectNone": "问题没有跟随任何一组：可能需要两个模组同时存在。你的模组列表已恢复。",
+    "bisectFoundGroup": "问题在这一组：{ids}。这些模组互相依赖，所以一起测试。你的模组列表已恢复。",
+    "bisectOneGroup": "你启用的模组全部互相依赖（{ids}），所以无法分成小组测试。",
     "sectionExists": "已存在名为“{name}”的分组。请换一个名称。",
     "noneOurs": "所选模组都不是由 PZMM 安装的；Steam 模组请在 Steam 中取消订阅。",
     "logCopied": "已复制活动日志（路径中的用户名已隐藏）。",
@@ -410,6 +412,7 @@
     "unsubscribe": "取消订阅"
   },
   "common": {
+    "imageFailed": "图片加载失败",
     "cancel": "取消",
     "close": "关闭",
     "install": "安装",

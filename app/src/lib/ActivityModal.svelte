@@ -3,6 +3,7 @@
   import { KIND_ICONS, type LogEntry, type LogKind } from "./activity.svelte";
   import { fmtDateTime, fmtNum, workshopUrl } from "./format";
   import { t } from "./i18n.svelte";
+  import { thumb } from "./thumb";
   import Icon from "./Icon.svelte";
   import Modal from "./Modal.svelte";
 
@@ -63,7 +64,7 @@
         <p class="muted small">{fmtDateTime(sel.time / 1000)}</p>
         {#each items as it (it.id)}
           <div class="card">
-            {#if it.preview_url}<img src={it.preview_url} alt="" loading="lazy" />{/if}
+            {#if it.preview_url}<img use:thumb={t("common.imageFailed")} src={it.preview_url} alt="" loading="lazy" />{/if}
             <div>
               <strong>{it.title}</strong>
               <p class="muted small">{t("details.subscribers", { count: it.subscriptions, n: fmtNum(it.subscriptions) })}</p>

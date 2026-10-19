@@ -7,6 +7,7 @@
   import Menu from "./Menu.svelte";
   import Stars from "./Stars.svelte";
   import { keyedError, t } from "./i18n.svelte";
+  import { thumb } from "./thumb";
   import { arrowPick, linkClick, trap } from "./ui";
   import { confirmed } from "./ask.svelte";
 
@@ -159,15 +160,15 @@
   <div class="scroll">
     {#if images.length}
       <div class="gallery">
-        <img class="main" src={images[shot] ?? images[0]} alt="" />
+        <img use:thumb={t("common.imageFailed")} class="main" src={images[shot] ?? images[0]} alt="" />
         {#if images.length > 1 || info?.videos.length}
           <div class="thumbs">
             {#each images as src, i}
-              <button class:on={i === shot} onclick={() => (shot = i)} aria-label={t("panel.screenshotLabel", { n: i + 1 })}><img {src} alt="" loading="lazy" /></button>
+              <button class:on={i === shot} onclick={() => (shot = i)} aria-label={t("panel.screenshotLabel", { n: i + 1 })}><img use:thumb={t("common.imageFailed")} {src} alt="" loading="lazy" /></button>
             {/each}
             {#each info?.videos ?? [] as v}
               <button class="video" onclick={() => api.openUrl(`https://www.youtube.com/watch?v=${v}`)} title={t("panel.youtubeTip")} aria-label={t("panel.youtubeLabel")}>
-                <img src={`https://img.youtube.com/vi/${v}/mqdefault.jpg`} alt="" loading="lazy" /><span><Icon name="play" size={18} fill /></span>
+                <img use:thumb={t("common.imageFailed")} src={`https://img.youtube.com/vi/${v}/mqdefault.jpg`} alt="" loading="lazy" /><span><Icon name="play" size={18} fill /></span>
               </button>
             {/each}
           </div>
@@ -230,7 +231,7 @@
       <ul class="mini">
         {#each info.members as m (m.id)}
           <li>
-            {#if m.preview_url}<img src={m.preview_url} alt="" loading="lazy" />{/if}
+            {#if m.preview_url}<img use:thumb={t("common.imageFailed")} src={m.preview_url} alt="" loading="lazy" />{/if}
             <button class="quiet link" onclick={() => onOpen(m)}>{m.title}</button>
             {#if m.have}<span class="have small"><Icon name="check" size={12} /> {t("common.installed")}</span>{/if}
           </li>

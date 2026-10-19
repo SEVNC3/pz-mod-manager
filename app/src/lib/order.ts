@@ -302,21 +302,71 @@ export function moveSection(rows: Row[], from: number, to: number): Row[] | null
 }
 
 /**
- * One bisect test: everything enabled that isn't a suspect stays on, plus the first half
- * (or the first `count`) of the suspects and (transitively) what they require. Returns the ids to enable and
- * the half under test.
+ * The groups Find the broken mod tests together: `enabled` (in load order) joined by each requirement that is
+ * enabled too, or by the enabled mods a requirement that's off needs (one not installed joins nothing). Each connected set is a group, in load order, groups by
+ * their first member, so a mod is never on without the enabled mods it needs. The game makes the same groups
+ * (tests/fixtures/bisect-groups.json).
  */
-export function bisectRound(original: Row[], suspects: string[], requires: (id: string) => string[], count = Math.ceil(suspects.length / 2)): { on: Set<string>; testing: string[] } {
+export function bisectGroups(enabled: string[], requires: (id: string) => string[]): string[][] {
+  const at = new Map(enabled.map((id, i) => [id, i]));
+  const root = enabled.map((_, i) => i);
+  const find = (i: number): number => (root[i] === i ? i : (root[i] = find(root[i])));
+  enabled.forEach((id, i) => {
+    // a requirement that's off is followed through to the enabled mods it needs (each mod once: cycles end)
+    const seen = new Set([id]);
+    const follow = (r: string) => {
+      if (seen.has(r)) return;
+      seen.add(r);
+      const j = at.get(r);
+      if (j !== undefined) root[find(i)] = find(j);
+      else requires(r).forEach(follow);
+    };
+    requires(id).forEach(follow);
+  });
+  const groups = new Map<number, string[]>();
+  enabled.forEach((id, i) => {
+    const k = find(i);
+    const g = groups.get(k);
+    if (g) g.push(id);
+    else groups.set(k, [id]);
+  });
+  return [...groups.values()];
+}
+
+/**
+ * One bisect test: every enabled mod outside the suspect groups stays on, plus the first half (or the first
+ * `count`) of the suspect groups; `alone`: only the suspect groups (the check on the last one). Returns the ids to
+ * enable and the groups under test.
+ */
+export function bisectRound(original: Row[], suspects: string[][], count = Math.ceil(suspects.length / 2), alone = false): { on: Set<string>; testing: string[][] } {
+  if (alone) return { on: new Set(suspects.flat()), testing: suspects };
   const testing = suspects.slice(0, count);
-  const suspect = new Set(suspects);
+  const suspect = new Set(suspects.flat());
   const on = new Set(original.filter((r): r is ModRow => isMod(r) && r.on && !suspect.has(r.id)).map((r) => r.id));
-  const add = (id: string) => {
-    if (on.has(id)) return;
-    on.add(id);
-    requires(id).forEach(add);
-  };
-  testing.forEach(add);
+  testing.flat().forEach((id) => on.add(id));
   return { on, testing };
+}
+
+/** A search saved before groups (lists of ids): its suspects grouped, testing the groups it was testing. */
+export function bisectUpgrade<T extends { suspects: unknown[]; testing: unknown[] }>(b: T, requires: (id: string) => string[]): T & { suspects: string[][]; testing: string[][] } {
+  if (!b.suspects.some((s) => typeof s === "string")) return b as T & { suspects: string[][]; testing: string[][] };
+  const was = new Set((b.testing as (string | string[])[]).flat());
+  const suspects = bisectGroups(b.suspects as string[], requires);
+  return { ...b, suspects, testing: suspects.filter((g) => g.some((id) => was.has(id))) };
+}
+
+/**
+ * After a test: still broken narrows to the groups tested, fixed to the others. One group left because it was
+ * tested and still broken is the answer; one left only because the others were cleared is tested alone first
+ * (`confirm`), and if it alone is fine, two mods in different groups break only together (`none`).
+ */
+export function bisectNext(s: { suspects: string[][]; testing: string[][]; confirm?: boolean }, stillBroken: boolean): { found: string[] } | { none: true } | { suspects: string[][]; confirm: boolean } {
+  if (s.confirm) return stillBroken ? { found: s.suspects[0] } : { none: true };
+  const tested = new Set(s.testing.flat());
+  const next = stillBroken ? s.testing : s.suspects.filter((g) => !g.some((id) => tested.has(id)));
+  if (!next.length) return { none: true };
+  if (next.length === 1 && stillBroken) return { found: next[0] };
+  return { suspects: next, confirm: next.length === 1 };
 }
 
 /** Mods that only `ids` require (directly or through each other): removing `ids` leaves them unused. */
