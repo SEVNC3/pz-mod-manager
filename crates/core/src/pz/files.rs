@@ -138,6 +138,8 @@ pub struct Stats {
     pub size: u64,
     pub modified: u64,
     pub created: u64,
+    /// When it first arrived on this PC, as far as PZMM can tell (see `store::first_seen`); 0 if unknown.
+    pub first_seen: u64,
 }
 
 pub fn stats(dir: &Path) -> Stats {

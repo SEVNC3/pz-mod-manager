@@ -1055,7 +1055,19 @@ fn conflicts(id: String) -> Res<Vec<pz::files::Conflict>> {
 async fn mod_stats() -> Res<BTreeMap<String, pz::files::Stats>> {
     blocking(|| -> Res<_> {
         let mods = reading(scan)?;
-        Ok(mods.into_iter().map(|(id, m)| (id, pz::files::stats(&m.dir))).collect())
+        let paths = Paths::detect();
+        let (index, first) = (store::load(&paths).unwrap_or_default(), store::history_first(&paths));
+        let out: BTreeMap<String, pz::files::Stats> = mods
+            .into_iter()
+            .map(|(id, m)| {
+                let mut s = pz::files::stats(&m.dir);
+                s.first_seen = store::first_seen(first.get(&id).copied(), index.get(&id).map_or(0, |e| e.installed_at), s.created);
+                (id, s)
+            })
+            .collect();
+        // the game's "First seen" and "Start with recently added" read the same dates
+        store::first_seen_for_game(&paths, &out.iter().map(|(id, s)| (id.clone(), s.first_seen)).collect());
+        Ok(out)
     })
     .await
 }

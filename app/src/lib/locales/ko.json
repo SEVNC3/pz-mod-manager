@@ -829,6 +829,8 @@
     "unsubscribeTip": "Steam에서 구독 취소"
   },
   "details": {
+    "firstSeen": "처음 확인",
+    "firstSeenTip": "PZMM이 알 수 있는 범위에서 이 모드가 이 PC에 들어온 시점이에요. Steam이 모드를 다시 받으면 바뀔 수 있어요.",
     "label": "모드 상세 정보",
     "closeTip": "닫고 로드 순서 보기 (Esc)",
     "closeLabel": "상세 정보 닫기",

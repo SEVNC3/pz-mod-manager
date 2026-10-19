@@ -217,7 +217,7 @@ pub fn overlaps_for_game(paths: &Paths, overlaps: &std::collections::HashMap<Str
 }
 
 /// What PZMM writes for the game (app.txt aside): a game playing in another folder gets copies (see [`mirror`]).
-const MIRRORED: [&str; 10] = ["library.txt", "order.txt", "overlaps.txt", "profiles.txt", "tags.txt", "findings.txt", "installed.txt", "categories.txt", "feed.txt", "servers.txt"];
+const MIRRORED: [&str; 11] = ["library.txt", "order.txt", "firstseen.txt", "overlaps.txt", "profiles.txt", "tags.txt", "findings.txt", "installed.txt", "categories.txt", "feed.txt", "servers.txt"];
 
 /// Copy what PZMM writes for the game from `from` (the active bridge folder) to `to` (a game playing elsewhere), the
 /// files that differ only.

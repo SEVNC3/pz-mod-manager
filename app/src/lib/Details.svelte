@@ -24,10 +24,13 @@
     onRollback,
     onSelect,
     onClose,
+    firstSeen = 0,
   }: {
     id: string;
     mods: Map<string, ModRow>;
     busy: boolean;
+    /** When it first arrived on this PC (0: unknown, not shown). */
+    firstSeen?: number;
     /** A search for a broken mod owns the lists: installs, Enable/Disable and Remove wait. */
     lock?: boolean;
     hasUpdate: boolean;
@@ -212,6 +215,10 @@
         <dt>{k}</dt>
         <dd>{v}</dd>
       {/each}
+      {#if firstSeen}
+        <dt>{t("details.firstSeen")}</dt>
+        <dd title={t("details.firstSeenTip")}>{fmtDate(firstSeen, "long")}</dd>
+      {/if}
       <dt>{t("details.tags")}</dt>
       <dd class="chips">
         {#each tags as x}

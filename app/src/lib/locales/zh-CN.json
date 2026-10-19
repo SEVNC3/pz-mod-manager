@@ -829,6 +829,8 @@
     "unsubscribeTip": "在 Steam 取消订阅"
   },
   "details": {
+    "firstSeen": "首次出现",
+    "firstSeenTip": "据 PZMM 所知，这个模组首次出现在这台电脑上的时间。如果 Steam 重新下载该模组，可能会重置。",
     "label": "模组详情",
     "closeTip": "关闭（Esc）以查看加载顺序",
     "closeLabel": "关闭详情",

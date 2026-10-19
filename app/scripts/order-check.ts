@@ -1,7 +1,7 @@
 // Self-check for src/lib/order.ts. Run: node scripts/order-check.ts
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { modNeed, keptServers, autosort, bisectGroups, bisectNext, bisectRound, bisectUpgrade, dependants, findProblems, neededBy, sortByName, groupByCategory, loadList, moveSection, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortLoadOrder, sortMaps, autosortMaps, solveBackground, syncOrder } from "../src/lib/order.ts";
+import { modNeed, keptServers, autosort, bisectGroups, bisectNext, bisectOrder, bisectRound, bisectUpgrade, dependants, findProblems, neededBy, sortByName, groupByCategory, loadList, moveSection, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortLoadOrder, sortMaps, autosortMaps, solveBackground, syncOrder } from "../src/lib/order.ts";
 import type { GameServer, ModRow, Row, ServerMods } from "../src/lib/api.ts";
 
 const mod = (id: string, on = true, extra: Partial<ModRow> = {}): Row => ({
@@ -40,15 +40,16 @@ assert.equal(ids(sortLoadOrder(cyc)), "+X +Y");
 
 // Find the broken mod: the shared fixture's groups, then whole searches for every culprit in every case
 type BisectCase = { name: string; enabled: string[]; requires: Record<string, string[]>; groups: string[][] };
-type BisectSearch = { case: string; why: string; broken: string[]; lead?: string[]; expect: { result: string; ids: string[] }; rounds: number };
+type BisectSearch = { case: string; why: string; broken: string[]; lead?: string[]; seen?: Record<string, number>; expect: { result: string; ids: string[] }; rounds: number };
 const fixture: { cases: BisectCase[]; searches?: BisectSearch[] } = JSON.parse(readFileSync(new URL("../../tests/fixtures/bisect-groups.json", import.meta.url), "utf8"));
 /** A whole search, the answers given by `broken(on)`: what it ends in, after checking each round's list. */
-function search(c: BisectCase, broken: (on: Set<string>) => boolean, first: string[] = []): { found?: string[]; together?: string[]; none?: true; rounds: number } {
+function search(c: BisectCase, broken: (on: Set<string>) => boolean, first: string[] = [], seen: Record<string, number> = {}): { found?: string[]; together?: string[]; none?: true; rounds: number } {
   const need = (id: string) => c.requires[id] ?? [];
   const original = c.enabled.map((id) => mod(id, true, { requires: need(id) }));
   const groups = bisectGroups(c.enabled, need);
-  const lead = groups.filter((g) => g.some((id) => first.includes(id)));
-  let s: { suspects: string[][]; testing: string[][]; confirm?: boolean } = { suspects: [...lead, ...groups.filter((g) => !lead.includes(g))], testing: [] };
+  const order = bisectOrder(groups, (id) => seen[id] ?? 0, first);
+  const lead = { length: order.lead };
+  let s: { suspects: string[][]; testing: string[][]; confirm?: boolean } = { suspects: order.suspects, testing: [] };
   if (s.suspects.length < 2) return { found: s.suspects[0], rounds: 0 }; // one group: said at the start
   for (let round = 1; round <= 2 * c.enabled.length + 3; round++) {
     // as +page.svelte's bisectApply: round 1 all suspects off, round 2 the logs' groups
@@ -78,10 +79,18 @@ for (const c of fixture.cases) {
 // the shared whole searches (the game replays the same ones): result, ids and how many answers it took
 for (const x of fixture.searches ?? []) {
   const c = fixture.cases.find((k) => k.name === x.case)!;
-  const r = search(c, (on) => x.broken.every((id) => on.has(id)), x.lead ?? []);
+  const r = search(c, (on) => x.broken.every((id) => on.has(id)), x.lead ?? [], x.seen ?? {});
   const result = r.rounds === 0 ? "oneGroup" : r.found ? "found" : r.together ? "together" : "none";
   assert.deepEqual({ result, ids: r.found ?? r.together ?? [], rounds: r.rounds }, { ...x.expect, rounds: x.rounds }, `${x.case}: ${x.why}`);
 }
+// Start with recently added: newest groups first, the logs' groups before them, the load order when dates don't tell
+const g4 = [["A", "A2"], ["B"], ["C"], ["D"]];
+const at: Record<string, number> = { A: 10, A2: 50, B: 20, C: 40, D: 30 };
+assert.deepEqual(bisectOrder(g4, (id) => at[id] ?? 0), { suspects: [["A", "A2"], ["C"], ["D"], ["B"]], lead: 0 }, "a group is as new as its newest mod");
+assert.deepEqual(bisectOrder(g4, (id) => at[id] ?? 0, ["B"]), { suspects: [["B"], ["A", "A2"], ["C"], ["D"]], lead: 1 }, "the logs' groups first, then by date");
+assert.deepEqual(bisectOrder(g4, () => 0).suspects, g4, "no dates: load order");
+assert.deepEqual(bisectOrder(g4, () => 7).suspects, g4, "all the same date: load order");
+assert.deepEqual(bisectOrder([["X"], ["Y"], ["Z"]], (id) => ({ X: 5, Y: 5, Z: 9 })[id] ?? 0).suspects, [["Z"], ["X"], ["Y"]], "ties keep load order");
 // the reporter's chain: Viewpoint, ZombieBuddy and Viewpoint's add-ons are found together, never apart
 const vp = fixture.cases[0];
 assert.deepEqual(search(vp, (on) => on.has("BloodFXAddon")).found, ["ZombieBuddy", "Viewpoint", "ViewpointSurface", "ViewpointBloodFX", "BloodFXAddon"]);

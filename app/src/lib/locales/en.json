@@ -892,6 +892,8 @@
     "unsubscribeTip": "Unsubscribe in Steam"
   },
   "details": {
+    "firstSeen": "First seen",
+    "firstSeenTip": "When this mod arrived on this PC, as far as PZMM can tell. It can reset if Steam downloads the mod again.",
     "label": "Mod details",
     "closeTip": "Close (Esc) to see the load order",
     "closeLabel": "Close details",

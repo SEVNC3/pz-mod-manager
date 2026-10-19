@@ -35,7 +35,7 @@
   import Settings from "$lib/Settings.svelte";
   import { applyPrefs, prefs } from "$lib/prefs.svelte";
   import ModTable from "$lib/ModTable.svelte";
-  import { autosort, bisectGroups, bisectNext, bisectRound, bisectUpgrade, dependants, findProblems, groupByCategory, loadList, moveSection, neededBy, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortByName, sortLoadOrder, syncOrder, tiers } from "$lib/order";
+  import { autosort, bisectGroups, bisectNext, bisectOrder, bisectRound, bisectUpgrade, dependants, findProblems, groupByCategory, loadList, moveSection, neededBy, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortByName, sortLoadOrder, syncOrder, tiers } from "$lib/order";
   import LoadOrder from "$lib/LoadOrder.svelte";
   import WindowControls from "$lib/WindowControls.svelte";
   import ProfilePicker from "$lib/ProfilePicker.svelte";
@@ -352,7 +352,7 @@
         const name = (m: ModRow) => (m.name || m.id).toLowerCase();
         if (sortBy === "name") return name(x).localeCompare(name(y));
         if (sortBy === "enabled") return Number(y.on) - Number(x.on) || (x.on ? (place.get(x.id) ?? -1) - (place.get(y.id) ?? -1) : name(x).localeCompare(name(y)));
-        if (sortBy === "installed") return (stats[y.id]?.created ?? 0) - (stats[x.id]?.created ?? 0);
+        if (sortBy === "installed") return (stats[y.id]?.first_seen ?? 0) - (stats[x.id]?.first_seen ?? 0);
         if (sortBy === "size") return (stats[y.id]?.size ?? 0) - (stats[x.id]?.size ?? 0);
         if (sortBy === "updated") return (stats[y.id]?.modified ?? 0) - (stats[x.id]?.modified ?? 0);
         const rank = (m: ModRow) => (m.missing || problems.has(m.id) ? 0 : updates.has(m.id) ? 1 : 2);
@@ -1532,17 +1532,16 @@
     const kept = await snapshot("bisect");
     pending--;
     if (!kept) return;
-    // groups in load order, the ones holding a mod the logs point at first
+    // the groups the logs point at first, then the recently added
     const groups = bisectGroups(order.filter((id) => enabled.includes(id)).concat(enabled.filter((id) => !order.includes(id))), (id) => mods.get(id)?.requires ?? []);
-    const lead = groups.filter((g) => g.some((id) => first.includes(id)));
-    const suspects = [...lead, ...groups.filter((g) => !lead.includes(g))];
+    const { suspects, lead } = bisectOrder(groups, (id) => stats[id]?.first_seen ?? 0, first);
     findings = null;
     undoStack = redoStack = []; // undoing into a half-disabled test list would be a trap
     if (suspects.length < 2) {
       say("log.bisectOneGroup", { ids: suspects.flat().join(", ") }, true);
       return;
     }
-    bisectApply({ profile: view?.profile ?? "", original: $state.snapshot({ rows, order }), suspects, testing: [], round: 1, lead: lead.length, keep });
+    bisectApply({ profile: view?.profile ?? "", original: $state.snapshot({ rows, order }), suspects, testing: [], round: 1, lead, keep });
   }
 
   function bisectAnswer(stillBroken: boolean) {
@@ -2577,7 +2576,7 @@
     </div>
 
     {#if selected}
-      <Details id={selected} {mods} {busy} lock={!!profileLock} hasUpdate={updates.has(selected)} neededBy={needed.get(selected) ?? []} tags={marks.tags[selected] ?? []} {allTags}
+      <Details id={selected} {mods} {busy} firstSeen={stats[selected]?.first_seen ?? 0} lock={!!profileLock} hasUpdate={updates.has(selected)} neededBy={needed.get(selected) ?? []} tags={marks.tags[selected] ?? []} {allTags}
         onTags={setTags} onRule={(id, rule) => run(t("busy.saving"), () => api.modRuleSet(id, rule), { keepHistory: true })} onUpdate={(id) => updateMods([id])} onInstallWorkshop={installWorkshop}
         onToggle={toggle} onSelect={(id) => (selected = id)}
         onRemove={remove} onRollback={(id) => run(t("busy.restoring", { id }), () => api.rollback(id))} onClose={() => (selected = null)} />

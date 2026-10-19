@@ -892,6 +892,8 @@
     "unsubscribeTip": "In Steam abbestellen"
   },
   "details": {
+    "firstSeen": "Zuerst gesehen",
+    "firstSeenTip": "Wann diese Mod auf diesen PC kam, soweit PZMM es weiß. Kann sich ändern, wenn Steam die Mod neu herunterlädt.",
     "label": "Mod-Details",
     "closeTip": "Schließen (Esc), um die Ladereihenfolge zu sehen",
     "closeLabel": "Details schließen",

@@ -892,6 +892,8 @@
     "unsubscribeTip": "Cancelar la suscripción en Steam"
   },
   "details": {
+    "firstSeen": "Visto por primera vez",
+    "firstSeenTip": "Cuándo llegó este mod a este PC, según lo que PZMM puede saber. Puede reiniciarse si Steam vuelve a descargar el mod.",
     "label": "Detalles del mod",
     "closeTip": "Cerrar (Esc) para ver el orden de carga",
     "closeLabel": "Cerrar detalles",

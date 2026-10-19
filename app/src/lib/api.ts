@@ -220,8 +220,9 @@ export type Finding = { level: "error" | "warning" | "note"; subject: string; te
 export type Snapshot = { id: string; time: number; label: string; enabled: number; mods: number };
 /** What writing a server config would change; `maps_to` equals `maps_from` when Map= stays. */
 type ServerPreview = { new: boolean; added: string[]; removed: string[]; maps_from: string[]; maps_to: string[]; items_added: string[]; items_removed: string[] };
-/** `created`: when the mod's folder was made (installed or subscribed), 0 if unknown. */
-export type Stats = { size: number; modified: number; created: number };
+/** `created`: when the mod's folder was made (installed or subscribed), 0 if unknown. `first_seen`: when it first
+ * arrived on this PC as far as PZMM can tell (the earliest of the download history, PZMM's install and the folder). */
+export type Stats = { size: number; modified: number; created: number; first_seen: number };
 export type Overlap = { wins_over: string[]; loses_to: string[] };
 export type Conflict = { other: string; files: number; wins: boolean; examples: string[] };
 export type Save = { mode: string; name: string; mods: string[]; modified: number };

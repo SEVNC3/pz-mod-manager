@@ -1018,6 +1018,8 @@
     "unsubscribeTip": "Anuluj subskrypcję w Steam"
   },
   "details": {
+    "firstSeen": "Pierwszy raz widziany",
+    "firstSeenTip": "Kiedy ten mod trafił na ten komputer, na ile PZMM może to ustalić. Może się zmienić, jeśli Steam pobierze mod ponownie.",
     "label": "Szczegóły moda",
     "closeTip": "Zamknij (Esc), aby zobaczyć kolejność ładowania",
     "closeLabel": "Zamknij szczegóły",

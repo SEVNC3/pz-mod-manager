@@ -348,6 +348,19 @@ export function bisectRound(original: Row[], suspects: string[][], count = Math.
   return { on, testing };
 }
 
+/**
+ * Find the broken mod's suspects in the order it tests them: the groups holding a mod the logs point at first (`lead`
+ * of them), then the rest newest first by when their newest mod arrived (`seen`), so the first half tested is the
+ * recently added. When every date is 0 or the same, the load order.
+ */
+export function bisectOrder(groups: string[][], seen: (id: string) => number, first: string[] = []): { suspects: string[][]; lead: number } {
+  const lead = groups.filter((g) => g.some((id) => first.includes(id)));
+  const newest = (g: string[]) => Math.max(0, ...g.map(seen));
+  let rest = groups.filter((g) => !lead.includes(g));
+  if (new Set(rest.map(newest)).size > 1) rest = [...rest].sort((a, b) => newest(b) - newest(a)); // stable: ties keep load order
+  return { suspects: [...lead, ...rest], lead: lead.length };
+}
+
 /** A search saved before groups (lists of ids): its suspects grouped, testing the groups it was testing, and every
  * other mod that was on kept on (an old suspect can need one of them). */
 export function bisectUpgrade<T extends { suspects: unknown[]; testing: unknown[]; original: { rows: Row[] } }>(b: T, requires: (id: string) => string[]): T & { suspects: string[][]; testing: string[][]; keep?: string[] } {
