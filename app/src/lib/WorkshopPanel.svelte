@@ -160,7 +160,15 @@
   <div class="scroll">
     {#if images.length}
       <div class="gallery">
-        <img use:thumb={t("common.imageFailed")} class="main" src={images[shot] ?? images[0]} alt="" />
+        <div class="stage">
+          <img use:thumb={t("common.imageFailed")} class="main" src={images[shot] ?? images[0]} alt="" />
+          {#if images.length > 1}
+            <button class="step prev" onclick={() => (shot = (shot + images.length - 1) % images.length)} aria-label={t("workshop.previous")}><Icon name="chevron-left" size={20} /></button>
+            <button class="step next" onclick={() => (shot = (shot + 1) % images.length)} aria-label={t("workshop.next")}><Icon name="chevron-right" size={20} /></button>
+            <!-- i18n-ignore: a picture count -->
+            <span class="count">{shot + 1} / {images.length}</span>
+          {/if}
+        </div>
         {#if images.length > 1 || info?.videos.length}
           <div class="thumbs">
             {#each images as src, i}
@@ -341,6 +349,41 @@
     object-fit: contain;
     background: #000;
     border-radius: 8px;
+  }
+  .stage {
+    position: relative;
+  }
+  .step {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 6px;
+    border-radius: 999px;
+    border: none;
+    color: #fff;
+    background: rgb(0 0 0 / 0.5);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .prev {
+    left: 8px;
+  }
+  .next {
+    right: 8px;
+  }
+  .stage:hover .step,
+  .step:focus-visible {
+    opacity: 1;
+  }
+  .count {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    color: #fff;
+    background: rgb(0 0 0 / 0.5);
   }
   .thumbs {
     display: flex;
