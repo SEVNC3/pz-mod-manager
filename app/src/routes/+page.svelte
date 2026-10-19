@@ -240,14 +240,17 @@
   let activityView = $state<"" | "expand" | "history">("");
   // search, filters and sort start as they were left (kept in prefs)
   let search = $state(prefs.modsSearch);
-  type Filter = "all" | "on" | "off" | "fav" | "hidden" | "problems";
-  let filter = $state<Filter>((["all", "on", "off", "fav", "hidden", "problems"].includes(prefs.modsFilter) ? prefs.modsFilter : "all") as Filter);
+  type Filter = "all" | "on" | "off" | "fav" | "hidden" | "problems" | "updates";
+  let filter = $state<Filter>((["all", "on", "off", "fav", "hidden", "problems", "updates"].includes(prefs.modsFilter) ? prefs.modsFilter : "all") as Filter);
   /** Only mods of this kind (framework, patch, map, ui, translation; "" any). */
   let kind = $state(prefs.modsKind);
   /** Only mods with this tag of the player's ("" any). */
   let tag = $state(prefs.modsTag);
   /** Only mods with texts in the game's language. */
   let inLanguage = $state(prefs.modsLang);
+  /** Only mods first seen, or changed, in the last this many days (0: any time). Not remembered: they're relative. */
+  let addedDays = $state(0);
+  let changedDays = $state(0);
   /** Presets, favourites and hidden mods the game's mod menu and the Workshop mod managers keep (shared with them),
    * and the player's own tags (PZMM's). */
   let marks = $state<Marks>({ presets: [], favourites: [], hidden: [], tags: {} });
@@ -299,7 +302,7 @@
   });
   const language = $derived(view?.language ?? "");
 
-  const filtering = $derived(search.trim() !== "" || filter !== "all" || kind !== "" || tag !== "" || (inLanguage && !!language) || sortBy !== "order");
+  const filtering = $derived(search.trim() !== "" || filter !== "all" || kind !== "" || tag !== "" || (inLanguage && !!language) || addedDays > 0 || changedDays > 0 || sortBy !== "order");
   // --- sections: separators can be collapsed (remembered per profile on this computer) ---
   let collapsed = $state<Set<string>>(new Set());
   const collapsedKey = $derived(`pzmm.collapsed.${view?.profile ?? ""}`);
@@ -336,6 +339,9 @@
         if (filter === "off" && r.on) return false;
         if (filter === "problems" && !problems.has(r.id) && !r.missing) return false;
         if (filter === "fav" && !favourites.has(r.id)) return false;
+        if (filter === "updates" && !updates.has(r.id)) return false;
+        if (addedDays && (stats[r.id]?.first_seen ?? 0) < Date.now() / 1000 - addedDays * 86400) return false;
+        if (changedDays && (stats[r.id]?.modified ?? 0) < Date.now() / 1000 - changedDays * 86400) return false;
         // hidden mods only show under Hidden, or when searched for
         if (filter === "hidden" ? !hidden.has(r.id) : hidden.has(r.id) && !q && filter !== "problems") return false; // Problems counts them too
         if (kind && !cats?.kinds[r.id]?.includes(kind)) return false;
@@ -1635,10 +1641,15 @@
   let filtersAt = $state<{ x: number; y: number } | null>(null);
   let sortAt = $state<{ x: number; y: number } | null>(null);
   let moreAt = $state<{ x: number; y: number } | null>(null);
+  const DAYS = [1, 7, 30];
+  const WITHIN: Record<number, string> = { 1: "mods.within1", 7: "mods.within7", 30: "mods.within30" };
   /** The filters beyond the status bar that are on, each with how to clear it (shown as chips). */
   const extraFilters = $derived([
     ...(filter === "fav" ? [{ key: "fav", label: t("mods.filterFavourites"), clear: () => (filter = "all") }] : []),
     ...(filter === "hidden" ? [{ key: "hidden", label: t("mods.filterHidden"), clear: () => (filter = "all") }] : []),
+    ...(filter === "updates" ? [{ key: "updates", label: t("mods.filterUpdates"), clear: () => (filter = "all") }] : []),
+    ...(addedDays ? [{ key: "added", label: t("mods.addedChip", { when: t(WITHIN[addedDays]) }), clear: () => (addedDays = 0) }] : []),
+    ...(changedDays ? [{ key: "changed", label: t("mods.changedChip", { when: t(WITHIN[changedDays]) }), clear: () => (changedDays = 0) }] : []),
     ...(kind ? [{ key: "kind", label: t(`kinds.${kind}`), clear: () => pickKind("") }] : []),
     ...(tag ? [{ key: "tag", label: tag, clear: () => (tag = "") }] : []),
     ...(inLanguage && language ? [{ key: "lang", label: t("mods.inLanguage", { language }), clear: () => (inLanguage = false) }] : []),
@@ -1647,7 +1658,12 @@
     { heading: t("mods.showLabel") },
     { label: t("mods.filterFavourites"), checked: filter === "fav", keep: true, run: () => (filter = filter === "fav" ? "all" : "fav") },
     { label: hidden.size ? t("mods.filterHiddenN", { count: hidden.size }) : t("mods.filterHidden"), checked: filter === "hidden", keep: true, run: () => (filter = filter === "hidden" ? "all" : "hidden") },
+    { label: updates.size ? t("mods.filterUpdatesN", { count: updates.size }) : t("mods.filterUpdates"), checked: filter === "updates", keep: true, run: () => (filter = filter === "updates" ? "all" : "updates") },
     ...(language ? [{ label: t("mods.inLanguage", { language }), checked: inLanguage, keep: true, run: () => (inLanguage = !inLanguage) }] : []),
+    { heading: t("mods.addedHeading") },
+    ...DAYS.map((d) => ({ label: t(WITHIN[d]), checked: addedDays === d, keep: true, run: () => (addedDays = addedDays === d ? 0 : d) })),
+    { heading: t("mods.changedHeading") },
+    ...DAYS.map((d) => ({ label: t(WITHIN[d]), checked: changedDays === d, keep: true, run: () => (changedDays = changedDays === d ? 0 : d) })),
     { heading: t("mods.kindHeading") },
     { label: t("mods.kindAny"), checked: !kind, keep: true, run: () => pickKind("") },
     ...KINDS.map((k) => ({ label: t(`kinds.${k}`), checked: kind === k, keep: true, run: () => pickKind(kind === k ? "" : k) })),
@@ -1658,6 +1674,7 @@
     filter = "all";
     tag = "";
     inLanguage = false;
+    addedDays = changedDays = 0;
     sortBy = "order";
     pickKind("");
   }
