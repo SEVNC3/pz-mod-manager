@@ -5,7 +5,7 @@
   // An empty url shows the icon as a disabled "coming soon" stub.
   const LINKS = {
     github: "https://github.com/SEVNC3/pz-mod-manager",
-    discord: "https://discord.com/invite/6URUy6mNzu",
+    discord: "https://discord.com/invite/6zKZuZ5WWe",
     kofi: "https://ko-fi.com/sevnc3",
   };
 
