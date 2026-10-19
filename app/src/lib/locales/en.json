@@ -351,7 +351,10 @@
     "checkSetupFailed": "Couldn't check the setup: {error}",
     "bisectNeedsTwo": "Enable at least two mods to search for a broken one.",
     "bisectFound": "Found it: {id} causes the problem. Your mod list is restored.",
-    "bisectNone": "The problem didn't follow any single mod. Your mod list is restored.",
+    "bisectNone": "The problem still happens with every suspect off, so it isn't one of these mods. Your mod list is restored.",
+    "bisectFoundGroup": "It's in this group: {ids}. These mods need each other, so they were tested together: turn off the ones nothing else needs, one at a time, to find which. Your mod list is restored.",
+    "bisectOneGroup": "Your enabled mods all need each other ({ids}), so the search can't split them into groups to test: turn some off by hand to narrow it down.",
+    "bisectTogether": "{ids} breaks it only together with mods in another group: turning it off fixes your list, but it's fine on its own. Your mod list is restored.",
     "sectionExists": "There's already a section called \"{name}\". Pick another name.",
     "noneOurs": "None of the selected mods were installed by PZMM; unsubscribe Steam mods in Steam.",
     "logCopied": "Copied the activity log (your user name is hidden in paths).",
@@ -448,6 +451,7 @@
     "unsubscribe": "Unsubscribe"
   },
   "common": {
+    "imageFailed": "Image failed to load",
     "cancel": "Cancel",
     "close": "Close",
     "install": "Install",
@@ -888,6 +892,8 @@
     "unsubscribeTip": "Unsubscribe in Steam"
   },
   "details": {
+    "firstSeen": "First seen",
+    "firstSeenTip": "When this mod arrived on this PC, as far as PZMM can tell. It can reset if Steam downloads the mod again.",
     "label": "Mod details",
     "closeTip": "Close (Esc) to see the load order",
     "closeLabel": "Close details",
@@ -1218,6 +1224,13 @@
     }
   },
   "servers": {
+    "leaveOut": {
+      "title": "Mods this server gets",
+      "hint": "Untick mods the server shouldn't get, like client-side add-ons. PZMM remembers this for {server}.",
+      "clientSide": "client-side add-on?",
+      "clientSideTip": "It needs Project Viewpoint or ZombieBuddy, which usually run only on players' PCs. Check its Workshop page before leaving it out.",
+      "count": "{left} of {count} left out"
+    },
     "label": "Servers",
     "rail": {
       "label": "Server lists and your servers",
@@ -1538,6 +1551,7 @@
       "notWorkshop": "{id} isn't from the Workshop: copy its folder into the server's mods folder yourself",
       "unknownMod": "{id} isn't installed here and no listed Workshop item names it: check the Mod ID",
       "needs": "{id} needs {item}, which isn't in Mods",
+      "needsLeftOut": "{id} needs {item}, which you left out for this server",
       "needsLater": "{id} needs {item}, which comes after it in Mods",
       "incompatible": "{id} is incompatible with {item}, which is also in Mods",
       "requiredItem": "Workshop item {id} requires {item}, which isn't in WorkshopItems"
@@ -3491,6 +3505,7 @@
     "guessTip": "A probable match: its Workshop page doesn't name the server's mod ID. Untick it to leave it out."
   },
   "errors": {
+    "certIntercepted": "Something on your computer is intercepting secure connections (usually antivirus, firewall or VPN). Turn off its HTTPS scanning or add PZMM as an exception.",
     "busy": "PZMM is busy installing or changing mods: try again when it's done",
     "reloaded": "The mod list was changed in the game's mod menu, so PZMM reloaded it. Make your change again.",
     "profileChanged": "The active profile is now \"{now}\", so this change to \"{profile}\" wasn't saved.",
@@ -3538,7 +3553,7 @@
     "settingsHint": "You can change this later in Settings."
   },
   "whatsNew": {
-    "notes": "A massive update: the in-game mod manager now matches the app\nGet PZMM - Client on the Steam Workshop to use it in game\nEvery tab from the app, in game, in 10 languages\nThe app and the game sync your profile, sections and load order\nAsk PZMM from the game to install, back up or run Check setup\nProblems, overridden files and updates agree on both sides\nUpdates no longer bring back mods you removed\nWorkshop copies never replace your GitHub or local installs\nMap presets are one list across your game folders\nLots of fixes from two full bug sweeps",
+    "notes": "Antivirus and VPNs no longer break downloads\nFind the broken mod keeps mods that need each other together\nIt starts with the mods you added last\nFirst seen: the day a mod landed on your PC\nLeave mods out of a server, remembered per server\nWorkshop pictures that fail to load say so",
     "title": "What's new in {version}",
     "enjoying": "Enjoying PZMM?",
     "upvote": "If you're enjoying this app please upvote it on Steam!",

@@ -1,3 +1,13 @@
+# 0.2.1
+- Find the broken mod keeps mods that need each other together now. Viewpoint and its add-ons, or a car pack and its framework, go off and on as one, so nothing loses a requirement halfway through. Lyven Ka Vinsxy caught this on the Workshop page. Cheers.
+- It also tries the mods you added most recently first, and a mod's details show when it first landed on your PC. GhostyAshes asked for that on Discord. Needs the app, which knows the dates.
+- Giving a hosted server your mods shows a checklist now. Untick the client-side add-ons and it remembers that for the server. That one's for newbee on Discord.
+- Check setup tells you when a mod's Workshop item was removed, banned or hidden.
+- Fixed: Find the broken mod dropped mods this build can't load from your list when it finished. My bad.
+- Fixed: the game sometimes listed a mod twice, so the app kept saying your mod list was different.
+- More of the screen is in your language, and its messages now match the app's word for word.
+- Got an idea or a bug? Tell me on Discord or the Workshop page. Most of this update came from people who did.
+
 # 0.2.0
 - **Get the desktop app.** If you don't have PZMM yet, download it free from github.com/SEVNC3/pz-mod-manager (Windows and Linux). This screen does most of what it does; the app does the rest, and the two work together.
 - **A massive update.** We've worked hard to fully replicate the desktop app in the game: the same tabs, the same look and the same way of working, from your mod list and load order to maps, saves, servers and Check setup.

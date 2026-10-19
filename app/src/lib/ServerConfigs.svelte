@@ -6,9 +6,13 @@
   import { keyedError, t, th } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
   import MapOrder from "./MapOrder.svelte";
+  import LeaveOut from "./LeaveOut.svelte";
+  import type { Row } from "./api";
 
-  let { busy, lock = "", profile, onImport, ask }: {
+  let { busy, lock = "", profile, rows, onImport, ask }: {
     busy: boolean;
+    /** The active profile's library: the mods Write sends, less the server's leave-out list. */
+    rows: Row[];
     /** Why switching profile is blocked now ("" when it isn't): Use as profile waits. */
     lock?: string;
     profile: string;
@@ -102,6 +106,7 @@
   <button class="primary" type="submit" disabled={busy || !target.trim() || hosted.includes(ini(target.trim()))}><Icon name="upload" size={14} />{t("servers.writeTo", { name: target.trim() || "…" })}</button>
 </form>
 {#if hosted.length}<p class="hint">{t("servers.hostedHint")}</p>{/if}
+{#if !hosted.includes(ini(target.trim()))}<LeaveOut server={target} {rows} />{/if}
 {#if maps.length}
   <h3>{t("servers.mapOrder")}</h3>
   <p class="hint">{@html th("servers.mapOrderHint")}</p>

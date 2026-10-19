@@ -1524,7 +1524,7 @@ mod tests {
             installed.get_mut(id).unwrap().source = format!("steam:{item}");
         }
         let line = |build: u8| {
-            let (l, notes) = pz::server::lines_for(&p.enabled(), &installed, build, &[]);
+            let (l, notes) = pz::server::lines_for(&p.enabled(), &installed, build, &[], &[]);
             assert!(notes.is_empty(), "{notes:?}");
             pz::server::line_values(&l.mods, &l.workshop, &l.maps, build == 41)
         };

@@ -74,6 +74,8 @@ pub enum Request {
     /// The library as the game has it after an Undo or Redo there: `# --- name`, `+id` and `-id` lines (the
     /// app keeps its own on and off). Quiet.
     Library { lines: Vec<String> },
+    /// The mods server `server` (its ini name) doesn't get from now on (none: every mod). Quiet.
+    LeaveOut { server: String, ids: Vec<String> },
     /// A section added under `to`, renamed to `to`, removed, or moved before section `to` (else to the end)
     /// (`op`: add, rename, remove, move). Quiet too.
     Section { op: String, name: String, to: Option<String> },
@@ -82,7 +84,7 @@ pub enum Request {
 impl Request {
     /// A sorting change: PZMM doesn't come to the front for it, or start for it.
     fn quiet(&self) -> bool {
-        matches!(self, Request::Place { .. } | Request::Section { .. } | Request::Library { .. } | Request::Tags { .. })
+        matches!(self, Request::Place { .. } | Request::Section { .. } | Request::Library { .. } | Request::Tags { .. } | Request::LeaveOut { .. })
     }
 }
 
@@ -217,7 +219,7 @@ pub fn overlaps_for_game(paths: &Paths, overlaps: &std::collections::HashMap<Str
 }
 
 /// What PZMM writes for the game (app.txt aside): a game playing in another folder gets copies (see [`mirror`]).
-const MIRRORED: [&str; 10] = ["library.txt", "order.txt", "overlaps.txt", "profiles.txt", "tags.txt", "findings.txt", "installed.txt", "categories.txt", "feed.txt", "servers.txt"];
+const MIRRORED: [&str; 12] = ["library.txt", "order.txt", "firstseen.txt", "leaveout.txt", "overlaps.txt", "profiles.txt", "tags.txt", "findings.txt", "installed.txt", "categories.txt", "feed.txt", "servers.txt"];
 
 /// Copy what PZMM writes for the game from `from` (the active bridge folder) to `to` (a game playing elsewhere), the
 /// files that differ only.
@@ -322,6 +324,11 @@ fn parse(text: &str, now: Option<u64>, active: &str) -> (Vec<Stamped>, Vec<Ack>)
                 let tags: Vec<String> = list.split(';').map(str::trim).filter(|t| !t.is_empty()).map(String::from).collect();
                 (named(id) && tags.len() <= 50 && tags.iter().all(|t| t.chars().count() <= 40 && !t.chars().any(char::is_control))).then(|| Request::Tags { id: id.into(), tags })
             }
+            "leaveout" => {
+                let (server, list) = arg.split_once('\t').unwrap_or((arg, ""));
+                let ids: Vec<String> = list.split(';').map(str::trim).filter(|t| !t.is_empty()).map(String::from).collect();
+                (plain(server) && ids.len() <= 2000 && ids.iter().all(|i| named(i))).then(|| Request::LeaveOut { server: server.into(), ids })
+            }
             "fix" => (!arg.is_empty() && arg.len() <= 20_000 && !arg.chars().any(char::is_control)).then(|| Request::Fix { fix: arg.into() }),
             "restore" => arg
                 .split_once('\t')
@@ -367,7 +374,7 @@ fn parse(text: &str, now: Option<u64>, active: &str) -> (Vec<Stamped>, Vec<Ack>)
             dropped.push(no("Too many requests at once. Ask again."));
         } else if !req.quiet() && now.is_some_and(|now| now.saturating_sub(at) > STALE) {
             dropped.push(no("PZMM wasn't running in time. Ask again."));
-        } else if req.quiet() && profile != active {
+        } else if req.quiet() && profile != active && !matches!(req, Request::LeaveOut { .. }) {
             dropped.push(no(&format!("PZMM's profile is now {active}.")));
         } else if req.quiet() && out.last().is_some_and(|l| l.req == req) {
             // the same sorting edit twice in a row is one (a loud one, a backup say, is answered when it's done:
@@ -755,6 +762,13 @@ mod tests {
         assert_eq!((json[0]["id"].as_str(), json[0]["mod"].as_str()), (Some("100-1"), Some("ModA")));
         assert_eq!(reqs[1].req, Request::Profile { name: "Other one".into() });
         assert_eq!(reqs.len(), 2, "a profile needs a name");
+        // a leave-out list: quiet, for any profile (it's the server's), and empty clears it
+        let (l, dropped) = parse("100-1\tOther\tleaveout\tservertest\tUI;VPAddon\n100-2\tP\tleaveout\tservertest\n100-3\tP\tleaveout\t../x\tA\n", Some(100), "P");
+        assert_eq!(l.iter().map(|s| s.req.clone()).collect::<Vec<_>>(), vec![
+            Request::LeaveOut { server: "servertest".into(), ids: vec!["UI".into(), "VPAddon".into()] },
+            Request::LeaveOut { server: "servertest".into(), ids: vec![] },
+        ]);
+        assert!(l[0].req.quiet() && dropped.iter().any(|a| a.id == "100-3" && !a.ok), "a server name that's a path is refused");
         let (t, _) = parse("100-1\tP\ttags\tModA\tKeep; Fun ;\n100-2\tP\ttags\tModB\n", Some(100), "P");
         assert_eq!(t.iter().map(|s| s.req.clone()).collect::<Vec<_>>(), vec![
             Request::Tags { id: "ModA".into(), tags: vec!["Keep".into(), "Fun".into()] },

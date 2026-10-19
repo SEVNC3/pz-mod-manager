@@ -24,7 +24,11 @@ tar = "0.4.46"
 tempfile = "3.27.0"
 tokio = { version = "1", features = ["rt-multi-thread", "time", "macros"] }
 trash = "5.2.9"
-ureq = "3.4.2"
+# platform-verifier: the computer's own trusted certificates (antivirus, VPN and company roots too)
+ureq = { version = "3.4.2", features = ["platform-verifier"] }
+# to check the computer's certificates load before using them (both already in the tree through ureq)
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+rustls-platform-verifier = "0.7"
 # the same roots ureq trusts, for FTPS
 webpki-roots = "1.0.9"
 zip = "9.0.1"

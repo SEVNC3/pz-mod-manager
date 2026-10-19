@@ -328,7 +328,10 @@
     "checkSetupFailed": "无法检查设置：{error}",
     "bisectNeedsTwo": "至少启用两个模组才能查找出问题的模组。",
     "bisectFound": "找到了：{id} 导致了该问题。你的模组列表已恢复。",
-    "bisectNone": "该问题与任何单个模组都无关。你的模组列表已恢复。",
+    "bisectNone": "关闭所有可疑模组后问题仍然存在，所以不是这些模组造成的。你的模组列表已恢复。",
+    "bisectFoundGroup": "问题在这一组：{ids}。这些模组互相依赖，所以一起测试：逐个关闭没有其他模组依赖的那些来找出是哪一个。你的模组列表已恢复。",
+    "bisectOneGroup": "你启用的模组全部互相依赖（{ids}），所以无法分成小组测试：请手动关闭一些来缩小范围。",
+    "bisectTogether": "{ids} 只有和其他组的模组一起时才出问题：关闭它能修复你的列表，但单独使用没问题。你的模组列表已恢复。",
     "sectionExists": "已存在名为“{name}”的分组。请换一个名称。",
     "noneOurs": "所选模组都不是由 PZMM 安装的；Steam 模组请在 Steam 中取消订阅。",
     "logCopied": "已复制活动日志（路径中的用户名已隐藏）。",
@@ -410,6 +413,7 @@
     "unsubscribe": "取消订阅"
   },
   "common": {
+    "imageFailed": "图片加载失败",
     "cancel": "取消",
     "close": "关闭",
     "install": "安装",
@@ -825,6 +829,8 @@
     "unsubscribeTip": "在 Steam 取消订阅"
   },
   "details": {
+    "firstSeen": "首次出现",
+    "firstSeenTip": "据 PZMM 所知，这个模组首次出现在这台电脑上的时间。如果 Steam 重新下载该模组，可能会重置。",
     "label": "模组详情",
     "closeTip": "关闭（Esc）以查看加载顺序",
     "closeLabel": "关闭详情",
@@ -1149,6 +1155,13 @@
     }
   },
   "servers": {
+    "leaveOut": {
+      "title": "此服务器获得的模组",
+      "hint": "取消勾选服务器不需要的模组，例如仅客户端的附加内容。PZMM 会为 {server} 记住这些设置。",
+      "clientSide": "仅客户端附加？",
+      "clientSideTip": "它需要 Project Viewpoint 或 ZombieBuddy，这些通常只在玩家电脑上运行。排除前请先查看它的创意工坊页面。",
+      "count": "已排除 {left}/{count}"
+    },
     "label": "服务器",
     "rail": {
       "label": "服务器列表与你的服务器",
@@ -1452,6 +1465,7 @@
       "notWorkshop": "{id} 不是创意工坊模组：请自行将其文件夹复制到服务器的 mods 文件夹",
       "unknownMod": "{id} 未安装在这里，列表中的创意工坊物品也都不包含它：请检查 mod ID",
       "needs": "{id} 需要 {item}，但 Mods 中没有它",
+      "needsLeftOut": "{id} 需要 {item}，但你已为此服务器排除了它",
       "needsLater": "{id} 需要 {item}，但它在 Mods 中排在后面",
       "incompatible": "{id} 与 {item} 不兼容，而它也在 Mods 中",
       "requiredItem": "创意工坊物品 {id} 需要 {item}，但它不在 WorkshopItems 中"
@@ -3320,6 +3334,7 @@
     "guessTip": "可能的匹配：它的创意工坊页面没有写出服务器的模组 ID。取消勾选即可不下载。"
   },
   "errors": {
+    "certIntercepted": "你电脑上的某个程序正在拦截安全连接（通常是杀毒软件、防火墙或 VPN）。请关闭它的 HTTPS 扫描，或将 PZMM 添加为例外。",
     "busy": "PZMM 正在安装或更改模组：完成后请重试",
     "reloaded": "模组列表已在游戏的模组菜单中更改，PZMM 已重新载入。请再次进行更改。",
     "profileChanged": "当前配置现在是“{now}”，因此对“{profile}”的这项更改未保存。",
@@ -3367,7 +3382,7 @@
     "settingsHint": "之后可以在设置中更改。"
   },
   "whatsNew": {
-    "notes": "重大更新：游戏内模组管理器现在与应用一致\n在 Steam 创意工坊获取 PZMM - Client 即可在游戏中使用\n应用的每个标签页都在游戏中，支持 10 种语言\n应用和游戏同步你的配置、分组和加载顺序\n在游戏中让 PZMM 安装、备份或检查设置\n问题、被覆盖的文件和更新在两边保持一致\n更新不再找回你已移除的模组\n创意工坊副本不会替换你的 GitHub 或本地安装\n地图预设在所有游戏文件夹中是同一个列表\n两轮完整排查带来的大量修复",
+    "notes": "杀毒软件和 VPN 不再导致下载失败\n查找出错模组会把互相依赖的模组放在一起\n它会从你最近添加的模组开始\n首次出现：模组来到你电脑上的那天\n为服务器排除模组，每个服务器单独记住\n加载失败的创意工坊图片会提示出来",
     "title": "{version} 更新内容",
     "enjoying": "喜欢 PZMM 吗？",
     "upvote": "如果你喜欢这个应用，请在 Steam 上点个赞！",

@@ -62,6 +62,32 @@ pub fn installed_for_game(paths: &Paths, index: &Index) {
     }
 }
 
+/// When a mod first arrived on this PC, as far as PZMM can tell: the earliest of its first install or subscription in
+/// the download history, PZMM's install time and its folder's creation (0s don't count); 0 when none is known. An
+/// update or a fresh Steam download can make the folder newer, which is why the earliest wins.
+pub fn first_seen(history_first: Option<u64>, installed_at: u64, created: u64) -> u64 {
+    [history_first.unwrap_or(0), installed_at, created].into_iter().filter(|t| *t > 0).min().unwrap_or(0)
+}
+
+/// Each mod's first install or subscription in the download history (oldest record), by mod id.
+pub fn history_first(paths: &Paths) -> std::collections::HashMap<String, u64> {
+    let mut out = std::collections::HashMap::new();
+    for r in crate::history::list(paths).into_iter().filter(|r| r.action == "installed" || r.action == "subscribed") {
+        out.insert(r.id, r.at); // newest first: the last one kept is the oldest
+    }
+    out
+}
+
+/// When each mod first arrived (see [`first_seen`]), for the PZMM - Client mod's "First seen":
+/// `Zomboid/Lua/pzmm/firstseen.txt`, a `<mod id>\t<seconds>` line per mod (unknown ones left out), where that folder is.
+pub fn first_seen_for_game(paths: &Paths, seen: &BTreeMap<String, u64>) {
+    let dir = pz::bridge::dir(paths);
+    if dir.is_dir() {
+        let text: String = seen.iter().filter(|(_, t)| **t > 0).map(|(id, t)| format!("{id}\t{t}\n")).collect();
+        pz::bridge::write_for_game(&dir.join("firstseen.txt"), &text);
+    }
+}
+
 /// The player's tags for the PZMM - Client mod: `Zomboid/Lua/pzmm/tags.txt`, a `<mod id>\t<tag>;<tag>` line per mod
 /// (tags never hold `;` or tabs there), where that folder is.
 pub fn tags_for_game(paths: &Paths, tags: &Tags) {
@@ -780,6 +806,15 @@ name=v2
         let index = load(&paths).unwrap();
         assert!(index.contains_key("modx") && !index.contains_key("ModX"));
         assert!(fs::read_to_string(mod_dir(&paths, "modx").unwrap().join("mod.info")).unwrap().contains("v1"));
+    }
+
+    #[test]
+    fn first_seen_is_the_earliest_known() {
+        assert_eq!(first_seen(Some(100), 300, 200), 100, "the history's first install");
+        assert_eq!(first_seen(None, 300, 200), 200, "an update made the install time newer than the folder");
+        assert_eq!(first_seen(None, 0, 200), 200, "a subscription: only the folder");
+        assert_eq!(first_seen(None, 300, 0), 300, "no folder time on this system");
+        assert_eq!(first_seen(None, 0, 0), 0, "unknown: hidden");
     }
 
     #[test]

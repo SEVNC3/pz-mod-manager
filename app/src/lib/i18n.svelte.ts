@@ -57,6 +57,8 @@ export const th = (key: string, vars: Vars = {}) => t(key, Object.fromEntries(Ob
  */
 export function keyedError(e: unknown): [string, Vars] {
   const s = String(e).replace(/^Error:\s*/, "");
+  // a certificate PZMM can't trust, from any web call (sources::CERT_INTERCEPTED in the core)
+  if (s.includes("is intercepting secure connections")) return ["errors.certIntercepted", {}];
   const m = s.match(/^(errors\.\w+)(\{[\s\S]*?\})?: /);
   if (!m) return [s, {}];
   try {

@@ -11,6 +11,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      # the TLS test's CA, trusted here as an antivirus' or company's root would be (its key isn't kept anywhere)
+      - if: runner.os == 'Linux'
+        run: sudo cp crates/core/tests/tls/ca.pem /usr/local/share/ca-certificates/pzmm-test-ca.crt && sudo update-ca-certificates && echo "PZMM_TEST_CA_TRUSTED=1" >> "$GITHUB_ENV"
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
   app:
@@ -25,7 +28,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: npm ci && npm run check && node scripts/order-check.ts && node scripts/bbcode-check.ts && node scripts/i18n-check.ts && node scripts/logkind-check.ts && node scripts/findings-check.ts && npm run build
+      - run: npm ci && npm run check && node scripts/order-check.ts && node scripts/bbcode-check.ts && node scripts/i18n-check.ts && node scripts/logkind-check.ts && node scripts/findings-check.ts && node scripts/thumb-check.ts && npm run build
         working-directory: app
       - run: cargo clippy -p pzmm-app --all-targets -- -D warnings
       - run: cargo test -p pzmm-app

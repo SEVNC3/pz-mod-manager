@@ -3,6 +3,7 @@
   import { api, newQuery, VIEWPOINT, type Browse, type Query, type WorkshopItem } from "./api";
   import { compact, fmtDate, fmtNum, plain } from "./format";
   import { keyedError, t, th } from "./i18n.svelte";
+  import { thumb } from "./thumb";
   import Icon from "./Icon.svelte";
   import InstallButton from "./InstallButton.svelte";
   import Stars from "./Stars.svelte";
@@ -287,7 +288,7 @@
 {#snippet card(it: WorkshopItem, small = false)}
   <li class="card" class:small>
     <button class="thumb" onclick={() => (open = it)} aria-label={t("workshop.detailsLabel", { title: it.title })}>
-      {#if it.preview_url}<img src={it.preview_url} alt="" loading="lazy" />{/if}
+      {#if it.preview_url}<img use:thumb={t("common.imageFailed")} src={it.preview_url} alt="" loading="lazy" />{/if}
       {#if it.collection}<span class="kind"><Icon name="folder" size={12} /> {t("workshop.collectionBadge", { count: it.num_children })}</span>{/if}
     </button>
     <div class="body">

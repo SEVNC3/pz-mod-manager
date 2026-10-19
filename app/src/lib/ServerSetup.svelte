@@ -2,6 +2,7 @@
   import type { GameServer, SetupItem } from "./api";
   import { fmtSize } from "./format";
   import { t } from "./i18n.svelte";
+  import { thumb } from "./thumb";
   import Icon from "./Icon.svelte";
   import { trap } from "./ui";
 
@@ -37,7 +38,7 @@
       {@const it = of.get(id)}
       {@const name = it?.title || id}
       <li>
-        {#if it?.preview_url}<img class="thumb" src={it.preview_url} alt="" loading="lazy" />
+        {#if it?.preview_url}<img use:thumb={t("common.imageFailed")} class="thumb" src={it.preview_url} alt="" loading="lazy" />
         {:else}<span class="thumb blank" aria-hidden="true">{items ? name.charAt(0) : ""}</span>{/if}
         <span class="name" title={name}>{items ? name : "…"}</span>
         {#if it?.likely}

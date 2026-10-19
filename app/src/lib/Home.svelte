@@ -59,6 +59,7 @@
   import { fmtAgo, fmtDate, fmtNum } from "./format";
   import { counted } from "./findings";
   import { keyedError, t } from "./i18n.svelte";
+  import { thumb } from "./thumb";
   import Icon, { type IconName } from "./Icon.svelte";
   import Menu, { type MenuItem } from "./Menu.svelte";
   import Scrap from "./Scrap.svelte";
@@ -638,7 +639,7 @@
                 {@const name = e.title || e.item}
                 <li>
                   <button class="upd" onclick={() => onGo("feed")} title={name}>
-                    {#if previews[e.item]}<img class="thumb" src={previews[e.item]} alt="" loading="lazy" />
+                    {#if previews[e.item]}<img use:thumb={t("common.imageFailed")} class="thumb" src={previews[e.item]} alt="" loading="lazy" />
                     {:else}<span class="thumb blank" aria-hidden="true">{name.charAt(0)}</span>{/if}
                     <span class="utext">
                       <span class="uname">{name}</span>

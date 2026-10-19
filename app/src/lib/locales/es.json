@@ -351,7 +351,10 @@
     "checkSetupFailed": "No se pudo comprobar la configuración: {error}",
     "bisectNeedsTwo": "Activa al menos dos mods para buscar uno que falle.",
     "bisectFound": "Encontrado: {id} causa el problema. Tu lista de mods se ha restaurado.",
-    "bisectNone": "El problema no se debe a ningún mod en concreto. Tu lista de mods se ha restaurado.",
+    "bisectNone": "El problema sigue ocurriendo con todos los sospechosos desactivados, así que no es ninguno de estos mods. Tu lista de mods está restaurada.",
+    "bisectFoundGroup": "Está en este grupo: {ids}. Estos mods se necesitan entre sí, así que se probaron juntos: desactiva uno a uno los que nadie más necesita para encontrar cuál es. Tu lista de mods está restaurada.",
+    "bisectOneGroup": "Todos tus mods activos se necesitan entre sí ({ids}), así que la búsqueda no puede dividirlos en grupos para probar: desactiva algunos a mano para acotarlo.",
+    "bisectTogether": "{ids} lo rompe solo junto con mods de otro grupo: desactivarlo arregla tu lista, pero por sí solo está bien. Tu lista de mods está restaurada.",
     "sectionExists": "Ya hay una sección llamada «{name}». Elige otro nombre.",
     "noneOurs": "Ninguno de los mods seleccionados lo instaló PZMM; cancela la suscripción de los mods de Steam en Steam.",
     "logCopied": "Registro de actividad copiado (tu nombre de usuario se oculta en las rutas).",
@@ -448,6 +451,7 @@
     "unsubscribe": "Cancelar suscripción"
   },
   "common": {
+    "imageFailed": "No se pudo cargar la imagen",
     "cancel": "Cancelar",
     "close": "Cerrar",
     "install": "Instalar",
@@ -888,6 +892,8 @@
     "unsubscribeTip": "Cancelar la suscripción en Steam"
   },
   "details": {
+    "firstSeen": "Visto por primera vez",
+    "firstSeenTip": "Cuándo llegó este mod a este PC, según lo que PZMM puede saber. Puede reiniciarse si Steam vuelve a descargar el mod.",
     "label": "Detalles del mod",
     "closeTip": "Cerrar (Esc) para ver el orden de carga",
     "closeLabel": "Cerrar detalles",
@@ -1218,6 +1224,13 @@
     }
   },
   "servers": {
+    "leaveOut": {
+      "title": "Mods que recibe este servidor",
+      "hint": "Desmarca los mods que el servidor no debe recibir, como complementos solo de cliente. PZMM lo recuerda para {server}.",
+      "clientSide": "¿complemento de cliente?",
+      "clientSideTip": "Necesita Project Viewpoint o ZombieBuddy, que normalmente solo funcionan en los PC de los jugadores. Revisa su página del Workshop antes de dejarlo fuera.",
+      "count": "{left} de {count} fuera"
+    },
     "label": "Servidores",
     "rail": {
       "label": "Listas de servidores y tus servidores",
@@ -1538,6 +1551,7 @@
       "notWorkshop": "{id} no es del Workshop: copia su carpeta tú mismo en la carpeta de mods del servidor",
       "unknownMod": "{id} no está instalado aquí y ningún elemento del Workshop de la lista lo nombra: revisa el mod ID",
       "needs": "{id} necesita {item}, que no está en Mods",
+      "needsLeftOut": "{id} necesita {item}, que dejaste fuera de este servidor",
       "needsLater": "{id} necesita {item}, que va después en Mods",
       "incompatible": "{id} es incompatible con {item}, que también está en Mods",
       "requiredItem": "El elemento del Workshop {id} necesita {item}, que no está en WorkshopItems"
@@ -3491,6 +3505,7 @@
     "guessTip": "Una coincidencia probable: su página del Workshop no menciona el ID de mod del servidor. Desmárcala para dejarla fuera."
   },
   "errors": {
+    "certIntercepted": "Algo en tu equipo está interceptando las conexiones seguras (normalmente un antivirus, firewall o VPN). Desactiva su análisis HTTPS o añade PZMM como excepción.",
     "busy": "PZMM está ocupado instalando o cambiando mods: inténtalo de nuevo cuando termine",
     "reloaded": "La lista de mods se cambió en el menú de mods del juego, así que PZMM la recargó. Vuelve a hacer tu cambio.",
     "profileChanged": "El perfil activo ahora es «{now}», así que este cambio en «{profile}» no se guardó.",
@@ -3538,7 +3553,7 @@
     "settingsHint": "Puedes cambiarlo luego en Ajustes."
   },
   "whatsNew": {
-    "notes": "Una actualización enorme: el gestor de mods del juego ya es igual que la app\nConsigue PZMM - Client en el Steam Workshop para usarlo en el juego\nTodas las pestañas de la app, en el juego, en 10 idiomas\nLa app y el juego sincronizan tu perfil, secciones y orden de carga\nPide a PZMM desde el juego que instale, haga copias o revise la configuración\nProblemas, archivos sobrescritos y actualizaciones coinciden en ambos lados\nLas actualizaciones ya no devuelven los mods que quitaste\nLas copias del Workshop nunca reemplazan tus instalaciones de GitHub o locales\nLos presets de mapas son una sola lista en todas tus carpetas del juego\nMuchas correcciones de dos revisiones completas de errores",
+    "notes": "Los antivirus y las VPN ya no rompen las descargas\nBuscar el mod roto mantiene juntos los mods que se necesitan\nEmpieza por los mods que añadiste los últimos\nVisto por primera vez: el día que el mod llegó a tu PC\nDeja mods fuera de un servidor, recordado por servidor\nLas imágenes del Workshop que no cargan lo indican",
     "title": "Novedades de {version}",
     "enjoying": "¿Te gusta PZMM?",
     "upvote": "Si te gusta esta app, ¡vótala en Steam!",
