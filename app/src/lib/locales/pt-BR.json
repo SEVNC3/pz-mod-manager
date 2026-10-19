@@ -3495,6 +3495,7 @@
     "guessTip": "Uma correspondência provável: a página dela na Oficina não cita o ID do mod do servidor. Desmarque para deixá-la de fora."
   },
   "errors": {
+    "certIntercepted": "Algo no seu computador está interceptando conexões seguras (geralmente antivírus, firewall ou VPN). Desative a verificação HTTPS dele ou adicione o PZMM como exceção.",
     "busy": "O PZMM está ocupado instalando ou alterando mods: tente de novo quando terminar",
     "reloaded": "A lista de mods foi alterada no menu de mods do jogo, então o PZMM a recarregou. Faça sua alteração de novo.",
     "profileChanged": "O perfil ativo agora é \"{now}\", então esta alteração em \"{profile}\" não foi salva.",

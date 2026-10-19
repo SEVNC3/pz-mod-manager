@@ -3495,6 +3495,7 @@
     "guessTip": "Une correspondance probable : sa page Workshop ne cite pas l'ID de mod du serveur. Décoche-la pour l'exclure."
   },
   "errors": {
+    "certIntercepted": "Quelque chose sur votre ordinateur intercepte les connexions sécurisées (souvent un antivirus, un pare-feu ou un VPN). Désactivez son analyse HTTPS ou ajoutez PZMM en exception.",
     "busy": "PZMM est occupé à installer ou modifier des mods : réessayez quand il aura fini",
     "reloaded": "La liste de mods a été modifiée dans le menu des mods du jeu, donc PZMM l'a rechargée. Refaites votre modification.",
     "profileChanged": "Le profil actif est maintenant « {now} », donc cette modification de « {profile} » n'a pas été enregistrée.",

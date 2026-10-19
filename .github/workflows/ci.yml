@@ -11,6 +11,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      # the TLS test's CA, trusted here as an antivirus' or company's root would be (its key isn't kept anywhere)
+      - if: runner.os == 'Linux'
+        run: sudo cp crates/core/tests/tls/ca.pem /usr/local/share/ca-certificates/pzmm-test-ca.crt && sudo update-ca-certificates && echo "PZMM_TEST_CA_TRUSTED=1" >> "$GITHUB_ENV"
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
   app:

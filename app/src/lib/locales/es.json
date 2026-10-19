@@ -3495,6 +3495,7 @@
     "guessTip": "Una coincidencia probable: su página del Workshop no menciona el ID de mod del servidor. Desmárcala para dejarla fuera."
   },
   "errors": {
+    "certIntercepted": "Algo en tu equipo está interceptando las conexiones seguras (normalmente un antivirus, firewall o VPN). Desactiva su análisis HTTPS o añade PZMM como excepción.",
     "busy": "PZMM está ocupado instalando o cambiando mods: inténtalo de nuevo cuando termine",
     "reloaded": "La lista de mods se cambió en el menú de mods del juego, así que PZMM la recargó. Vuelve a hacer tu cambio.",
     "profileChanged": "El perfil activo ahora es «{now}», así que este cambio en «{profile}» no se guardó.",

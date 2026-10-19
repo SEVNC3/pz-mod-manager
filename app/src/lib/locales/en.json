@@ -3495,6 +3495,7 @@
     "guessTip": "A probable match: its Workshop page doesn't name the server's mod ID. Untick it to leave it out."
   },
   "errors": {
+    "certIntercepted": "Something on your computer is intercepting secure connections (usually antivirus, firewall or VPN). Turn off its HTTPS scanning or add PZMM as an exception.",
     "busy": "PZMM is busy installing or changing mods: try again when it's done",
     "reloaded": "The mod list was changed in the game's mod menu, so PZMM reloaded it. Make your change again.",
     "profileChanged": "The active profile is now \"{now}\", so this change to \"{profile}\" wasn't saved.",

@@ -102,10 +102,55 @@ const CONNECT: std::time::Duration = std::time::Duration::from_secs(10);
 const DOWNLOAD: std::time::Duration = std::time::Duration::from_secs(15 * 60);
 
 /// The one HTTP agent every web call goes through, so a silent server never hangs PZMM
-/// (ureq waits forever by default).
+/// (ureq waits forever by default). It trusts the computer's own certificates (see [`roots`]), and a
+/// certificate it can't trust is said plainly (see [`intercepted`]).
 pub(crate) fn agent() -> &'static ureq::Agent {
     static AGENT: std::sync::OnceLock<ureq::Agent> = std::sync::OnceLock::new();
-    AGENT.get_or_init(|| ureq::Agent::config_builder().timeout_connect(Some(CONNECT)).timeout_global(Some(CALL)).build().into())
+    AGENT.get_or_init(|| agent_with(roots()))
+}
+
+fn agent_with(roots: ureq::tls::RootCerts) -> ureq::Agent {
+    ureq::Agent::config_builder()
+        .timeout_connect(Some(CONNECT))
+        .timeout_global(Some(CALL))
+        .tls_config(ureq::tls::TlsConfig::builder().root_certs(roots).build())
+        .middleware(plain_certs)
+        .build()
+        .into()
+}
+
+/// The computer's trusted certificates, so antivirus, VPN and company networks that inspect HTTPS with
+/// a root of their own work; PZMM's bundled Mozilla roots when they can't be loaded, or with
+/// `PZMM_BUNDLED_ROOTS=1`.
+fn roots() -> ureq::tls::RootCerts {
+    if std::env::var_os("PZMM_BUNDLED_ROOTS").is_some_and(|v| v == "1") {
+        return ureq::tls::RootCerts::WebPki;
+    }
+    match rustls_platform_verifier::Verifier::new(std::sync::Arc::new(rustls::crypto::ring::default_provider())) {
+        Ok(_) => ureq::tls::RootCerts::PlatformVerifier,
+        Err(e) => {
+            crate::log!("error: couldn't load this computer's trusted certificates, using PZMM's own: {e}");
+            ureq::tls::RootCerts::WebPki
+        }
+    }
+}
+
+/// Said instead of a certificate error (the app shows it in the player's language: `errors.certIntercepted`).
+pub(crate) const CERT_INTERCEPTED: &str = "Something on your computer is intercepting secure connections (usually antivirus, firewall or VPN). Turn off its HTTPS scanning or add PZMM as an exception.";
+
+fn plain_certs(req: ureq::http::Request<ureq::SendBody>, next: ureq::middleware::MiddlewareNext) -> Result<ureq::http::Response<ureq::Body>, ureq::Error> {
+    next.handle(req).map_err(intercepted)
+}
+
+/// A certificate PZMM can't trust (rustls' "invalid peer certificate: UnknownIssuer"...) as [`CERT_INTERCEPTED`],
+/// with the original after it for bug reports; any other error as it is.
+fn intercepted(e: ureq::Error) -> ureq::Error {
+    let text = e.to_string();
+    if text.contains("invalid peer certificate") {
+        ureq::Error::Io(std::io::Error::other(format!("{CERT_INTERCEPTED} ({text})")))
+    } else {
+        e
+    }
 }
 
 /// A page or API response (up to `CALL`).
@@ -553,9 +598,69 @@ pub(crate) fn fake_http(routes: Vec<(&'static str, u16, String)>) -> (String, Se
 mod tests {
     use super::*;
 
+    /// An HTTPS server on localhost with a certificate from tests/tls's test CA (its key thrown away), answering "ok".
+    fn test_server() -> String {
+        use rustls::pki_types::pem::PemObject;
+        use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/tls");
+        let certs: Vec<CertificateDer> = CertificateDer::pem_file_iter(dir.join("server.pem")).unwrap().map(|c| c.unwrap()).collect();
+        let key = PrivateKeyDer::from_pem_file(dir.join("server.pkcs8.key")).unwrap();
+        let config = std::sync::Arc::new(
+            rustls::ServerConfig::builder_with_provider(std::sync::Arc::new(rustls::crypto::ring::default_provider()))
+                .with_safe_default_protocol_versions()
+                .unwrap()
+                .with_no_client_auth()
+                .with_single_cert(certs, key)
+                .unwrap(),
+        );
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let config = config.clone();
+                std::thread::spawn(move || {
+                    use std::io::{Read, Write};
+                    let mut tls = rustls::StreamOwned::new(rustls::ServerConnection::new(config).unwrap(), stream);
+                    let (mut head, mut b) = (Vec::new(), [0u8; 1]);
+                    while !head.ends_with(b"\r\n\r\n") && tls.read(&mut b).is_ok_and(|n| n == 1) {
+                        head.push(b[0]);
+                    }
+                    let _ = tls.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok");
+                    let _ = tls.flush();
+                });
+            }
+        });
+        format!("https://localhost:{port}/")
+    }
+
+    #[test]
+    fn certificates_are_checked_against_the_computers_and_untrusted_ones_said_plainly() {
+        let url = test_server();
+        let read = |a: &ureq::Agent| a.get(&url).call().and_then(|mut r| r.body_mut().read_to_string());
+        // the server itself works, with its CA trusted
+        let ca = std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/tls/ca.pem")).unwrap();
+        let ca = ureq::tls::Certificate::from_pem(&ca).unwrap();
+        assert_eq!(read(&agent_with(ureq::tls::RootCerts::new_with_certs(&[ca]))).unwrap(), "ok");
+        // the computer's certificates: on CI the test CA is installed (PZMM_TEST_CA_TRUSTED=1) and it connects, as an
+        // antivirus' root would; anywhere else it isn't, and the error says so plainly
+        let platform = read(&agent_with(roots()));
+        if std::env::var_os("PZMM_TEST_CA_TRUSTED").is_some() {
+            assert_eq!(platform.unwrap(), "ok");
+        } else {
+            let e = platform.unwrap_err().to_string();
+            assert!(e.contains(CERT_INTERCEPTED), "{e}");
+        }
+        // PZMM's own bundled roots never trust it
+        assert!(read(&agent_with(ureq::tls::RootCerts::WebPki)).unwrap_err().to_string().contains(CERT_INTERCEPTED));
+    }
+
     #[test]
     fn web_calls_time_out() {
         let t = agent().config().timeouts();
+        // certificate errors are said plainly, the rest left alone
+        let cert = intercepted(ureq::Error::Rustls(rustls::Error::InvalidCertificate(rustls::CertificateError::UnknownIssuer))).to_string();
+        assert!(cert.contains(CERT_INTERCEPTED) && cert.contains("UnknownIssuer"), "{cert}");
+        assert_eq!(intercepted(ureq::Error::StatusCode(404)).to_string(), "http status: 404");
         assert_eq!((t.connect, t.global), (Some(CONNECT), Some(CALL)), "every call through the shared agent is bounded");
         // a server that accepts and never answers
         let silent = std::net::TcpListener::bind("127.0.0.1:0").unwrap();

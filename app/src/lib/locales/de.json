@@ -3495,6 +3495,7 @@
     "guessTip": "Ein wahrscheinlicher Treffer: Seine Workshop-Seite nennt die Mod-ID des Servers nicht. Entferne den Haken, um ihn wegzulassen."
   },
   "errors": {
+    "certIntercepted": "Etwas auf deinem Computer fängt sichere Verbindungen ab (meist Antivirus, Firewall oder VPN). Schalte dessen HTTPS-Prüfung aus oder füge PZMM als Ausnahme hinzu.",
     "busy": "PZMM installiert oder ändert gerade Mods: Versuche es erneut, wenn es fertig ist",
     "reloaded": "Die Modliste wurde im Modmenü des Spiels geändert, daher hat PZMM sie neu geladen. Nimm deine Änderung erneut vor.",
     "profileChanged": "Das aktive Profil ist jetzt „{now}“, daher wurde diese Änderung an „{profile}“ nicht gespeichert.",

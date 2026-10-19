@@ -3845,6 +3845,7 @@
     "guessTip": "Prawdopodobne dopasowanie: jego strona w Warsztacie nie podaje ID moda serwera. Odznacz, aby go pominąć."
   },
   "errors": {
+    "certIntercepted": "Coś na twoim komputerze przechwytuje bezpieczne połączenia (zwykle antywirus, zapora lub VPN). Wyłącz jego skanowanie HTTPS albo dodaj PZMM jako wyjątek.",
     "busy": "PZMM instaluje lub zmienia mody: spróbuj ponownie, gdy skończy",
     "reloaded": "Lista modów została zmieniona w menu modów w grze, więc PZMM wczytał ją ponownie. Wprowadź zmianę jeszcze raz.",
     "profileChanged": "Aktywny profil to teraz „{now}”, więc ta zmiana w „{profile}” nie została zapisana.",
