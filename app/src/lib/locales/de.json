@@ -3553,7 +3553,7 @@
     "settingsHint": "Das lässt sich später in den Einstellungen ändern."
   },
   "whatsNew": {
-    "notes": "Ein riesiges Update: der Mod-Manager im Spiel entspricht jetzt der App\nHol dir PZMM - Client im Steam Workshop, um ihn im Spiel zu nutzen\nJeder Tab der App, im Spiel, in 10 Sprachen\nApp und Spiel gleichen Profil, Abschnitte und Ladereihenfolge ab\nBitte PZMM aus dem Spiel, zu installieren, zu sichern oder Setup prüfen auszuführen\nProbleme, überschriebene Dateien und Updates stimmen auf beiden Seiten überein\nUpdates holen entfernte Mods nicht mehr zurück\nWorkshop-Kopien ersetzen nie deine GitHub- oder lokalen Installationen\nKartenvorlagen sind eine Liste über alle Spielordner\nViele Fehlerbehebungen aus zwei kompletten Fehlersuchen",
+    "notes": "Antivirus und VPNs blockieren keine Downloads mehr\nKaputte Mod finden hält Mods zusammen, die einander brauchen\nEs beginnt mit den Mods, die du zuletzt hinzugefügt hast\nZuerst gesehen: der Tag, an dem eine Mod auf deinen PC kam\nMods von einem Server weglassen, pro Server gemerkt\nWorkshop-Bilder, die nicht laden, sagen das jetzt",
     "title": "Neu in {version}",
     "enjoying": "Gefällt dir PZMM?",
     "upvote": "Wenn dir die App gefällt, gib ihr bitte einen Daumen hoch auf Steam!",

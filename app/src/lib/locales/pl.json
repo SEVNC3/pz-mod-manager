@@ -3903,7 +3903,7 @@
     "settingsHint": "Możesz to później zmienić w Ustawieniach."
   },
   "whatsNew": {
-    "notes": "Ogromna aktualizacja: menedżer modów w grze działa teraz jak aplikacja\nPobierz PZMM - Client z Warsztatu Steam, aby używać go w grze\nKażda karta aplikacji, w grze, w 10 językach\nAplikacja i gra synchronizują profil, sekcje i kolejność ładowania\nPoproś PZMM z gry o instalację, kopię zapasową lub sprawdzenie konfiguracji\nProblemy, nadpisane pliki i aktualizacje zgadzają się po obu stronach\nAktualizacje nie przywracają już usuniętych modów\nKopie z Warsztatu nigdy nie zastępują instalacji z GitHuba ani lokalnych\nPresety map to jedna lista dla wszystkich folderów gry\nMnóstwo poprawek z dwóch pełnych przeglądów błędów",
+    "notes": "Antywirusy i VPN-y nie psują już pobierania\nZnajdź zepsuty mod trzyma razem mody, które się potrzebują\nZaczyna od modów dodanych ostatnio\nPierwszy raz widziany: dzień, w którym mod trafił na twój komputer\nPomijaj mody na serwerze, zapamiętane dla każdego serwera\nObrazy z Warsztatu, które się nie wczytają, mówią o tym",
     "title": "Co nowego w {version}",
     "enjoying": "Podoba ci się PZMM?",
     "upvote": "Jeśli podoba ci się ta aplikacja, oceń ją na Steam!",

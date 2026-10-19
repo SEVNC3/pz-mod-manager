@@ -3553,7 +3553,7 @@
     "settingsHint": "You can change this later in Settings."
   },
   "whatsNew": {
-    "notes": "A massive update: the in-game mod manager now matches the app\nGet PZMM - Client on the Steam Workshop to use it in game\nEvery tab from the app, in game, in 10 languages\nThe app and the game sync your profile, sections and load order\nAsk PZMM from the game to install, back up or run Check setup\nProblems, overridden files and updates agree on both sides\nUpdates no longer bring back mods you removed\nWorkshop copies never replace your GitHub or local installs\nMap presets are one list across your game folders\nLots of fixes from two full bug sweeps",
+    "notes": "Antivirus and VPNs no longer break downloads\nFind the broken mod keeps mods that need each other together\nIt starts with the mods you added last\nFirst seen: the day a mod landed on your PC\nLeave mods out of a server, remembered per server\nWorkshop pictures that fail to load say so",
     "title": "What's new in {version}",
     "enjoying": "Enjoying PZMM?",
     "upvote": "If you're enjoying this app please upvote it on Steam!",
