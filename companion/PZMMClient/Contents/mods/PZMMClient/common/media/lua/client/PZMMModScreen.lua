@@ -863,6 +863,25 @@ local function readInstalled()
     return by, any
 end
 
+--- When each enabled mod first arrived on this PC, as the app knows it (Zomboid/Lua/pzmm/firstseen.txt, "<id>\t<secs>":
+--- PZMM's install time, else when its folder appeared; it can reset if Steam downloads the mod again). id -> secs;
+--- empty without the app (the game can't read folder dates).
+function K.readFirstSeen()
+    local by = {}
+    pcall(function()
+        local r = getFileReader("pzmm/firstseen.txt", false)
+        if not r then return end
+        local line = r:readLine()
+        while line do
+            local id, at = line:match("^([^\t]+)\t(%d+)")
+            if id and tonumber(at) and tonumber(at) > 0 then by[id] = tonumber(at) end
+            line = r:readLine()
+        end
+        r:close()
+    end)
+    return by
+end
+
 --- The search for the broken mod (Zomboid/Lua/pzmm/bisect.txt, so it survives restarting the game): the mods that were
 --- on, in load order, the suspect groups, the groups under test and the round; or just a result (the mod or group
 --- found, members split by "|"; "" for none). Groups are "a|b;c": a file from before groups reads as one mod a group.
@@ -896,7 +915,7 @@ local function readBisect()
         if t.result ~= nil then
             b = { result = t.result }
         elseif t.original and t.suspects then
-            b = { original = ids(t.original), suspects = groups(t.suspects), testing = groups(t.testing), round = tonumber(t.round) or 1, had = {}, maps = t.maps and ids(t.maps) or nil, alone = t.alone == "1" or nil, keep = {} }
+            b = { original = ids(t.original), suspects = groups(t.suspects), testing = groups(t.testing), round = tonumber(t.round) or 1, had = {}, maps = t.maps and ids(t.maps) or nil, alone = t.alone == "1" or nil, keep = {}, lead = tonumber(t.lead) }
             for _, id in ipairs(ids(t.keep)) do b.keep[id] = true end
             -- saved before groups: its frameworks stayed on as non-suspects, and stay on (alone round too)
             if t.keep == nil then
@@ -921,7 +940,7 @@ local function writeBisect(b)
                 for i, g in ipairs(list) do out[i] = table.concat(g, "|") end
                 return table.concat(out, ";")
             end
-            w:write("original\t" .. table.concat(b.original, ";") .. "\nsuspects\t" .. groups(b.suspects) .. "\ntesting\t" .. groups(b.testing) .. "\nround\t" .. b.round .. (b.maps and ("\nmaps\t" .. table.concat(b.maps, ";")) or "") .. (b.alone and "\nalone\t1" or "") .. "\nkeep\t" .. table.concat((function() local k = {} for id in pairs(b.keep or {}) do k[#k + 1] = id end table.sort(k) return k end)(), ";") .. "\n")
+            w:write("original\t" .. table.concat(b.original, ";") .. "\nsuspects\t" .. groups(b.suspects) .. "\ntesting\t" .. groups(b.testing) .. "\nround\t" .. b.round .. (b.maps and ("\nmaps\t" .. table.concat(b.maps, ";")) or "") .. (b.alone and "\nalone\t1" or "") .. (b.lead and ("\nlead\t" .. b.lead) or "") .. "\nkeep\t" .. table.concat((function() local k = {} for id in pairs(b.keep or {}) do k[#k + 1] = id end table.sort(k) return k end)(), ";") .. "\n")
         end
         w:close()
     end)
@@ -3375,6 +3394,29 @@ function K.bisectGroups(order, reqs)
     return groups
 end
 
+--- The suspects' order, as the app's bisectOrder: the groups holding a mod in `first` lead (`lead` = how many), then
+--- the rest newest first by their newest member's first-seen date (`seen`: id -> secs, firstseen.txt); ties, and
+--- no dates at all, keep load order. Returns { groups, lead }.
+function K.bisectOrder(groups, seen, first)
+    local want = {}
+    for _, id in ipairs(first or {}) do want[id] = true end
+    local lead, rest = {}, {}
+    for _, g in ipairs(groups) do
+        local hit = false
+        for _, id in ipairs(g) do if want[id] then hit = true end end
+        if hit then lead[#lead + 1] = g else rest[#rest + 1] = { g = g, i = #rest + 1 } end
+    end
+    for _, r in ipairs(rest) do
+        r.at = 0
+        for _, id in ipairs(r.g) do r.at = math.max(r.at, seen and seen[id] or 0) end
+    end
+    -- stable: equal dates keep their load order
+    table.sort(rest, function(x, y) if x.at ~= y.at then return x.at > y.at end return x.i < y.i end)
+    local n = #lead
+    for _, r in ipairs(rest) do lead[#lead + 1] = r.g end
+    return { groups = lead, lead = n }
+end
+
 --- One test, as the app's bisectRound: every mod outside the suspect groups stays on (`original` order), plus the
 --- first `count` suspect groups; `alone`: only the suspect groups and the mods kept as they are (`keep`: on mods this
 --- build can't load). Returns the set of mods on and the groups under test.
@@ -3411,8 +3453,9 @@ end
 
 function PZMMMods:bisectApply()
     local b = self.bisect
-    -- round 1 has every suspect off (still broken there: it isn't these mods); then halves
-    local count = b.round == 1 and 0 or math.ceil(#b.suspects / 2)
+    -- round 1 has every suspect off (still broken there: it isn't these mods); round 2 the lead groups (the mods it
+    -- was asked to start with) when there are some but not all; then halves (as the app's bisectApply)
+    local count = b.round == 1 and 0 or (b.round == 2 and b.lead and b.lead > 0 and b.lead < #b.suspects) and b.lead or math.ceil(#b.suspects / 2)
     local on, testing = K.bisectRound(b.original, b.suspects, count, b.alone, b.keep)
     b.testing = testing
     local list = {}
@@ -3426,7 +3469,8 @@ function PZMMMods:bisectApply()
     self:acceptNow()
 end
 
-function PZMMMods:bisectStart()
+--- `first`: mods to start with (their groups lead, as the app's bisectStart(first)).
+function PZMMMods:bisectStart(first)
     if self.bisect then return end
     if self:changes(true) > 0 then return self:say("Accept or discard your changes first: the search saves its test lists as it goes.") end
     local mods = self.model.mods
@@ -3456,12 +3500,14 @@ function PZMMMods:bisectStart()
         for _, g in ipairs(suspects) do for _, id in ipairs(g) do ids[#ids + 1] = id end end
         return self:say(T("bisect_one_group", "Your enabled mods all need each other (%1), so the search can't split them into groups to test: turn some off by hand to narrow it down.", table.concat(ids, ", ")))
     end
+    -- the groups holding a mod to start with go first, then the newest arrivals first (firstseen.txt, from the app)
+    suspects = K.bisectOrder(suspects, self.firstSeen, first)
     local maps = {}
     pcall(function()
         local mo = self.model:getActiveMods():getMapOrder()
         for i = 0, mo:size() - 1 do maps[#maps + 1] = mo:get(i) end
     end)
-    self.bisect = { original = original, had = had, keep = keep, suspects = suspects, testing = {}, round = 1, maps = maps }
+    self.bisect = { original = original, had = had, keep = keep, suspects = suspects.groups, testing = {}, round = 1, maps = maps, lead = suspects.lead }
     self:bisectApply()
 end
 
@@ -4977,6 +5023,17 @@ function PZMMMods:drawDetails(d, x, y, w, bottom)
         field("Updated", days <= 0 and "today" or days == 1 and "yesterday" or days < 60 and (days .. " days ago") or (math.floor(days / 30) .. " months ago"))
     end
     if stu and (stu.size or 0) > 0 then field("Size", (math.floor(stu.size / 104857.6) / 10) .. " MB") end
+    -- when it first arrived on this PC, as the app knows it (firstseen.txt; none without the app)
+    local seen = self.firstSeen and self.firstSeen[d.modId]
+    if seen then
+        local fy = y
+        local ok, when = pcall(os.date, "%d %B %Y", K.LT(seen))
+        field(T("details_first_seen", "First seen"), ok and when or "")
+        local hx, hy = self:getMouseX(), self:getMouseY()
+        if hx >= x and hx < x + w and hy >= fy and hy < y then
+            tip(self, T("details_first_seen", "First seen") .. "\n" .. T("details_first_seen_tip", "When this mod arrived on this PC, as far as PZMM can tell. It can reset if Steam downloads the mod again."))
+        end
+    end
     field(T("details_langs", "Has texts in"), self:langsOf(d))
     pcall(function()
         local lo, hi = info:getVersionMin(), info:getVersionMax()
@@ -6846,6 +6903,7 @@ function PZMMMods.open()
     s.lib, s.app, s.feed = s:readLib(), readApp(), readFeed()
     s.tags = readTags()
     s.installed, s.hasInstalled = readInstalled()
+    s.firstSeen = K.readFirstSeen()
     s.bisect = readBisect()
     applyTheme(s.app)
     s.defRev, s.defChanged, s.openedAt, s.appAt = s.app and s.app.default_rev, nil, getTimestampMs(), getTimestampMs()

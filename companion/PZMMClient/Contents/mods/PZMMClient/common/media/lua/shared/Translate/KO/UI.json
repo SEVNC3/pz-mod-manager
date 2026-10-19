@@ -42,6 +42,8 @@
     "UI_PZMM_close": "닫기",
     "UI_PZMM_details_add_tag": "태그 추가",
     "UI_PZMM_details_description": "설명",
+    "UI_PZMM_details_first_seen": "처음 확인",
+    "UI_PZMM_details_first_seen_tip": "PZMM이 알 수 있는 범위에서 이 모드가 이 PC에 들어온 시점이에요. Steam이 모드를 다시 받으면 바뀔 수 있어요.",
     "UI_PZMM_details_langs": "텍스트 언어",
     "UI_PZMM_details_mod_version": "모드 버전",
     "UI_PZMM_details_needed_by": "필요로 하는 모드",

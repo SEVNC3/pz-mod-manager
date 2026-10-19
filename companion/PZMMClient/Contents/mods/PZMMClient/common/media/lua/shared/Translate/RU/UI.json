@@ -42,6 +42,8 @@
     "UI_PZMM_close": "Закрыть",
     "UI_PZMM_details_add_tag": "Добавить метку",
     "UI_PZMM_details_description": "Описание",
+    "UI_PZMM_details_first_seen": "Впервые замечен",
+    "UI_PZMM_details_first_seen_tip": "Когда этот мод появился на этом ПК, насколько может судить PZMM. Может сброситься, если Steam заново скачает мод.",
     "UI_PZMM_details_langs": "Есть тексты на",
     "UI_PZMM_details_mod_version": "Версия мода",
     "UI_PZMM_details_needed_by": "Нужен для",

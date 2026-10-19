@@ -42,6 +42,8 @@
     "UI_PZMM_close": "Schließen",
     "UI_PZMM_details_add_tag": "Tag hinzufügen",
     "UI_PZMM_details_description": "Beschreibung",
+    "UI_PZMM_details_first_seen": "Zuerst gesehen",
+    "UI_PZMM_details_first_seen_tip": "Wann diese Mod auf diesen PC kam, soweit PZMM es weiß. Kann sich ändern, wenn Steam die Mod neu herunterlädt.",
     "UI_PZMM_details_langs": "Hat Texte in",
     "UI_PZMM_details_mod_version": "Mod-Version",
     "UI_PZMM_details_needed_by": "Benötigt von",

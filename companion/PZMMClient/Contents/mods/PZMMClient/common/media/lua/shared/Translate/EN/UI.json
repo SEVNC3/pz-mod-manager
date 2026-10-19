@@ -42,6 +42,8 @@
     "UI_PZMM_close": "Close",
     "UI_PZMM_details_add_tag": "Add tag",
     "UI_PZMM_details_description": "Description",
+    "UI_PZMM_details_first_seen": "First seen",
+    "UI_PZMM_details_first_seen_tip": "When this mod arrived on this PC, as far as PZMM can tell. It can reset if Steam downloads the mod again.",
     "UI_PZMM_details_langs": "Has texts in",
     "UI_PZMM_details_mod_version": "Mod version",
     "UI_PZMM_details_needed_by": "Needed by",

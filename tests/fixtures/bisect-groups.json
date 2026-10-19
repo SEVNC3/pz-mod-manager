@@ -548,6 +548,121 @@
       "rounds": 4
     },
     {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "the newest group breaks it",
+      "broken": [
+        "Solo"
+      ],
+      "seen": {
+        "ZombieBuddy": 1760000000,
+        "Viewpoint": 1760000000,
+        "ViewpointSurface": 1760000000,
+        "ViewpointBloodFX": 1760000000,
+        "BloodFXAddon": 1760000000,
+        "TsarLib": 1760086400,
+        "Ki5Car": 1760086400,
+        "ALifeFramework": 1760172800,
+        "ALifeNPCs": 1760172800,
+        "Solo": 1760259200
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Solo"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "the oldest group breaks it",
+      "broken": [
+        "ZombieBuddy"
+      ],
+      "seen": {
+        "ZombieBuddy": 1760000000,
+        "Viewpoint": 1760000000,
+        "ViewpointSurface": 1760000000,
+        "ViewpointBloodFX": 1760000000,
+        "BloodFXAddon": 1760000000,
+        "TsarLib": 1760086400,
+        "Ki5Car": 1760086400,
+        "ALifeFramework": 1760172800,
+        "ALifeNPCs": 1760172800,
+        "Solo": 1760259200
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "ZombieBuddy",
+          "Viewpoint",
+          "ViewpointSurface",
+          "ViewpointBloodFX",
+          "BloodFXAddon"
+        ]
+      },
+      "rounds": 4
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "every date equal keeps load order",
+      "broken": [
+        "Solo"
+      ],
+      "seen": {
+        "ZombieBuddy": 1760000000,
+        "Viewpoint": 1760000000,
+        "ViewpointSurface": 1760000000,
+        "ViewpointBloodFX": 1760000000,
+        "BloodFXAddon": 1760000000,
+        "TsarLib": 1760000000,
+        "Ki5Car": 1760000000,
+        "ALifeFramework": 1760000000,
+        "ALifeNPCs": 1760000000,
+        "Solo": 1760000000
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Solo"
+        ]
+      },
+      "rounds": 4
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "a log lead goes before the newest",
+      "broken": [
+        "ZombieBuddy"
+      ],
+      "lead": [
+        "Solo"
+      ],
+      "seen": {
+        "ZombieBuddy": 1760000000,
+        "Viewpoint": 1760000000,
+        "ViewpointSurface": 1760000000,
+        "ViewpointBloodFX": 1760000000,
+        "BloodFXAddon": 1760000000,
+        "TsarLib": 1760086400,
+        "Ki5Car": 1760086400,
+        "ALifeFramework": 1760172800,
+        "ALifeNPCs": 1760172800,
+        "Solo": 1760259200
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "ZombieBuddy",
+          "Viewpoint",
+          "ViewpointSurface",
+          "ViewpointBloodFX",
+          "BloodFXAddon"
+        ]
+      },
+      "rounds": 4
+    },
+    {
       "case": "a diamond is one group",
       "why": "A alone breaks it",
       "broken": [
@@ -692,6 +807,99 @@
       "rounds": 3
     },
     {
+      "case": "a diamond is one group",
+      "why": "the newest group breaks it",
+      "broken": [
+        "E"
+      ],
+      "seen": {
+        "A": 1760000000,
+        "B": 1760000000,
+        "C": 1760000000,
+        "D": 1760000000,
+        "E": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "E"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a diamond is one group",
+      "why": "the oldest group breaks it",
+      "broken": [
+        "A"
+      ],
+      "seen": {
+        "A": 1760000000,
+        "B": 1760000000,
+        "C": 1760000000,
+        "D": 1760000000,
+        "E": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a diamond is one group",
+      "why": "every date equal keeps load order",
+      "broken": [
+        "E"
+      ],
+      "seen": {
+        "A": 1760000000,
+        "B": 1760000000,
+        "C": 1760000000,
+        "D": 1760000000,
+        "E": 1760000000
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "E"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a diamond is one group",
+      "why": "a log lead goes before the newest",
+      "broken": [
+        "A"
+      ],
+      "lead": [
+        "E"
+      ],
+      "seen": {
+        "A": 1760000000,
+        "B": 1760000000,
+        "C": 1760000000,
+        "D": 1760000000,
+        "E": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "rounds": 3
+    },
+    {
       "case": "a requirement cycle is one group and terminates",
       "why": "X alone breaks it",
       "broken": [
@@ -796,6 +1004,87 @@
       "rounds": 3
     },
     {
+      "case": "a requirement cycle is one group and terminates",
+      "why": "the newest group breaks it",
+      "broken": [
+        "Z"
+      ],
+      "seen": {
+        "X": 1760000000,
+        "Y": 1760000000,
+        "Z": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Z"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a requirement cycle is one group and terminates",
+      "why": "the oldest group breaks it",
+      "broken": [
+        "X"
+      ],
+      "seen": {
+        "X": 1760000000,
+        "Y": 1760000000,
+        "Z": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "X",
+          "Y"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement cycle is one group and terminates",
+      "why": "every date equal keeps load order",
+      "broken": [
+        "Z"
+      ],
+      "seen": {
+        "X": 1760000000,
+        "Y": 1760000000,
+        "Z": 1760000000
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Z"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement cycle is one group and terminates",
+      "why": "a log lead goes before the newest",
+      "broken": [
+        "X"
+      ],
+      "lead": [
+        "Z"
+      ],
+      "seen": {
+        "X": 1760000000,
+        "Y": 1760000000,
+        "Z": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "X",
+          "Y"
+        ]
+      },
+      "rounds": 3
+    },
+    {
       "case": "requirements that are off or not installed add no edge",
       "why": "M alone breaks it",
       "broken": [
@@ -890,6 +1179,87 @@
       "lead": [
         "N"
       ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "M",
+          "O"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "requirements that are off or not installed add no edge",
+      "why": "the newest group breaks it",
+      "broken": [
+        "N"
+      ],
+      "seen": {
+        "M": 1760000000,
+        "O": 1760000000,
+        "N": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "N"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "requirements that are off or not installed add no edge",
+      "why": "the oldest group breaks it",
+      "broken": [
+        "M"
+      ],
+      "seen": {
+        "M": 1760000000,
+        "O": 1760000000,
+        "N": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "M",
+          "O"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "requirements that are off or not installed add no edge",
+      "why": "every date equal keeps load order",
+      "broken": [
+        "N"
+      ],
+      "seen": {
+        "M": 1760000000,
+        "N": 1760000000,
+        "O": 1760000000
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "N"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "requirements that are off or not installed add no edge",
+      "why": "a log lead goes before the newest",
+      "broken": [
+        "M"
+      ],
+      "lead": [
+        "N"
+      ],
+      "seen": {
+        "M": 1760000000,
+        "O": 1760000000,
+        "N": 1760086400
+      },
       "expect": {
         "result": "found",
         "ids": [
@@ -1022,6 +1392,93 @@
       "rounds": 3
     },
     {
+      "case": "groups keep load order and follow their first member",
+      "why": "the newest group breaks it",
+      "broken": [
+        "R1"
+      ],
+      "seen": {
+        "L1": 1760000000,
+        "L2": 1760000000,
+        "R1": 1760086400,
+        "R2": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "R1",
+          "R2"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "groups keep load order and follow their first member",
+      "why": "the oldest group breaks it",
+      "broken": [
+        "L1"
+      ],
+      "seen": {
+        "L1": 1760000000,
+        "L2": 1760000000,
+        "R1": 1760086400,
+        "R2": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "L1",
+          "L2"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "groups keep load order and follow their first member",
+      "why": "every date equal keeps load order",
+      "broken": [
+        "R1"
+      ],
+      "seen": {
+        "L1": 1760000000,
+        "R1": 1760000000,
+        "L2": 1760000000,
+        "R2": 1760000000
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "R1",
+          "R2"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "groups keep load order and follow their first member",
+      "why": "a log lead goes before the newest",
+      "broken": [
+        "L1"
+      ],
+      "lead": [
+        "R1"
+      ],
+      "seen": {
+        "L1": 1760000000,
+        "L2": 1760000000,
+        "R1": 1760086400,
+        "R2": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "L1",
+          "L2"
+        ]
+      },
+      "rounds": 3
+    },
+    {
       "case": "a requirement listed before its user still joins",
       "why": "Lib alone breaks it",
       "broken": [
@@ -1126,6 +1583,87 @@
       "rounds": 3
     },
     {
+      "case": "a requirement listed before its user still joins",
+      "why": "the newest group breaks it",
+      "broken": [
+        "Other"
+      ],
+      "seen": {
+        "Lib": 1760000000,
+        "User": 1760000000,
+        "Other": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a requirement listed before its user still joins",
+      "why": "the oldest group breaks it",
+      "broken": [
+        "Lib"
+      ],
+      "seen": {
+        "Lib": 1760000000,
+        "User": 1760000000,
+        "Other": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Lib",
+          "User"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement listed before its user still joins",
+      "why": "every date equal keeps load order",
+      "broken": [
+        "Other"
+      ],
+      "seen": {
+        "Lib": 1760000000,
+        "Other": 1760000000,
+        "User": 1760000000
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement listed before its user still joins",
+      "why": "a log lead goes before the newest",
+      "broken": [
+        "Lib"
+      ],
+      "lead": [
+        "Other"
+      ],
+      "seen": {
+        "Lib": 1760000000,
+        "User": 1760000000,
+        "Other": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Lib",
+          "User"
+        ]
+      },
+      "rounds": 3
+    },
+    {
       "case": "a requirement loaded after its user still joins",
       "why": "User alone breaks it",
       "broken": [
@@ -1220,6 +1758,87 @@
       "lead": [
         "Other"
       ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "User",
+          "Lib"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement loaded after its user still joins",
+      "why": "the newest group breaks it",
+      "broken": [
+        "Other"
+      ],
+      "seen": {
+        "User": 1760000000,
+        "Lib": 1760000000,
+        "Other": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a requirement loaded after its user still joins",
+      "why": "the oldest group breaks it",
+      "broken": [
+        "User"
+      ],
+      "seen": {
+        "User": 1760000000,
+        "Lib": 1760000000,
+        "Other": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "User",
+          "Lib"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement loaded after its user still joins",
+      "why": "every date equal keeps load order",
+      "broken": [
+        "Other"
+      ],
+      "seen": {
+        "User": 1760000000,
+        "Other": 1760000000,
+        "Lib": 1760000000
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement loaded after its user still joins",
+      "why": "a log lead goes before the newest",
+      "broken": [
+        "User"
+      ],
+      "lead": [
+        "Other"
+      ],
+      "seen": {
+        "User": 1760000000,
+        "Lib": 1760000000,
+        "Other": 1760086400
+      },
       "expect": {
         "result": "found",
         "ids": [
@@ -1491,6 +2110,87 @@
       "rounds": 3
     },
     {
+      "case": "a chain through a mod that's off joins its ends",
+      "why": "the newest group breaks it",
+      "broken": [
+        "Other"
+      ],
+      "seen": {
+        "A": 1760000000,
+        "B": 1760000000,
+        "Other": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a chain through a mod that's off joins its ends",
+      "why": "the oldest group breaks it",
+      "broken": [
+        "A"
+      ],
+      "seen": {
+        "A": 1760000000,
+        "B": 1760000000,
+        "Other": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "A",
+          "B"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a chain through a mod that's off joins its ends",
+      "why": "every date equal keeps load order",
+      "broken": [
+        "Other"
+      ],
+      "seen": {
+        "A": 1760000000,
+        "Other": 1760000000,
+        "B": 1760000000
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a chain through a mod that's off joins its ends",
+      "why": "a log lead goes before the newest",
+      "broken": [
+        "A"
+      ],
+      "lead": [
+        "Other"
+      ],
+      "seen": {
+        "A": 1760000000,
+        "B": 1760000000,
+        "Other": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "A",
+          "B"
+        ]
+      },
+      "rounds": 3
+    },
+    {
       "case": "an off mod in a cycle terminates",
       "why": "P alone breaks it",
       "broken": [
@@ -1569,6 +2269,81 @@
       "lead": [
         "Q"
       ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "P"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "an off mod in a cycle terminates",
+      "why": "the newest group breaks it",
+      "broken": [
+        "Q"
+      ],
+      "seen": {
+        "P": 1760000000,
+        "Q": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Q"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "an off mod in a cycle terminates",
+      "why": "the oldest group breaks it",
+      "broken": [
+        "P"
+      ],
+      "seen": {
+        "P": 1760000000,
+        "Q": 1760086400
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "P"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "an off mod in a cycle terminates",
+      "why": "every date equal keeps load order",
+      "broken": [
+        "Q"
+      ],
+      "seen": {
+        "P": 1760000000,
+        "Q": 1760000000
+      },
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Q"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "an off mod in a cycle terminates",
+      "why": "a log lead goes before the newest",
+      "broken": [
+        "P"
+      ],
+      "lead": [
+        "Q"
+      ],
+      "seen": {
+        "P": 1760000000,
+        "Q": 1760086400
+      },
       "expect": {
         "result": "found",
         "ids": [

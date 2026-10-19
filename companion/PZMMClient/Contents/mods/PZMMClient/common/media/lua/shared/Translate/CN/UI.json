@@ -42,6 +42,8 @@
     "UI_PZMM_close": "关闭",
     "UI_PZMM_details_add_tag": "添加标签",
     "UI_PZMM_details_description": "描述",
+    "UI_PZMM_details_first_seen": "首次出现",
+    "UI_PZMM_details_first_seen_tip": "据 PZMM 所知，这个模组首次出现在这台电脑上的时间。如果 Steam 重新下载该模组，可能会重置。",
     "UI_PZMM_details_langs": "包含以下语言的文本",
     "UI_PZMM_details_mod_version": "模组版本",
     "UI_PZMM_details_needed_by": "被以下模组需要",
