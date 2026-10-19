@@ -7242,7 +7242,8 @@ local function readNotes(kind, label, file)
             elseif lead then
                 notes[#notes + 1] = { lead, rest }
             elseif line:match("^%-%s+") then
-                notes[#notes + 1] = { line:gsub("^%-%s+", ""), "" }
+                -- a plain bullet reads as plain text (no bold lead)
+                notes[#notes + 1] = { "", (line:gsub("^%-%s+", "")) }
             end
             line = r:readLine()
         end
@@ -7357,7 +7358,7 @@ function PZMMNews:prerender()
         if not (c and c.tab == self.tab and c.w == w) then
             c = { tab = self.tab, w = w, lines = {} }
             for _, note in ipairs(self.tab) do
-                for _, l in ipairs(wrap(note[1], w - 48)) do c.lines[#c.lines + 1] = { l, true } end
+                if note[1] ~= "" then for _, l in ipairs(wrap(note[1], w - 48)) do c.lines[#c.lines + 1] = { l, true } end end
                 for _, l in ipairs(wrap(note[2], w - 48)) do c.lines[#c.lines + 1] = { l, false } end
                 c.lines[#c.lines + 1] = { "", false }
             end
