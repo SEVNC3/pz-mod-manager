@@ -42,7 +42,7 @@ assert.equal(ids(sortLoadOrder(cyc)), "+X +Y");
 type BisectCase = { name: string; enabled: string[]; requires: Record<string, string[]>; groups: string[][] };
 const fixture: { cases: BisectCase[] } = JSON.parse(readFileSync(new URL("../../tests/fixtures/bisect-groups.json", import.meta.url), "utf8"));
 /** A whole search, the answers given by `broken(on)`: what it ends in, after checking each round's list. */
-function search(c: BisectCase, broken: (on: Set<string>) => boolean, first: string[] = []): { found?: string[]; none?: true; rounds: number } {
+function search(c: BisectCase, broken: (on: Set<string>) => boolean, first: string[] = []): { found?: string[]; together?: string[]; none?: true; rounds: number } {
   const need = (id: string) => c.requires[id] ?? [];
   const original = c.enabled.map((id) => mod(id, true, { requires: need(id) }));
   const groups = bisectGroups(c.enabled, need);
@@ -59,6 +59,7 @@ function search(c: BisectCase, broken: (on: Set<string>) => boolean, first: stri
     assert.deepEqual(order, [...on].sort((a, b) => c.enabled.indexOf(a) - c.enabled.indexOf(b)), `${c.name}: load order`);
     const next = bisectNext({ ...s, testing }, broken(on));
     if ("found" in next) return { found: next.found, rounds: round };
+    if ("together" in next) return { together: next.together, rounds: round };
     if ("none" in next) return { none: true, rounds: round };
     s = { ...next, testing: [] };
   }
@@ -76,10 +77,11 @@ for (const c of fixture.cases) {
 // the reporter's chain: Viewpoint, ZombieBuddy and Viewpoint's add-ons are found together, never apart
 const vp = fixture.cases[0];
 assert.deepEqual(search(vp, (on) => on.has("BloodFXAddon")).found, ["ZombieBuddy", "Viewpoint", "ViewpointSurface", "ViewpointBloodFX", "BloodFXAddon"]);
-// two mods in different groups that break only together: said, not blamed on one group
-assert.ok(search(vp, (on) => on.has("Solo") && on.has("Ki5Car")).none, "two mods together");
-// fixed with nothing on test: never loops
-assert.ok(search(vp, () => false).none);
+// two mods in different groups that break only together: the one left is named, and said to need the other
+const pair = search(vp, (on) => on.has("Solo") && on.has("Ki5Car"));
+assert.ok(pair.together && (pair.together.includes("Solo") || pair.together.includes("Ki5Car")), "two mods together");
+// fixed whatever is on: never loops, and blames nothing on its own
+assert.ok(!search(vp, () => false).found);
 // a search saved before groups (lists of ids) still loads: grouped, testing the groups it was testing
 const old = { round: 3, suspects: ["Lib", "Other", "User"], testing: ["User"] };
 const up = bisectUpgrade(old, (id) => (id === "User" ? ["Lib"] : []));

@@ -1545,11 +1545,12 @@
     const next = bisectNext(bisect, stillBroken);
     if (!("suspects" in next)) {
       const { original, profile } = bisect;
-      const group = "found" in next ? next.found : [];
+      const group = "found" in next ? next.found : "together" in next ? next.together : [];
       setBisect(null);
       undoStack = redoStack = [];
       restoreBisected(original, profile);
-      if (group.length > 1) say("log.bisectFoundGroup", { ids: group.join(", ") }, true);
+      if ("together" in next) say("log.bisectTogether", { ids: group.join(", ") }, true);
+      else if (group.length > 1) say("log.bisectFoundGroup", { ids: group.join(", ") }, true);
       else say(group.length ? "log.bisectFound" : "log.bisectNone", { id: group[0] ?? "" }, !!group.length);
       logOpen = true;
       if (group.length) selected = group[0];

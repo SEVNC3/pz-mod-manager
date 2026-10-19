@@ -354,6 +354,7 @@
     "bisectNone": "O problema não seguiu nenhum grupo: talvez precise de dois mods juntos. Sua lista de mods foi restaurada.",
     "bisectFoundGroup": "Está neste grupo: {ids}. Esses mods precisam uns dos outros, então foram testados juntos. Sua lista de mods foi restaurada.",
     "bisectOneGroup": "Todos os seus mods ativos precisam uns dos outros ({ids}), então a busca não consegue dividi-los em grupos para testar.",
+    "bisectTogether": "{ids} só quebra junto com mods de outro grupo: desativá-lo corrige sua lista, mas sozinho funciona. Sua lista de mods foi restaurada.",
     "sectionExists": "Já existe uma seção chamada “{name}”. Escolha outro nome.",
     "noneOurs": "Nenhum dos mods selecionados foi instalado pelo PZMM; cancele a inscrição de mods da Steam na própria Steam.",
     "logCopied": "Registro de atividade copiado (seu nome de usuário fica oculto nos caminhos).",

@@ -358,10 +358,11 @@ export function bisectUpgrade<T extends { suspects: unknown[]; testing: unknown[
 /**
  * After a test: still broken narrows to the groups tested, fixed to the others. One group left because it was
  * tested and still broken is the answer; one left only because the others were cleared is tested alone first
- * (`confirm`), and if it alone is fine, two mods in different groups break only together (`none`).
+ * (`confirm`), and if it alone is fine, it breaks only together with mods in another group (`together`: turning
+ * it off still fixes the list played).
  */
-export function bisectNext(s: { suspects: string[][]; testing: string[][]; confirm?: boolean }, stillBroken: boolean): { found: string[] } | { none: true } | { suspects: string[][]; confirm: boolean } {
-  if (s.confirm) return stillBroken ? { found: s.suspects[0] } : { none: true };
+export function bisectNext(s: { suspects: string[][]; testing: string[][]; confirm?: boolean }, stillBroken: boolean): { found: string[] } | { together: string[] } | { none: true } | { suspects: string[][]; confirm: boolean } {
+  if (s.confirm) return stillBroken ? { found: s.suspects[0] } : { together: s.suspects[0] };
   const tested = new Set(s.testing.flat());
   const next = stillBroken ? s.testing : s.suspects.filter((g) => !g.some((id) => tested.has(id)));
   if (!next.length) return { none: true };

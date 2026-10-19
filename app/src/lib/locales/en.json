@@ -354,6 +354,7 @@
     "bisectNone": "The problem didn't follow any single group: it may take two mods together. Your mod list is restored.",
     "bisectFoundGroup": "It's in this group: {ids}. These mods need each other, so they were tested together. Your mod list is restored.",
     "bisectOneGroup": "Your enabled mods all need each other ({ids}), so the search can't split them into groups to test.",
+    "bisectTogether": "{ids} breaks it only together with mods in another group: turning it off fixes your list, but it's fine on its own. Your mod list is restored.",
     "sectionExists": "There's already a section called \"{name}\". Pick another name.",
     "noneOurs": "None of the selected mods were installed by PZMM; unsubscribe Steam mods in Steam.",
     "logCopied": "Copied the activity log (your user name is hidden in paths).",
