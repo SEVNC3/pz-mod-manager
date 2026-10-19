@@ -351,7 +351,7 @@
     "checkSetupFailed": "Setup konnte nicht geprüft werden: {error}",
     "bisectNeedsTwo": "Aktiviere mindestens zwei Mods, um nach einem fehlerhaften zu suchen.",
     "bisectFound": "Gefunden: {id} verursacht das Problem. Deine Modliste ist wiederhergestellt.",
-    "bisectNone": "Das Problem folgte keiner einzelnen Gruppe: vielleicht braucht es zwei Mods zusammen. Deine Modliste ist wiederhergestellt.",
+    "bisectNone": "Das Problem tritt auch auf, wenn alle diese Mods aus sind, also liegt es an keinem von ihnen. Deine Modliste ist wiederhergestellt.",
     "bisectFoundGroup": "Es liegt in dieser Gruppe: {ids}. Diese Mods brauchen einander, darum wurden sie zusammen getestet. Deine Modliste ist wiederhergestellt.",
     "bisectOneGroup": "Deine aktiven Mods brauchen alle einander ({ids}), darum kann die Suche sie nicht in Gruppen zum Testen aufteilen.",
     "bisectTogether": "{ids} löst es nur zusammen mit Mods aus einer anderen Gruppe aus: Ausschalten behebt deine Liste, allein ist es aber in Ordnung. Deine Modliste ist wiederhergestellt.",

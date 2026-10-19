@@ -49,10 +49,10 @@ function search(c: BisectCase, broken: (on: Set<string>) => boolean, first: stri
   const lead = groups.filter((g) => g.some((id) => first.includes(id)));
   let s: { suspects: string[][]; testing: string[][]; confirm?: boolean } = { suspects: [...lead, ...groups.filter((g) => !lead.includes(g))], testing: [] };
   if (s.suspects.length < 2) return { found: s.suspects[0], rounds: 0 }; // one group: said at the start
-  let count: number | undefined = lead.length && lead.length < s.suspects.length ? lead.length : undefined;
-  for (let round = 1; round <= 2 * c.enabled.length + 2; round++) {
+  for (let round = 1; round <= 2 * c.enabled.length + 3; round++) {
+    // as +page.svelte's bisectApply: round 1 all suspects off, round 2 the logs' groups
+    const count = round === 1 ? 0 : round === 2 && lead.length && lead.length < s.suspects.length ? lead.length : undefined;
     const { on, testing } = bisectRound(original, s.suspects, count, s.confirm);
-    count = undefined;
     // never a mod on while an enabled mod it needs is off; the load order kept
     for (const id of on) for (const r of need(id)) assert.ok(!c.enabled.includes(r) || on.has(r), `${c.name}: ${id} on without ${r}`);
     const order = c.enabled.filter((id) => on.has(id));
@@ -82,6 +82,8 @@ const pair = search(vp, (on) => on.has("Solo") && on.has("Ki5Car"));
 assert.ok(pair.together && (pair.together.includes("Solo") || pair.together.includes("Ki5Car")), "two mods together");
 // fixed whatever is on: never loops, and blames nothing on its own
 assert.ok(!search(vp, () => false).found);
+// broken whatever is on (not a mod at all): round 1, with every suspect off, says so
+assert.deepEqual(search(vp, () => true), { none: true, rounds: 1 });
 // a search saved before groups (lists of ids) still loads: grouped, testing the groups it was testing
 const old = { round: 3, suspects: ["Lib", "Other", "User"], testing: ["User"] };
 const up = bisectUpgrade(old, (id) => (id === "User" ? ["Lib"] : []));

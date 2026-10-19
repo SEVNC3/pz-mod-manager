@@ -351,7 +351,7 @@
     "checkSetupFailed": "Não foi possível verificar a configuração: {error}",
     "bisectNeedsTwo": "Ative pelo menos dois mods para procurar um quebrado.",
     "bisectFound": "Encontrado: {id} causa o problema. Sua lista de mods foi restaurada.",
-    "bisectNone": "O problema não seguiu nenhum grupo: talvez precise de dois mods juntos. Sua lista de mods foi restaurada.",
+    "bisectNone": "O problema acontece com todos esses mods desativados, então não é nenhum deles. Sua lista de mods foi restaurada.",
     "bisectFoundGroup": "Está neste grupo: {ids}. Esses mods precisam uns dos outros, então foram testados juntos. Sua lista de mods foi restaurada.",
     "bisectOneGroup": "Todos os seus mods ativos precisam uns dos outros ({ids}), então a busca não consegue dividi-los em grupos para testar.",
     "bisectTogether": "{ids} só quebra junto com mods de outro grupo: desativá-lo corrige sua lista, mas sozinho funciona. Sua lista de mods foi restaurada.",

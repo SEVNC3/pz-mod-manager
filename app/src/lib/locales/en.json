@@ -351,7 +351,7 @@
     "checkSetupFailed": "Couldn't check the setup: {error}",
     "bisectNeedsTwo": "Enable at least two mods to search for a broken one.",
     "bisectFound": "Found it: {id} causes the problem. Your mod list is restored.",
-    "bisectNone": "The problem didn't follow any single group: it may take two mods together. Your mod list is restored.",
+    "bisectNone": "The problem happens with all of these mods off, so it isn't one of them. Your mod list is restored.",
     "bisectFoundGroup": "It's in this group: {ids}. These mods need each other, so they were tested together. Your mod list is restored.",
     "bisectOneGroup": "Your enabled mods all need each other ({ids}), so the search can't split them into groups to test.",
     "bisectTogether": "{ids} breaks it only together with mods in another group: turning it off fixes your list, but it's fine on its own. Your mod list is restored.",

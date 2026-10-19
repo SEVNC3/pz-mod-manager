@@ -1380,7 +1380,7 @@
   // --- find a broken mod by halving the suspects each game run ---
   /** `profile`: where it started; its test lists and the restore go there only. */
   /** Find the broken mod: suspects and testing are groups of mods that need each other (`bisectGroups`). */
-  let bisect = $state<{ profile: string; original: Lists; suspects: string[][]; testing: string[][]; round: number; confirm?: boolean } | null>(null);
+  let bisect = $state<{ profile: string; original: Lists; suspects: string[][]; testing: string[][]; round: number; confirm?: boolean; lead?: number } | null>(null);
   /** Why profile changes are blocked now ("" when they aren't): a search for a broken mod runs on this profile. */
   const profileLock = $derived(bisect && bisect.profile === view?.profile ? t("findings.finishFirst") : "");
   /** List edits wait for a job, and for a search for a broken mod (it owns the lists until it ends). */
@@ -1509,7 +1509,9 @@
 
   /** Enabled = everything not under suspicion + the half (or the first `count`) of the groups being tested, in the
    * original load order. The search moves on only once that list is saved (else it stays where it was, and says so). */
-  async function bisectApply(b: NonNullable<typeof bisect>, count?: number) {
+  async function bisectApply(b: NonNullable<typeof bisect>) {
+    // round 1 with every suspect off (still broken there: none of them), round 2 the groups the logs point at
+    const count = b.round === 1 ? 0 : b.round === 2 && b.lead && b.lead < b.suspects.length ? b.lead : undefined;
     const { on, testing } = bisectRound(b.original.rows, b.suspects, count, b.confirm);
     const o = b.original.order.filter((id) => on.has(id));
     if (await commit(b.original.rows.map((r) => (r.kind === "mod" ? { ...r, on: on.has(r.id) } : r)), o, false, b.profile)) setBisect({ ...b, testing });
@@ -1519,7 +1521,8 @@
   /** `first`: mods the logs point at; the first round tests just them, then the rest is halved. */
   async function bisectStart(first: string[] = []) {
     if (bisect || busy) return; // one search at a time (a second click lands while the first one saves)
-    const enabled = [...mods.values()].filter((m) => m.on && !m.missing).map((m) => m.id);
+    // mods this build can't load aren't suspects (they stay as they are)
+    const enabled = [...mods.values()].filter((m) => m.on && !m.missing && !(view?.build !== 41 && m.only41) && !(view?.build === 41 && m.only42)).map((m) => m.id);
     if (enabled.length < 2) return say("log.bisectNeedsTwo", {}, true);
     // Snapshots keeps the list from before it too
     pending++;
@@ -1537,7 +1540,7 @@
       say("log.bisectOneGroup", { ids: suspects.flat().join(", ") }, true);
       return;
     }
-    bisectApply({ profile: view?.profile ?? "", original: $state.snapshot({ rows, order }), suspects, testing: [], round: 1 }, lead.length && lead.length < suspects.length ? lead.length : undefined);
+    bisectApply({ profile: view?.profile ?? "", original: $state.snapshot({ rows, order }), suspects, testing: [], round: 1, lead: lead.length });
   }
 
   function bisectAnswer(stillBroken: boolean) {
