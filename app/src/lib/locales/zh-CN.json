@@ -1155,6 +1155,13 @@
     }
   },
   "servers": {
+    "leaveOut": {
+      "title": "此服务器获得的模组",
+      "hint": "取消勾选服务器不需要的模组，例如仅客户端的附加内容。PZMM 会为 {server} 记住这些设置。",
+      "clientSide": "仅客户端附加？",
+      "clientSideTip": "它需要 Project Viewpoint 或 ZombieBuddy，这些通常只在玩家电脑上运行。排除前请先查看它的创意工坊页面。",
+      "count": "已排除 {left}/{count}"
+    },
     "label": "服务器",
     "rail": {
       "label": "服务器列表与你的服务器",
@@ -1458,6 +1465,7 @@
       "notWorkshop": "{id} 不是创意工坊模组：请自行将其文件夹复制到服务器的 mods 文件夹",
       "unknownMod": "{id} 未安装在这里，列表中的创意工坊物品也都不包含它：请检查 mod ID",
       "needs": "{id} 需要 {item}，但 Mods 中没有它",
+      "needsLeftOut": "{id} 需要 {item}，但你已为此服务器排除了它",
       "needsLater": "{id} 需要 {item}，但它在 Mods 中排在后面",
       "incompatible": "{id} 与 {item} 不兼容，而它也在 Mods 中",
       "requiredItem": "创意工坊物品 {id} 需要 {item}，但它不在 WorkshopItems 中"

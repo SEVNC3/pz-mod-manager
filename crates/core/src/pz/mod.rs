@@ -26,6 +26,7 @@ pub mod geoip;
 pub mod host;
 pub mod javamods;
 pub mod launcher;
+pub mod leave_out;
 pub mod logs;
 pub mod managers;
 pub mod maps;

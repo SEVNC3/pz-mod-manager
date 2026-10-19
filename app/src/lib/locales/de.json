@@ -1224,6 +1224,13 @@
     }
   },
   "servers": {
+    "leaveOut": {
+      "title": "Mods, die dieser Server bekommt",
+      "hint": "Entferne den Haken bei Mods, die der Server nicht bekommen soll, etwa reine Client-Add-ons. PZMM merkt sich das für {server}.",
+      "clientSide": "Client-Add-on?",
+      "clientSideTip": "Sie braucht Project Viewpoint oder ZombieBuddy, die meist nur auf den PCs der Spieler laufen. Prüfe ihre Workshop-Seite, bevor du sie weglässt.",
+      "count": "{left} von {count} weggelassen"
+    },
     "label": "Server",
     "rail": {
       "label": "Serverlisten und deine Server",
@@ -1544,6 +1551,7 @@
       "notWorkshop": "{id} stammt nicht aus dem Workshop: Kopiere seinen Ordner selbst in den Mods-Ordner des Servers",
       "unknownMod": "{id} ist hier nicht installiert und kein aufgeführtes Workshop-Objekt nennt es: Prüfe die Mod-ID",
       "needs": "{id} braucht {item}, das nicht in Mods steht",
+      "needsLeftOut": "{id} braucht {item}, das du für diesen Server weggelassen hast",
       "needsLater": "{id} braucht {item}, das in Mods danach kommt",
       "incompatible": "{id} ist mit {item} unverträglich, das auch in Mods steht",
       "requiredItem": "Das Workshop-Objekt {id} braucht {item}, das nicht in WorkshopItems steht"

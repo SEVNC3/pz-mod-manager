@@ -1224,6 +1224,13 @@
     }
   },
   "servers": {
+    "leaveOut": {
+      "title": "Mods this server gets",
+      "hint": "Untick mods the server shouldn't get, like client-side add-ons. PZMM remembers this for {server}.",
+      "clientSide": "client-side add-on?",
+      "clientSideTip": "It needs Project Viewpoint or ZombieBuddy, which usually run only on players' PCs. Check its Workshop page before leaving it out.",
+      "count": "{left} of {count} left out"
+    },
     "label": "Servers",
     "rail": {
       "label": "Server lists and your servers",
@@ -1544,6 +1551,7 @@
       "notWorkshop": "{id} isn't from the Workshop: copy its folder into the server's mods folder yourself",
       "unknownMod": "{id} isn't installed here and no listed Workshop item names it: check the Mod ID",
       "needs": "{id} needs {item}, which isn't in Mods",
+      "needsLeftOut": "{id} needs {item}, which you left out for this server",
       "needsLater": "{id} needs {item}, which comes after it in Mods",
       "incompatible": "{id} is incompatible with {item}, which is also in Mods",
       "requiredItem": "Workshop item {id} requires {item}, which isn't in WorkshopItems"

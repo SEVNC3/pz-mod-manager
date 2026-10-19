@@ -329,7 +329,7 @@ type External = { kind: "linuxgsm" | "docker"; folder: string; run: string[] };
 export type FoundServer = { name: string; data: string; install: string | null; external: External };
 export type ServerBackup = { file: string; time: number; size: number; reason: string; label: string };
 /** A request from the game (PZMM - Client writes them; the core checks them). */
-export type GameRequest = { id: string; profile: string } & ({ action: "install"; ids: string[] } | { action: "backup"; mode: string; name: string } | { action: "check" } | { action: "library"; lines: string[] } | { action: "open"; tab: string } | { action: "place"; mod: string; section: string; before: string | null } | { action: "profile"; name: string } | { action: "tags"; mod: string; tags: string[] } | { action: "fix"; fix: string } | { action: "restore"; mode: string; name: string; file: string }
+export type GameRequest = { id: string; profile: string } & ({ action: "install"; ids: string[] } | { action: "backup"; mode: string; name: string } | { action: "check" } | { action: "library"; lines: string[] } | { action: "open"; tab: string } | { action: "place"; mod: string; section: string; before: string | null } | { action: "profile"; name: string } | { action: "tags"; mod: string; tags: string[] } | { action: "fix"; fix: string } | { action: "restore"; mode: string; name: string; file: string } | { action: "leaveout"; server: string; ids: string[] }
   | { action: "section"; op: "add" | "rename" | "remove" | "move"; name: string; to: string | null });
 /** What the game last reported: the mods it loaded, at the menu or in a game. */
 export type GameReport = { client: string; game: string; state: string; at: number; mods: string[]; save: string | null; server: string | null; zomboid: string; elsewhere: boolean };
@@ -739,9 +739,12 @@ export const api = {
   hostSend: (name: string, command: string) => invoke<string | null>("host_send", { name, command }),
   hostPlayers: (name: string) => invoke<string[]>("host_players", { name }),
   hostLines: (name: string) => invoke<ServerLines>("host_lines", { name }),
-  hostLinesFromProfile: (profile: string, build: number) => invoke<[ServerLines, string[]]>("host_lines_from_profile", { profile, build }),
+  /** `server`: its leave-out list applies (see LeaveOut.svelte). */
+  hostLinesFromProfile: (profile: string, build: number, server: string | null = null) => invoke<[ServerLines, string[]]>("host_lines_from_profile", { profile, build, server }),
+  leaveOutGet: (server: string) => invoke<string[]>("leave_out_get", { server }),
+  leaveOutSet: (server: string, ids: string[]) => invoke<void>("leave_out_set", { server, ids }),
   hostLinesFromCollection: (input: string, build: number) => invoke<[ServerLines, string[]]>("host_lines_from_collection", { input, build }),
-  hostCheck: (lines: ServerLines) => invoke<LineReport>("host_check", { lines }),
+  hostCheck: (lines: ServerLines, server: string | null = null) => invoke<LineReport>("host_check", { lines, server }),
   hostLinesWith: (lines: ServerLines, input: string, build: number, first: boolean) => invoke<[ServerLines, string[]]>("host_lines_with", { lines, input, build, first }),
   hostPeople: (name: string) => invoke<People>("host_people", { name }),
   hostCatalog: (name: string) => invoke<Catalog>("host_catalog", { name }),

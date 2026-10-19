@@ -692,7 +692,7 @@
         {/if}
 
         <div class="card configs">
-          <ServerConfigs {busy} {lock} {profile} {onImport} {ask} />
+          <ServerConfigs {busy} {lock} {profile} {rows} {onImport} {ask} />
         </div>
       </div>
     {/if}

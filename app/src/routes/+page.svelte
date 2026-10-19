@@ -418,7 +418,7 @@
       // i18n-ignore: the game's words, in English as the game is
       if (sorting && r.profile !== view?.profile) why = `PZMM's profile is now ${view?.profile}.`;
       // i18n-ignore: the game's words, in English as the game is
-      else if (!sorting && r.action !== "tags" && Date.now() / 1000 - parseFloat(r.id) > 170) why = "The game stopped waiting for PZMM: ask again.";
+      else if (!sorting && r.action !== "tags" && r.action !== "leaveout" && Date.now() / 1000 - parseFloat(r.id) > 170) why = "The game stopped waiting for PZMM: ask again.";
       else if (r.action === "place" || r.action === "section") {
         why = await (r.action === "place" ? placeFromGame(r) : sectionFromGame(r));
       } else if (r.action === "library") why = await libraryFromGame(r.lines);
@@ -428,6 +428,12 @@
         } catch (e) {
           say(...keyedError(e), true);
           why = `PZMM couldn't save the tags: ${e}`;
+        }
+      else if (r.action === "leaveout")
+        try {
+          await api.leaveOutSet(r.server, r.ids);
+        } catch (e) {
+          why = `PZMM couldn't save the server's leave-out list: ${e}`;
         }
       else if (r.action === "open") tab = r.tab as typeof tab;
       else if (r.action === "check") openCheck();

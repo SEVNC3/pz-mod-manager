@@ -7,6 +7,7 @@
   import { intlLang, keyedError, t } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
   import MapOrder from "./MapOrder.svelte";
+  import LeaveOut from "./LeaveOut.svelte";
   import { autosort, orderOf, sortLoadOrder } from "./order";
 
   let { server, profiles, profile, rows, ask, dirty = $bindable(false) }: {
@@ -115,7 +116,7 @@
   async function useProfile() {
     error = done = "";
     try {
-      const [l, n] = await api.hostLinesFromProfile(fromProfile, build);
+      const [l, n] = await api.hostLinesFromProfile(fromProfile, build, server.name);
       show(l.maps.length ? l : { ...l, maps });
       notes = n;
       check();
@@ -186,7 +187,7 @@
     checking = true;
     error = "";
     try {
-      const r = await api.hostCheck(lines);
+      const r = await api.hostCheck(lines, server.name);
       problems = r.problems ?? [];
       titles = { ...titles, ...r.titles };
       modInfo = { ...modInfo, ...r.mods };
@@ -342,6 +343,7 @@
       </select>
       <button onclick={useProfile}><Icon name="download" size={14} />{t("hosting.mods.useProfile")}</button>
     </div>
+    <LeaveOut server={server.name} {rows} />
     <div class="row">
       <label for="sm-collection">{t("hosting.mods.fromCollection")}</label>
       <textarea id="sm-collection" class="links" rows="1" bind:value={collection} placeholder={t("hosting.mods.collectionPlaceholder")} spellcheck="false"></textarea>

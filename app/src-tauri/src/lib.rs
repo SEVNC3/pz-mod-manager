@@ -1173,7 +1173,9 @@ fn server_export(name: String, maps: Vec<String>) -> Res<Vec<String>> {
 async fn server_check(name: String, maps: Vec<String>) -> Res<Vec<pz::server::Problem>> {
     blocking(move || {
         let lines = reading(|paths| pz::server::planned(paths, &name, &active(paths)?.enabled(), &scan(paths)?, Some(maps.as_slice()).filter(|m| !m.is_empty()))).map_err(anyhow::Error::msg)?;
-        check_lines(&lines).map(|r| r.problems)
+        let mut problems = check_lines(&lines)?.problems;
+        pz::server::mark_left_out(&mut problems, &pz::leave_out::get(&Paths::detect(), &name));
+        Ok::<_, anyhow::Error>(problems)
     })
     .await
 }
@@ -1328,13 +1330,25 @@ fn host_lines(name: String) -> Res<pz::server::ServerMods> {
     quick_read(|paths| pz::server::read(&pz::server::path(paths, &name)?))
 }
 
-/// The lines a profile's enabled mods make (its arranged maps), and notes about mods left out.
+/// The lines a profile's enabled mods make (its arranged maps), less what `server` leaves out, and notes about mods left out.
 #[tauri::command(async)]
-fn host_lines_from_profile(profile: String, build: u8) -> Res<(pz::server::ServerMods, Vec<String>)> {
+fn host_lines_from_profile(profile: String, build: u8, server: Option<String>) -> Res<(pz::server::ServerMods, Vec<String>)> {
     quick_read(|paths| {
         let p = profile::load(paths, &profile)?;
-        Ok(pz::server::lines_for(&p.enabled(), &scan(paths)?, build, &profile::map_order(paths, &profile)))
+        let leave = server.map(|s| pz::leave_out::get(paths, &s)).unwrap_or_default();
+        Ok(pz::server::lines_for(&p.enabled(), &scan(paths)?, build, &profile::map_order(paths, &profile), &leave))
     })
+}
+
+/// The mods server `server` doesn't get when PZMM writes its mod lines.
+#[tauri::command(async)]
+fn leave_out_get(server: String) -> Vec<String> {
+    pz::leave_out::get(&Paths::detect(), &server)
+}
+
+#[tauri::command(async)]
+fn leave_out_set(server: String, ids: Vec<String>) -> Res<()> {
+    locked(|paths| pz::leave_out::set(paths, &server, &ids))
 }
 
 #[tauri::command]
@@ -1388,8 +1402,15 @@ fn check_lines(lines: &pz::server::ServerMods) -> anyhow::Result<LineReport> {
 }
 
 #[tauri::command]
-async fn host_check(lines: pz::server::ServerMods) -> Res<LineReport> {
-    blocking(move || check_lines(&lines)).await
+async fn host_check(lines: pz::server::ServerMods, server: Option<String>) -> Res<LineReport> {
+    blocking(move || {
+        let mut r = check_lines(&lines)?;
+        if let Some(s) = server {
+            pz::server::mark_left_out(&mut r.problems, &pz::leave_out::get(&Paths::detect(), &s));
+        }
+        Ok::<_, anyhow::Error>(r)
+    })
+    .await
 }
 
 /// `lines` with the Workshop items in `input` (links or IDs) added and what they require (see `host::lines_with`).
@@ -2215,6 +2236,7 @@ fn watch_game(app: &AppHandle) {
                     store::installed_for_game(&paths, &index);
                 }
                 store::tags_for_game(&paths, &store::tags(&paths));
+                pz::leave_out::for_game(&paths);
                 categories_for_game();
                 // the UI's part: Check setup's findings and the feed, written there again
                 let _ = app.emit("game-bridge", ());
@@ -4111,7 +4133,7 @@ pub fn run() {
             find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_preview, server_check, server_export, server_import, save_use,
             perf_view, game_running, perf_memory_set, perf_jvm_set, profile_launch, profile_launch_set, pzopt_run, save_sandbox, save_sandbox_write, save_sandbox_preset, save_details, save_backup, save_restore, save_backup_delete, save_repair, save_set_mods, save_players,
             game_requests, game_ack, game_busy, game_look, game_activity_add, game_activity, game_findings, save_restore_from_game, save_backup_from_game, feed_seen, game_settings, game_settings_set, game_report, save_backup_name, save_thumb, save_reset, save_clone, save_databases, save_table,
-            host_view, host_ports, host_create, host_preflight, host_start, host_stop, host_restart, host_log, host_send, host_players, host_lines, host_lines_from_profile,
+            host_view, host_ports, host_create, host_preflight, host_start, host_stop, host_restart, host_log, host_send, host_players, host_lines, host_lines_from_profile, leave_out_get, leave_out_set,
             host_lines_from_collection, host_check, host_lines_with, host_people, host_catalog, host_remote_add, host_remote_forget, host_preview, host_write, host_adopt, host_forget, app_quit, app_close, splash_done, history_list, history_clear, finding_hide, zb_unblock,
             host_auto_set, host_tag, host_tag_set, host_check_updates, host_backups, host_backup, host_restore, host_config, host_ini_write, host_sandbox_write, host_spawn_write, host_preset, host_preset_save,
             host_discord_set, host_discord_test, host_discord_bot_set, host_discord_bot_test, host_address_set, host_ftp_set, host_ftp_browse, host_ftp_forget, host_ftp_pull, host_ftp_push, host_ftp_world,

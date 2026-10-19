@@ -1224,6 +1224,13 @@
     }
   },
   "servers": {
+    "leaveOut": {
+      "title": "Mods que este servidor recebe",
+      "hint": "Desmarque os mods que o servidor não deve receber, como complementos só de cliente. O PZMM lembra disso para {server}.",
+      "clientSide": "complemento de cliente?",
+      "clientSideTip": "Ele precisa do Project Viewpoint ou do ZombieBuddy, que normalmente rodam só nos PCs dos jogadores. Veja a página dele na Oficina antes de deixá-lo de fora.",
+      "count": "{left} de {count} de fora"
+    },
     "label": "Servidores",
     "rail": {
       "label": "Listas de servidores e seus servidores",
@@ -1544,6 +1551,7 @@
       "notWorkshop": "{id} não é da Oficina: copie a pasta dele você mesmo para a pasta de mods do servidor",
       "unknownMod": "{id} não está instalado aqui e nenhum item da Oficina listado o cita: confira o mod ID",
       "needs": "{id} precisa de {item}, que não está em Mods",
+      "needsLeftOut": "{id} precisa de {item}, que você deixou de fora deste servidor",
       "needsLater": "{id} precisa de {item}, que vem depois em Mods",
       "incompatible": "{id} é incompatível com {item}, que também está em Mods",
       "requiredItem": "O item da Oficina {id} precisa de {item}, que não está em WorkshopItems"

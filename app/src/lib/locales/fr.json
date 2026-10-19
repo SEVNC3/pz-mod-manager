@@ -1224,6 +1224,13 @@
     }
   },
   "servers": {
+    "leaveOut": {
+      "title": "Mods que reçoit ce serveur",
+      "hint": "Décochez les mods que le serveur ne doit pas recevoir, comme les modules côté client. PZMM s’en souvient pour {server}.",
+      "clientSide": "module côté client ?",
+      "clientSideTip": "Il a besoin de Project Viewpoint ou de ZombieBuddy, qui ne tournent en général que sur les PC des joueurs. Vérifiez sa page Workshop avant de l’exclure.",
+      "count": "{left} sur {count} exclus"
+    },
     "label": "Serveurs",
     "rail": {
       "label": "Listes de serveurs et vos serveurs",
@@ -1544,6 +1551,7 @@
       "notWorkshop": "{id} ne vient pas du Workshop : copiez vous-même son dossier dans le dossier mods du serveur",
       "unknownMod": "{id} n'est pas installé ici et aucun objet Workshop listé ne le contient : vérifiez le mod ID",
       "needs": "{id} a besoin de {item}, qui n'est pas dans Mods",
+      "needsLeftOut": "{id} a besoin de {item}, que vous avez exclu pour ce serveur",
       "needsLater": "{id} a besoin de {item}, qui vient après dans Mods",
       "incompatible": "{id} est incompatible avec {item}, qui est aussi dans Mods",
       "requiredItem": "L'objet Workshop {id} a besoin de {item}, qui n'est pas dans WorkshopItems"
