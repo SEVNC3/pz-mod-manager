@@ -3394,6 +3394,91 @@ function K.bisectGroups(order, reqs)
     return groups
 end
 
+--- A leave-out file: "<server>\t<id>;<id>" lines -> { [lower server] = { name = as written, ids = { id -> true } } }.
+--- The app's is leaveout.txt (it owns the list); the game keeps leaveout_game.txt only while the app isn't there.
+function K.readLeaveOut(file)
+    local out = {}
+    pcall(function()
+        local r = getFileReader(file, false)
+        if not r then return end
+        local line = r:readLine()
+        while line do
+            local name, list = line:match("^([^\t]+)\t(.*)$")
+            if name then
+                local e = { name = name, ids = {} }
+                for id in list:gmatch("[^;]+") do e.ids[id] = true end
+                out[name:lower()] = e
+            end
+            line = r:readLine()
+        end
+        r:close()
+    end)
+    return out
+end
+
+--- What a server gets, as the app's lines_for: the enabled mods in `order` not in `left`; the Workshop items of the
+--- kept ones (an item stays while any kept mod comes from it); `maps` (load order) without the maps only left-out
+--- mods bring (`mapsOf(id)`: a mod's map folders). Returns ids, items, maps, and what was dropped.
+function K.serverLists(order, left, wsOf2, maps, mapsOf)
+    local ids, items, seenItem, dropped = {}, {}, {}, {}
+    local keptMaps, leftMaps = {}, {}
+    for _, id in ipairs(order) do
+        if left[id] then
+            dropped[#dropped + 1] = id
+            for _, m in ipairs(mapsOf(id) or {}) do leftMaps[m] = true end
+        else
+            ids[#ids + 1] = id
+            local ws = wsOf2(id)
+            if ws and ws ~= "" and ws ~= "0" and not seenItem[ws] then
+                seenItem[ws] = true
+                items[#items + 1] = ws
+            end
+            for _, m in ipairs(mapsOf(id) or {}) do keptMaps[m] = true end
+        end
+    end
+    -- Map=: from the kept mods' maps (with the ones no mod brings, like the game's own); none kept but some left
+    -- out: just the game's own map, so theirs go; none at all: {} (the server's Map= stays as it is)
+    local outMaps, keptAny, leftAny = {}, next(keptMaps) ~= nil, next(leftMaps) ~= nil
+    if keptAny then
+        for _, m in ipairs(maps) do
+            if keptMaps[m] or not leftMaps[m] then outMaps[#outMaps + 1] = m end
+        end
+    elseif leftAny then
+        outMaps = { K.BASE_MAP }
+    end
+    return ids, items, outMaps, dropped
+end
+
+--- Kept mods that need a left-out one (the app's hosting.check.needsLeftOut): { { id, needs } }.
+function K.needsLeftOut(order, left, reqs)
+    local out = {}
+    for _, id in ipairs(order) do
+        if not left[id] then
+            for _, q in ipairs(reqs(id) or {}) do
+                if left[q] then out[#out + 1] = { id, q } end
+            end
+        end
+    end
+    return out
+end
+
+--- Whether a mod's requirements, followed through installed mods, reach Project Viewpoint or ZombieBuddy (the app's
+--- "client-side add-on?" label; not Viewpoint or ZombieBuddy themselves).
+function K.clientSide(id, reqs)
+    if id == "Viewpoint" or id == "ZombieBuddy" then return false end
+    local seen, hit = {}, false
+    local function walk(m)
+        if hit or seen[m] then return end
+        seen[m] = true
+        for _, q in ipairs(reqs(m) or {}) do
+            if q == "Viewpoint" or q == "ZombieBuddy" then hit = true return end
+            walk(q)
+        end
+    end
+    walk(id)
+    return hit
+end
+
 --- The suspects' order, as the app's bisectOrder: the groups holding a mod in `first` lead (`lead` = how many), then
 --- the rest newest first by their newest member's first-seen date (`seen`: id -> secs, firstseen.txt); ties, and
 --- no dates at all, keep load order. Returns { groups, lead }.
@@ -6419,14 +6504,18 @@ function PZMMOverlay:prerender()
     if self.ask then
         local q = self.ask
         rect(self, 0, 0, self.width, self.height, hex("000000"), 0.5)
-        local w = math.min(560, self.width - 32)
+        local w = math.min(q.checks and 640 or 560, self.width - 32)
         local tw = w - 44
         local title = wrap(q.title, tw)
+        -- a checklist: a capped, scrolling list of ticks under the lines
+        local RH = math.max(BOX, H_SMALL) + 10
+        local shown = q.checks and math.max(1, math.min(#q.checks, math.floor(self.height * 0.5 / RH))) or 0
+        local listH = shown * RH
         local lines = {}
         for _, l in ipairs(q.lines or {}) do
             for i, r in ipairs(wrap(l, tw - 18)) do lines[#lines + 1] = { r, i == 1 } end
         end
-        local h = 20 + #title * (H_SMALL + 2) + 10 + (#lines > 0 and #lines * (H_SMALL + 2) + 8 or 0) + (self.entry and BAR + 14 or 0) + BAR + 20
+        local h = 20 + #title * (H_SMALL + 2) + 10 + (#lines > 0 and #lines * (H_SMALL + 2) + 8 or 0) + (q.checks and listH + 14 or 0) + (self.entry and BAR + 14 or 0) + BAR + 20
         local x, y = math.floor((self.width - w) / 2), math.floor((self.height - h) / 2)
         self.box = { x = x, y = y, w = w, h = h }
         round(self, x - 1, y + 1, w + 2, h + 4, 10, C.black, 0.28 * SHADOW.k)
@@ -6444,6 +6533,35 @@ function PZMMOverlay:prerender()
             ty = ty + H_SMALL + 2
         end
         if #lines > 0 then ty = ty + 8 end
+        if q.checks then
+            local full = #q.checks * RH
+            self.checkScroll = math.max(0, math.min(self.checkScroll or 0, full - listH))
+            self.checkBox = { x = x + 12, y = ty, w = w - 24, h = listH, full = full, row = RH }
+            round(self, x + 12, ty, w - 24, listH, 6, C.raised, 0.5)
+            self:setStencilRect(x + 12, ty, w - 24, listH)
+            for i, c in ipairs(q.checks) do
+                local ry = ty + (i - 1) * RH - self.checkScroll
+                if ry + RH > ty and ry < ty + listH then
+                    local over = mx >= x + 12 and mx < x + w - 12 and my >= math.max(ry, ty) and my < math.min(ry + RH, ty + listH)
+                    if over then rect(self, x + 12, ry, w - 24, RH, C.hover, 1) end
+                    checkbox(self, x + 22, ry + math.floor((RH - BOX) / 2), c.on)
+                    local nw = c.note and (width(c.note) + 16) or 0
+                    text(self, fit(c.label, w - 24 - 20 - BOX - 10 - nw - 10), x + 22 + BOX + 10, ry + math.floor((RH - H_SMALL) / 2), c.on and C.text or C.muted)
+                    if c.note then text(self, c.note, x + w - 22 - width(c.note), ry + math.floor((RH - H_SMALL) / 2), C.accentText) end
+                    if over and c.tip then tip(self, c.tip) end
+                    local y0, y1 = math.max(ry, ty), math.min(ry + RH, ty + listH)
+                    self.hits[#self.hits + 1] = { x = x + 12, y = y0, w = w - 24, h = y1 - y0, keep = true, fn = function() c.on = not c.on; if q.recount then q.recount() end end }
+                end
+            end
+            self:clearStencilRect()
+            if full > listH then
+                -- where the list is: a thin thumb at its right
+                local th = math.max(16, math.floor(listH * listH / full))
+                local tyy = ty + math.floor((listH - th) * self.checkScroll / (full - listH))
+                round(self, x + w - 17, tyy, 4, th, 2, C.muted, 0.6)
+            end
+            ty = ty + listH + 14
+        end
         if self.entry then
             -- the text box, drawn as the search box is
             round(self, x + 22, ty, w - 44, BAR, 6, C.raised)
@@ -6527,6 +6645,14 @@ function PZMMOverlay:prerender()
             end
         end
     end
+end
+
+--- The wheel scrolls an ask's checklist.
+function PZMMOverlay:onMouseWheel(del)
+    local b = self.checkBox
+    if not b then return false end
+    self.checkScroll = math.max(0, math.min((self.checkScroll or 0) + del * b.row * 3, b.full - b.h))
+    return true
 end
 
 function PZMMOverlay:onMouseDown(x, y)
@@ -6904,6 +7030,7 @@ function PZMMMods.open()
     s.tags = readTags()
     s.installed, s.hasInstalled = readInstalled()
     s.firstSeen = K.readFirstSeen()
+    pcall(function() s:sendLeaveOuts() end)
     s.bisect = readBisect()
     applyTheme(s.app)
     s.defRev, s.defChanged, s.openedAt, s.appAt = s.app and s.app.default_rev, nil, getTimestampMs(), getTimestampMs()
@@ -7431,7 +7558,8 @@ function PZMMMods:request(line, said, quiet)
         self.sentAt[id] = getTimestampMs()
     end
     if ok and not quiet then self.launchAt = getTimestampMs() + 2500 end
-    self:say(ok and (said .. (quiet and "" or " Opening PZMM...")) or "Couldn't reach PZMM: Zomboid/Lua/pzmm/requests.txt can't be written.")
+    -- (a quiet request may say nothing: say() skips an empty line)
+    self:say(ok and ((said or "") .. (quiet and "" or " Opening PZMM...")) or "Couldn't reach PZMM: Zomboid/Lua/pzmm/requests.txt can't be written.")
     return ok and id or nil
 end
 
@@ -12315,22 +12443,94 @@ function PZMMMods:drawServers(x, y, w, mx, my, top, bh)
 end
 
 --- A hosted server's Mods=, WorkshopItems= and Map= become what's on in My mods (asks first).
+--- This server's leave-out list: the app's (leaveout.txt) when the app is installed, else the game's own copy.
+function PZMMMods:leaveOutFor(name)
+    local key = tostring(name):lower()
+    local e = self.app and K.readLeaveOut("pzmm/leaveout.txt")[key] or K.readLeaveOut("pzmm/leaveout_game.txt")[key]
+    return e and e.ids or {}
+end
+--- Keep a server's leave-out list: with the app, it saves it (quiet request "leaveout"); without, the game's copy, sent
+--- to the app once it's there (see sendLeaveOuts).
+function PZMMMods:saveLeaveOut(name, left)
+    local ids = {}
+    for id in pairs(left) do ids[#ids + 1] = id end
+    table.sort(ids)
+    local all = K.readLeaveOut("pzmm/leaveout_game.txt")
+    if self.app then
+        self:request("leaveout\t" .. name .. "\t" .. table.concat(ids, ";"), nil, true)
+        all[name:lower()] = nil
+    else
+        all[name:lower()] = #ids > 0 and { name = name, ids = left } or nil
+    end
+    pcall(function()
+        local w = getFileWriter("pzmm/leaveout_game.txt", true, false)
+        for _, e in pairs(all) do
+            local list = {}
+            for id in pairs(e.ids) do list[#list + 1] = id end
+            table.sort(list)
+            w:write(e.name .. "\t" .. table.concat(list, ";") .. "\n")
+        end
+        w:close()
+    end)
+end
+--- Lists the game kept while the app wasn't there go to the app once it is (as sections do), then the copy goes.
+function PZMMMods:sendLeaveOuts()
+    if not self.app then return end
+    local all = K.readLeaveOut("pzmm/leaveout_game.txt")
+    local any = false
+    for _, e in pairs(all) do
+        any = true
+        local list = {}
+        for id in pairs(e.ids) do list[#list + 1] = id end
+        table.sort(list)
+        self:request("leaveout\t" .. e.name .. "\t" .. table.concat(list, ";"), nil, true)
+    end
+    if any then pcall(function() local w = getFileWriter("pzmm/leaveout_game.txt", true, false); w:close() end) end
+end
+
 function PZMMMods:giveServerMods(st)
     local name = ""
     pcall(function() name = st:getName() end)
-    self:ask({ title = "Give " .. name .. " your mods?", lines = { "Its mods become the " .. #(self.order or {}) .. " on in My mods now, in load order, with their Workshop items and your map order." }, choices = {
+    local mods = self.model.mods
+    local function reqs(id)
+        local d, out = mods[id], {}
+        if not d then return out end
+        for q in pairs(d.requireMods or {}) do out[#out + 1] = q end
+        for _, q in ipairs(rules(d).requires) do out[#out + 1] = q end
+        return out
+    end
+    local order = {}
+    for _, id in ipairs(self.order or {}) do if mods[id] then order[#order + 1] = id end end
+    local left = self:leaveOutFor(name)
+    -- the checklist: every mod ticked unless this server leaves it out; Viewpoint/ZombieBuddy add-ons labelled only
+    local checks = {}
+    for _, id in ipairs(order) do
+        local side = K.clientSide(id, reqs)
+        checks[#checks + 1] = { id = id, label = mods[id].name or id, on = not left[id],
+            note = side and T("leaveout_client", "client-side add-on?") or nil,
+            tip = side and (T("leaveout_client", "client-side add-on?") .. "\n" .. T("leaveout_client_tip", "It needs Project Viewpoint or ZombieBuddy, which usually run only on players' PCs. Check its Workshop page before leaving it out.")) or nil }
+    end
+    local q
+    local function count()
+        local n = 0
+        for _, c in ipairs(checks) do if not c.on then n = n + 1 end end
+        return T("leaveout_count", "%1 of %2 left out", n, #checks)
+    end
+    q = { title = T("leaveout_title", "Mods this server gets") .. ": " .. name, checks = checks,
+        lines = { T("leaveout_hint", "Untick mods the server shouldn't get, like client-side add-ons. PZMM remembers this for %1.", name), count() },
+        choices = {
         { "Give it my mods", function()
-            local ids, items, seen = {}, {}, {}
-            for _, id in ipairs(self.order or {}) do
-                local d = self.model.mods[id]
-                if d then
-                    ids[#ids + 1] = id
-                    local ws = wsOf(d)
-                    if ws and ws ~= "" and ws ~= "0" and not seen[ws] then seen[ws] = true; items[#items + 1] = ws end
-                end
-            end
-            local maps = {}
-            for _, m in ipairs(self:maps()) do maps[#maps + 1] = m end
+            local now = {}
+            for _, c in ipairs(checks) do if not c.on then now[c.id] = true end end
+            self:saveLeaveOut(name, now)
+            local ids, items, maps = K.serverLists(order, now, function(id) return wsOf(mods[id]) end, self:maps(), function(id)
+                local out = {}
+                pcall(function()
+                    local a = getMapFoldersForMod(id)
+                    for i = 0, (a and a:size() or 0) - 1 do out[#out + 1] = tostring(a:get(i)) end
+                end)
+                return out
+            end)
             local ok = pcall(function()
                 st:loadFiles()
                 local o = st:getServerOptions()
@@ -12352,8 +12552,15 @@ function PZMMMods:giveServerMods(st)
             end)
             if self.srvSel and self.srvSel.hosted == st then self.srvSel.opts = nil end
             self:say(ok and (name .. " has your " .. #ids .. " mods now.") or ("Couldn't change " .. name .. "'s settings."))
+            -- a kept mod that needs one left out (as the app's check), once the server has the list
+            for _, w in ipairs(ok and K.needsLeftOut(order, now, reqs) or {}) do
+                self:say(T("check_needs_left_out", "%1 needs %2, which you left out for this server", mods[w[1]] and mods[w[1]].name or w[1], mods[w[2]] and mods[w[2]].name or w[2]), "error")
+            end
         end },
-    } })
+    } }
+    -- ticking updates the count line
+    q.recount = function() q.lines[2] = count() end
+    self:ask(q)
 end
 
 --- Put the installed mods of Workshop items `wsIds` (and the mods they require) into a hosted server's Mods= and
