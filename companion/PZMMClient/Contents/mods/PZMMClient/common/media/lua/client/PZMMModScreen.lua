@@ -1613,7 +1613,7 @@ function PZMMMods:drawActivityBar(right)
         if log[i].kind == "error" then unseen = true end
     end
     -- the toggle
-    local label = "Activity"
+    local label = T("act_title", "Activity")
     local tw = 16 + 8 + 8 + 8 + width(label) + 14
     local tx = PAD - 4
     local over = mx >= tx and mx < tx + tw and my >= by and my < by + BAR
@@ -2043,7 +2043,7 @@ local function libBody(lines)
     return table.concat(out, "\t")
 end
 
-local SORTS = { { "order", "Library order" }, { "name", "Name" }, { "enabled", "Enabled first" }, { "status", "Problems first" },
+local SORTS = { { "order", T("sort_library", "Library order") }, { "name", T("srv_by_name", "Name") }, { "enabled", T("sort_enabled", "Enabled first") }, { "status", T("sort_problems", "Problems first") },
     { "size", T("sort_size", "Size") }, { "changed", T("sort_changed", "Last changed") }, { "installed", T("sort_installed", "Date installed") } }
 
 --- Whether the list isn't all of it in library order (a search, a tab, a filter or a sort): drags need it to be.
@@ -2101,8 +2101,8 @@ function PZMMMods:drawTools(x, y, mx, my)
         if b[1] == "filters" and np < 2 then
             -- each active filter as a chip: click to clear it
             local active = {}
-            if self.favOnly then active[#active + 1] = { "unfav", "Favourites" } end
-            if self.filterHidden then active[#active + 1] = { "unhidden", "Hidden" } end
+            if self.favOnly then active[#active + 1] = { "unfav", T("home_favourites", "Favourites") } end
+            if self.filterHidden then active[#active + 1] = { "unhidden", T("filter_hidden", "Hidden") } end
             if self.filterKind then active[#active + 1] = { "uncat", self.filterKind } end
             if self.langOnly then active[#active + 1] = { "unlang", T("filter_lang", "In my language") } end
             if self.filterTag then active[#active + 1] = { "untag", self.filterTag } end
@@ -2232,8 +2232,8 @@ function PZMMMods:onTool(id, mx, my)
         local function redo() self.scroll = 0; self:updateView() end
         local items = {
             { T("filter_show", "Show"), heading = true },
-            { "Favourites", function() self.favOnly = not self.favOnly; redo() end, function() return self.favOnly == true end, keep = true },
-            { nh > 0 and ("Hidden (" .. nh .. ")") or "Hidden", function() self.filterHidden = not self.filterHidden; redo() end, function() return self.filterHidden == true end, keep = true },
+            { T("home_favourites", "Favourites"), function() self.favOnly = not self.favOnly; redo() end, function() return self.favOnly == true end, keep = true },
+            { T("filter_hidden", "Hidden") .. (nh > 0 and (" (" .. nh .. ")") or ""), function() self.filterHidden = not self.filterHidden; redo() end, function() return self.filterHidden == true end, keep = true },
             { T("filter_lang", "In my language"), function()
                 self.langOnly = not self.langOnly
                 self.langDone = false
@@ -2510,6 +2510,12 @@ function PZMMMods:checkSetup()
                 end)
                 add("error", d.name .. " can't load on this build of the game." .. range, { off(d) }, d.modId, { tpl = "%1 can't load on this build of the game." .. range, d = d })
             end
+            -- Steam answers a Workshop item that's gone, banned or hidden with an empty title
+            local st = self:steamOf(d)
+            if st and (st.title or "") == "" then
+                local why = " its Workshop item is gone, banned or hidden: it won't get updates, and a friend or server can't download it."
+                add("warn", d.name .. ":" .. why, { off(d) }, d.modId .. "~gone", { tpl = "%1:" .. why, d = d })
+            end
             for _, q in ipairs(self:rulesOf(d).requires) do
                 local dep = mods[q]
                 if not dep then
@@ -2542,7 +2548,7 @@ function PZMMMods:checkSetup()
                 local fixes
                 if st.pzmm then
                     local ws = wsOf(d)
-                    fixes = { { "Update", function() if self.app then self:request("install\t" .. ws, d.name .. " update asked for.") else self:openWorkshop(ws) end end } }
+                    fixes = { { T("feed_update", "Update"), function() if self.app then self:request("install\t" .. ws, d.name .. " update asked for.") else self:openWorkshop(ws) end end } }
                 end
                 add("warn", d.name .. ": " .. why, fixes, d.modId, { tpl = "%1: " .. why, d = d })
             end
@@ -2788,7 +2794,7 @@ function PZMMMods:drawCheck(x, y, w, bottom)
                 y = y + H_SMALL + 12
             end
         end
-        local label = "Run PZMM's full check"
+        local label = T("check_full", "Run PZMM's full check")
         local bw = width(label) + 28
         local _, _, over = flatButton(self, label, x, y, mx, my)
         if over then tip(self, label .. "\nOpens PZMM on Check setup: it also checks server configs, overlapping files and game files.") end
@@ -5393,7 +5399,7 @@ function PZMMMods:drawEntry(e, x, y, w, mx, my, top, bottom)
     -- an update still waiting to download: Update (PZMM installs it; else Steam's page)
     local eyeAfter = lx
     if e.pending then
-        local label = "Update"
+        local label = T("feed_update", "Update")
         local ubw = width(label) + 48
         lx = lx - 8 - ubw
         eyeAfter = lx
@@ -5430,7 +5436,7 @@ function PZMMMods:drawEntry(e, x, y, w, mx, my, top, bottom)
     end
     if #e.risks > 0 then
         local cx = tx
-        local label = "May break saves"
+        local label = T("feed_may_break", "May break saves")
         if TB.alert then
             self:drawTextureScaled(TB.alert, tx, y + math.floor((HEADH - 14) / 2), 14, 14, 1, C.danger.r, C.danger.g, C.danger.b)
             tx = tx + 18
@@ -5494,7 +5500,7 @@ function PZMMMods:drawFeed()
     local rx = x0 + cw
     if f then
         -- Enabled only, at the right of the heading
-        local label = "Enabled only"
+        local label = T("maps_enabled_only", "Enabled only")
         local cx = x0 + cw - width(label) - BOX - 8
         local cy = y + (H_MEDIUM - BOX) / 2
         checkbox(self, cx, cy, self.enabledOnly)
@@ -7335,10 +7341,10 @@ function PZMMMods:banners()
     local list = {}
     -- PZMM changed the mods while this screen was open: take them, or keep this list (Accept writes it)
     if self.defChanged then
-        list[#list + 1] = { tone = "accent", text = "PZMM changed your mods since you opened this screen.",
-            buttons = { { label = "Use PZMM's mods", icon = TB.swap, tip = "Use PZMM's mods\nTurns your mods on and off here as PZMM has them.",
+        list[#list + 1] = { tone = "accent", text = T("app_changed", "PZMM changed your mods since you opened this screen."),
+            buttons = { { label = T("use_app_mods", "Use PZMM's mods"), icon = TB.swap, tip = "Use PZMM's mods\nTurns your mods on and off here as PZMM has them.",
                     fn = function() self:takeAppMods(); self.bannerCache = nil; self:say("Your mods here are PZMM's now.") end },
-                { label = "Keep this list", tip = "Keep this list\nAccept writes this screen's list over PZMM's.",
+                { label = T("keep_list", "Keep this list"), tip = "Keep this list\nAccept writes this screen's list over PZMM's.",
                     fn = function() self.defRev, self.defChanged, self.bannerCache = self.app and self.app.default_rev, nil, nil end } } }
     end
     -- the save you'd continue was played with other mods
@@ -10155,8 +10161,8 @@ function PZMMMods:drawMapMods(x, y, w, mx, my, top, bh)
         items[#items + 1] = { T("maps_hide_spawn", "Hide spawn-point mods"), function() self.mapHideSpawn = not (self.mapHideSpawn ~= false) end, function() return self.mapHideSpawn ~= false end, keep = true }
         self:menu(items, mxp, myp)
     end, fcur ~= "all")
-    local sorts = { { "order", T("maps_sort_order", "Load order") }, { "name", "Name" }, { "cells", T("maps_sort_cells", "Most cells") },
-        { "clash", "Most conflicts" }, { "enabled", "Enabled first" }, { "updated", T("maps_sort_updated", "Recently updated") }, { "newest", T("maps_sort_newest", "Newest") } }
+    local sorts = { { "order", T("maps_sort_order", "Load order") }, { "name", T("srv_by_name", "Name") }, { "cells", T("maps_sort_cells", "Most cells") },
+        { "clash", T("maps_sort_clash", "Most conflicts") }, { "enabled", T("sort_enabled", "Enabled first") }, { "updated", T("maps_sort_updated", "Recently updated") }, { "newest", T("maps_sort_newest", "Newest") } }
     local sname = T("maps_sort_order", "Load order")
     for _, o in ipairs(sorts) do if o[1] == (self.mapSort or "order") then sname = o[2] end end
     tool(TB.sort, sname, "Sort the list\nEnabled first, load order, name, most cells, most conflicts, or by Steam's update and creation times.", function(mxp, myp)
@@ -12473,7 +12479,7 @@ function PZMMMods:drawSettings(x, y, w, mx, my)
     end
     y = y + h + 20
     -- Make a mod, as far as the game goes: your own Workshop items
-    local label = "Your Workshop items"
+    local label = T("make_items", "Your Workshop items")
     local bw = width(label) + 46
     local tw, over = toolButton(self, TB.layers, label, x, y, mx, my)
     if over then tip(self, "Your Workshop items\nMods you made: open their files, and upload an update from the game's Workshop screen.") end
@@ -12880,7 +12886,7 @@ function PZMMMods:drawMake(x, y, w, mx, my, top, bh)
     end)
     if #staged > 0 then
         y = self:drawNotice(x, y, w, T("notice_make", "checking any mod folder and building its upload folder."), mx, my)
-        bold(self, "Your Workshop items", x, y, C.text)
+        bold(self, T("make_items", "Your Workshop items"), x, y, C.text)
         y = y + H_SMALL + 10
         local rh = H_SMALL * 2 + 28
         -- an item's Check findings open under its row

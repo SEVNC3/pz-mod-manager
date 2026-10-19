@@ -1,4 +1,6 @@
-# 0.2.0
+# 0.2.1
+- **Gone Workshop items in Check setup.** A mod whose Workshop item was removed, banned or hidden is now flagged: it won't get updates, and friends or servers can't download it.
+- **More of the screen in your language.** Sort and filter names, Activity, Update, May break saves, Your Workshop items and the PZMM-changed-your-mods banner are now translated.
 - **Get the desktop app.** If you don't have PZMM yet, download it free from github.com/SEVNC3/pz-mod-manager (Windows and Linux). This screen does most of what it does; the app does the rest, and the two work together.
 - **A massive update.** We've worked hard to fully replicate the desktop app in the game: the same tabs, the same look and the same way of working, from your mod list and load order to maps, saves, servers and Check setup.
 - **Sync across both.** If you have the app too, the two now stay in sync: your profile, sections, load order, settings, accent colour and theme, and one activity list of what each did. Change your mods in the app while this screen is open and Use PZMM's mods takes them here.
