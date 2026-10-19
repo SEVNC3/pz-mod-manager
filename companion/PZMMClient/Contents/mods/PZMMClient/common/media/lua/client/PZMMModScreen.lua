@@ -1265,6 +1265,15 @@ end
 local function entryHeight(e, i) return e.head and (HEAD + (i > 1 and GAP or 0)) or ROW end
 
 function PZMMMods:prerender()
+    local ok, err = pcall(self.prerenderScreen, self)
+    if not ok and self.drawError ~= tostring(err) then
+        self.drawError = tostring(err)
+        print("PZMM - Client: drawing the screen failed: " .. self.drawError)
+        self:say("Couldn't draw part of this screen. Game's mod screen, at the top right, still works.", "error")
+    end
+end
+
+function PZMMMods:prerenderScreen()
     -- a button let go outside the screen sends no mouse-up: a drag still on would follow the mouse for good
     if self.drag or self.odrag or self.mapDrag or self.sbDrag or self.gridDrag then
         local ok, down = pcall(isMouseButtonDown, 0)
@@ -1316,9 +1325,11 @@ function PZMMMods:prerender()
         end
     else
         local msg = self.app and "Open PZMM to see your profile's sections here" or "Get the PZMM app: github.com/SEVNC3/pz-mod-manager/releases/latest"
-        text(self, msg, px, ty, C.muted)
-        -- with the app installed but no library yet, a click still lists its profiles
-        if self.app then self.profileBox = { x = px, y = py, w = width(msg), h = BAR } end
+        local mxp, myp = self:getMouseX(), self:getMouseY()
+        local over = mxp >= px and mxp < px + width(msg) and myp >= py and myp < py + BAR
+        text(self, msg, px, ty, over and C.accent or C.muted)
+        -- with the app installed but no library yet, a click still lists its profiles; without it, opens the download
+        self.profileBox = { x = px, y = py, w = width(msg), h = BAR }
         pend = px + width(msg)
     end
     -- the app's top bar actions the game can do too, at the right: icon and label, explained on hover; the
@@ -3175,10 +3186,17 @@ K.OVERLAP_DIRS = { "media/lua/client", "media/lua/server", "media/lua/shared", "
 
 --- PZMM's overlaps (overlaps.txt: "<id> TAB <loses to> TAB <wins over>", every media file compared), the enabled
 --- mods only (it can lag a toggle); nil without the file. Read again every 2 seconds.
+function PZMMMods:orderKey()
+    if self.orderKeyOf ~= self.order then
+        self.orderKeyOf, self.orderKeyText = self.order, table.concat(self.order or {}, ";")
+    end
+    return self.orderKeyText
+end
+
 function PZMMMods:appOverlaps()
     local t = getTimestampMs()
     local c = self.ovApp
-    if c and t - c.at < 2000 and c.key == table.concat(self.order or {}, ";") then return c.of end
+    if c and t - c.at < 2000 and c.key == self:orderKey() then return c.of end
     local on, of, found = {}, {}, false
     for _, id in ipairs(self.order or {}) do on[id] = true end
     pcall(function()
@@ -3198,7 +3216,7 @@ function PZMMMods:appOverlaps()
         end
         r:close()
     end)
-    self.ovApp = { at = t, key = table.concat(self.order or {}, ";"), of = found and of or nil }
+    self.ovApp = { at = t, key = self:orderKey(), of = found and of or nil }
     return self.ovApp.of
 end
 
@@ -3207,7 +3225,7 @@ end
 function PZMMMods:overlaps()
     local app = self:appOverlaps()
     if app then return app, true end
-    local key = table.concat(self.order or {}, ";")
+    local key = self:orderKey()
     if not self.ov or self.ov.key ~= key then
         local todo = {}
         for i, id in ipairs(self.order or {}) do todo[i] = id end
@@ -5705,7 +5723,7 @@ function PZMMMods:onMouseDown(x, y)
     local pb = self.profileBox
     if pb and x >= pb.x and x < pb.x + pb.w and y >= pb.y and y < pb.y + pb.h then
         getSoundManager():playUISound("UISelectListItem")
-        self:profileMenu()
+        if self.app then self:profileMenu() else openLink(K.RELEASES_URL) end
         return true
     end
     for _, a in ipairs(self.actionBoxes or {}) do

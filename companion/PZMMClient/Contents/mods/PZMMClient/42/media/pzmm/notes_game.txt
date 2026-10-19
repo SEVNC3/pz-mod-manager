@@ -1,5 +1,8 @@
 # 0.2.1
 - **Gone Workshop items in Check setup.** A mod whose Workshop item was removed, banned or hidden is now flagged: it won't get updates, and friends or servers can't download it.
+- **No more false "different mod list" alarms.** The game sometimes lists a mod twice, once with a backslash in front; it now tells PZMM each mod once, so PZMM stops saying the game loaded an extra mod.
+- **Get the PZMM app is a link.** Without the app, the line at the top of My mods now opens the download page.
+- **Steadier screen.** If part of the screen fails to draw, it says so once in the activity bar instead of filling the log every frame. My mods also does less work each frame with big mod lists.
 - **More of the screen in your language.** Sort and filter names, Activity, Update, May break saves, Your Workshop items and the PZMM-changed-your-mods banner are now translated.
 - **Get the desktop app.** If you don't have PZMM yet, download it free from github.com/SEVNC3/pz-mod-manager (Windows and Linux). This screen does most of what it does; the app does the rest, and the two work together.
 - **A massive update.** We've worked hard to fully replicate the desktop app in the game: the same tabs, the same look and the same way of working, from your mod list and load order to maps, saves, servers and Check setup.

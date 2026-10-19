@@ -17,7 +17,11 @@ end
 local function write(state)
     local ok, err = pcall(function()
         local ids, mods = {}, getActivatedMods()
-        for i = 0, mods:size() - 1 do ids[#ids + 1] = json(mods:get(i)) end
+        local seen = {}
+        for i = 0, mods:size() - 1 do
+            local id = (tostring(mods:get(i)):gsub("^\\+", ""))
+            if not seen[id] then seen[id] = true; ids[#ids + 1] = json(id) end
+        end
         local fields = {
             '"v":1',
             '"client":' .. json(VERSION),
