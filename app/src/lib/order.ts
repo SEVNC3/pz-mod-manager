@@ -335,11 +335,12 @@ export function bisectGroups(enabled: string[], requires: (id: string) => string
 
 /**
  * One bisect test: every enabled mod outside the suspect groups stays on, plus the first half (or the first
- * `count`) of the suspect groups; `alone`: only the suspect groups (the check on the last one). Returns the ids to
- * enable and the groups under test.
+ * `count`) of the suspect groups; `alone`: only the suspect groups (the check on the last one). `keep` stays on in
+ * every round, alone too (mods this build can't load; a search from before groups: everything not a suspect, as
+ * its suspects aren't closed over requirements). Returns the ids to enable and the groups under test.
  */
-export function bisectRound(original: Row[], suspects: string[][], count = Math.ceil(suspects.length / 2), alone = false): { on: Set<string>; testing: string[][] } {
-  if (alone) return { on: new Set(suspects.flat()), testing: suspects };
+export function bisectRound(original: Row[], suspects: string[][], count = Math.ceil(suspects.length / 2), alone = false, keep: string[] = []): { on: Set<string>; testing: string[][] } {
+  if (alone) return { on: new Set([...keep, ...suspects.flat()]), testing: suspects };
   const testing = suspects.slice(0, count);
   const suspect = new Set(suspects.flat());
   const on = new Set(original.filter((r): r is ModRow => isMod(r) && r.on && !suspect.has(r.id)).map((r) => r.id));
@@ -347,12 +348,15 @@ export function bisectRound(original: Row[], suspects: string[][], count = Math.
   return { on, testing };
 }
 
-/** A search saved before groups (lists of ids): its suspects grouped, testing the groups it was testing. */
-export function bisectUpgrade<T extends { suspects: unknown[]; testing: unknown[] }>(b: T, requires: (id: string) => string[]): T & { suspects: string[][]; testing: string[][] } {
+/** A search saved before groups (lists of ids): its suspects grouped, testing the groups it was testing, and every
+ * other mod that was on kept on (an old suspect can need one of them). */
+export function bisectUpgrade<T extends { suspects: unknown[]; testing: unknown[]; original: { rows: Row[] } }>(b: T, requires: (id: string) => string[]): T & { suspects: string[][]; testing: string[][]; keep?: string[] } {
   if (!b.suspects.some((s) => typeof s === "string")) return b as T & { suspects: string[][]; testing: string[][] };
   const was = new Set((b.testing as (string | string[])[]).flat());
+  const old = new Set(b.suspects as string[]);
   const suspects = bisectGroups(b.suspects as string[], requires);
-  return { ...b, suspects, testing: suspects.filter((g) => g.some((id) => was.has(id))) };
+  const keep = b.original.rows.filter((r): r is ModRow => isMod(r) && r.on && !old.has(r.id)).map((r) => r.id);
+  return { ...b, suspects, testing: suspects.filter((g) => g.some((id) => was.has(id))), keep };
 }
 
 /**

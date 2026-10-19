@@ -93,10 +93,21 @@ assert.ok(!search(vp, () => false).found);
 // broken whatever is on (not a mod at all): round 1, with every suspect off, says so
 assert.deepEqual(search(vp, () => true), { none: true, rounds: 1 });
 // a search saved before groups (lists of ids) still loads: grouped, testing the groups it was testing
-const old = { round: 3, suspects: ["Lib", "Other", "User"], testing: ["User"] };
+const oldRows = [mod("Lib"), mod("Other"), mod("User", true, { requires: ["Lib"] })];
+const old = { round: 3, suspects: ["Lib", "Other", "User"], testing: ["User"], original: { rows: oldRows } };
 const up = bisectUpgrade(old, (id) => (id === "User" ? ["Lib"] : []));
-assert.deepEqual([up.round, up.suspects, up.testing], [3, [["Lib", "User"], ["Other"]], [["Lib", "User"]]]);
+assert.deepEqual([up.round, up.suspects, up.testing, up.keep], [3, [["Lib", "User"], ["Other"]], [["Lib", "User"]], []]);
 assert.equal(bisectUpgrade(up, () => []), up, "a grouped one is left as it is");
+// an old search whose suspects are leaves (their framework L cleared, so on): L stays on, its alone round too
+const leafRows = [mod("L"), mod("Z", true, { requires: ["L"] }), mod("Other")];
+const leaf = bisectUpgrade({ round: 4, suspects: ["Z", "Other"], testing: ["Other"], original: { rows: leafRows } }, (id) => (id === "Z" ? ["L"] : []));
+assert.deepEqual(leaf.keep, ["L"]);
+const toAlone = bisectNext(leaf, false);
+assert.ok("suspects" in toAlone && toAlone.confirm);
+const alone = bisectRound(leafRows, (toAlone as { suspects: string[][] }).suspects, undefined, true, leaf.keep);
+assert.deepEqual([...alone.on].sort(), ["L", "Z"], "Z is never on without L");
+// mods this build can't load stay as they are in the alone round too
+assert.deepEqual([...bisectRound(leafRows, [["Other"]], undefined, true, ["Old41"]).on].sort(), ["Old41", "Other"]);
 
 // the library and the load order: the order follows the library's on/off, never its positions
 const lib: Row[] = [{ kind: "sep", name: "S" }, mod("A"), mod("B", false), mod("C"), mod("D")];
