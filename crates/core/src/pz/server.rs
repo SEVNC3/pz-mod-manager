@@ -340,7 +340,11 @@ pub fn lines_for(enabled: &[String], mods: &std::collections::BTreeMap<String, c
             None => notes.push(format!("{id} isn't from the Workshop: copy its folder into the server's mods folder yourself")),
         }
     }
-    let maps = map_order(order, &mod_maps(&ids, mods, build));
+    let mut maps = map_order(order, &mod_maps(&ids, mods, build));
+    // only left-out mods brought maps: Map= is written back to the game's own (empty would keep their maps there)
+    if maps.is_empty() && !mod_maps(leave, mods, build).is_empty() {
+        maps = vec![BASE_MAP.to_string()];
+    }
     (ServerMods { mods: ids, workshop, maps }, notes)
 }
 
@@ -363,6 +367,39 @@ mod tests {
         assert_eq!((p.key, p.text.as_str()), ("needsLeftOut", "Kept needs UI, which you left out for this server"));
         // nothing left out: everything as before
         assert_eq!(lines_for(&on(&["Kept", "UI"]), &mods, 42, &[], &[]).0.mods, ["Kept", "UI"]);
+    }
+
+    /// tests/fixtures/server-leave-out.json, which the game replays too: lines_for, the check and the label.
+    #[test]
+    fn the_shared_leave_out_cases() {
+        let fx: serde_json::Value = serde_json::from_str(&fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/server-leave-out.json")).unwrap()).unwrap();
+        let strs = |v: &serde_json::Value| v.as_array().map(|a| a.iter().map(|s| s.as_str().unwrap().to_string()).collect::<Vec<_>>()).unwrap_or_default();
+        for c in fx["cases"].as_array().unwrap() {
+            let name = c["name"].as_str().unwrap();
+            let t = tempfile::tempdir().unwrap();
+            let requires = |id: &str| strs(&c["requires"][id]);
+            let mut mods = std::collections::BTreeMap::new();
+            for id in strs(&c["order"]) {
+                let dir = t.path().join(&id);
+                for m in strs(&c["mapsOf"][id.as_str()]) {
+                    fs::create_dir_all(dir.join("42/media/maps").join(m)).unwrap();
+                }
+                fs::create_dir_all(&dir).unwrap();
+                let source = c["workshop"][id.as_str()].as_str().map_or("manual".to_string(), |w| format!("workshop:{w}"));
+                mods.insert(id.clone(), crate::store::Row { id: id.clone(), dir, source, requires: requires(&id), ..Default::default() });
+            }
+            let left = strs(&c["left"]);
+            let (l, _) = lines_for(&strs(&c["order"]), &mods, 42, &strs(&c["maps"]), &left);
+            let e = &c["expect"];
+            assert_eq!((&l.mods, &l.workshop, &l.maps), (&strs(&e["mods"]), &strs(&e["items"]), &strs(&e["maps"])), "{name}");
+            let mut problems = check(&l, &mods, None);
+            mark_left_out(&mut problems, &left);
+            let got: Vec<Vec<String>> = problems.iter().filter(|p| p.key == "needsLeftOut").map(|p| vec![p.id.clone(), p.item.clone()]).collect();
+            let want: Vec<Vec<String>> = e["needsLeftOut"].as_array().unwrap().iter().map(strs).collect();
+            assert_eq!(got, want, "{name}: needsLeftOut");
+            let side: Vec<String> = strs(&c["order"]).into_iter().filter(|id| super::super::leave_out::client_side(id, &|r: &str| requires(r))).collect();
+            assert_eq!(side, strs(&e["clientSide"]), "{name}: clientSide");
+        }
     }
 
     #[test]

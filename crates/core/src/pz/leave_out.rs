@@ -49,6 +49,9 @@ pub fn for_game(paths: &Paths) {
 /// Mods that look client-side: their requirements (through installed mods) reach Project Viewpoint or ZombieBuddy,
 /// which usually run on players' PCs only. Only a label: nothing is left out for the player.
 pub fn client_side(id: &str, requires: &dyn Fn(&str) -> Vec<String>) -> bool {
+    if id == "Viewpoint" || id == "ZombieBuddy" {
+        return false;
+    }
     let (mut todo, mut seen) = (requires(id), std::collections::HashSet::new());
     while let Some(r) = todo.pop() {
         if r == "Viewpoint" || r == "ZombieBuddy" {
@@ -87,6 +90,7 @@ mod tests {
                 "ViewpointLib" => vec!["Viewpoint".into()],
                 "Loop" => vec!["Loop".into()],
                 "Java" => vec!["ZombieBuddy".into()],
+                "Viewpoint" => vec!["ZombieBuddy".into()],
                 _ => vec![],
             }
         };

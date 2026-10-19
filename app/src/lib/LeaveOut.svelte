@@ -26,6 +26,7 @@
   const needs = $derived(new Map(rows.filter((r): r is ModRow => r.kind === "mod").map((m) => [m.id, m.requires])));
   /** Its requirements, through installed mods, reach Project Viewpoint or ZombieBuddy (as leave_out::client_side). */
   function clientSide(id: string) {
+    if (id === "Viewpoint" || id === "ZombieBuddy") return false;
     const todo = [...(needs.get(id) ?? [])];
     const seen = new Set<string>();
     while (todo.length) {
