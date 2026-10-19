@@ -137,7 +137,7 @@ cd app && npx tauri build                   # installers in target/release/bundl
 | `crates/cli` | The `pzmm` command line |
 | `app/` | The desktop app: Tauri 2 with Svelte 5 |
 
-The full plan is in [docs/FOUNDATION.md](docs/FOUNDATION.md). To release, set the new `version` in `Cargo.toml` (and `app/package.json`), then push a matching `v*` tag. CI builds every download, signs the installers with the updater key (GitHub secret `TAURI_SIGNING_PRIVATE_KEY`; a copy is in the maintainer's 1Password), and publishes `latest.json`, which installed copies check for updates. The release page starts with `docs/release-notes/install.md`, then the early-access note, then `docs/release-notes/<tag>.md`.
+The full plan is in [docs/FOUNDATION.md](docs/FOUNDATION.md). To release, set the new `version` in `Cargo.toml` (and `app/package.json`), then push a matching `v*` tag. CI builds every download, signs the installers with the updater key (GitHub secret `TAURI_SIGNING_PRIVATE_KEY`; a copy is in the maintainer's 1Password), and publishes `latest.json`, which installed copies check for updates. The release page starts with `docs/release-notes/install.md`, then the bug-report note (`docs/release-notes/bug-report.md`), then `docs/release-notes/<tag>.md`.
 
 </details>
 

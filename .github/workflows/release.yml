@@ -97,16 +97,16 @@ jobs:
               "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
               "platforms": platforms,
           }, open("dist/latest.json", "w"), indent=2)
-      # The body: how to install (with this version's file names), the early-access banner, then the hand-written
+      # The body: how to install (with this version's file names), the bug-report note, then the hand-written
       # notes when docs/release-notes/<tag>.md exists, else GitHub's commit list.
-      # Early access: every release is a draft (publish by hand). Not ticked as a GitHub pre-release, because the
-      # in-app updater reads releases/latest, which skips pre-releases; the title and banner say early access.
+      # Every release is a public release, made as a draft to check before publishing by hand (never a GitHub
+      # pre-release: the in-app updater reads releases/latest, which skips those).
       - run: |
           notes="docs/release-notes/${{ github.ref_name }}.md"
           ver="${{ github.ref_name }}"; ver="${ver#v}"
-          { sed "s/{VERSION}/$ver/g" docs/release-notes/install.md; echo; cat docs/release-notes/early-access.md; echo; if [ -f "$notes" ]; then cat "$notes"; fi; } > body.md
+          { sed "s/{VERSION}/$ver/g" docs/release-notes/install.md; echo; cat docs/release-notes/bug-report.md; echo; if [ -f "$notes" ]; then cat "$notes"; fi; } > body.md
           how=(--notes-file body.md); [ -f "$notes" ] || how+=(--generate-notes)
           for f in $(find dist -type f); do echo "$(sha256sum < "$f" | cut -d" " -f1)  $(basename "$f")"; done > SHA256SUMS.txt && mv SHA256SUMS.txt dist/
-          find dist -type f && gh release create ${{ github.ref_name }} $(find dist -type f) --repo ${{ github.repository }} --draft --title "${{ github.ref_name }} (early access pre-release)" "${how[@]}"
+          find dist -type f && gh release create ${{ github.ref_name }} $(find dist -type f) --repo ${{ github.repository }} --draft --title "${{ github.ref_name }} (Public Release)" "${how[@]}"
         env:
           GH_TOKEN: ${{ github.token }}
