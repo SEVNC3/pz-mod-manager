@@ -1,6 +1,7 @@
 # 0.2.1
 - **Gone Workshop items in Check setup.** A mod whose Workshop item was removed, banned or hidden is now flagged: it won't get updates, and friends or servers can't download it.
 - **Find the broken mod keeps mods together.** Mods that need each other, like Project Viewpoint and its add-ons or a car pack and its framework, are now turned off and on together, so a requirement is never off under a mod that needs it. Frameworks can be found too: the result names the mod, or the group it is in.
+- **Find the broken mod keeps every mod you had on.** Mods this build can't load are left as they are during the search and are back on after it; they used to be dropped from your list when it finished. Its messages now match the app's, in every language.
 - **No more false "different mod list" alarms.** The game sometimes lists a mod twice, once with a backslash in front; it now tells PZMM each mod once, so PZMM stops saying the game loaded an extra mod.
 - **Get the PZMM app is a link.** Without the app, the line at the top of My mods now opens the download page.
 - **Steadier screen.** If part of the screen fails to draw, it says so once in the activity bar instead of filling the log every frame. My mods also does less work each frame with big mod lists.

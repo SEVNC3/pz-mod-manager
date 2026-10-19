@@ -317,5 +317,1265 @@
         ]
       ]
     }
+  ],
+  "searchesAbout": "Whole searches. broken: the problem shows when all of these are on ([]: always). lead: mods the logs point at (the app only; the game can't read the logs and skips these). Round 1 has every suspect off; round 2 tests the lead groups if any (and fewer than all), else the first half; a single group left from the untested side is tested alone (cleared groups off); one group left after still broken is found. expect.result: found | together | none | oneGroup (no rounds). rounds: answers given.",
+  "searches": [
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "ZombieBuddy alone breaks it",
+      "broken": [
+        "ZombieBuddy"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "ZombieBuddy",
+          "Viewpoint",
+          "ViewpointSurface",
+          "ViewpointBloodFX",
+          "BloodFXAddon"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "Viewpoint alone breaks it",
+      "broken": [
+        "Viewpoint"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "ZombieBuddy",
+          "Viewpoint",
+          "ViewpointSurface",
+          "ViewpointBloodFX",
+          "BloodFXAddon"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "ViewpointSurface alone breaks it",
+      "broken": [
+        "ViewpointSurface"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "ZombieBuddy",
+          "Viewpoint",
+          "ViewpointSurface",
+          "ViewpointBloodFX",
+          "BloodFXAddon"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "ViewpointBloodFX alone breaks it",
+      "broken": [
+        "ViewpointBloodFX"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "ZombieBuddy",
+          "Viewpoint",
+          "ViewpointSurface",
+          "ViewpointBloodFX",
+          "BloodFXAddon"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "BloodFXAddon alone breaks it",
+      "broken": [
+        "BloodFXAddon"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "ZombieBuddy",
+          "Viewpoint",
+          "ViewpointSurface",
+          "ViewpointBloodFX",
+          "BloodFXAddon"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "TsarLib alone breaks it",
+      "broken": [
+        "TsarLib"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "TsarLib",
+          "Ki5Car"
+        ]
+      },
+      "rounds": 4
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "Ki5Car alone breaks it",
+      "broken": [
+        "Ki5Car"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "TsarLib",
+          "Ki5Car"
+        ]
+      },
+      "rounds": 4
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "ALifeFramework alone breaks it",
+      "broken": [
+        "ALifeFramework"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "ALifeFramework",
+          "ALifeNPCs"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "ALifeNPCs alone breaks it",
+      "broken": [
+        "ALifeNPCs"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "ALifeFramework",
+          "ALifeNPCs"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "Solo alone breaks it",
+      "broken": [
+        "Solo"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Solo"
+        ]
+      },
+      "rounds": 4
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "broken whatever is on (not a mod)",
+      "broken": [],
+      "expect": {
+        "result": "none",
+        "ids": []
+      },
+      "rounds": 1
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "two groups that break only together",
+      "broken": [
+        "ZombieBuddy",
+        "Solo"
+      ],
+      "expect": {
+        "result": "together",
+        "ids": [
+          "Solo"
+        ]
+      },
+      "rounds": 4
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "the logs point at the culprit",
+      "broken": [
+        "Solo"
+      ],
+      "lead": [
+        "Solo"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Solo"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "the reporter's Viewpoint chain, Ki5-style framework and A-Life NPCs",
+      "why": "the logs point at an innocent group",
+      "broken": [
+        "ZombieBuddy"
+      ],
+      "lead": [
+        "Solo"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "ZombieBuddy",
+          "Viewpoint",
+          "ViewpointSurface",
+          "ViewpointBloodFX",
+          "BloodFXAddon"
+        ]
+      },
+      "rounds": 4
+    },
+    {
+      "case": "a diamond is one group",
+      "why": "A alone breaks it",
+      "broken": [
+        "A"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a diamond is one group",
+      "why": "B alone breaks it",
+      "broken": [
+        "B"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a diamond is one group",
+      "why": "C alone breaks it",
+      "broken": [
+        "C"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a diamond is one group",
+      "why": "D alone breaks it",
+      "broken": [
+        "D"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a diamond is one group",
+      "why": "E alone breaks it",
+      "broken": [
+        "E"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "E"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a diamond is one group",
+      "why": "broken whatever is on (not a mod)",
+      "broken": [],
+      "expect": {
+        "result": "none",
+        "ids": []
+      },
+      "rounds": 1
+    },
+    {
+      "case": "a diamond is one group",
+      "why": "two groups that break only together",
+      "broken": [
+        "A",
+        "E"
+      ],
+      "expect": {
+        "result": "together",
+        "ids": [
+          "E"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a diamond is one group",
+      "why": "the logs point at the culprit",
+      "broken": [
+        "E"
+      ],
+      "lead": [
+        "E"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "E"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a diamond is one group",
+      "why": "the logs point at an innocent group",
+      "broken": [
+        "A"
+      ],
+      "lead": [
+        "E"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement cycle is one group and terminates",
+      "why": "X alone breaks it",
+      "broken": [
+        "X"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "X",
+          "Y"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a requirement cycle is one group and terminates",
+      "why": "Y alone breaks it",
+      "broken": [
+        "Y"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "X",
+          "Y"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a requirement cycle is one group and terminates",
+      "why": "Z alone breaks it",
+      "broken": [
+        "Z"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Z"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement cycle is one group and terminates",
+      "why": "broken whatever is on (not a mod)",
+      "broken": [],
+      "expect": {
+        "result": "none",
+        "ids": []
+      },
+      "rounds": 1
+    },
+    {
+      "case": "a requirement cycle is one group and terminates",
+      "why": "two groups that break only together",
+      "broken": [
+        "X",
+        "Z"
+      ],
+      "expect": {
+        "result": "together",
+        "ids": [
+          "Z"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement cycle is one group and terminates",
+      "why": "the logs point at the culprit",
+      "broken": [
+        "Z"
+      ],
+      "lead": [
+        "Z"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Z"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a requirement cycle is one group and terminates",
+      "why": "the logs point at an innocent group",
+      "broken": [
+        "X"
+      ],
+      "lead": [
+        "Z"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "X",
+          "Y"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "requirements that are off or not installed add no edge",
+      "why": "M alone breaks it",
+      "broken": [
+        "M"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "M",
+          "O"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "requirements that are off or not installed add no edge",
+      "why": "N alone breaks it",
+      "broken": [
+        "N"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "N"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "requirements that are off or not installed add no edge",
+      "why": "O alone breaks it",
+      "broken": [
+        "O"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "M",
+          "O"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "requirements that are off or not installed add no edge",
+      "why": "broken whatever is on (not a mod)",
+      "broken": [],
+      "expect": {
+        "result": "none",
+        "ids": []
+      },
+      "rounds": 1
+    },
+    {
+      "case": "requirements that are off or not installed add no edge",
+      "why": "two groups that break only together",
+      "broken": [
+        "M",
+        "N"
+      ],
+      "expect": {
+        "result": "together",
+        "ids": [
+          "N"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "requirements that are off or not installed add no edge",
+      "why": "the logs point at the culprit",
+      "broken": [
+        "N"
+      ],
+      "lead": [
+        "N"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "N"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "requirements that are off or not installed add no edge",
+      "why": "the logs point at an innocent group",
+      "broken": [
+        "M"
+      ],
+      "lead": [
+        "N"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "M",
+          "O"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "groups keep load order and follow their first member",
+      "why": "L1 alone breaks it",
+      "broken": [
+        "L1"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "L1",
+          "L2"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "groups keep load order and follow their first member",
+      "why": "R1 alone breaks it",
+      "broken": [
+        "R1"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "R1",
+          "R2"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "groups keep load order and follow their first member",
+      "why": "L2 alone breaks it",
+      "broken": [
+        "L2"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "L1",
+          "L2"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "groups keep load order and follow their first member",
+      "why": "R2 alone breaks it",
+      "broken": [
+        "R2"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "R1",
+          "R2"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "groups keep load order and follow their first member",
+      "why": "broken whatever is on (not a mod)",
+      "broken": [],
+      "expect": {
+        "result": "none",
+        "ids": []
+      },
+      "rounds": 1
+    },
+    {
+      "case": "groups keep load order and follow their first member",
+      "why": "two groups that break only together",
+      "broken": [
+        "L1",
+        "R1"
+      ],
+      "expect": {
+        "result": "together",
+        "ids": [
+          "R1",
+          "R2"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "groups keep load order and follow their first member",
+      "why": "the logs point at the culprit",
+      "broken": [
+        "R1"
+      ],
+      "lead": [
+        "R1"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "R1",
+          "R2"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "groups keep load order and follow their first member",
+      "why": "the logs point at an innocent group",
+      "broken": [
+        "L1"
+      ],
+      "lead": [
+        "R1"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "L1",
+          "L2"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement listed before its user still joins",
+      "why": "Lib alone breaks it",
+      "broken": [
+        "Lib"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Lib",
+          "User"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a requirement listed before its user still joins",
+      "why": "Other alone breaks it",
+      "broken": [
+        "Other"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement listed before its user still joins",
+      "why": "User alone breaks it",
+      "broken": [
+        "User"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Lib",
+          "User"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a requirement listed before its user still joins",
+      "why": "broken whatever is on (not a mod)",
+      "broken": [],
+      "expect": {
+        "result": "none",
+        "ids": []
+      },
+      "rounds": 1
+    },
+    {
+      "case": "a requirement listed before its user still joins",
+      "why": "two groups that break only together",
+      "broken": [
+        "Lib",
+        "Other"
+      ],
+      "expect": {
+        "result": "together",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement listed before its user still joins",
+      "why": "the logs point at the culprit",
+      "broken": [
+        "Other"
+      ],
+      "lead": [
+        "Other"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a requirement listed before its user still joins",
+      "why": "the logs point at an innocent group",
+      "broken": [
+        "Lib"
+      ],
+      "lead": [
+        "Other"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Lib",
+          "User"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement loaded after its user still joins",
+      "why": "User alone breaks it",
+      "broken": [
+        "User"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "User",
+          "Lib"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a requirement loaded after its user still joins",
+      "why": "Other alone breaks it",
+      "broken": [
+        "Other"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement loaded after its user still joins",
+      "why": "Lib alone breaks it",
+      "broken": [
+        "Lib"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "User",
+          "Lib"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a requirement loaded after its user still joins",
+      "why": "broken whatever is on (not a mod)",
+      "broken": [],
+      "expect": {
+        "result": "none",
+        "ids": []
+      },
+      "rounds": 1
+    },
+    {
+      "case": "a requirement loaded after its user still joins",
+      "why": "two groups that break only together",
+      "broken": [
+        "User",
+        "Other"
+      ],
+      "expect": {
+        "result": "together",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a requirement loaded after its user still joins",
+      "why": "the logs point at the culprit",
+      "broken": [
+        "Other"
+      ],
+      "lead": [
+        "Other"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a requirement loaded after its user still joins",
+      "why": "the logs point at an innocent group",
+      "broken": [
+        "User"
+      ],
+      "lead": [
+        "Other"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "User",
+          "Lib"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "one mod",
+      "why": "Only alone breaks it",
+      "broken": [
+        "Only"
+      ],
+      "expect": {
+        "result": "oneGroup",
+        "ids": [
+          "Only"
+        ]
+      },
+      "rounds": 0
+    },
+    {
+      "case": "one mod",
+      "why": "broken whatever is on (not a mod)",
+      "broken": [],
+      "expect": {
+        "result": "oneGroup",
+        "ids": [
+          "Only"
+        ]
+      },
+      "rounds": 0
+    },
+    {
+      "case": "one giant group",
+      "why": "Core alone breaks it",
+      "broken": [
+        "Core"
+      ],
+      "expect": {
+        "result": "oneGroup",
+        "ids": [
+          "Core",
+          "P1",
+          "P2",
+          "P3",
+          "P4",
+          "P5"
+        ]
+      },
+      "rounds": 0
+    },
+    {
+      "case": "one giant group",
+      "why": "P1 alone breaks it",
+      "broken": [
+        "P1"
+      ],
+      "expect": {
+        "result": "oneGroup",
+        "ids": [
+          "Core",
+          "P1",
+          "P2",
+          "P3",
+          "P4",
+          "P5"
+        ]
+      },
+      "rounds": 0
+    },
+    {
+      "case": "one giant group",
+      "why": "P2 alone breaks it",
+      "broken": [
+        "P2"
+      ],
+      "expect": {
+        "result": "oneGroup",
+        "ids": [
+          "Core",
+          "P1",
+          "P2",
+          "P3",
+          "P4",
+          "P5"
+        ]
+      },
+      "rounds": 0
+    },
+    {
+      "case": "one giant group",
+      "why": "P3 alone breaks it",
+      "broken": [
+        "P3"
+      ],
+      "expect": {
+        "result": "oneGroup",
+        "ids": [
+          "Core",
+          "P1",
+          "P2",
+          "P3",
+          "P4",
+          "P5"
+        ]
+      },
+      "rounds": 0
+    },
+    {
+      "case": "one giant group",
+      "why": "P4 alone breaks it",
+      "broken": [
+        "P4"
+      ],
+      "expect": {
+        "result": "oneGroup",
+        "ids": [
+          "Core",
+          "P1",
+          "P2",
+          "P3",
+          "P4",
+          "P5"
+        ]
+      },
+      "rounds": 0
+    },
+    {
+      "case": "one giant group",
+      "why": "P5 alone breaks it",
+      "broken": [
+        "P5"
+      ],
+      "expect": {
+        "result": "oneGroup",
+        "ids": [
+          "Core",
+          "P1",
+          "P2",
+          "P3",
+          "P4",
+          "P5"
+        ]
+      },
+      "rounds": 0
+    },
+    {
+      "case": "one giant group",
+      "why": "broken whatever is on (not a mod)",
+      "broken": [],
+      "expect": {
+        "result": "oneGroup",
+        "ids": [
+          "Core",
+          "P1",
+          "P2",
+          "P3",
+          "P4",
+          "P5"
+        ]
+      },
+      "rounds": 0
+    },
+    {
+      "case": "a chain through a mod that's off joins its ends",
+      "why": "A alone breaks it",
+      "broken": [
+        "A"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "A",
+          "B"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a chain through a mod that's off joins its ends",
+      "why": "Other alone breaks it",
+      "broken": [
+        "Other"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a chain through a mod that's off joins its ends",
+      "why": "B alone breaks it",
+      "broken": [
+        "B"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "A",
+          "B"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a chain through a mod that's off joins its ends",
+      "why": "broken whatever is on (not a mod)",
+      "broken": [],
+      "expect": {
+        "result": "none",
+        "ids": []
+      },
+      "rounds": 1
+    },
+    {
+      "case": "a chain through a mod that's off joins its ends",
+      "why": "two groups that break only together",
+      "broken": [
+        "A",
+        "Other"
+      ],
+      "expect": {
+        "result": "together",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "a chain through a mod that's off joins its ends",
+      "why": "the logs point at the culprit",
+      "broken": [
+        "Other"
+      ],
+      "lead": [
+        "Other"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Other"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "a chain through a mod that's off joins its ends",
+      "why": "the logs point at an innocent group",
+      "broken": [
+        "A"
+      ],
+      "lead": [
+        "Other"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "A",
+          "B"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "an off mod in a cycle terminates",
+      "why": "P alone breaks it",
+      "broken": [
+        "P"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "P"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "an off mod in a cycle terminates",
+      "why": "Q alone breaks it",
+      "broken": [
+        "Q"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Q"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "an off mod in a cycle terminates",
+      "why": "broken whatever is on (not a mod)",
+      "broken": [],
+      "expect": {
+        "result": "none",
+        "ids": []
+      },
+      "rounds": 1
+    },
+    {
+      "case": "an off mod in a cycle terminates",
+      "why": "two groups that break only together",
+      "broken": [
+        "P",
+        "Q"
+      ],
+      "expect": {
+        "result": "together",
+        "ids": [
+          "Q"
+        ]
+      },
+      "rounds": 3
+    },
+    {
+      "case": "an off mod in a cycle terminates",
+      "why": "the logs point at the culprit",
+      "broken": [
+        "Q"
+      ],
+      "lead": [
+        "Q"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "Q"
+        ]
+      },
+      "rounds": 2
+    },
+    {
+      "case": "an off mod in a cycle terminates",
+      "why": "the logs point at an innocent group",
+      "broken": [
+        "P"
+      ],
+      "lead": [
+        "Q"
+      ],
+      "expect": {
+        "result": "found",
+        "ids": [
+          "P"
+        ]
+      },
+      "rounds": 3
+    }
   ]
 }
