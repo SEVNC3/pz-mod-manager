@@ -864,7 +864,8 @@ local function readInstalled()
 end
 
 --- The search for the broken mod (Zomboid/Lua/pzmm/bisect.txt, so it survives restarting the game): the mods that were
---- on, in load order, the suspects, the half under test and the round; or just a result (the mod found, "" for none).
+--- on, in load order, the suspect groups, the groups under test and the round; or just a result (the mod or group
+--- found, members split by "|"; "" for none). Groups are "a|b;c": a file from before groups reads as one mod a group.
 local function readBisect()
     local b
     pcall(function()
@@ -883,10 +884,19 @@ local function readBisect()
             for id in tostring(s or ""):gmatch("[^;]+") do out[#out + 1] = id end
             return out
         end
+        local function groups(s)
+            local out = {}
+            for _, g in ipairs(ids(s)) do
+                local members = {}
+                for id in g:gmatch("[^|]+") do members[#members + 1] = id end
+                if #members > 0 then out[#out + 1] = members end
+            end
+            return out
+        end
         if t.result ~= nil then
             b = { result = t.result }
         elseif t.original and t.suspects then
-            b = { original = ids(t.original), suspects = ids(t.suspects), testing = ids(t.testing), round = tonumber(t.round) or 1, had = {}, maps = t.maps and ids(t.maps) or nil }
+            b = { original = ids(t.original), suspects = groups(t.suspects), testing = groups(t.testing), round = tonumber(t.round) or 1, had = {}, maps = t.maps and ids(t.maps) or nil, alone = t.alone == "1" or nil }
             for _, id in ipairs(b.original) do b.had[id] = true end
         end
     end)
@@ -899,7 +909,12 @@ local function writeBisect(b)
         if b and b.result ~= nil then
             w:write("result\t" .. b.result .. "\n")
         elseif b then
-            w:write("original\t" .. table.concat(b.original, ";") .. "\nsuspects\t" .. table.concat(b.suspects, ";") .. "\ntesting\t" .. table.concat(b.testing, ";") .. "\nround\t" .. b.round .. (b.maps and ("\nmaps\t" .. table.concat(b.maps, ";")) or "") .. "\n")
+            local function groups(list)
+                local out = {}
+                for i, g in ipairs(list) do out[i] = table.concat(g, "|") end
+                return table.concat(out, ";")
+            end
+            w:write("original\t" .. table.concat(b.original, ";") .. "\nsuspects\t" .. groups(b.suspects) .. "\ntesting\t" .. groups(b.testing) .. "\nround\t" .. b.round .. (b.maps and ("\nmaps\t" .. table.concat(b.maps, ";")) or "") .. (b.alone and "\nalone\t1" or "") .. "\n")
         end
         w:close()
     end)
@@ -3310,32 +3325,75 @@ end
 --- Find the broken mod (the app's bisect, order.ts bisectRound): the suspects are the enabled mods (but not the
 --- frameworks others need: they stay on); each round turns on the first half of them with what they need, and
 --- the rest off, and saves it. You start the game, see whether the problem happens, and answer here.
+--- The enabled mods `order` as dependency-closed groups: a mod and every enabled mod it needs (or that needs it) are one
+--- group, so a search never turns a requirement off under a mod that stays on. Members keep load order; groups follow
+--- their first member. `reqs(id)` lists a mod's requirements (off or missing ones add nothing). Checked against
+--- tests/fixtures/bisect-groups.json, as the app's grouping is.
+function K.bisectGroups(order, reqs)
+    local pos, parent = {}, {}
+    for i, id in ipairs(order) do pos[id], parent[id] = i, id end
+    local function find(a)
+        while parent[a] ~= a do
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        end
+        return a
+    end
+    -- a requirement that's off is followed through to the enabled mods it needs: turning a group on turns it
+    -- and them on, so they must be in that group
+    for _, id in ipairs(order) do
+        local seen = {}
+        local function link(q)
+            if seen[q] then return end
+            seen[q] = true
+            if pos[q] then
+                local a, c = find(id), find(q)
+                if a ~= c then parent[c] = a end
+            else
+                for _, r in ipairs(reqs(q) or {}) do link(r) end
+            end
+        end
+        for _, q in ipairs(reqs(id) or {}) do link(q) end
+    end
+    local groups, at = {}, {}
+    for _, id in ipairs(order) do
+        local r = find(id)
+        if not at[r] then
+            groups[#groups + 1] = {}
+            at[r] = #groups
+        end
+        local g = groups[at[r]]
+        g[#g + 1] = id
+    end
+    return groups
+end
+
 function PZMMMods:bisectApply()
     local b = self.bisect
     local suspect, on = {}, {}
-    for _, id in ipairs(b.suspects) do suspect[id] = true end
-    for _, id in ipairs(b.original) do if not suspect[id] then on[id] = true end end
+    for _, g in ipairs(b.suspects) do for _, id in ipairs(g) do suspect[id] = true end end
+    -- the cleared groups are on, except in the last group's round, which tests it alone
+    if not b.alone then for _, id in ipairs(b.original) do if not suspect[id] then on[id] = true end end end
     -- round 1 tests with none of them: "still happens" then means it is not these mods
     local count = b.round == 1 and 0 or math.ceil(#b.suspects / 2)
     b.testing = {}
-    local added = false
+    -- a test never turns on a mod that was off before the search (as the app's): a group already holds every
+    -- enabled mod its members need, and what was off stays off, as it was when the problem showed
     local function add(id)
-        if on[id] then return end
+        if on[id] or not b.had[id] then return end
         local d = self.model.mods[id]
         if not d then return end
         on[id] = true
-        if not b.had[id] then added = true end
         for q in pairs(d.requireMods or {}) do add(q) end
         for _, q in ipairs(rules(d).requires) do add(q) end
     end
+    -- a whole group at a time: it already holds every enabled mod its members need
     for i = 1, count do
         b.testing[i] = b.suspects[i]
-        add(b.suspects[i])
+        for _, id in ipairs(b.suspects[i]) do add(id) end
     end
     local list = {}
     for _, id in ipairs(b.original) do if on[id] then list[#list + 1] = id end end
-    for id in pairs(on) do if not b.had[id] then list[#list + 1] = id end end
-    if added then list = sortLoadOrder(list, self.model.mods) end
     writeBisect(b)
     self:setOrder(list)
     -- the game's Accept drops the maps of mods that are off: put the order back each round
@@ -3349,7 +3407,7 @@ function PZMMMods:bisectStart()
     if self.bisect then return end
     if self:changes(true) > 0 then return self:say("Accept or discard your changes first: the search saves its test lists as it goes.") end
     local mods = self.model.mods
-    local original, had, needed = {}, {}, {}
+    local original, had = {}, {}
     for _, id in ipairs(self:activeOrder()) do
         local d = mods[id]
         if d and d.isAvailable ~= false then
@@ -3357,13 +3415,17 @@ function PZMMMods:bisectStart()
             had[id] = true
         end
     end
-    for _, id in ipairs(original) do
-        for q in pairs(mods[id].requireMods or {}) do needed[q] = true end
-        for _, q in ipairs(rules(mods[id]).requires) do needed[q] = true end
-    end
-    local suspects = {}
-    for _, id in ipairs(original) do if not needed[id] then suspects[#suspects + 1] = id end end
-    if #suspects < 2 then return self:say("Enable at least two mods to search for a broken one.") end
+    -- frameworks are suspects too, always in the same group as the mods that need them
+    -- (asked for mods that are off too, to follow a chain through them; a mod that isn't installed needs nothing here)
+    local suspects = K.bisectGroups(original, function(id)
+        local d, out = mods[id], {}
+        if not d then return out end
+        for q in pairs(d.requireMods or {}) do out[#out + 1] = q end
+        for _, q in ipairs(rules(d).requires) do out[#out + 1] = q end
+        return out
+    end)
+    if #original < 2 then return self:say("Enable at least two mods to search for a broken one.") end
+    if #suspects < 2 then return self:say("Your enabled mods all need each other, so they can't be split up to test: turn some off by hand to narrow it down.") end
     local maps = {}
     pcall(function()
         local mo = self.model:getActiveMods():getMapOrder()
@@ -3377,14 +3439,20 @@ end
 function PZMMMods:bisectAnswer(still)
     local b = self.bisect
     if not (b and b.suspects) then return end
+    -- narrow by whole groups: the ones under test if it still happens, else the rest
     local tested = {}
-    for _, id in ipairs(b.testing) do tested[id] = true end
+    for _, g in ipairs(b.testing) do tested[g[1]] = true end
     local suspects = {}
-    for _, id in ipairs(b.suspects) do
-        if (tested[id] == true) == still then suspects[#suspects + 1] = id end
+    for _, g in ipairs(b.suspects) do
+        if (tested[g[1]] == true) == still then suspects[#suspects + 1] = g end
     end
-    if #suspects <= 1 then return self:bisectFinish(suspects[1] or "") end
-    b.suspects, b.round = suspects, b.round + 1
+    -- the last group alone: broken means it's the one; fine means it breaks only with mods in another group
+    if b.alone then return self:bisectFinish((still and "" or "~") .. table.concat(b.suspects[1], "|")) end
+    if #suspects == 0 then return self:bisectFinish("") end
+    -- one group left: found if it was on when the problem showed; else it's only what remains once the rest were
+    -- cleared, so test it alone, with the cleared groups off too (as the app does)
+    if #suspects == 1 and still then return self:bisectFinish(table.concat(suspects[1], "|")) end
+    b.suspects, b.round, b.alone = suspects, b.round + 1, #suspects == 1 or nil
     self:bisectApply()
 end
 
@@ -3419,13 +3487,20 @@ function PZMMMods:drawBisect(x, y, w, mx, my)
     end
     if not b then
         buttons({ { T("findings_find", "Find the broken mod"), nil, function() self:bisectStart() end,
-            "Find the broken mod\nTurns off half of your mods at a time and asks whether the problem still happens, until one is left. Your mod list is restored after." } })
+            "Find the broken mod\nTurns off half of your mods at a time, keeping mods that need each other together, and asks whether the problem still happens, until one mod or group is left. Your mod list is restored after." } })
         return y
     end
     if b.result ~= nil then
-        local d = self.model.mods[b.result]
-        local msg = b.result ~= "" and ("Found it: " .. (d and d.name or b.result) .. " causes the problem. Your mod list is restored.")
-            or "The problem didn't follow any single mod. Your mod list is restored."
+        local together = b.result:sub(1, 1) == "~"
+        local members = {}
+        for id in b.result:gsub("^~", ""):gmatch("[^|]+") do members[#members + 1] = id end
+        local d = #members == 1 and self.model.mods[members[1]] or nil -- (Show it, found or together)
+        local names = {}
+        for _, id in ipairs(members) do names[#names + 1] = self.model.mods[id] and self.model.mods[id].name or id end
+        local msg = together and (table.concat(names, ", ") .. " breaks it only together with mods in another group: turning it off fixes your list, but it's fine on its own. Your mod list is restored.")
+            or #members == 1 and ("Found it: " .. names[1] .. " causes the problem. Your mod list is restored.")
+            or #members > 1 and ("It's in this group: " .. table.concat(names, ", ") .. ". They need each other, so they were tested together: turn the ones others don't need off one at a time to find which. Your mod list is restored.")
+            or "The problem didn't follow any single mod or group. Your mod list is restored."
         local y0 = y
         for _, l in ipairs(wrap(msg, w - 12)) do
             text(self, l, x + 12, y, C.text)
@@ -3442,8 +3517,10 @@ function PZMMMods:drawBisect(x, y, w, mx, my)
     local y0 = y
     bold(self, "Finding the broken mod, round " .. b.round .. ":", x + 12, y, C.text)
     y = y + H_SMALL + 4
-    local n, t = #b.suspects, #b.testing
-    local msg = n .. (n == 1 and " suspect" or " suspects") .. " left, " .. t .. " enabled for this test (plus what they need). Start the game, check whether the problem happens, then come back here."
+    local n, t, nm = #b.suspects, #b.testing, 0
+    for _, g in ipairs(b.suspects) do nm = nm + #g end
+    local msg = nm .. (nm == 1 and " suspect mod" or " suspect mods") .. " left in " .. n .. (n == 1 and " group" or " groups") .. ", " .. t .. (t == 1 and " group" or " groups")
+        .. " on for this test. Mods that need each other are tested together. Start the game, check whether the problem happens, then come back here."
     for _, l in ipairs(wrap(msg, w - 12)) do
         text(self, l, x + 12, y, C.text)
         y = y + H_SMALL + 2
