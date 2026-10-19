@@ -290,6 +290,14 @@ pub fn check(lines: &ServerMods, installed: &std::collections::BTreeMap<String, 
     out
 }
 
+/// A kept mod's requirement that the server's leave-out list holds says so ("needsLeftOut"), not just "needs".
+pub fn mark_left_out(problems: &mut [Problem], leave: &[String]) {
+    for p in problems.iter_mut().filter(|p| p.key == "needs" && leave.contains(&p.item)) {
+        p.key = "needsLeftOut";
+        p.text = format!("{} needs {}, which you left out for this server", p.id, p.item);
+    }
+}
+
 /// The lines `export` writes, and notes about mods the server won't get.
 struct Written {
     build: u8,
@@ -303,16 +311,21 @@ fn plan(paths: &Paths, name: &str, enabled: &[String], mods: &std::collections::
     let build = build(paths, name);
     let file = path(paths, name)?;
     let current = read(&file).map(|c| c.maps).unwrap_or_default();
-    let (lines, notes) = lines_for(enabled, mods, build, arranged.unwrap_or(&current));
+    let (lines, notes) = lines_for(enabled, mods, build, arranged.unwrap_or(&current), &super::leave_out::get(paths, name));
     Ok((file, Written { build, ids: lines.mods, workshop: lines.workshop, maps: lines.maps, notes }))
 }
 
 /// A server's lines for the `enabled` mods (in load order): installed mods go in `Mods=`, their
 /// Workshop items in `WorkshopItems=`, their maps (on `build`, arranged as in `order`, see
-/// [`map_order`]) in `Map=`. Also notes about mods the server won't get.
-pub fn lines_for(enabled: &[String], mods: &std::collections::BTreeMap<String, crate::store::Row>, build: u8, order: &[String]) -> (ServerMods, Vec<String>) {
+/// [`map_order`]) in `Map=`. Mods in `leave` (the server's leave-out list) aren't sent at all: their Workshop item
+/// goes only when no mod sent comes from it, their maps with them. Also notes about mods the server won't get.
+pub fn lines_for(enabled: &[String], mods: &std::collections::BTreeMap<String, crate::store::Row>, build: u8, order: &[String], leave: &[String]) -> (ServerMods, Vec<String>) {
     let (mut ids, mut workshop, mut notes) = (vec![], vec![], vec![]);
     for id in enabled {
+        if leave.contains(id) {
+            notes.push(format!("{id} was left out for this server"));
+            continue;
+        }
         let Some(m) = mods.get(id) else {
             notes.push(format!("{id} isn't installed, so it was left out"));
             continue;
@@ -327,13 +340,67 @@ pub fn lines_for(enabled: &[String], mods: &std::collections::BTreeMap<String, c
             None => notes.push(format!("{id} isn't from the Workshop: copy its folder into the server's mods folder yourself")),
         }
     }
-    let maps = map_order(order, &mod_maps(&ids, mods, build));
+    let mut maps = map_order(order, &mod_maps(&ids, mods, build));
+    // only left-out mods brought maps: Map= is written back to the game's own (empty would keep their maps there)
+    if maps.is_empty() && !mod_maps(leave, mods, build).is_empty() {
+        maps = vec![BASE_MAP.to_string()];
+    }
     (ServerMods { mods: ids, workshop, maps }, notes)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_left_out_mod_and_only_its_own_item_and_maps_go() {
+        let row = |id: &str, item: &str| crate::store::Row { id: id.into(), source: format!("workshop:{item}"), requires: if id == "Kept" { vec!["UI".into()] } else { vec![] }, ..Default::default() };
+        let mods: std::collections::BTreeMap<String, crate::store::Row> = [row("Kept", "1"), row("Sibling", "1"), row("UI", "2"), row("Alone", "3")].into_iter().map(|r| (r.id.clone(), r)).collect();
+        let on = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let (l, notes) = lines_for(&on(&["Kept", "Sibling", "UI", "Alone"]), &mods, 42, &[], &on(&["Sibling", "UI", "Alone"]));
+        assert_eq!(l.mods, ["Kept"]);
+        assert_eq!(l.workshop, ["1"], "item 1 stays for Kept; 2 and 3 had only left-out mods");
+        assert!(notes.iter().any(|n| n == "UI was left out for this server"));
+        let mut problems = check(&l, &mods, None);
+        mark_left_out(&mut problems, &on(&["UI"]));
+        let p = problems.iter().find(|p| p.id == "Kept").unwrap();
+        assert_eq!((p.key, p.text.as_str()), ("needsLeftOut", "Kept needs UI, which you left out for this server"));
+        // nothing left out: everything as before
+        assert_eq!(lines_for(&on(&["Kept", "UI"]), &mods, 42, &[], &[]).0.mods, ["Kept", "UI"]);
+    }
+
+    /// tests/fixtures/server-leave-out.json, which the game replays too: lines_for, the check and the label.
+    #[test]
+    fn the_shared_leave_out_cases() {
+        let fx: serde_json::Value = serde_json::from_str(&fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/server-leave-out.json")).unwrap()).unwrap();
+        let strs = |v: &serde_json::Value| v.as_array().map(|a| a.iter().map(|s| s.as_str().unwrap().to_string()).collect::<Vec<_>>()).unwrap_or_default();
+        for c in fx["cases"].as_array().unwrap() {
+            let name = c["name"].as_str().unwrap();
+            let t = tempfile::tempdir().unwrap();
+            let requires = |id: &str| strs(&c["requires"][id]);
+            let mut mods = std::collections::BTreeMap::new();
+            for id in strs(&c["order"]) {
+                let dir = t.path().join(&id);
+                for m in strs(&c["mapsOf"][id.as_str()]) {
+                    fs::create_dir_all(dir.join("42/media/maps").join(m)).unwrap();
+                }
+                fs::create_dir_all(&dir).unwrap();
+                let source = c["workshop"][id.as_str()].as_str().map_or("manual".to_string(), |w| format!("workshop:{w}"));
+                mods.insert(id.clone(), crate::store::Row { id: id.clone(), dir, source, requires: requires(&id), ..Default::default() });
+            }
+            let left = strs(&c["left"]);
+            let (l, _) = lines_for(&strs(&c["order"]), &mods, 42, &strs(&c["maps"]), &left);
+            let e = &c["expect"];
+            assert_eq!((&l.mods, &l.workshop, &l.maps), (&strs(&e["mods"]), &strs(&e["items"]), &strs(&e["maps"])), "{name}");
+            let mut problems = check(&l, &mods, None);
+            mark_left_out(&mut problems, &left);
+            let got: Vec<Vec<String>> = problems.iter().filter(|p| p.key == "needsLeftOut").map(|p| vec![p.id.clone(), p.item.clone()]).collect();
+            let want: Vec<Vec<String>> = e["needsLeftOut"].as_array().unwrap().iter().map(strs).collect();
+            assert_eq!(got, want, "{name}: needsLeftOut");
+            let side: Vec<String> = strs(&c["order"]).into_iter().filter(|id| super::super::leave_out::client_side(id, &|r: &str| requires(r))).collect();
+            assert_eq!(side, strs(&e["clientSide"]), "{name}: clientSide");
+        }
+    }
 
     #[test]
     fn round_trip_keeps_other_settings() {

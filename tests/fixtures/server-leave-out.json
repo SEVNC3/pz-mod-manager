@@ -1,0 +1,71 @@
+{
+  "about": "What a server gets when a profile is written to it with a per-server leave-out list. order: the enabled mods in load order. left: the ids left out. workshop: a mod's Workshop item (absent: a local mod). maps: the profile's map order. mapsOf: a mod's map folders. Rules: Mods= is order without left (load order kept). WorkshopItems= is each kept mod's item once, in first-kept order; an item goes only when no kept mod comes from it. Map= is maps without the folders only left-out mods bring (a folder a kept mod also brings stays; maps no mod brings, like the game's own, stay); but when no kept mod brings a map it is [] (the writer then leaves Map= as it is), unless left-out mods brought maps, then just [\"Muldraugh, KY\"] so theirs go. needsLeftOut: [kept id, the left-out id it requires] for each direct requirement in left, in order. clientSide: mods whose requirements, followed through installed mods, reach Viewpoint or ZombieBuddy (not those two). Both the app (server.rs lines_for) and the game (PZMMModScreen.lua K.serverLists / K.needsLeftOut / K.clientSide) must give exactly these.",
+  "cases": [
+    {
+      "name": "Viewpoint add-ons left out, a shared Workshop item stays, a left-out map goes",
+      "order": ["ZombieBuddy", "Viewpoint", "VPParkour", "VPSurface", "Ki5Lib", "Ki5Car", "MapMod", "Shared1", "Shared2"],
+      "left": ["VPSurface", "MapMod", "Shared2"],
+      "requires": { "Viewpoint": ["ZombieBuddy"], "VPParkour": ["Viewpoint"], "VPSurface": ["Viewpoint"], "Ki5Car": ["Ki5Lib"] },
+      "workshop": { "ZombieBuddy": "100", "Viewpoint": "200", "VPParkour": "201", "VPSurface": "202", "Ki5Lib": "300", "Ki5Car": "301", "MapMod": "400", "Shared1": "500", "Shared2": "500" },
+      "maps": ["Mockingbird", "Muldraugh, KY"],
+      "mapsOf": { "MapMod": ["Mockingbird"] },
+      "expect": {
+        "mods": ["ZombieBuddy", "Viewpoint", "VPParkour", "Ki5Lib", "Ki5Car", "Shared1"],
+        "items": ["100", "200", "201", "300", "301", "500"],
+        "maps": ["Muldraugh, KY"],
+        "needsLeftOut": [],
+        "clientSide": ["VPParkour", "VPSurface"]
+      }
+    },
+    {
+      "name": "a kept mod needs a left-out one",
+      "order": ["Lib", "User", "Other"],
+      "left": ["Lib"],
+      "requires": { "User": ["Lib"] },
+      "workshop": { "Lib": "1", "User": "2" },
+      "maps": [],
+      "mapsOf": {},
+      "expect": { "mods": ["User", "Other"], "items": ["2"], "maps": [], "needsLeftOut": [["User", "Lib"]], "clientSide": [] }
+    },
+    {
+      "name": "a map a kept mod also brings stays",
+      "order": ["MapA", "MapB"],
+      "left": ["MapA"],
+      "requires": {},
+      "workshop": { "MapA": "10", "MapB": "11" },
+      "maps": ["Shared Town", "Muldraugh, KY"],
+      "mapsOf": { "MapA": ["Shared Town"], "MapB": ["Shared Town"] },
+      "expect": { "mods": ["MapB"], "items": ["11"], "maps": ["Shared Town", "Muldraugh, KY"], "needsLeftOut": [], "clientSide": [] }
+    },
+    {
+      "name": "nothing left out is the whole list",
+      "order": ["A", "B"],
+      "left": [],
+      "requires": { "B": ["A"] },
+      "workshop": { "A": "7", "B": "7" },
+      "maps": ["Muldraugh, KY"],
+      "mapsOf": {},
+      "expect": { "mods": ["A", "B"], "items": ["7"], "maps": [], "needsLeftOut": [], "clientSide": [] }
+    },
+    {
+      "name": "everything left out",
+      "order": ["A", "B"],
+      "left": ["A", "B"],
+      "requires": {},
+      "workshop": { "A": "7" },
+      "maps": [],
+      "mapsOf": {},
+      "expect": { "mods": [], "items": [], "maps": [], "needsLeftOut": [], "clientSide": [] }
+    },
+    {
+      "name": "a client-side chain through a mod that isn't enabled",
+      "order": ["Viewpoint", "Addon"],
+      "left": [],
+      "requires": { "Addon": ["Bridge"], "Bridge": ["Viewpoint"] },
+      "workshop": {},
+      "maps": [],
+      "mapsOf": {},
+      "expect": { "mods": ["Viewpoint", "Addon"], "items": [], "maps": [], "needsLeftOut": [], "clientSide": ["Addon"] }
+    }
+  ]
+}

@@ -35,7 +35,7 @@
   import Settings from "$lib/Settings.svelte";
   import { applyPrefs, prefs } from "$lib/prefs.svelte";
   import ModTable from "$lib/ModTable.svelte";
-  import { autosort, bisectRound, dependants, findProblems, groupByCategory, loadList, moveSection, neededBy, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortByName, sortLoadOrder, syncOrder, tiers } from "$lib/order";
+  import { autosort, bisectGroups, bisectNext, bisectOrder, bisectRound, bisectUpgrade, dependants, findProblems, groupByCategory, loadList, moveSection, neededBy, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortByName, sortLoadOrder, syncOrder, tiers } from "$lib/order";
   import LoadOrder from "$lib/LoadOrder.svelte";
   import WindowControls from "$lib/WindowControls.svelte";
   import ProfilePicker from "$lib/ProfilePicker.svelte";
@@ -352,7 +352,7 @@
         const name = (m: ModRow) => (m.name || m.id).toLowerCase();
         if (sortBy === "name") return name(x).localeCompare(name(y));
         if (sortBy === "enabled") return Number(y.on) - Number(x.on) || (x.on ? (place.get(x.id) ?? -1) - (place.get(y.id) ?? -1) : name(x).localeCompare(name(y)));
-        if (sortBy === "installed") return (stats[y.id]?.created ?? 0) - (stats[x.id]?.created ?? 0);
+        if (sortBy === "installed") return (stats[y.id]?.first_seen ?? 0) - (stats[x.id]?.first_seen ?? 0);
         if (sortBy === "size") return (stats[y.id]?.size ?? 0) - (stats[x.id]?.size ?? 0);
         if (sortBy === "updated") return (stats[y.id]?.modified ?? 0) - (stats[x.id]?.modified ?? 0);
         const rank = (m: ModRow) => (m.missing || problems.has(m.id) ? 0 : updates.has(m.id) ? 1 : 2);
@@ -418,7 +418,7 @@
       // i18n-ignore: the game's words, in English as the game is
       if (sorting && r.profile !== view?.profile) why = `PZMM's profile is now ${view?.profile}.`;
       // i18n-ignore: the game's words, in English as the game is
-      else if (!sorting && r.action !== "tags" && Date.now() / 1000 - parseFloat(r.id) > 170) why = "The game stopped waiting for PZMM: ask again.";
+      else if (!sorting && r.action !== "tags" && r.action !== "leaveout" && Date.now() / 1000 - parseFloat(r.id) > 170) why = "The game stopped waiting for PZMM: ask again.";
       else if (r.action === "place" || r.action === "section") {
         why = await (r.action === "place" ? placeFromGame(r) : sectionFromGame(r));
       } else if (r.action === "library") why = await libraryFromGame(r.lines);
@@ -428,6 +428,12 @@
         } catch (e) {
           say(...keyedError(e), true);
           why = `PZMM couldn't save the tags: ${e}`;
+        }
+      else if (r.action === "leaveout")
+        try {
+          await api.leaveOutSet(r.server, r.ids);
+        } catch (e) {
+          why = `PZMM couldn't save the server's leave-out list: ${e}`;
         }
       else if (r.action === "open") tab = r.tab as typeof tab;
       else if (r.action === "check") openCheck();
@@ -1379,7 +1385,8 @@
 
   // --- find a broken mod by halving the suspects each game run ---
   /** `profile`: where it started; its test lists and the restore go there only. */
-  let bisect = $state<{ profile: string; original: Lists; suspects: string[]; testing: string[]; round: number } | null>(null);
+  /** Find the broken mod: suspects and testing are groups of mods that need each other (`bisectGroups`). */
+  let bisect = $state<{ profile: string; original: Lists; suspects: string[][]; testing: string[][]; round: number; confirm?: boolean; lead?: number; keep?: string[] } | null>(null);
   /** Why profile changes are blocked now ("" when they aren't): a search for a broken mod runs on this profile. */
   const profileLock = $derived(bisect && bisect.profile === view?.profile ? t("findings.finishFirst") : "");
   /** List edits wait for a job, and for a search for a broken mod (it owns the lists until it ends). */
@@ -1493,9 +1500,10 @@
     } catch {}
     if (!b || !view) return; // the mods weren't read: asked next start
     if (!view.profiles.includes(b.profile)) return setBisect(null); // its profile is gone
-    const i = await ask(t("findings.bisectLeft", { profile: b.profile }), [t("findings.bisectLeftLine", { count: b.suspects.length })],
+    b = bisectUpgrade(b, (id) => mods.get(id)?.requires ?? []); // one saved before groups
+    const i = await ask(t("findings.bisectLeft", { profile: b.profile }), [t("findings.bisectLeftLine", { count: b.suspects.flat().length })],
       [{ label: t("findings.bisectResume"), icon: "play" }, { label: t("findings.bisectRestore"), icon: "rollback" }]);
-    if (i === 0) bisect = b;
+    if (i === 0) setBisect(b);
     else if (i === 1) {
       setBisect(null);
       restoreBisected(b.original, b.profile);
@@ -1505,11 +1513,13 @@
   /** False (and said) when the search's profile isn't the active one: its lists mustn't go to another. */
   const onBisectProfile = (b: NonNullable<typeof bisect>) => b.profile === view?.profile || (say("log.bisectOtherProfile", { profile: b.profile }, true), false);
 
-  /** Enabled = everything not under suspicion + the half (or the first `count`) being tested + what those require.
-   * The search moves on only once that list is saved (else it stays where it was, and says so). */
-  async function bisectApply(b: NonNullable<typeof bisect>, count?: number) {
-    const { on, testing } = bisectRound(b.original.rows, b.suspects, (id) => mods.get(id)?.requires ?? [], count);
-    const o = placeAll([...on].filter((id) => !b.original.order.includes(id)), b.original.order); // a requirement that was off
+  /** Enabled = everything not under suspicion + the half (or the first `count`) of the groups being tested, in the
+   * original load order. The search moves on only once that list is saved (else it stays where it was, and says so). */
+  async function bisectApply(b: NonNullable<typeof bisect>) {
+    // round 1 with every suspect off (still broken there: none of them), round 2 the groups the logs point at
+    const count = b.round === 1 ? 0 : b.round === 2 && b.lead && b.lead < b.suspects.length ? b.lead : undefined;
+    const { on, testing } = bisectRound(b.original.rows, b.suspects, count, b.confirm, b.keep);
+    const o = b.original.order.filter((id) => on.has(id));
     if (await commit(b.original.rows.map((r) => (r.kind === "mod" ? { ...r, on: on.has(r.id) } : r)), o, false, b.profile)) setBisect({ ...b, testing });
     else say("log.bisectSaveFailed", {}, true);
   }
@@ -1517,7 +1527,10 @@
   /** `first`: mods the logs point at; the first round tests just them, then the rest is halved. */
   async function bisectStart(first: string[] = []) {
     if (bisect || busy) return; // one search at a time (a second click lands while the first one saves)
-    const enabled = [...mods.values()].filter((m) => m.on && !m.missing).map((m) => m.id);
+    // mods this build can't load aren't suspects: they stay as they are, every round (`keep`)
+    const cant = (m: ModRow) => (view?.build !== 41 && m.only41) || (view?.build === 41 && m.only42);
+    const enabled = [...mods.values()].filter((m) => m.on && !m.missing && !cant(m)).map((m) => m.id);
+    const keep = [...mods.values()].filter((m) => m.on && !m.missing && cant(m)).map((m) => m.id);
     if (enabled.length < 2) return say("log.bisectNeedsTwo", {}, true);
     // Snapshots keeps the list from before it too
     pending++;
@@ -1525,27 +1538,35 @@
     const kept = await snapshot("bisect");
     pending--;
     if (!kept) return;
-    const lead = first.filter((id) => enabled.includes(id));
-    const suspects = [...lead, ...enabled.filter((id) => !lead.includes(id))];
+    // the groups the logs point at first, then the recently added
+    const groups = bisectGroups(order.filter((id) => enabled.includes(id)).concat(enabled.filter((id) => !order.includes(id))), (id) => mods.get(id)?.requires ?? []);
+    const { suspects, lead } = bisectOrder(groups, (id) => stats[id]?.first_seen ?? 0, first);
     findings = null;
     undoStack = redoStack = []; // undoing into a half-disabled test list would be a trap
-    bisectApply({ profile: view?.profile ?? "", original: $state.snapshot({ rows, order }), suspects, testing: [], round: 1 }, lead.length && lead.length < suspects.length ? lead.length : undefined);
+    if (suspects.length < 2) {
+      say("log.bisectOneGroup", { ids: suspects.flat().join(", ") }, true);
+      return;
+    }
+    bisectApply({ profile: view?.profile ?? "", original: $state.snapshot({ rows, order }), suspects, testing: [], round: 1, lead, keep });
   }
 
   function bisectAnswer(stillBroken: boolean) {
     if (!bisect || !onBisectProfile(bisect)) return;
-    const suspects = stillBroken ? bisect.testing : bisect.suspects.filter((s) => !bisect!.testing.includes(s));
-    if (suspects.length <= 1) {
+    const next = bisectNext(bisect, stillBroken);
+    if (!("suspects" in next)) {
       const { original, profile } = bisect;
+      const group = "found" in next ? next.found : "together" in next ? next.together : [];
       setBisect(null);
       undoStack = redoStack = [];
       restoreBisected(original, profile);
-      say(suspects.length ? "log.bisectFound" : "log.bisectNone", { id: suspects[0] ?? "" }, !!suspects.length);
+      if ("together" in next) say("log.bisectTogether", { ids: group.join(", ") }, true);
+      else if (group.length > 1) say("log.bisectFoundGroup", { ids: group.join(", ") }, true);
+      else say(group.length ? "log.bisectFound" : "log.bisectNone", { id: group[0] ?? "" }, !!group.length);
       logOpen = true;
-      if (suspects.length) selected = suspects[0];
+      if (group.length) selected = group[0];
       return;
     }
-    bisectApply({ ...bisect, suspects, round: bisect.round + 1 });
+    bisectApply({ ...bisect, ...next, round: bisect.round + 1 });
   }
 
   /** The list from before the search, back; if that can't be saved, Snapshots has it. */
@@ -2561,7 +2582,7 @@
     </div>
 
     {#if selected}
-      <Details id={selected} {mods} {busy} lock={!!profileLock} hasUpdate={updates.has(selected)} neededBy={needed.get(selected) ?? []} tags={marks.tags[selected] ?? []} {allTags}
+      <Details id={selected} {mods} {busy} firstSeen={stats[selected]?.first_seen ?? 0} lock={!!profileLock} hasUpdate={updates.has(selected)} neededBy={needed.get(selected) ?? []} tags={marks.tags[selected] ?? []} {allTags}
         onTags={setTags} onRule={(id, rule) => run(t("busy.saving"), () => api.modRuleSet(id, rule), { keepHistory: true })} onUpdate={(id) => updateMods([id])} onInstallWorkshop={installWorkshop}
         onToggle={toggle} onSelect={(id) => (selected = id)}
         onRemove={remove} onRollback={(id) => run(t("busy.restoring", { id }), () => api.rollback(id))} onClose={() => (selected = null)} />

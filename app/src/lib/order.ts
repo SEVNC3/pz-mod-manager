@@ -302,21 +302,89 @@ export function moveSection(rows: Row[], from: number, to: number): Row[] | null
 }
 
 /**
- * One bisect test: everything enabled that isn't a suspect stays on, plus the first half
- * (or the first `count`) of the suspects and (transitively) what they require. Returns the ids to enable and
- * the half under test.
+ * The groups Find the broken mod tests together: `enabled` (in load order) joined by each requirement that is
+ * enabled too, or by the enabled mods a requirement that's off needs (one not installed joins nothing). Each connected set is a group, in load order, groups by
+ * their first member, so a mod is never on without the enabled mods it needs. The game makes the same groups
+ * (tests/fixtures/bisect-groups.json).
  */
-export function bisectRound(original: Row[], suspects: string[], requires: (id: string) => string[], count = Math.ceil(suspects.length / 2)): { on: Set<string>; testing: string[] } {
+export function bisectGroups(enabled: string[], requires: (id: string) => string[]): string[][] {
+  const at = new Map(enabled.map((id, i) => [id, i]));
+  const root = enabled.map((_, i) => i);
+  const find = (i: number): number => (root[i] === i ? i : (root[i] = find(root[i])));
+  enabled.forEach((id, i) => {
+    // a requirement that's off is followed through to the enabled mods it needs (each mod once: cycles end)
+    const seen = new Set([id]);
+    const follow = (r: string) => {
+      if (seen.has(r)) return;
+      seen.add(r);
+      const j = at.get(r);
+      if (j !== undefined) root[find(i)] = find(j);
+      else requires(r).forEach(follow);
+    };
+    requires(id).forEach(follow);
+  });
+  const groups = new Map<number, string[]>();
+  enabled.forEach((id, i) => {
+    const k = find(i);
+    const g = groups.get(k);
+    if (g) g.push(id);
+    else groups.set(k, [id]);
+  });
+  return [...groups.values()];
+}
+
+/**
+ * One bisect test: every enabled mod outside the suspect groups stays on, plus the first half (or the first
+ * `count`) of the suspect groups; `alone`: only the suspect groups (the check on the last one). `keep` stays on in
+ * every round, alone too (mods this build can't load; a search from before groups: everything not a suspect, as
+ * its suspects aren't closed over requirements). Returns the ids to enable and the groups under test.
+ */
+export function bisectRound(original: Row[], suspects: string[][], count = Math.ceil(suspects.length / 2), alone = false, keep: string[] = []): { on: Set<string>; testing: string[][] } {
+  if (alone) return { on: new Set([...keep, ...suspects.flat()]), testing: suspects };
   const testing = suspects.slice(0, count);
-  const suspect = new Set(suspects);
+  const suspect = new Set(suspects.flat());
   const on = new Set(original.filter((r): r is ModRow => isMod(r) && r.on && !suspect.has(r.id)).map((r) => r.id));
-  const add = (id: string) => {
-    if (on.has(id)) return;
-    on.add(id);
-    requires(id).forEach(add);
-  };
-  testing.forEach(add);
+  testing.flat().forEach((id) => on.add(id));
   return { on, testing };
+}
+
+/**
+ * Find the broken mod's suspects in the order it tests them: the groups holding a mod the logs point at first (`lead`
+ * of them), then the rest newest first by when their newest mod arrived (`seen`), so the first half tested is the
+ * recently added. When every date is 0 or the same, the load order.
+ */
+export function bisectOrder(groups: string[][], seen: (id: string) => number, first: string[] = []): { suspects: string[][]; lead: number } {
+  const lead = groups.filter((g) => g.some((id) => first.includes(id)));
+  const newest = (g: string[]) => Math.max(0, ...g.map(seen));
+  let rest = groups.filter((g) => !lead.includes(g));
+  if (new Set(rest.map(newest)).size > 1) rest = [...rest].sort((a, b) => newest(b) - newest(a)); // stable: ties keep load order
+  return { suspects: [...lead, ...rest], lead: lead.length };
+}
+
+/** A search saved before groups (lists of ids): its suspects grouped, testing the groups it was testing, and every
+ * other mod that was on kept on (an old suspect can need one of them). */
+export function bisectUpgrade<T extends { suspects: unknown[]; testing: unknown[]; original: { rows: Row[] } }>(b: T, requires: (id: string) => string[]): T & { suspects: string[][]; testing: string[][]; keep?: string[] } {
+  if (!b.suspects.some((s) => typeof s === "string")) return b as T & { suspects: string[][]; testing: string[][] };
+  const was = new Set((b.testing as (string | string[])[]).flat());
+  const old = new Set(b.suspects as string[]);
+  const suspects = bisectGroups(b.suspects as string[], requires);
+  const keep = b.original.rows.filter((r): r is ModRow => isMod(r) && r.on && !old.has(r.id)).map((r) => r.id);
+  return { ...b, suspects, testing: suspects.filter((g) => g.some((id) => was.has(id))), keep };
+}
+
+/**
+ * After a test: still broken narrows to the groups tested, fixed to the others. One group left because it was
+ * tested and still broken is the answer; one left only because the others were cleared is tested alone first
+ * (`confirm`), and if it alone is fine, it breaks only together with mods in another group (`together`: turning
+ * it off still fixes the list played).
+ */
+export function bisectNext(s: { suspects: string[][]; testing: string[][]; confirm?: boolean }, stillBroken: boolean): { found: string[] } | { together: string[] } | { none: true } | { suspects: string[][]; confirm: boolean } {
+  if (s.confirm) return stillBroken ? { found: s.suspects[0] } : { together: s.suspects[0] };
+  const tested = new Set(s.testing.flat());
+  const next = stillBroken ? s.testing : s.suspects.filter((g) => !g.some((id) => tested.has(id)));
+  if (!next.length) return { none: true };
+  if (next.length === 1 && stillBroken) return { found: next[0] };
+  return { suspects: next, confirm: next.length === 1 };
 }
 
 /** Mods that only `ids` require (directly or through each other): removing `ids` leaves them unused. */
