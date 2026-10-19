@@ -40,7 +40,8 @@ assert.equal(ids(sortLoadOrder(cyc)), "+X +Y");
 
 // Find the broken mod: the shared fixture's groups, then whole searches for every culprit in every case
 type BisectCase = { name: string; enabled: string[]; requires: Record<string, string[]>; groups: string[][] };
-const fixture: { cases: BisectCase[] } = JSON.parse(readFileSync(new URL("../../tests/fixtures/bisect-groups.json", import.meta.url), "utf8"));
+type BisectSearch = { case: string; why: string; broken: string[]; lead?: string[]; expect: { result: string; ids: string[] }; rounds: number };
+const fixture: { cases: BisectCase[]; searches?: BisectSearch[] } = JSON.parse(readFileSync(new URL("../../tests/fixtures/bisect-groups.json", import.meta.url), "utf8"));
 /** A whole search, the answers given by `broken(on)`: what it ends in, after checking each round's list. */
 function search(c: BisectCase, broken: (on: Set<string>) => boolean, first: string[] = []): { found?: string[]; together?: string[]; none?: true; rounds: number } {
   const need = (id: string) => c.requires[id] ?? [];
@@ -73,6 +74,13 @@ for (const c of fixture.cases) {
     assert.deepEqual(search(c, (on) => on.has(culprit)).found, groupOf(culprit), `${c.name}: ${culprit}`);
     assert.deepEqual(search(c, (on) => on.has(culprit), [culprit]).found, groupOf(culprit), `${c.name}: ${culprit}, from the logs`);
   }
+}
+// the shared whole searches (the game replays the same ones): result, ids and how many answers it took
+for (const x of fixture.searches ?? []) {
+  const c = fixture.cases.find((k) => k.name === x.case)!;
+  const r = search(c, (on) => x.broken.every((id) => on.has(id)), x.lead ?? []);
+  const result = r.rounds === 0 ? "oneGroup" : r.found ? "found" : r.together ? "together" : "none";
+  assert.deepEqual({ result, ids: r.found ?? r.together ?? [], rounds: r.rounds }, { ...x.expect, rounds: x.rounds }, `${x.case}: ${x.why}`);
 }
 // the reporter's chain: Viewpoint, ZombieBuddy and Viewpoint's add-ons are found together, never apart
 const vp = fixture.cases[0];
