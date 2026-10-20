@@ -225,8 +225,8 @@ type ServerPreview = { new: boolean; added: string[]; removed: string[]; maps_fr
 export type Stats = { size: number; modified: number; created: number; first_seen: number };
 export type Overlap = { wins_over: string[]; loses_to: string[] };
 export type Conflict = { other: string; files: number; wins: boolean; examples: string[] };
-export type Save = { mode: string; name: string; mods: string[]; modified: number };
-export type ServersAndSaves = { servers: string[]; server_dir: string; saves: Save[]; deleted: [string, string][]; own_folder: string | null };
+export type Save = { mode: string; name: string; mods: string[]; maps: string[]; modified: number };
+export type ServersAndSaves = { servers: string[]; server_dir: string; saves: Save[]; deleted: [string, string][]; own_folder: string | null; saves_dir: string };
 /** Zero-byte map files: cells the game rebuilds once removed, and world files only a backup brings back. */
 export type SaveDetails = { backups: ServerBackup[]; broken: { cells: string[]; other: string[] }; resets: Record<string, number> };
 /** The game's memory, PZ_Optimization and what the mod list weighs (core pz/perf.rs). */
@@ -330,7 +330,10 @@ export type FoundServer = { name: string; data: string; install: string | null; 
 export type ServerBackup = { file: string; time: number; size: number; reason: string; label: string };
 /** A request from the game (PZMM - Client writes them; the core checks them). */
 export type GameRequest = { id: string; profile: string } & ({ action: "install"; ids: string[] } | { action: "backup"; mode: string; name: string } | { action: "check" } | { action: "library"; lines: string[] } | { action: "open"; tab: string } | { action: "place"; mod: string; section: string; before: string | null } | { action: "profile"; name: string } | { action: "tags"; mod: string; tags: string[] } | { action: "fix"; fix: string } | { action: "restore"; mode: string; name: string; file: string } | { action: "leaveout"; server: string; ids: string[] }
-  | { action: "section"; op: "add" | "rename" | "remove" | "move"; name: string; to: string | null });
+  | { action: "section"; op: "add" | "rename" | "remove" | "move"; name: string; to: string | null } | { action: "remove"; ids: string[] } | { action: "find"; mod: string }
+  | { action: "import"; text: string } | { action: "profileedit"; op: "new" | "rename" | "duplicate" | "delete"; name: string; to: string | null } | { action: "serverprofile"; addr: string; ids: string[] }
+  | { action: "server"; op: "start" | "stop" | "restart"; name: string } | { action: "feed" } | { action: "cancel" } | { action: "rollback"; mod: string } | { action: "set"; key: string; value: string }
+  | { action: "pics"; item: string } | { action: "snapshot"; snapshot: string } | { action: "hide"; key: string } | { action: "unhide"; key: string } | { action: "serverfav"; addr: string; on: boolean });
 /** What the game last reported: the mods it loaded, at the menu or in a game. */
 export type GameReport = { client: string; game: string; state: string; at: number; mods: string[]; save: string | null; server: string | null; zomboid: string; elsewhere: boolean };
 export type BackupView = { backups: ServerBackup[]; empty_cells: string[]; game_on_start: boolean; game_count: string; game_dir: string };
@@ -462,7 +465,7 @@ export type Folder = {
 };
 /** A cell's [x, y]: B41 cells are 300 tiles, B42 cells 256, so only one build's cells compare. */
 export type Cell = [number, number];
-type MapFolder = { folder: string; title: string; lots: string[]; cells: Cell[] };
+type MapFolder = { folder: string; title: string; lots: string[]; cells: Cell[]; description?: string | null };
 export type MapMod = { id: string; name: string; source: string; requires: string[]; maps: MapFolder[] };
 /** A Workshop item PZMM read maps from (the Workshop scan or a check). */
 /** `mods`: how many mods the item holds on this build (a mod pack holds several); times are Unix seconds. */
@@ -617,7 +620,8 @@ export const api = {
   /** The other profiles that enable any of `ids`, with how many. */
   profilesUsing: (ids: string[]) => invoke<Record<string, number>>("profiles_using", { ids }),
   rollback: (id: string) => invoke<View>("rollback", { id }),
-  profileNew: (name: string) => invoke<View>("profile_new", { name }),
+  /** `zomboid`: for Project Zomboid, whichever game the active profile is for. */
+  profileNew: (name: string, zomboid = false) => invoke<View>("profile_new", { name, zomboid }),
   profileUse: (name: string) => invoke<View>("profile_use", { name }),
   profileDelete: (name: string) => invoke<View>("profile_delete", { name }),
   profilesUnused: () => invoke<string[]>("profiles_unused"),
@@ -690,7 +694,18 @@ export const api = {
   gameSettings: () => invoke<Record<string, boolean> | null>("game_settings"),
   gameSettingsSet: (set: Record<string, boolean>) => invoke<void>("game_settings_set", { set }),
   gameLook: (accent: string, theme: string) => invoke<void>("game_look", { accent, theme }),
+  /** The download or install running ("": none), for the game (app.txt). */
+  gameJob: (label: string, done: number, total: number) => invoke<void>("game_job", { label, done, total }),
+  /** The settings the game shows (settings_app.txt; the backend keeps those it knows). */
+  gameAppSettings: (set: Record<string, string>) => invoke<void>("game_app_settings", { set }),
+  gamePics: (item: string) => invoke<void>("game_pics", { item }),
   gameBusy: (on: boolean) => invoke<void>("game_busy", { on }),
+  /** The app's search for a broken mod runs (app.txt says bisect=1). */
+  gameBisect: (on: boolean) => invoke<void>("game_bisect", { on }),
+  /** The game's own search for a broken mod runs (its bisect.txt). */
+  gameBisecting: () => invoke<boolean>("game_bisecting"),
+  /** What the game's own search found, once it ended (bisect.txt `result`: ids split by `|`, `~` first when only together; "" none). */
+  gameBisectResult: () => invoke<string | null>("game_bisect_result"),
   gameActivityAdd: (lines: { at: number; kind: string; text: string }[]) => invoke<void>("game_activity_add", { lines }),
   gameActivity: () => invoke<{ at: number; kind: "info" | "error" | "install" | "update" | "remove"; text: string }[]>("game_activity"),
   gameFindings: (lines: string[]) => invoke<void>("game_findings", { lines }),
@@ -699,6 +714,9 @@ export const api = {
   saveRestore: (mode: string, name: string, file: string) => invoke<void>("save_restore", { mode, name, file }),
   saveRestoreFromGame: (mode: string, name: string, file: string) => invoke<void>("save_restore_from_game", { mode, name, file }),
   saveBackupFromGame: (mode: string, name: string) => invoke<void>("save_backup_from_game", { mode, name }),
+  saveRename: (mode: string, name: string, to: string) => invoke<void>("save_rename", { mode, name, to }),
+  /** Back the save up, then delete it. */
+  saveDelete: (mode: string, name: string) => invoke<void>("save_delete", { mode, name }),
   saveBackupDelete: (mode: string, name: string, file: string) => invoke<void>("save_backup_delete", { mode, name, file }),
   saveRepair: (mode: string, name: string) => invoke<number>("save_repair", { mode, name }),
   /** Give the save the active profile's mods. */
@@ -859,6 +877,8 @@ export const api = {
   collectionProfile: (title: string, items: string[], skip: string[]) => invoke<View>("collection_profile", { title, items, skip }),
   lists: () => invoke<Marks>("lists"),
   presetSave: (preset: Preset) => invoke<Marks>("preset_save", { preset }),
+  lastPlayed: () => invoke<number>("last_played"),
+  presetDelete: (from: string, name: string) => invoke<Marks>("preset_delete", { from, name }),
   presetImport: (preset: Preset) => invoke<View>("preset_import", { preset }),
   modMark: (id: string, kind: "favourite" | "hidden", on: boolean) => invoke<Marks>("mod_mark", { id, kind, on }),
   modPin: (id: string, after: string[], before: string[]) => invoke<View>("mod_pin", { id, after, before }),
@@ -900,6 +920,8 @@ export const api = {
   serverJoin: (server: GameServer, password: string, remember: boolean) => invoke<void>("server_join", { server, password, remember }),
   launcherView: () => invoke<LauncherView>("launcher_view"),
   serverFavourite: (server: GameServer, on: boolean) => invoke<Omit<LauncherView, "key_saved">>("server_favourite", { server, on }),
+  /** The game's star on a server, by `host:port` (servers.txt's address). */
+  serverFavouriteAt: (addr: string, on: boolean) => invoke<Omit<LauncherView, "key_saved">>("server_favourite_at", { addr, on }),
   serverPasswordSaved: (connect: string) => invoke<boolean>("server_password_saved", { connect }),
   serverPasswordForget: (connect: string) => invoke<void>("server_password_forget", { connect }),
   steamKeySet: (key: string) => invoke<void>("steam_key_set", { key }),

@@ -4,6 +4,8 @@
   let kept: { at: number; feed: FeedData } | null = null;
   /** A launch starts the feed over (it lists updates since the last one). */
   export const forgetFeed = () => (kept = null);
+  /** A feed read elsewhere (the one at launch): the tab opens on it instead of asking Steam again. */
+  export const keepFeed = (feed: FeedData) => (kept = { at: Date.now(), feed });
 </script>
 
 <script lang="ts">

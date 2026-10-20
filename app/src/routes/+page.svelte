@@ -16,7 +16,7 @@
   import Links from "$lib/Links.svelte";
   import Icon from "$lib/Icon.svelte";
   import ActivityLog from "$lib/ActivityLog.svelte";
-  import Feed, { forgetFeed } from "$lib/Feed.svelte";
+  import Feed, { forgetFeed, keepFeed } from "$lib/Feed.svelte";
   import Home, { forgetGlance, glance } from "$lib/Home.svelte";
   import Authoring from "$lib/Authoring.svelte";
   import Menu, { type MenuItem } from "$lib/Menu.svelte";
@@ -412,6 +412,8 @@
       return;
     }
     const isSorting = (r: GameRequest) => r.action === "place" || r.action === "section" || r.action === "library" || r.action === "tags";
+    // the game doesn't wait on these (bridge.rs `quiet`)
+    const waitless = (r: GameRequest) => ["tags", "leaveout", "feed", "cancel", "set", "pics", "serverfav", "hide", "unhide"].includes(r.action);
     // an Accept in the game's mod menu since the last look: taken in first, or the first edit is refused as "reloaded"
     if (reqs.some(isSorting)) await reloadList();
     // sorting edits first: a question about another request (or a long job it starts) mustn't keep them waiting
@@ -424,7 +426,7 @@
       // i18n-ignore: the game's words, in English as the game is
       if (sorting && r.profile !== view?.profile) why = `PZMM's profile is now ${view?.profile}.`;
       // i18n-ignore: the game's words, in English as the game is
-      else if (!sorting && r.action !== "tags" && r.action !== "leaveout" && Date.now() / 1000 - parseFloat(r.id) > 170) why = "The game stopped waiting for PZMM: ask again.";
+      else if (!sorting && !waitless(r) && Date.now() / 1000 - parseFloat(r.id) > 170) why = "The game stopped waiting for PZMM: ask again.";
       else if (r.action === "place" || r.action === "section") {
         why = await (r.action === "place" ? placeFromGame(r) : sectionFromGame(r));
       } else if (r.action === "library") why = await libraryFromGame(r.lines);
@@ -441,11 +443,40 @@
         } catch (e) {
           why = `PZMM couldn't save the server's leave-out list: ${e}`;
         }
-      else if (r.action === "open") tab = r.tab as typeof tab;
-      else if (r.action === "check") openCheck();
+      else if (r.action === "open") {
+        if (r.tab === "log") logOpen = true;
+        else if (r.tab === "history") activityView = "history";
+        else if (r.tab === "snapshots") openSnapshots();
+        else tab = r.tab as typeof tab;
+      } else if (r.action === "check") openCheck();
       else if (r.action === "profile") why = await profileFromGame(r.name);
       else if (r.action === "fix") why = await fixFromGame(r.fix);
       else if (r.action === "restore") why = await restoreFromGame(r);
+      else if (r.action === "remove") why = await removeFromGame(r.ids);
+      else if (r.action === "find") why = await findFromGame(r.mod);
+      else if (r.action === "import") {
+        const done = await importFrom(r.text, true);
+        // i18n-ignore: the game's words, in English as the game is
+        if (done !== true) why = done === null ? "Not imported: you said no in PZMM." : "PZMM couldn't import it: see its activity log.";
+      } else if (r.action === "profileedit") why = await profileEditFromGame(r);
+      else if (r.action === "serverprofile") why = await serverProfileFromGame(r.addr, r.ids);
+      else if (r.action === "server") why = await serverFromGame(r);
+      else if (r.action === "feed")
+        try {
+          await api.feed(true); // feed.txt follows
+          forgetFeed();
+        } catch (e) {
+          why = `PZMM couldn't read the change notes: ${e}`;
+        }
+      // i18n-ignore: the game's words, in English as the game is
+      else if (r.action === "cancel") longJobs ? api.installStop().catch(() => {}) : (why = "PZMM isn't downloading anything.");
+      else if (r.action === "rollback") why = await rollbackFromGame(r.mod);
+      else if (r.action === "set") why = await setFromGame(r.key, r.value);
+      else if (r.action === "hide") why = await hideFromGame(r.key);
+      else if (r.action === "unhide") why = await unhideFromGame(r.key);
+      else if (r.action === "serverfav") await api.serverFavouriteAt(r.addr, r.on).catch((e) => (why = `PZMM couldn't save the favourite: ${e}`));
+      else if (r.action === "pics") await api.gamePics(r.item).catch((e) => (why = `PZMM couldn't read the item's pictures: ${e}`));
+      else if (r.action === "snapshot") why = await snapshotFromGame(r.snapshot);
       else if (r.action === "install") {
         // titles, not bare IDs: any mod can write the request, so show what's being installed
         const titles = new Map((await api.workshopItems(r.ids).catch(() => [])).map((i) => [i.id, i.title]));
@@ -493,8 +524,46 @@
 
   /** Check setup's groups the game shows under Problems (not hidden, not a server's), with their fixes. */
   const gameGroups = () => groups(findings ?? []).filter((g) => !g.hidden && !isServer(g.finding));
+  /** The ones hidden here that the game can show again (only "check" and "low" hide). */
+  const hiddenGroups = () => groups(findings ?? []).filter((g) => g.hidden && !isServer(g.finding) && (g.severity === "check" || g.severity === "low"));
   /** A fix's name for the game: stable across checks (the finding, its mods and the fix), so a later check still finds it. */
   const fixId = (g: Group, r: Remedy) => `${g.key}|${g.ids.join(",")}|${r.label}|${JSON.stringify(g.finding.vars)}|${JSON.stringify(r.vars ?? {})}`.replace(/[\t\r\n]/g, " ");
+  const oneLine = (s: string) => s.replace(/[\t\r\n]+/g, " ");
+  /** A finding's first three columns in findings.txt (`<level>\t<mod or ->\t<text>`): the key a game's "It's fine" names. */
+  function gameKey(g: Group) {
+    const level = { broken: "error", risk: "risk", check: "warn", low: "info" } as const;
+    const mod = g.ids.length === 1 && mods.has(g.ids[0]) ? g.ids[0] : "-";
+    const text = t(`doctor.${g.key}`, g.finding.vars);
+    const said = mod === "-" && g.ids.some((id) => mods.has(id)) ? `${g.ids.map((id) => mods.get(id)?.name || id).join(", ")}: ${text}` : text;
+    return [level[g.severity], mod, oneLine(said)].join("\t");
+  }
+  /** "It's fine" on a finding: hidden as Check setup hides it, and findings.txt written again without it. */
+  async function hideFinding(f: Finding, on: boolean) {
+    findingsSent = null;
+    await api.findingHide(f, on).catch((e) => say(...keyedError(e), true));
+  }
+  /** The game's "It's fine" on one of PZMM's findings (its findings.txt key). Returns why it wasn't done. */
+  async function hideFromGame(key: string) {
+    if (!findings) await checkSetup(false);
+    const g = gameGroups().find((g) => gameKey(g).trim() === key.trim());
+    // i18n-ignore: the game's words, in English as the game is
+    if (!g) return "That problem has changed since: Check setup again.";
+    // i18n-ignore: the game's words, in English as the game is
+    if (g.severity !== "check" && g.severity !== "low") return "PZMM doesn't hide that one.";
+    await Promise.all(g.ids.map((id) => hideFinding({ ...g.finding, subject: id }, true)));
+    await checkSetup(false);
+    return "";
+  }
+  /** The game's "Show again" on a finding hidden here (its findings.txt key, level `hidden-warn` or `hidden-info`). Returns why it wasn't done. */
+  async function unhideFromGame(key: string) {
+    if (!findings) await checkSetup(false);
+    const g = hiddenGroups().find((g) => gameKey(g).trim() === key.trim().replace(/^hidden-/, ""));
+    // i18n-ignore: the game's words, in English as the game is
+    if (!g) return "That problem has changed since: Check setup again.";
+    await Promise.all(g.ids.map((id) => hideFinding({ ...g.finding, subject: id }, false)));
+    await checkSetup(false);
+    return "";
+  }
   // the game's Problems follow every check (findings.txt)
   /** The check whose results the game has (a new check, or the same one after a switch, is written again). */
   let findingsSent: Finding[] | null = null;
@@ -505,15 +574,12 @@
       if (view && !checkingSetup) untrack(() => checkSetup(false));
       return;
     }
-    const one = (s: string) => s.replace(/[\t\r\n]+/g, " ");
-    const level = { broken: "error", risk: "warn", check: "warn", low: "info" } as const;
-    const lines = gameGroups().map((g) => {
-      const mod = g.ids.length === 1 && mods.has(g.ids[0]) ? g.ids[0] : "-";
-      const text = t(`doctor.${g.key}`, g.finding.vars);
-      const said = mod === "-" && g.ids.some((id) => mods.has(id)) ? `${g.ids.map((id) => mods.get(id)?.name || id).join(", ")}: ${text}` : text;
-      const fix = remedies(g.finding, g.ids, fixes).flatMap((r) => [fixId(g, r), one(t(`check.fix.${r.label}`, r.vars))]);
-      return [level[g.severity], mod, one(said), ...fix].join("\t");
-    });
+    const line = (g: Group) => {
+      const fix = remedies(g.finding, g.ids, fixes).flatMap((r) => [fixId(g, r), oneLine(t(`check.fix.${r.label}`, r.vars))]);
+      return [gameKey(g), ...fix].join("\t");
+    };
+    // the hidden ones too, so the game can show them again: `hidden-<level>`, the rest as it was
+    const lines = [...gameGroups().map(line), ...hiddenGroups().map((g) => `hidden-${line(g)}`)];
     // every list edit re-runs this (it reads the mods): written once per check, which also stamps its time
     if (findings === findingsSent) return;
     findingsSent = findings;
@@ -573,6 +639,155 @@
     if (!(await askGame(t("game.profileAsk", { name }), { label: t("game.profileUse"), icon: "swap" }))) return "Not switched: you said no in PZMM.";
     // i18n-ignore: the game's words, in English as the game is
     return (await run(t("busy.switchingTo", { name }), () => api.profileUse(name))) ? "" : "PZMM couldn't switch profiles: see its activity log.";
+  }
+
+  /** A profile the game makes (empty, for Project Zomboid), renames, copies or deletes (asking first, as Delete does). Returns why it wasn't done. */
+  async function profileEditFromGame(r: Extract<GameRequest, { action: "profileedit" }>) {
+    // i18n-ignore: the game's words, in English as the game is
+    if (profileLock) return "PZMM is searching for a broken mod on this profile: finish that first.";
+    // i18n-ignore: the game's words, in English as the game is
+    if (r.op !== "new" && !view?.profiles.includes(r.name)) return `There's no PZMM profile called ${r.name}.`;
+    // i18n-ignore: the game's words, in English as the game is
+    if (r.op === "delete") return (await deleteProfile(r.name)) ? "" : "Not deleted: you said no in PZMM, or see its activity log.";
+    // i18n-ignore: the game's words, in English as the game is
+    if (busy) return "PZMM is busy: ask again when it's done.";
+    const to = r.to ?? r.name;
+    const yes = { new: { label: t("app.create"), icon: "plus" }, rename: { label: t("app.rename"), icon: "check" }, duplicate: { label: t("app.duplicate"), icon: "copy" } } as const;
+    // i18n-ignore: the game's words, in English as the game is
+    if (!(await askGame(t(`game.profileEditAsk.${r.op}`, { name: r.name, to }), yes[r.op]))) return "Not done: you said no in PZMM.";
+    // i18n-ignore: the game's words, in English as the game is
+    return (await nameProfile(r.op, r.to ?? r.name, r.name, true)) ? "" : "PZMM couldn't do it: see its activity log.";
+  }
+
+  /** The game's server profile: "Server <name>" made or refreshed with exactly `ids` and switched to, as setting up a
+   * server does, without downloading (what isn't installed is said in the log). Returns why it wasn't done. */
+  async function serverProfileFromGame(addr: string, ids: string[]) {
+    // i18n-ignore: the game's words, in English as the game is
+    if (profileLock) return "PZMM is searching for a broken mod on this profile: finish that first.";
+    // its name as the server browser last saw it (`addr` is its query port there, `port` the game's), else its address
+    const l = await api.launcherView().catch(() => null);
+    const server = [...(l?.favourites ?? []), ...(l?.history ?? [])].find((s) => s.addr === addr || `${s.addr.replace(/:\d+$/, "")}:${s.port}` === addr) ?? ({ addr, name: addr } as GameServer);
+    // i18n-ignore: the game's words, in English as the game is
+    if (!(await askGame(t("game.serverProfileAsk", { name: server.name }), { label: t("game.profileUse"), icon: "swap" }))) return "Not switched: you said no in PZMM.";
+    // i18n-ignore: the game's words, in English as the game is
+    return (await run(t("busy.settingUpServer", { name: server.name }), () => api.serverSetup(server, [], ids, []))) ? "" : "PZMM couldn't make the server's profile: see its activity log.";
+  }
+
+  /** PZMM's copies of mods the game asks to remove, as Remove does (it asks first). Returns why they weren't removed. */
+  async function removeFromGame(ids: string[]) {
+    const ours = ids.filter((id) => mods.get(id) && removable(mods.get(id)!));
+    // i18n-ignore: the game's words, in English as the game is
+    if (!ours.length) return "PZMM didn't install those, so it can't remove them.";
+    const skipped = ids.length - ours.length;
+    // i18n-ignore: the game's words, in English as the game is
+    return (await removeMods(ours, skipped ? [t("confirm.removeSkipped", { count: skipped })] : [])) ? "" : "Not removed: you said no in PZMM, or see its activity log.";
+  }
+
+  /** A mod the game wants by its ID: the Workshop item that surely provides it, as Install missing finds it, after asking. */
+  async function findFromGame(id: string) {
+    if (mods.get(id) && !mods.get(id)!.missing) return "";
+    const best = (await api.findRequirement(id, "").catch(() => []))[0];
+    // i18n-ignore: the game's words, in English as the game is
+    if (!best?.confirmed || !best.fits_build) return `No Workshop item clearly provides ${id}: pick one in PZMM.`;
+    // i18n-ignore: the game's words, in English as the game is
+    if (!(await askGame(t("game.installAsk"), { label: t("game.install"), icon: "download" }, [`${best.title} (${best.id})`]))) return "Not installed: you said no in PZMM.";
+    // i18n-ignore: the game's words, in English as the game is
+    return (await installWorkshop(best.id)) ? "" : "PZMM couldn't install it: see its activity log.";
+  }
+
+  /** A mod's previous version back, once you say yes. Returns why it wasn't done. */
+  async function rollbackFromGame(id: string) {
+    const m = mods.get(id);
+    // i18n-ignore: the game's words, in English as the game is
+    if (!m || !isOurs(m)) return `PZMM didn't install ${id}, so it has no earlier version of it.`;
+    // i18n-ignore: the game's words, in English as the game is
+    if (profileLock) return "PZMM is searching for a broken mod on this profile: finish that first.";
+    // i18n-ignore: the game's words, in English as the game is
+    if (!(await askGame(t("game.rollbackAsk", { name: m.name || id }), { label: t("details.restore"), icon: "rollback" }))) return "Not rolled back: you said no in PZMM.";
+    // i18n-ignore: the game's words, in English as the game is
+    return (await rollback(id)) ? "" : "PZMM couldn't put the previous version back: see its activity log.";
+  }
+
+  /** A snapshot of the profile's list the game asks to put back, once you say yes. Returns why it wasn't done. */
+  async function snapshotFromGame(id: string) {
+    // i18n-ignore: the game's words, in English as the game is
+    if (busy) return "PZMM is busy: ask again when it's done.";
+    // i18n-ignore: the game's words, in English as the game is
+    if (profileLock) return "PZMM is searching for a broken mod on this profile: finish that first.";
+    const s = (await api.snapshotList().catch(() => [])).find((x) => x.id === id);
+    // i18n-ignore: the game's words, in English as the game is
+    if (!s) return "That snapshot isn't there any more.";
+    // i18n-ignore: the game's words, in English as the game is
+    if (!(await askGame(t("game.snapshotAsk", { time: fmtDateTime(s.time) }), { label: t("snapshots.restore"), icon: "rollback" }))) return "Not restored: you said no in PZMM.";
+    // i18n-ignore: the game's words, in English as the game is
+    return (await restoreSnapshot(id)) ? "" : "PZMM couldn't put that snapshot back: see its activity log.";
+  }
+
+  /** The game's start, stop or restart of a hosted server, once you say yes. Returns why it wasn't done. */
+  async function serverFromGame(r: Extract<GameRequest, { action: "server" }>) {
+    // i18n-ignore: the game's words, in English as the game is
+    if (busy) return "PZMM is busy: ask again when it's done.";
+    // i18n-ignore: the game's words, in English as the game is
+    if (profileLock) return "PZMM is searching for a broken mod on this profile: finish that first.";
+    const yes = { start: { label: t("hosting.start"), icon: "play" }, stop: { label: t("hosting.stop"), icon: "x" }, restart: { label: t("hosting.restart"), icon: "refresh" } } as const;
+    // i18n-ignore: the game's words, in English as the game is
+    if (!(await askGame(t(`game.serverAsk.${r.op}`, { name: r.name }), yes[r.op]))) return "Not done: you said no in PZMM.";
+    // not waited for (a stop waits for the save): its log lines say how it went, hosted.txt tells the game
+    ({ start: api.hostStart, stop: api.hostStop, restart: api.hostRestart })[r.op](r.name).catch((e) => say(...keyedError(e), true));
+    return "";
+  }
+
+  /** The settings the game shows and may change (`set`; bridge.rs APP_SETTINGS says what each takes): settings.json's by
+   * their own names, the look's from prefs, each notification, what closing does, and the game build. */
+  // not those that delete, or reach outside PZMM (recycle, remove_requirements, backup_cap_mb, save_backup_keep, autostart, update_action)
+  const SETTING_KEYS = ["update_check", "app_updates", "workshop_links", "save_backup_launch", "save_backup_exit", "save_backup_every", "autosort_new", "keep_marks"] as const;
+  const PREF_KEYS = { theme: "theme", accent: "accent", compact: "compact", show_ids: "showIds", fav_first: "favFirst" } as const;
+  const NOTIFY_KINDS: NotifyKind[] = ["crash", "restart", "downloads", "favourites"];
+  const asText = (v: unknown) => (typeof v === "boolean" ? (v ? "1" : "0") : String(v));
+  function gameSettings(): Record<string, string> {
+    const s = cfg?.settings;
+    if (!s) return {};
+    return {
+      ...Object.fromEntries(SETTING_KEYS.map((k) => [k, asText(s[k])])),
+      ...Object.fromEntries(Object.entries(PREF_KEYS).map(([k, p]) => [k, asText(prefs[p])])),
+      ...Object.fromEntries(NOTIFY_KINDS.map((n) => [`notify_${n}`, asText(s.notify.includes(n))])),
+      on_close: (s.close_ask ?? !s.tray) ? "ask" : s.tray ? "tray" : "quit",
+      build: String(view?.forced_build ?? "auto"),
+    };
+  }
+  // the game's copy (settings_app.txt), from the start and on every change
+  $effect(() => {
+    const set = gameSettings();
+    if (cfg) api.gameAppSettings(set).catch(() => {});
+  });
+  /** A setting the game changed (bridge.rs checked the key and its value). Returns why it wasn't done. */
+  async function setFromGame(key: string, value: string) {
+    const s = cfg?.settings;
+    // i18n-ignore: the game's words, in English as the game is
+    if (!s) return "PZMM hasn't read its settings yet: ask again.";
+    const pref = PREF_KEYS[key as keyof typeof PREF_KEYS];
+    const notify = NOTIFY_KINDS.find((k) => key === `notify_${k}`);
+    if (key === "build") {
+      // i18n-ignore: the game's words, in English as the game is
+      if (!(await run(t("busy.saving"), () => api.setBuild(value === "auto" ? null : (Number(value) as 41 | 42))))) return "PZMM couldn't change the game build: see its activity log.";
+    } else if (pref === "theme" || pref === "accent") prefs[pref] = value;
+    else if (pref) prefs[pref] = value === "1";
+    else {
+      if (notify) s.notify = value === "1" ? [...new Set([...s.notify, notify])] : s.notify.filter((k) => k !== notify);
+      else if (key === "on_close") (s.close_ask = value === "ask"), value !== "ask" && (s.tray = value === "tray");
+      else {
+        const k = key as (typeof SETTING_KEYS)[number];
+        Object.assign(s, { [k]: typeof s[k] === "boolean" ? value === "1" : typeof s[k] === "number" ? Number(value) : value });
+      }
+      try {
+        await api.settingsSet($state.snapshot(s));
+      } catch (e) {
+        say("settings.saveFailed", { error: t(...keyedError(e)) }, true);
+        return `PZMM couldn't save its settings: ${e}`;
+      }
+    }
+    say("game.settingSet", { name: key, value });
+    return "";
   }
 
   /** The game's library after an Undo or Redo there: its sections and order. On and off stay this profile's (the
@@ -734,7 +949,9 @@
    * (a preview showed its mods), the game switch. */
   /** Per profile, the mods that came new to it this session (the backend appended them): a New pill until restart. */
   let fresh = $state<Record<string, string[]>>({});
-  const freshHere = $derived(new Set(fresh[view?.profile ?? ""] ?? []));
+  /** When the game was last played: mods first seen since then are New too, as the game marks them (0: not known). */
+  let playedAt = $state(0);
+  const freshHere = $derived(new Set([...(fresh[view?.profile ?? ""] ?? []), ...(playedAt ? Object.keys(stats).filter((id) => stats[id].first_seen > playedAt) : [])]));
   function show(v: View) {
     const add = v.rows.flatMap((r) => (r.kind === "mod" && r.new && !fresh[v.profile]?.includes(r.id) ? [r.id] : []));
     if (add.length) fresh[v.profile] = [...(fresh[v.profile] ?? []), ...add];
@@ -762,7 +979,9 @@
   }
 
   /** Long jobs running (installs, updates, imports): download progress belongs to them. */
-  let longJobs = 0;
+  let longJobs = $state(0);
+  // the game shows the download or install running (app.txt's job=, done= and total=)
+  $effect(() => void api.gameJob(longJobs ? busyLabel : "", progress?.[0] ?? 0, progress?.[1] ?? 0).catch(() => {}));
 
   /**
    * Run a backend job that returns the new view. Errors go to the activity log; returns success.
@@ -1079,12 +1298,15 @@
   // --- snapshots of the profile before big changes ---
   let snapList = $state<Snapshot[] | null>(null);
   const openSnapshots = () => api.snapshotList().then((s) => (snapList = s)).catch((e) => say(...keyedError(e), true));
+  /** Whether it put it back. */
   async function restoreSnapshot(id: string) {
-    if (profileLocked()) return;
-    if (await run(t("busy.restoringSnapshot"), () => api.snapshotRestore(id))) {
+    if (profileLocked()) return false;
+    const ok = await run(t("busy.restoringSnapshot"), () => api.snapshotRestore(id));
+    if (ok) {
       say("log.snapshotRestored");
       openSnapshots();
     }
+    return ok;
   }
 
   // --- a preview before a save's mods replace the list ---
@@ -1109,6 +1331,7 @@
     try {
       await api.launchGame();
       feedCount = 0; // you're playing them now
+      playedAt = Date.now() / 1000;
       (forgetFeed(), forgetGlance());
       return true;
     } catch (e) {
@@ -1240,6 +1463,12 @@
     e.preventDefault();
     const text = (importText ?? "").trim();
     importText = null;
+    if ((await importFrom(text)) === null) importText = text;
+  }
+  /** Import's work (and the game's import request): whether it was imported (a collection: its picker opened); null when
+   * you said no to a share code (or `fromGame`, to a preset). */
+  async function importFrom(text: string, fromGame = false): Promise<boolean | null> {
+    if (profileLocked()) return false;
     try {
       if (/^(PZMM1:|\{)/.test(text)) {
         const shared = decodeShare(text);
@@ -1247,23 +1476,36 @@
         const on = shared.list.split("\n").flatMap((l) => (l.trim().startsWith("+") ? [l.trim().slice(1).trim()] : []));
         const get = on.filter((id) => !mods.has(id) && shared.workshop[id]).length;
         const lines = [t("preview.shareMods", { count: on.length }), ...(get ? [t("preview.shareDownloads", { count: get })] : [])];
-        if ((await ask(t("preview.shareTitle", { name: shared.name }), lines, [{ label: t("common.import"), icon: "upload" }])) !== 0) return void (importText = text);
-        await run(t("busy.importing", { name: shared.name }), () => api.profileImport(shared), { showLog: true });
+        if ((await ask(t("preview.shareTitle", { name: shared.name }), lines, [{ label: t("common.import"), icon: "upload" }])) !== 0) return null;
+        return await run(t("busy.importing", { name: shared.name }), () => api.profileImport(shared), { showLog: true });
       } else if (/steamcommunity\.com|^[\d\s,]+$/.test(text)) {
         await previewCollection(text, true);
+        return !!pack;
       } else {
         const preset = parsePreset(text);
         if (!preset) throw new Error(t("api.badShareCode"));
-        await importPreset({ from: "game", ...preset, workshop: [] });
+        if (fromGame && !(await askGame(t("game.presetAsk", { name: preset.name }), { label: t("common.import"), icon: "upload" }))) return null;
+        return await importPreset({ from: "game", ...preset, workshop: [] });
       }
     } catch (err) {
       say(...keyedError(err), true);
+      return false;
     }
   }
 
   /** A preset the game's mod menu or a Workshop mod manager saved, as a profile (a server preset's items are installed). */
-  const importPreset = (p: Preset) => run(t("busy.importing", { name: p.name }), () => api.presetImport(p), { showLog: true });
+  const importPreset = async (p: Preset) => !profileLocked() && run(t("busy.importing", { name: p.name }), () => api.presetImport(p), { showLog: true });
   let presetPick = $state(0);
+  /** Delete a saved preset from the game's or that manager's file, after asking. */
+  async function deletePreset(p: Preset) {
+    if (!(await confirmed(t("confirm.deletePreset", { name: p.name }), { label: t("common.delete"), icon: "trash" }))) return;
+    try {
+      marks = await api.presetDelete(p.from, p.name);
+      presetPick = 0;
+    } catch (e) {
+      say(...keyedError(e), true);
+    }
+  }
 
   /** Save the active profile's load order as a preset in Mod Manager's list or the game's mod menu. */
   async function savePreset(from: "modManager" | "game") {
@@ -1391,6 +1633,24 @@
 
   // --- find a broken mod by halving the suspects each game run ---
   /** `profile`: where it started; its test lists and the restore go there only. */
+  /** What the game's own search for a broken mod found, said as the app's own search says it (once: the last one said is kept). */
+  const GAME_BISECT_SAID = "pzmm.gameBisectSaid";
+  let gameBisectSaid: string | null = null;
+  try {
+    gameBisectSaid = localStorage.getItem(GAME_BISECT_SAID);
+  } catch {}
+  async function fromGameBisect() {
+    const r = await api.gameBisectResult().catch(() => null);
+    if (r === null || r === gameBisectSaid) return;
+    gameBisectSaid = r;
+    try {
+      localStorage.setItem(GAME_BISECT_SAID, r);
+    } catch {}
+    const ids = r.replace(/^~/, "").split("|").filter(Boolean);
+    if (r.startsWith("~")) say("log.bisectTogether", { ids: ids.join(", ") }, true);
+    else if (ids.length > 1) say("log.bisectFoundGroup", { ids: ids.join(", ") }, true);
+    else say(ids.length ? "log.bisectFound" : "log.bisectNone", { id: ids[0] ?? "" }, !!ids.length);
+  }
   /** Find the broken mod: suspects and testing are groups of mods that need each other (`bisectGroups`). */
   let bisect = $state<{ profile: string; original: Lists; suspects: string[][]; testing: string[][]; round: number; confirm?: boolean; lead?: number; keep?: string[] } | null>(null);
   /** Why profile changes are blocked now ("" when they aren't): a search for a broken mod runs on this profile. */
@@ -1494,6 +1754,7 @@
   const BISECT_KEY = "pzmm.bisect";
   function setBisect(b: typeof bisect) {
     bisect = b;
+    api.gameBisect(!!b).catch(() => {});
     try {
       if (b) localStorage.setItem(BISECT_KEY, JSON.stringify(b));
       else localStorage.removeItem(BISECT_KEY);
@@ -1541,8 +1802,11 @@
     // Snapshots keeps the list from before it too
     pending++;
     busyLabel = t("busy.saving");
-    const kept = await snapshot("bisect");
+    // nor beside the game's own search
+    const inGame = await api.gameBisecting().catch(() => false);
+    const kept = !inGame && (await snapshot("bisect"));
     pending--;
+    if (inGame) return say("log.bisectInGame", {}, true);
     if (!kept) return;
     // the groups the logs point at first, then the recently added
     const groups = bisectGroups(order.filter((id) => enabled.includes(id)).concat(enabled.filter((id) => !order.includes(id))), (id) => mods.get(id)?.requires ?? []);
@@ -1636,7 +1900,9 @@
   const TAB_IDS = ["home", "mods", "feed", "workshop", "maps", "servers", "saves", "zb", "authoring", "settings"];
   const KINDS = ["framework", "patch", "map", "ui", "translation"];
   /** The status filters on the bar; favourites, hidden, kind, tag and language live in the Filters menu. */
-  const STATUS_IDS = ["all", "on", "off", "problems"];
+  const STATUS_IDS = ["all", "on", "off", "problems", "hidden"];
+  /** Each tab's search box, for "/" and Ctrl+F. */
+  const SEARCH: Record<string, string> = { mods: "mod-search", maps: "maps-search", servers: "servers-search" };
   const SORT_KEYS: Record<(typeof SORTS)[number], string> = { order: "mods.sortOrder", name: "mods.sortName", enabled: "mods.sortEnabled", installed: "mods.sortInstalled", size: "mods.sortSize", updated: "mods.sortUpdated", status: "mods.sortStatus" };
   let filtersAt = $state<{ x: number; y: number } | null>(null);
   let sortAt = $state<{ x: number; y: number } | null>(null);
@@ -1646,7 +1912,6 @@
   /** The filters beyond the status bar that are on, each with how to clear it (shown as chips). */
   const extraFilters = $derived([
     ...(filter === "fav" ? [{ key: "fav", label: t("mods.filterFavourites"), clear: () => (filter = "all") }] : []),
-    ...(filter === "hidden" ? [{ key: "hidden", label: t("mods.filterHidden"), clear: () => (filter = "all") }] : []),
     ...(filter === "updates" ? [{ key: "updates", label: t("mods.filterUpdates"), clear: () => (filter = "all") }] : []),
     ...(addedDays ? [{ key: "added", label: t("mods.addedChip", { when: t(WITHIN[addedDays]) }), clear: () => (addedDays = 0) }] : []),
     ...(changedDays ? [{ key: "changed", label: t("mods.changedChip", { when: t(WITHIN[changedDays]) }), clear: () => (changedDays = 0) }] : []),
@@ -1657,7 +1922,6 @@
   const filterItems = $derived<MenuItem[]>([
     { heading: t("mods.showLabel") },
     { label: t("mods.filterFavourites"), checked: filter === "fav", keep: true, run: () => (filter = filter === "fav" ? "all" : "fav") },
-    { label: hidden.size ? t("mods.filterHiddenN", { count: hidden.size }) : t("mods.filterHidden"), checked: filter === "hidden", keep: true, run: () => (filter = filter === "hidden" ? "all" : "hidden") },
     { label: updates.size ? t("mods.filterUpdatesN", { count: updates.size }) : t("mods.filterUpdates"), checked: filter === "updates", keep: true, run: () => (filter = filter === "updates" ? "all" : "updates") },
     ...(language ? [{ label: t("mods.inLanguage", { language }), checked: inLanguage, keep: true, run: () => (inLanguage = !inLanguage) }] : []),
     { heading: t("mods.addedHeading") },
@@ -1680,15 +1944,26 @@
   }
 
   function globalKey(e: KeyboardEvent) {
-    // the WebView's own reload, print and find aren't PZMM's (a reload would drop what's running)
-    if (e.key === "F5" || ((e.ctrlKey || e.metaKey) && ["r", "p", "f"].includes(e.key.toLowerCase()))) return e.preventDefault();
+    // the WebView's own reload, print and find aren't PZMM's (a reload would drop what's running): Ctrl+F is the page's search
+    if (e.key === "F5" || ((e.ctrlKey || e.metaKey) && ["r", "p"].includes(e.key.toLowerCase()))) return e.preventDefault();
+    const ctrlF = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f";
+    if (ctrlF) e.preventDefault();
     // a box or window over the page: its shortcuts (Ctrl+Z, /, Ctrl+A) stay off the list behind; Escape closes a box
     const box = asking.now || importText !== null || snapList || modePlan;
     if ((checkOpen || activityView || whatsNew || readingLog || pack || box) && !(e.key === "Escape" && box)) return;
     const typing = isTyping(e);
-    if (e.key === "/" && !typing && tab === "mods") {
+    // "/" or Ctrl+F: the open tab's search, as in the game (Ctrl+F goes to My mods' from a tab without one)
+    if (ctrlF || (e.key === "/" && !typing && SEARCH[tab])) {
       e.preventDefault();
-      document.getElementById("mod-search")?.focus();
+      if (!SEARCH[tab]) tab = "mods";
+      tick().then(() => document.getElementById(SEARCH[tab])?.focus());
+      return;
+    }
+    // Ctrl+PageUp / PageDown: the next or previous tab (plain PageUp / PageDown scroll lists)
+    if ((e.ctrlKey || e.metaKey) && (e.key === "PageUp" || e.key === "PageDown")) {
+      e.preventDefault();
+      const i = TAB_IDS.indexOf(tab) + (e.key === "PageUp" ? -1 : 1);
+      tab = TAB_IDS[(i + TAB_IDS.length) % TAB_IDS.length] as typeof tab;
       return;
     }
     if (e.key === "Escape" && !typing && (asking.now || importText !== null || snapList || picked.size || selected || modePlan)) {
@@ -1833,15 +2108,30 @@
     await installAndSettle(sources.length === 1 ? t("busy.installingOne", { name: sources[0] }) : t("busy.installingMany", { count: sources.length }), () => api.install(sources), sources.length > 1);
   }
 
-  /** A new separator above the selected mod (or at the top), ready to rename. */
-  async function addSeparator() {
-    const at = Math.max(0, selected ? rows.findIndex((r) => r.kind === "mod" && r.id === selected) : 0);
+  /** A new separator at row `at` (else above the selected mod, or at the top), ready to rename. */
+  async function addSeparator(at = Math.max(0, selected ? rows.findIndex((r) => r.kind === "mod" && r.id === selected) : 0)) {
     const taken = new Set(separators);
     let name = t("mods.newSection");
     for (let n = 2; taken.has(name); n++) name = t("mods.newSectionN", { n });
     await commit([...rows.slice(0, at), { kind: "sep", name }, ...rows.slice(at)]);
     editingSep = at;
   }
+
+  /** A section's right-click menu, as in the game's: a new section after it, rename, remove, fold. */
+  let sepMenu = $state<{ i: number; x: number; y: number } | null>(null);
+  const sepMenuItems = $derived.by((): MenuItem[] => {
+    const r = sepMenu && rows[sepMenu.i];
+    if (!sepMenu || r?.kind !== "sep") return [];
+    const i = sepMenu.i;
+    const next = rows.findIndex((x, j) => j > i && x.kind === "sep");
+    return [
+      { label: t("modTable.newSectionBelow"), icon: "plus", run: () => addSeparator(next < 0 ? rows.length : next), disabled: editBusy || filtering },
+      { label: t("app.rename"), icon: "pencil", run: () => (editingSep = i), disabled: editBusy },
+      { label: t("common.remove"), icon: "trash", run: () => removeSep(i), disabled: editBusy || filtering, danger: true },
+      null,
+      { label: t(collapsed.has(r.name) ? "modTable.expandLabel" : "modTable.collapseLabel", { name: r.name }), icon: collapsed.has(r.name) ? "chevron-right" : "chevron-down", run: () => toggleSection(r.name) },
+    ];
+  });
 
   /** Drop a separator. Its mods stay where they are as loose mods (a nameless break ends the section above). */
   function removeSep(i: number) {
@@ -1875,15 +2165,18 @@
     if (busy || profileLocked()) return;
     const [kind, name, from] = [nameFor?.kind, nameFor?.value.trim(), nameFor?.from ?? view?.profile ?? ""];
     nameFor = null;
-    if (!name) return;
-    if (kind === "new") await run(t("busy.creatingProfile", { name }), () => api.profileNew(name));
-    else if (kind === "duplicate") await run(t("busy.copyingProfile", { name }), () => api.profileDuplicate(from, name));
-    else if (name !== from) {
-      try {
-        localStorage.setItem(`pzmm.collapsed.${name}`, localStorage.getItem(`pzmm.collapsed.${from}`) ?? "[]"); // folded sections go along
-      } catch {}
-      await run(t("busy.renamingProfile", { name }), () => api.profileRename(from, name), { renamed: true });
-    }
+    if (kind && name) await nameProfile(kind, name, from);
+  }
+  /** Make profile `name` (empty; `zomboid`: for Project Zomboid, whatever the active one is for), or `from` renamed or
+   * copied as it. Whether it was done. */
+  async function nameProfile(kind: "new" | "rename" | "duplicate", name: string, from: string, zomboid = false) {
+    if (kind === "new") return run(t("busy.creatingProfile", { name }), () => api.profileNew(name, zomboid));
+    if (kind === "duplicate") return run(t("busy.copyingProfile", { name }), () => api.profileDuplicate(from, name));
+    if (name === from) return true;
+    try {
+      localStorage.setItem(`pzmm.collapsed.${name}`, localStorage.getItem(`pzmm.collapsed.${from}`) ?? "[]"); // folded sections go along
+    } catch {}
+    return run(t("busy.renamingProfile", { name }), () => api.profileRename(from, name), { renamed: true });
   }
 
   // --- right-click menus: a mod row (library or load order), and Browse… ---
@@ -1931,7 +2224,7 @@
       null,
       { label: t("details.showFiles"), icon: "folder", run: () => d && api.openPath(d.dir), disabled: !d },
       ...(src.url ? [{ label: t(github ? "details.githubPage" : "details.workshopPage"), icon: (github ? "external" : "steam") as IconName, run: () => api.openUrl(src.url!) }] : []),
-      { label: t("menu.copyId"), icon: "copy", run: () => navigator.clipboard.writeText(id).then(() => say("log.idCopied", { id })).catch(() => {}) },
+      { label: t(many ? "menu.copyIds" : "menu.copyId"), icon: "copy", run: () => navigator.clipboard.writeText(ids.join(";")).then(() => say("log.idCopied", { id: ids.join(";") })).catch(() => {}) },
       { label: t("mods.group"), icon: "layers", run: () => groupLibrary(), disabled: editBusy },
       ...(d?.maps ? [{ label: t("menu.showInMaps"), icon: "search" as IconName, run: () => ((mapsFind = id), (tab = "maps")) }] : []),
       ...(removable(m) ? [null, { label: t("common.remove"), icon: "trash" as IconName, run: () => (picked.size > 1 && picked.has(id) ? bulkRemove() : remove(id)), disabled: editBusy, danger: true }] : []),
@@ -1986,6 +2279,8 @@
     selected = id;
   }
 
+  /** Every picked mod is hidden: the bulk bar offers Show again, else Hide. */
+  const pickedHidden = $derived([...picked].every((id) => hidden.has(id)));
   /** Bulk Enable / Disable leave favourites as they are. */
   let skipFavourites = $state(false);
 
@@ -2057,22 +2352,19 @@
   const separators = $derived(rows.flatMap((r) => (r.kind === "sep" && r.name ? [r.name] : [])));
 
   const remove = (id: string) => removeMods([id]);
+  /** A mod's previous version back (PZMM keeps one when it updates). */
+  const rollback = async (id: string) => !profileLocked() && run(t("busy.restoring", { id }), () => api.rollback(id));
 
-  /** Delete a profile; the active one only after switching to another of its game. */
+  /** Delete a profile; the active one only after switching to another of its game. Whether it was deleted. */
   async function deleteProfile(name: string) {
-    if (profileLocked() || !name) return;
-    if (name !== view?.profile) {
-      if (await confirmed(t("confirm.deleteOther", { name }), { label: t("common.delete"), icon: "trash" })) run(t("busy.deletingProfile", { name }), () => api.profileDelete(name));
-      return;
-    }
+    if (profileLocked() || !name) return false;
+    if (name !== view?.profile) return (await confirmed(t("confirm.deleteOther", { name }), { label: t("common.delete"), icon: "trash" })) && run(t("busy.deletingProfile", { name }), () => api.profileDelete(name));
     const other = modeProfiles.find((p) => p !== name); // stay in this game: switching game goes through the mode plan
-    if (!other) return;
-    if (await confirmed(t("confirm.deleteProfile", { name, other }), { label: t("common.delete"), icon: "trash" })) {
-      run(t("busy.deletingProfile", { name }), async () => {
-        await api.profileUse(other);
-        return api.profileDelete(name);
-      });
-    }
+    if (!other) return false;
+    return (await confirmed(t("confirm.deleteProfile", { name, other }), { label: t("common.delete"), icon: "trash" })) && run(t("busy.deletingProfile", { name }), async () => {
+      await api.profileUse(other);
+      return api.profileDelete(name);
+    });
   }
 
   /** Delete the server profiles whose server is gone from your history, favourites and hosted servers. */
@@ -2166,7 +2458,9 @@
     const unlistenGame = listen("game-requests", gameAsked);
     fromGameActivity();
     const unlistenActivity = listen("game-activity", fromGameActivity);
-    const unlistenBridge = listen("game-bridge", () => ((findingsSent = null), findings && (findings = [...findings]), api.feed(false).catch(() => {})));
+    fromGameBisect();
+    const unlistenBisect = listen("game-bisect", fromGameBisect);
+    const unlistenBridge = listen("game-bridge", () => ((findingsSent = null), findings && (findings = [...findings]), api.feed(false).catch(() => {}), cfg && api.gameAppSettings(gameSettings()).catch(() => {})));
     const unlistenList = listen("game-list", reloadList);
     // a Maps check downloads with SteamCMD too: its progress isn't an install's
     const unlistenProgress = listen<[number, number]>("progress", (e) => longJobs && (progress = e.payload));
@@ -2204,7 +2498,7 @@
     loadView().then(async (loaded) => {
       setTimeout(lift, Math.max(0, 2000 - (Date.now() - started)));
       workshopSeen = true; // the Workshop tab loads its first page now (for the build just read), so it opens at once
-      api.feed(true).catch(() => {}); // What's new: its change notes, kept on disk for when the tab opens
+      api.feed(true).then(keepFeed, () => {}); // What's new: its change notes, kept for when the tab opens
       if (loaded) whatsNewCheck(!!view?.created); // a first load that failed can't tell a first install
       fromGame(); // what the game asked while PZMM was closed, now there's a profile to apply it to
       refreshStats();
@@ -2218,6 +2512,7 @@
       if (cfg?.settings.app_updates !== false) checkAppUpdate();
     });
     refreshSave();
+    api.lastPlayed().then((s) => (playedAt = s)).catch(() => {});
     getVersion().then((v) => (appVersion = v));
     return () => {
       unlisten.then((f) => f());
@@ -2225,6 +2520,7 @@
       unlistenLink.then((f) => f());
       unlistenGame.then((f) => f());
       unlistenActivity.then((f) => f());
+      unlistenBisect.then((f) => f());
       unlistenBridge.then((f) => f());
       unlistenList.then((f) => f());
       unlistenQuit.then((f) => f());
@@ -2261,6 +2557,7 @@
         <button class="quiet" onclick={openImport} disabled={busy || !!profileLock} title={profileLock || t("app.importTip")} aria-label={t("common.import")}><Icon name="upload" size={14} /><span class="lbl">{t("common.import")}</span></button>
         <!-- mods subscribed or copied in while PZMM was open -->
         <button class="quiet" onclick={() => { refreshLists(); loadView(); }} disabled={busy} title={t("app.rescanTip")} aria-label={t("app.rescan")}><Icon name="refresh" size={14} /><span class="lbl">{t("app.rescan")}</span></button>
+        <button class="quiet icon" onclick={() => view && api.openPath(`${view.zomboid}/mods`)} title={t("app.modsFolderTip")} aria-label={t("app.modsFolder")}><Icon name="folder" size={14} /></button>
       {/if}
     </div>
 
@@ -2297,6 +2594,9 @@
       <Menu x={shareAt.x} y={shareAt.y} label={t("app.share")} onClose={() => (shareAt = null)}
         items={[{ label: t("app.shareCode"), icon: "copy", run: shareProfile }, { label: t("app.saveGamePreset"), icon: "upload", run: () => savePreset("game") }, { label: t("app.saveModManagerPreset"), icon: "upload", run: () => savePreset("modManager") }]} />
     {/if}
+    {#if sepMenu}
+      <Menu x={sepMenu.x} y={sepMenu.y} label={t("menu.label", { name: rows[sepMenu.i]?.name ?? "" })} items={sepMenuItems} onClose={() => (sepMenu = null)} />
+    {/if}
     {#if rowMenu}
       <Menu x={rowMenu.x} y={rowMenu.y} label={t("menu.label", { name: mods.get(rowMenu.id)?.name || rowMenu.id })} items={rowMenuItems} onClose={() => (rowMenu = null)} />
     {/if}
@@ -2332,6 +2632,7 @@
             {#each marks.presets as p, i}<option value={i}>{t(`presets.${p.from}`, { name: p.name, count: p.mods.length })}</option>{/each}
           </select>
           <button type="button" onclick={() => { const p = marks.presets[presetPick]; importText = null; if (p) importPreset(p); }}><Icon name="upload" size={14} />{t("common.import")}</button>
+          <button type="button" class="quiet danger" onclick={() => marks.presets[presetPick] && deletePreset(marks.presets[presetPick])}><Icon name="trash" size={14} />{t("common.delete")}</button>
         </div>
       {/if}
     </form>
@@ -2441,7 +2742,7 @@
   <div class="tabs" role="tablist" aria-label={t("app.sectionsLabel")} tabindex="-1" bind:this={tabsEl} onscroll={tabEnds} onwheel={(e) => e.deltaY && (e.currentTarget.scrollLeft += e.deltaY)} onkeydown={(e) => arrowPick(e, TAB_IDS, tab, (v) => (tab = v as typeof tab))}>
     {#each TAB_IDS as id}
       <!-- one Tab stop: the open tab (the arrow keys move between them) -->
-      <button role="tab" aria-selected={tab === id} tabindex={tab === id ? 0 : -1} class:active={tab === id} onclick={() => (tab = id as typeof tab)}>
+      <button role="tab" aria-selected={tab === id} tabindex={tab === id ? 0 : -1} class:active={tab === id} title={t(`tabs.${id}Tip`)} onclick={() => (tab = id as typeof tab)}>
         {t(`tabs.${id}`)}{#if (id === "zb" && zbNeeded) || (id === "settings" && folderTrouble)}<span class="alert" aria-label={t("app.needsSetup")}></span>{/if}{#if id === "feed" && feedCount}<span class="badge" aria-label={t("feed.countLabel", { count: feedCount })}>{feedCount}</span>{/if}
       </button>
     {/each}
@@ -2469,7 +2770,8 @@
   {#if tab === "workshop" || tab === "servers"}
     <!-- kept mounted above -->
   {:else if tab === "home"}
-    <Home {view} profiles={modeProfiles} enabled={enabledCount} problems={problemCount} {busy} lock={profileLock} {ask} onLaunch={launch} onGo={(id) => (tab = id as typeof tab)}
+    <Home {view} profiles={modeProfiles} enabled={enabledCount} problems={problemCount} {busy} lock={profileLock} {ask} onLaunch={launch} onGo={(id, f) => { if (f) filter = f as Filter; tab = id as typeof tab; }}
+      onUpdate={(ids) => updateMods(ids.filter((id) => mods.get(id)?.source.startsWith("workshop:")))}
       zbNeed={zbNeeded ? { count: zb?.required_by.length ?? 0, partial: !!(zb?.files_current || zb?.launcher_patched) } : null}
       save={homeSave}
       installedIds={[...mods.values()].filter((m) => !m.missing).map((m) => m.id)} onUseProfile={(p) => run(t("busy.switchingProfile"), () => api.profileUse(p))}
@@ -2486,14 +2788,14 @@
     {/key}
   {:else if tab === "saves"}
     {#key view?.profile}
-      <Saves {busy} lock={profileLock} profile={view?.profile ?? ""} enabledIds={order} onUseSave={useSave} onSettings={() => (tab = "settings")} {ask} />
+      <Saves {busy} lock={profileLock} profile={view?.profile ?? ""} enabledIds={order} installedIds={[...mods.values()].filter((m) => !m.missing).map((m) => m.id)} onUseSave={useSave} onSettings={() => (tab = "settings")} {ask} />
     {/key}
   {:else if tab === "zb"}
     <ZombieBuddy status={zb} {view} {updates} {busy} lock={profileLock}
       onSetup={async (vp) => { await run(t("busy.zbSetup"), () => api.zbInstall(vp), { showLog: true }); }}
       onRemove={async () => { await run(t("busy.zbRemove"), api.zbUninstall, { showLog: true }); }}
       onSwitch={() => planMode("viewpoint")} onInstall={() => installWorkshop(VIEWPOINT.workshop)}
-      onUpdate={() => updateMods([VIEWPOINT.mod])} onSettings={() => (tab = "settings")} />
+      onUpdate={() => updateMods([VIEWPOINT.mod])} onSettings={() => (tab = "settings")} onShowMod={(id) => { selected = id; tab = "mods"; }} />
   {:else if tab === "authoring"}
     <Authoring />
   {:else if tab === "settings"}
@@ -2522,11 +2824,12 @@
   <div class="filters">
     <input id="mod-search" type="search" bind:value={search} placeholder={t("mods.searchPlaceholder")} aria-label={t("mods.searchLabel")} />
     <div class="seg" role="radiogroup" aria-label={t("mods.showLabel")} tabindex="-1" onkeydown={(e) => arrowPick(e, STATUS_IDS, filter, (v) => (filter = v as typeof filter))}>
-      {#each [["all", t("mods.filterAll")], ["on", t("common.enabled")], ["off", t("common.disabled")], ["problems", problemCount ? t("mods.filterProblemsN", { count: problemCount }) : t("mods.filterProblems")]] as [v, label]}
-        <button role="radio" aria-checked={filter === v} class:active={filter === v} onclick={() => (filter = v as typeof filter)}>{label}</button>
+      {#each [["all", t("mods.filterAll")], ["on", t("common.enabled")], ["off", t("common.disabled")], ["problems", problemCount ? t("mods.filterProblemsN", { count: problemCount }) : t("mods.filterProblems")], ["hidden", hidden.size ? t("mods.filterHiddenN", { count: hidden.size }) : t("mods.filterHidden")]] as [v, label]}
+        <button role="radio" aria-checked={filter === v} class:active={filter === v} title={t(`mods.filterTip.${v}`)} onclick={() => (filter = v as typeof filter)}>{label}</button>
       {/each}
     </div>
     <button class="quiet" onclick={() => groupLibrary()} disabled={editBusy}><Icon name="layers" size={14} /><span class="lbl">{t("mods.group")}</span></button>
+    <button class="quiet" onclick={() => addSeparator()} disabled={editBusy || filtering} title={t("mods.newSectionTip")}><Icon name="plus" size={14} /><span class="lbl">{t("mods.newSection")}</span></button>
     <button class="quiet" class:on={extraFilters.length} aria-haspopup="menu" aria-expanded={!!filtersAt} onpointerdown={(e) => filtersAt && e.stopPropagation()} title={t("mods.filtersTip")}
       onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); filtersAt = filtersAt ? null : { x: r.left, y: r.bottom + 4 }; }}>
       <Icon name="filter" size={14} /><span class="lbl">{extraFilters.length ? t("mods.filtersN", { count: extraFilters.length }) : t("mods.filters")}</span></button>
@@ -2559,6 +2862,7 @@
           {#each separators as s}<option value={s}>{t("mods.moveUnder", { name: s })}</option>{/each}
           <option value="bottom">{t("mods.moveBottom")}</option>
         </select>
+        <button onclick={() => markAll([...picked], "hidden", !pickedHidden)}><Icon name={pickedHidden ? "eye" : "eye-off"} size={14} />{t(pickedHidden ? "mods.showAgain" : "mods.hide")}</button>
         <button class="danger" onclick={bulkRemove} disabled={editBusy}><Icon name="trash" size={14} />{t("common.remove")}</button>
         <button class="quiet" onclick={() => (picked = new Set())}><Icon name="x" size={14} />{t("common.clear")}</button>
       </span>
@@ -2594,15 +2898,16 @@
       {:else}
         <ModTable {rows} {order} {visible} {sectionOf} {filtering} busy={editBusy} build={view?.build ?? null} {stats} {overlaps} {problems} {updates} {favourites} fresh={freshHere} {hidden} kinds={cats?.kinds ?? {}} neededBy={needed} tags={marks.tags}
           {collapsed} {picked} {selected} bind:dragFrom bind:editingSep onRowClick={rowClick} onRowKey={rowKey} onToggle={toggleRow} onSubscribe={subscribe} onMenu={openMenu}
-          onToggleSection={toggleSection} onDrop={dropOn} onRename={renameSep} onRemoveSep={removeSep} />
+          onToggleSection={toggleSection} onDrop={dropOn} onRename={renameSep} onRemoveSep={removeSep} onSepMenu={(i, x, y) => (sepMenu = { i, x, y })}
+          {sortBy} onSort={(by) => (sortBy = by === sortBy ? "order" : (by as typeof sortBy))} onHide={(id) => markAll([id], "hidden", !hidden.has(id))} />
       {/if}
     </div>
 
     {#if selected}
-      <Details id={selected} {mods} {busy} firstSeen={stats[selected]?.first_seen ?? 0} lock={!!profileLock} hasUpdate={updates.has(selected)} neededBy={needed.get(selected) ?? []} tags={marks.tags[selected] ?? []} {allTags}
+      <Details id={selected} {mods} {busy} firstSeen={stats[selected]?.first_seen ?? 0} size={stats[selected]?.size ?? 0} updated={stats[selected]?.modified ?? 0} category={cats?.of[selected] ?? ""} lock={!!profileLock} hasUpdate={updates.has(selected)} neededBy={needed.get(selected) ?? []} tags={marks.tags[selected] ?? []} {allTags}
         onTags={setTags} onRule={(id, rule) => run(t("busy.saving"), () => api.modRuleSet(id, rule), { keepHistory: true })} onUpdate={(id) => updateMods([id])} onInstallWorkshop={installWorkshop}
         onToggle={toggle} onSelect={(id) => (selected = id)}
-        onRemove={remove} onRollback={(id) => run(t("busy.restoring", { id }), () => api.rollback(id))} onClose={() => (selected = null)} />
+        onRemove={remove} onRollback={rollback} onClose={() => (selected = null)} />
     {:else if rows.length}
       <LoadOrder {rows} {order} {mods} {problems} {fixable} {overlaps} busy={editBusy} onAutosort={autosortList} onSortAz={sortAz} onFix={fixLoadOrder}
         onMove={moveInOrder} onSelect={(id) => (selected = id)} onMenu={openMenu} onMenuKey={menuKey} />
@@ -2616,7 +2921,7 @@
     onExpand={() => (activityView = "expand")} onHistory={() => (activityView = "history")} />
   <!-- Check setup opens over any tab (Home's pill, My mods' button) -->
   {#if checkOpen}
-    <CheckSetup findings={findings ?? []} {logs} onSelect={(id) => ((checkOpen = false), (tab = "mods"), (selected = id))} failed={!findings && !checkingSetup} checking={checkingSetup} busy={editBusy} {fixes} names={(id) => mods.get(id)?.name || id} onHide={(f, on) => api.findingHide(f, on).catch((e) => say(...keyedError(e), true))}
+    <CheckSetup findings={findings ?? []} {logs} onSelect={(id) => ((checkOpen = false), (tab = "mods"), (selected = id))} failed={!findings && !checkingSetup} checking={checkingSetup} busy={editBusy} {fixes} names={(id) => mods.get(id)?.name || id} onHide={hideFinding}
       onRecheck={() => checkSetup(false)} onReadLog={() => (readingLog = true)} onFindBroken={() => ((checkOpen = false), bisectStart([...new Set(logs.flatMap((l) => [...(l.first?.ids ?? []), ...l.mods.flatMap((m) => (m.id ? [m.id] : []))]))]))}
       onClose={() => (checkOpen = false)} />
   {/if}

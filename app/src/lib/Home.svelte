@@ -67,7 +67,7 @@
   import { joinInServers, showInServers } from "./Servers.svelte";
   import { showInSettings } from "./Settings.svelte";
 
-  let { view, profiles, enabled, problems, busy, lock = "", installedIds, zbNeed = null, save = null, onSetup, onCheck, onLaunch, onUseProfile, onGo, onOpenLink, onCheckSetup, ask }: {
+  let { view, profiles, enabled, problems, busy, lock = "", installedIds, zbNeed = null, save = null, onSetup, onCheck, onLaunch, onUseProfile, onGo, onUpdate, onOpenLink, onCheckSetup, ask }: {
     view: View | null;
     /** The profiles of the game being played. */
     profiles: string[];
@@ -89,8 +89,10 @@
     onCheck: () => Promise<boolean>;
     onLaunch: () => void;
     onUseProfile: (name: string) => Promise<boolean>;
-    /** Another tab: "mods", "feed", "servers"... */
-    onGo: (tab: string) => void;
+    /** Another tab: "mods", "feed", "servers"... (`filter`: My mods' status filter). */
+    onGo: (tab: string, filter?: string) => void;
+    /** Update these mods (What's new's Update). */
+    onUpdate: (ids: string[]) => Promise<unknown>;
     /** A server's details in Servers (where it asks for a password). */
     onOpenLink: (url: string) => void;
     /** My mods with Check setup open. */
@@ -453,8 +455,8 @@
   </button>
 {/snippet}
 
-{#snippet stat(label: string, value: string, tone: "" | "bad" | "warn" = "", tip = value)}
-  <div class="stat"><span class="slabel">{label}</span><span class="svalue {tone}" title={tip}>{value}</span></div>
+{#snippet stat(label: string, value: string, tone: "" | "bad" | "warn" = "", tip = value, go?: () => void)}
+  <div class="stat"><span class="slabel">{label}</span>{#if go}<button class="svalue lastplayed {tone}" onclick={go} title={tip}>{value}</button>{:else}<span class="svalue {tone}" title={tip}>{value}</span>{/if}</div>
 {/snippet}
 
 <svelte:window onkeydown={(e) => e.key === "Escape" && sel.kind !== "home" && !menuAt && !(e.target as HTMLElement).closest?.("input, textarea, [role=dialog], [role=alertdialog], [role=menu]") && pick({ kind: "home" })} />
@@ -571,9 +573,9 @@
         <!-- the profile's state: its mods, then ZombieBuddy or the setup check -->
         <div class="end">
           <div class="stats">
-            {@render stat(t("home.stat.mods"), view ? String(enabled) : "…")}
-            {@render stat(t("home.stat.problems"), view ? String(problems) : "…", problems > 0 ? "bad" : "")}
-            {@render stat(t("home.stat.updates"), feed ? String(pending) : feedError ? "—" : "…", pending ? "warn" : "")}
+            {@render stat(t("home.stat.mods"), view ? String(enabled) : "…", "", undefined, () => onGo("mods", "on"))}
+            {@render stat(t("home.stat.problems"), view ? String(problems) : "…", problems > 0 ? "bad" : "", undefined, () => onGo("mods", "problems"))}
+            {@render stat(t("home.stat.updates"), feed ? String(pending) : feedError ? "—" : "…", pending ? "warn" : "", undefined, () => onGo("feed"))}
           </div>
           {#if zbNeed}{@render pill("bad", "alert", zbNeed.partial ? t("home.zb.partial") : t("home.zb.missing", { count: zbNeed.count }), t("home.health.fix"), () => onGo("zb"))}
           {:else if checkFailed}{@render pill("bad", "alert", t("home.health.failed"), t("home.health.run"), onCheckSetup)}
@@ -647,6 +649,7 @@
                     </span>
                     {#if e.risks.length}<span class="tag danger" title={e.risks.map((r) => t(`feed.risk.${r}`)).join("\n")}>{t("feed.mayBreak")}</span>{/if}
                   </button>
+                  {#if e.pending}<button class="primary" onclick={() => onUpdate(e.mods).then(() => glance().then((f) => (feed = f)))} disabled={busy}><Icon name="refresh" size={13} />{t("feed.update")}</button>{/if}
                 </li>
               {/each}
             </ul>
@@ -1254,6 +1257,11 @@
     list-style: none;
     margin: 0 -10px;
     padding: 0;
+  }
+  .updates li:has(> .primary) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   .upd {
     all: unset;

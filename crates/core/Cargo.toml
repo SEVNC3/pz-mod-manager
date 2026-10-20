@@ -10,6 +10,8 @@ repository.workspace = true
 anyhow = "1.0.104"
 dirs = "7.0.0"
 flate2 = "1.1.10"
+# PNG copies of Workshop and news pictures for the game (its getTexture reads PNG only): pz::pictures
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif"] }
 getrandom = "0.3.4"
 keyring = "4.2.0"
 ring = "0.17.14"

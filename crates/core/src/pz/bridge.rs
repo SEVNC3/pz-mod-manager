@@ -36,6 +36,38 @@ pub static GAME_BUSY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicB
 /// The app's look for the in-game manager to match: its accent (`#rrggbb`) and theme (`dark` or `light`).
 pub static LOOK: std::sync::Mutex<(String, String)> = std::sync::Mutex::new((String::new(), String::new()));
 
+/// The app's search for a broken mod is running: `bisect=1` in `app.txt`.
+pub static BISECT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The game's own search for a broken mod is running: its `bisect.txt` (in the game's bridge folder) has one under way
+/// (game Lua can't delete a file, so an ended search leaves it empty, or with just its `result`).
+pub fn game_bisecting(paths: &Paths) -> bool {
+    std::fs::read_to_string(game_dir(paths).join("bisect.txt")).is_ok_and(|t| t.lines().any(|l| l.starts_with("original\t")))
+}
+
+/// What the game's search for a broken mod found, once it has ended: its `bisect.txt` `result` (the mod, or a group's
+/// mods split by `|`, `~` first when they break it only together with others; empty: none of them).
+pub fn game_bisect_result(paths: &Paths) -> Option<String> {
+    std::fs::read_to_string(game_dir(paths).join("bisect.txt")).ok()?.lines().find_map(|l| l.trim_end_matches('\r').strip_prefix("result\t").map(String::from))
+}
+
+/// The game's edits to the library wait in `dir` (made while PZMM was closed): `library.txt` waits for them too, or the
+/// game shows the old one until they're done.
+pub fn sorting_queued(dir: &std::path::Path) -> bool {
+    ["requests.queue", "requests.taken", "requests.txt"].iter().any(|f| {
+        std::fs::read_to_string(dir.join(f)).is_ok_and(|t| t.lines().any(|l| matches!(l.split('\t').nth(2), Some("place" | "section" | "library"))))
+    })
+}
+
+/// The download or install running, for `app.txt`: its label (empty: none), and the items done of how many.
+pub static JOB: std::sync::Mutex<(String, usize, usize)> = std::sync::Mutex::new((String::new(), 0, 0));
+
+/// [`JOB`]'s lines in `app.txt`: `job=<label>`, `done=<n>` and `total=<n>` while one runs, else `job=` alone.
+pub fn job_lines() -> String {
+    let (label, done, total) = JOB.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    if label.is_empty() { "job=\n".into() } else { format!("job={}\ndone={done}\ntotal={total}\n", label.replace(['\r', '\n'], " ")) }
+}
+
 /// One request from the game.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "action", rename_all = "lowercase")]
@@ -79,13 +111,133 @@ pub enum Request {
     /// A section added under `to`, renamed to `to`, removed, or moved before section `to` (else to the end)
     /// (`op`: add, rename, remove, move). Quiet too.
     Section { op: String, name: String, to: Option<String> },
+    /// Remove PZMM's copies of these mods (after asking, as Remove does).
+    Remove { ids: Vec<String> },
+    /// Install the Workshop item that surely provides this mod (after asking).
+    Find {
+        #[serde(rename = "mod")]
+        id: String,
+    },
+    /// A share code, a preset's text or a collection link, made a profile as Import does.
+    Import { text: String },
+    /// A profile made (empty, Project Zomboid's), renamed or copied as `to`, or deleted (after asking).
+    #[serde(rename = "profileedit")]
+    ProfileEdit { op: String, name: String, to: Option<String> },
+    /// The server at `addr`'s profile made or refreshed with exactly these mods, and switched to (nothing installed).
+    #[serde(rename = "serverprofile")]
+    ServerProfile { addr: String, ids: Vec<String> },
+    /// Start, stop or restart a server PZMM hosts (its ini name).
+    Server { op: String, name: String },
+    /// What's new's next change notes (feed.txt is written again). Quiet.
+    Feed,
+    /// Cancel the download running. Quiet.
+    Cancel,
+    /// Put a mod's previous version back (after asking).
+    Rollback {
+        #[serde(rename = "mod")]
+        id: String,
+    },
+    /// Change one of [`APP_SETTINGS`]. Quiet.
+    Set { key: String, value: String },
+    /// Save a Workshop item's other pictures for the game (see `pictures::screenshots`). Quiet.
+    Pics { item: String },
+    /// Put the active profile back as one of its snapshots (`snapshots.txt`) had it.
+    Snapshot {
+        #[serde(rename = "snapshot")]
+        id: String,
+    },
+    /// Mark a Check setup finding "It's fine", as the app's own does. `key` is its `findings.txt` line's first three
+    /// columns (`<level>\t<mod or ->\t<text>`). Quiet.
+    Hide { key: String },
+    /// Show a hidden finding again (its `findings.txt` line's level is `hidden-warn` or `hidden-info`): [`Request::Hide`] undone. Quiet.
+    Unhide { key: String },
+    /// Star (`on`) or unstar the server joined at `addr` (`host:port`, as `servers.txt` gives it) in the app's favourites. Quiet.
+    #[serde(rename = "serverfav")]
+    ServerFav { addr: String, on: bool },
 }
 
 impl Request {
-    /// A sorting change: PZMM doesn't come to the front for it, or start for it.
+    /// A sorting change, or one that waits on nothing: PZMM doesn't come to the front for it, or start for it.
     fn quiet(&self) -> bool {
-        matches!(self, Request::Place { .. } | Request::Section { .. } | Request::Library { .. } | Request::Tags { .. } | Request::LeaveOut { .. })
+        self.sorting() || matches!(self, Request::LeaveOut { .. } | Request::Feed | Request::Cancel | Request::Set { .. } | Request::Pics { .. } | Request::Hide { .. } | Request::Unhide { .. } | Request::ServerFav { .. } | Request::Tags { .. })
     }
+    /// An edit to the profile the game showed: not made to another (tags are every profile's).
+    fn sorting(&self) -> bool {
+        matches!(self, Request::Place { .. } | Request::Section { .. } | Request::Library { .. })
+    }
+}
+
+/// The app's settings the game may change (`set\t<key>\t<value>`) and reads (`settings_app.txt`), with what each
+/// takes: choices split by `|` (`0|1` an on-off switch), `#` a `#rrggbb` colour, `n<max>` a whole number up to max.
+pub const APP_SETTINGS: [(&str, &str); 19] = [
+    ("update_check", "off|start|1h|3h"),
+    ("app_updates", "0|1"),
+    ("workshop_links", "steam|browser"),
+    ("save_backup_launch", "0|1"),
+    ("save_backup_exit", "0|1"),
+    ("save_backup_every", "n240"),
+    ("autosort_new", "0|1"),
+    ("keep_marks", "0|1"),
+    ("on_close", "ask|tray|quit"),
+    ("notify_crash", "0|1"),
+    ("notify_restart", "0|1"),
+    ("notify_downloads", "0|1"),
+    ("notify_favourites", "0|1"),
+    ("theme", "system|dark|light"),
+    ("accent", "#"),
+    ("compact", "0|1"),
+    ("show_ids", "0|1"),
+    ("fav_first", "0|1"),
+    ("build", "auto|41|42"),
+];
+
+/// `value` is one [`APP_SETTINGS`] lets `key` take (an unknown key takes none).
+fn app_setting_ok(key: &str, value: &str) -> bool {
+    APP_SETTINGS.iter().find(|(k, _)| *k == key).is_some_and(|(_, takes)| match *takes {
+        "#" => value.len() == 7 && value.starts_with('#') && value[1..].bytes().all(|b| b.is_ascii_hexdigit()),
+        t if t.starts_with('n') => value.bytes().all(|b| b.is_ascii_digit()) && value.parse::<u64>().is_ok_and(|n| t[1..].parse::<u64>().is_ok_and(|max| n <= max)),
+        t => t.split('|').any(|c| c == value),
+    })
+}
+
+/// The app's settings for the game's Settings: `settings_app.txt`, a `key=value` line for each of [`APP_SETTINGS`]
+/// (the UI's values: any other is left out). Only where PZMM - Client is.
+pub fn settings_for_game(paths: &Paths, set: &std::collections::BTreeMap<String, String>) {
+    let (file, text) = (dir(paths).join("settings_app.txt"), settings_text(set));
+    // the UI says it again on every profile change: written when it differs
+    if file.parent().is_some_and(std::path::Path::is_dir) && std::fs::read_to_string(&file).ok() != Some(text.clone()) {
+        write_for_game(&file, text);
+    }
+}
+
+fn settings_text(set: &std::collections::BTreeMap<String, String>) -> String {
+    set.iter().filter(|(k, v)| app_setting_ok(k, v)).map(|(k, v)| format!("{k}={v}\n")).collect()
+}
+
+/// The servers PZMM hosts, for the game's Servers: `hosted.txt`, `<ini>\t<state>\t<players>` lines (state: stopped,
+/// starting, running or crashed; players: the last count, 0 before one). Only where PZMM - Client is.
+pub fn hosted_for_game(paths: &Paths) {
+    let d = dir(paths);
+    if d.is_dir() {
+        let cards = super::host::cards(paths);
+        write_for_game(&d.join("hosted.txt"), hosted_text(cards.iter().filter(|c| c.managed).map(|c| (c.name.as_str(), c.status, c.players))));
+    }
+}
+
+fn hosted_text<'a>(servers: impl Iterator<Item = (&'a str, super::host::Status, Option<usize>)>) -> String {
+    use super::host::Status;
+    servers
+        .map(|(name, status, players)| {
+            // on its way down it's still up
+            let state = match status {
+                Status::Stopped => "stopped",
+                Status::Starting => "starting",
+                Status::Running | Status::Stopping => "running",
+                Status::Crashed => "crashed",
+            };
+            format!("{name}\t{state}\t{}\n", players.unwrap_or(0))
+        })
+        .collect()
 }
 
 /// A request as the game stamped it: `<at>-<seq>\t<profile>\t<action>\t<args>`.
@@ -118,11 +270,13 @@ const STALE: u64 = 60;
 /// `acks.txt` keeps the newest this many.
 const ACKS: usize = 200;
 
-/// The tabs a request may open (the app's `tab` values).
-const TABS: [&str; 10] = ["home", "mods", "feed", "workshop", "maps", "servers", "saves", "zb", "authoring", "settings"];
+/// The tabs a request may open (the app's `tab` values), and the activity log, the download history and the snapshots.
+const TABS: [&str; 13] = ["home", "mods", "feed", "workshop", "maps", "servers", "saves", "zb", "authoring", "settings", "log", "history", "snapshots"];
 /// At most this many requests that ask something of the player (all but sorting edits) are taken at once (drags queue up while PZMM is closed); the rest of a
 /// runaway file is dropped.
 const MAX: usize = 100;
+/// At most this many `pics` requests are taken at once: each reads a Steam page and downloads its pictures.
+const PICS: usize = 3;
 
 /// The watcher and the UI both move requests: one at a time.
 static QUEUE: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -219,7 +373,12 @@ pub fn overlaps_for_game(paths: &Paths, overlaps: &std::collections::HashMap<Str
 }
 
 /// What PZMM writes for the game (app.txt aside): a game playing in another folder gets copies (see [`mirror`]).
-const MIRRORED: [&str; 12] = ["library.txt", "order.txt", "firstseen.txt", "leaveout.txt", "overlaps.txt", "profiles.txt", "tags.txt", "findings.txt", "installed.txt", "categories.txt", "feed.txt", "servers.txt"];
+const MIRRORED: [&str; 19] = [
+    "library.txt", "order.txt", "maps.txt", "firstseen.txt", "leaveout.txt", "overlaps.txt", "profiles.txt", "tags.txt", "findings.txt", "installed.txt", "categories.txt", "feed.txt", "servers.txt",
+    "news.txt", "hosted.txt", "settings_app.txt", "history.txt", "snapshots.txt",
+    // the app's only (the game writes its own activity_game.txt); not client.txt, which the game writes too
+    "activity_app.txt",
+];
 
 /// Copy what PZMM writes for the game from `from` (the active bridge folder) to `to` (a game playing elsewhere), the
 /// files that differ only.
@@ -318,7 +477,48 @@ fn parse(text: &str, now: Option<u64>, active: &str) -> (Vec<Stamped>, Vec<Ack>)
             }
             "backup" => arg.split_once('/').filter(|(m, n)| plain(m) && plain(n)).map(|(m, n)| Request::Backup { mode: m.into(), name: n.into() }),
             "check" => Some(Request::Check),
-            "profile" => named(arg).then(|| Request::Profile { name: arg.into() }),
+            // `new|rename|duplicate|delete\t<name>[\t<new name>]`, else the profile to switch to
+            "profile" => match arg.split_once('\t') {
+                Some((op @ ("new" | "rename" | "duplicate" | "delete"), rest)) => {
+                    let (name, to) = rest.split_once('\t').unwrap_or((rest, ""));
+                    let ok = named(name) && if matches!(op, "rename" | "duplicate") { named(to) } else { to.is_empty() };
+                    ok.then(|| Request::ProfileEdit { op: op.into(), name: name.into(), to: (!to.is_empty()).then(|| to.into()) })
+                }
+                _ => named(arg).then(|| Request::Profile { name: arg.into() }),
+            },
+            "remove" => {
+                let ids = commas(arg);
+                (!ids.is_empty() && ids.len() <= 2000 && ids.iter().all(|i| named(i))).then_some(Request::Remove { ids })
+            }
+            "find" => named(arg).then(|| Request::Find { id: arg.into() }),
+            "rollback" => named(arg).then(|| Request::Rollback { id: arg.into() }),
+            "import" => (!arg.is_empty() && arg.len() <= 100_000 && !arg.chars().any(char::is_control)).then(|| Request::Import { text: arg.into() }),
+            "serverprofile" => {
+                let (addr, list) = arg.split_once('\t').unwrap_or((arg, ""));
+                let ids = commas(list);
+                // `host:port`
+                (host_port(addr) && ids.len() <= 2000 && ids.iter().all(|i| named(i))).then(|| Request::ServerProfile { addr: addr.into(), ids })
+            }
+            "serverfav" => match arg.split_once('\t') {
+                Some((addr, on @ ("1" | "0"))) if host_port(addr) => Some(Request::ServerFav { addr: addr.into(), on: on == "1" }),
+                _ => None,
+            },
+            "server" => arg.split_once('\t').filter(|(op, name)| matches!(*op, "start" | "stop" | "restart") && plain(name)).map(|(op, name)| Request::Server { op: op.into(), name: name.into() }),
+            "feed" => (arg == "more").then_some(Request::Feed),
+            "cancel" => Some(Request::Cancel),
+            "set" => {
+                let (key, value) = arg.split_once('\t').unwrap_or((arg, ""));
+                // any mod can write here: only what Settings shows, to values it offers
+                if !app_setting_ok(key, value) {
+                    crate::log!("the game asked to set {key:?} to {value:?}: refused");
+                    dropped.push(Ack { id: id.into(), ok: false, why: format!("PZMM doesn't let the game set {key} to {value}.") });
+                    continue;
+                }
+                Some(Request::Set { key: key.into(), value: value.into() })
+            }
+            "hide" | "unhide" => (arg.split('\t').count() == 3 && arg.len() <= 2000 && !arg.chars().any(|c| c.is_control() && c != '\t')).then(|| if action == "hide" { Request::Hide { key: arg.into() } } else { Request::Unhide { key: arg.into() } }),
+            "pics" => (!arg.is_empty() && arg.len() <= 20 && arg.bytes().all(|b| b.is_ascii_digit())).then(|| Request::Pics { item: arg.into() }),
+            "snapshot" => (!arg.is_empty() && arg.len() <= 20 && arg.bytes().all(|b| b.is_ascii_digit())).then(|| Request::Snapshot { id: arg.into() }),
             "tags" => {
                 let (id, list) = arg.split_once('\t').unwrap_or((arg, ""));
                 let tags: Vec<String> = list.split(';').map(str::trim).filter(|t| !t.is_empty()).map(String::from).collect();
@@ -374,8 +574,10 @@ fn parse(text: &str, now: Option<u64>, active: &str) -> (Vec<Stamped>, Vec<Ack>)
             dropped.push(no("Too many requests at once. Ask again."));
         } else if !req.quiet() && now.is_some_and(|now| now.saturating_sub(at) > STALE) {
             dropped.push(no("PZMM wasn't running in time. Ask again."));
-        } else if req.quiet() && profile != active && !matches!(req, Request::LeaveOut { .. }) {
+        } else if req.sorting() && profile != active {
             dropped.push(no(&format!("PZMM's profile is now {active}.")));
+        } else if matches!(req, Request::Pics { .. }) && out.iter().filter(|s| matches!(s.req, Request::Pics { .. })).count() >= PICS {
+            dropped.push(no("PZMM gets the pictures of 3 items at a time. Ask again."));
         } else if req.quiet() && out.last().is_some_and(|l| l.req == req) {
             // the same sorting edit twice in a row is one (a loud one, a backup say, is answered when it's done:
             // the game may act on its ok)
@@ -390,6 +592,16 @@ fn parse(text: &str, now: Option<u64>, active: &str) -> (Vec<Stamped>, Vec<Ack>)
 /// A mod ID or section name: a line of text.
 fn named(s: &str) -> bool {
     !s.trim().is_empty() && s.len() <= 200 && !s.chars().any(char::is_control)
+}
+
+/// `A,B,C` as its items (spaces around them, and empty ones, dropped).
+fn commas(s: &str) -> Vec<String> {
+    s.split(',').map(str::trim).filter(|i| !i.is_empty()).map(String::from).collect()
+}
+
+/// `host:port`, one word.
+fn host_port(addr: &str) -> bool {
+    addr.len() <= 300 && !addr.chars().any(|c| c.is_whitespace() || c.is_control()) && addr.rsplit_once(':').is_some_and(|(h, p)| !h.is_empty() && p.parse::<u16>().is_ok())
 }
 
 /// A save folder's part: a name, not a path.
@@ -457,7 +669,7 @@ pub fn activity_for_game(paths: &Paths, new: &[Activity]) {
 
 /// The game's own activity (`activity_game.txt`, which PZMM - Client rewrites), oldest first.
 pub fn game_activity(paths: &Paths) -> Vec<Activity> {
-    read_activity(&crate::pz::bridge::dir(paths).join("activity_game.txt"))
+    read_activity(&game_dir(paths).join("activity_game.txt"))
 }
 
 /// Check setup's findings for the PZMM - Client mod's Problems: `findings.txt`, `at=<secs>` then the UI's lines
@@ -481,13 +693,13 @@ pub const CLIENT_KEYS: [(&str, bool); 5] = [("logo", true), ("watermark", true),
 
 /// Every `key=0|1` in `client.txt` (the game may have keys this app doesn't know yet).
 fn client_file(paths: &Paths) -> std::collections::BTreeMap<String, bool> {
-    let text = std::fs::read_to_string(crate::pz::bridge::dir(paths).join("client.txt")).unwrap_or_default();
+    let text = std::fs::read_to_string(game_dir(paths).join("client.txt")).unwrap_or_default();
     text.lines().filter_map(|l| l.trim().split_once('=')).map(|(k, v)| (k.trim().to_string(), v.trim() != "0")).collect()
 }
 
 /// PZMM - Client's options the app shows, the file's or their defaults. None before the mod has run here.
 pub fn client_settings(paths: &Paths) -> Option<std::collections::BTreeMap<String, bool>> {
-    let dir = dir(paths);
+    let dir = game_dir(paths);
     if !dir.join("client.txt").exists() && !dir.join("game.json").exists() {
         return None;
     }
@@ -504,7 +716,7 @@ pub fn set_client_settings(paths: &Paths, set: &std::collections::BTreeMap<Strin
         now.insert(k.clone(), *v);
     }
     let text: String = now.iter().map(|(k, v)| format!("{k}={}\n", u8::from(*v))).collect();
-    Ok(crate::write_atomic(&crate::pz::bridge::dir(paths).join("client.txt"), text)?)
+    Ok(crate::write_atomic(&game_dir(paths).join("client.txt"), text)?)
 }
 
 /// What the game last reported (`game.json`, written at the main menu and when a game starts).
@@ -780,6 +992,137 @@ mod tests {
         let (r, _) = parse("100-1\tP\trestore\tSurvivor/Rising\tC:\\data\\b.zip\n100-2\tP\trestore\tSurvivor/..\tx.zip\n100-3\tP\trestore\tSurvivor/Rising\n", Some(100), "P");
         assert_eq!(r.iter().map(|s| s.req.clone()).collect::<Vec<_>>(), vec![Request::Restore { mode: "Survivor".into(), name: "Rising".into(), file: "C:\\data\\b.zip".into() }]);
         assert!(!reqs[1].req.quiet());
+    }
+
+    #[test]
+    fn the_games_newer_requests_are_checked() {
+        let text = "remove\tA,B\nremove\t\nfind\tModA\nrollback\tModA\nimport\tPZMM1:abc\nimport\t\nprofile\tnew\tSolo\nprofile\trename\tSolo\tDuo\nprofile\tduplicate\tSolo\nprofile\tdelete\tSolo\nprofile\tnew\nserverprofile\t1.2.3.4:16261\tA,B\nserverprofile\tnoport\tA\nserver\tstart\tservertest\nserver\twipe\tservertest\nserver\tstop\t../x\nfeed\tmore\nfeed\tall\ncancel\npics\t123\npics\tx1\nsnapshot\t1792000000123\nopen\thistory\n";
+        let s = |v: &str| v.to_string();
+        assert_eq!(reqs(text), vec![
+            Request::Remove { ids: vec![s("A"), s("B")] },
+            Request::Find { id: s("ModA") },
+            Request::Rollback { id: s("ModA") },
+            Request::Import { text: s("PZMM1:abc") },
+            Request::ProfileEdit { op: s("new"), name: s("Solo"), to: None },
+            Request::ProfileEdit { op: s("rename"), name: s("Solo"), to: Some(s("Duo")) },
+            Request::ProfileEdit { op: s("delete"), name: s("Solo"), to: None },
+            Request::Profile { name: s("new") },
+            Request::ServerProfile { addr: s("1.2.3.4:16261"), ids: vec![s("A"), s("B")] },
+            Request::Server { op: s("start"), name: s("servertest") },
+            Request::Feed,
+            Request::Cancel,
+            Request::Pics { item: s("123") },
+            Request::Snapshot { id: s("1792000000123") },
+            Request::Open { tab: s("history") },
+        ], "a copy needs its new name; a lone `new` is the profile called that");
+        assert!([Request::Feed, Request::Cancel, Request::Pics { item: s("1") }, Request::Set { key: s("theme"), value: s("dark") }].iter().all(Request::quiet));
+        assert!(!Request::Remove { ids: vec![] }.quiet() && !Request::Server { op: s("stop"), name: s("x") }.quiet());
+        // quiet, but not an edit to the profile the game showed: done whichever profile is active
+        let (ok, _) = parse(&format!("{NOW}-1\tOther\tpics\t123\n{NOW}-2\tOther\tplace\tA\tMaps\n"), Some(NOW), "Default");
+        assert_eq!(ok.len(), 1);
+        let json = serde_json::to_value(&parse(&stamped("rollback\tModA\nserverprofile\th:1\t\n"), Some(NOW), "Default").0).unwrap();
+        assert_eq!((json[0]["action"].as_str(), json[0]["mod"].as_str(), json[1]["action"].as_str(), json[1]["ids"].as_array().map(Vec::len)), (Some("rollback"), Some("ModA"), Some("serverprofile"), Some(0)));
+    }
+
+    #[test]
+    fn a_hide_names_a_findings_line() {
+        let key = "warn\tModA\tModA has no poster";
+        assert_eq!(reqs(&format!("hide\t{key}\nhide\tModA\nhide\twarn\t-\ta\tb\nhide\t\n")), vec![Request::Hide { key: key.into() }], "level, mod and text: three columns");
+        assert!(Request::Hide { key: key.into() }.quiet());
+        let json = serde_json::to_value(&parse(&stamped(&format!("hide\t{key}")), Some(NOW), "Default").0).unwrap();
+        assert_eq!((json[0]["action"].as_str(), json[0]["key"].as_str()), (Some("hide"), Some(key)));
+        // and back: the hidden line's own level
+        let back = "hidden-warn\tModA\tModA has no poster";
+        assert_eq!(reqs(&format!("unhide\t{back}\nunhide\tModA\n")), vec![Request::Unhide { key: back.into() }]);
+        assert!(Request::Unhide { key: back.into() }.quiet());
+    }
+
+    #[test]
+    fn a_server_star_names_host_and_port() {
+        assert_eq!(reqs("serverfav\t203.0.113.5:16261\t1\nserverfav\tplay.example.com:16261\t0\nserverfav\tnoport\t1\nserverfav\th:1\tyes\nserverfav\th:1\n"), vec![
+            Request::ServerFav { addr: "203.0.113.5:16261".into(), on: true },
+            Request::ServerFav { addr: "play.example.com:16261".into(), on: false },
+        ]);
+        let (ok, _) = parse(&format!("{NOW}-1\tOther\tserverfav\th:1\t1\n{NOW}-2\tOther\ttags\tModA\tFun\n"), Some(NOW), "Default");
+        assert_eq!(ok.len(), 2, "a star, and tags, are every profile's");
+        assert!(ok.iter().all(|s| s.req.quiet()));
+        let json = serde_json::to_value(&ok).unwrap();
+        assert_eq!((json[0]["action"].as_str(), json[0]["addr"].as_str(), json[0]["on"].as_bool()), (Some("serverfav"), Some("h:1"), Some(true)));
+    }
+
+    #[test]
+    fn edits_waiting_hold_the_library_back() {
+        let t = tempfile::tempdir().unwrap();
+        assert!(!sorting_queued(t.path()));
+        std::fs::write(t.path().join("requests.queue"), "1-1\tDefault\tcheck\n1-2\tDefault\ttags\tA\tFun\n").unwrap();
+        assert!(!sorting_queued(t.path()), "tags aren't in library.txt");
+        std::fs::write(t.path().join("requests.txt"), "1-3\tDefault\tplace\tA\tMaps\n").unwrap();
+        assert!(sorting_queued(t.path()));
+    }
+
+    #[test]
+    fn the_games_bisect_is_seen() {
+        let (_t, paths) = crate::store::tests::temp_paths();
+        let dir = paths.zomboid.join("Lua/pzmm");
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(!game_bisecting(&paths));
+        for (text, on) in [("", false), ("result\tA\n", false), ("original\tA;B\nsuspects\tA;B\n", true)] {
+            std::fs::write(dir.join("bisect.txt"), text).unwrap();
+            assert_eq!(game_bisecting(&paths), on, "{text:?}");
+        }
+        for (text, found) in [("", None), ("original\tA;B\n", None), ("result\t\r\n", Some("")), ("result\t~A|B\n", Some("~A|B"))] {
+            std::fs::write(dir.join("bisect.txt"), text).unwrap();
+            assert_eq!(game_bisect_result(&paths).as_deref(), found, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn pictures_three_items_at_a_time() {
+        let (ok, no) = parse(&stamped("pics\t1\npics\t2\ncheck\npics\t3\npics\t4\npics\t5\n"), Some(NOW), "Default");
+        assert_eq!(ok.iter().filter(|s| matches!(s.req, Request::Pics { .. })).count(), 3);
+        assert_eq!(ok.len(), 4, "other requests aren't held back");
+        assert!(no.len() == 2 && no.iter().all(|a| a.why.contains("3 items")), "{no:?}");
+    }
+
+    #[test]
+    fn settings_are_only_those_settings_shows() {
+        let (ok, no) = parse(&stamped("set\ttheme\tdark\nset\taccent\t#A1b2C3\nset\tsave_backup_every\t100\nset\tsave_backup_every\t241\nset\trecycle\t0\nset\tbuild\tauto\nset\tlaunch_args\t-cachedir=C:/x\nset\ttheme\tpink\nset\taccent\tred\nset\tbackup_cap_mb\t-1\n"), Some(NOW), "Default");
+        let set: Vec<(&str, &str)> = ok.iter().map(|s| match &s.req { Request::Set { key, value } => (key.as_str(), value.as_str()), r => panic!("{r:?}") }).collect();
+        assert_eq!(set, [("theme", "dark"), ("accent", "#A1b2C3"), ("save_backup_every", "100"), ("build", "auto")]);
+        assert_eq!(no.len(), 6);
+        assert!(no.iter().all(|a| !a.ok && a.why.starts_with("PZMM doesn't let the game set ")), "{no:?}");
+        let mut values: std::collections::BTreeMap<String, String> = APP_SETTINGS.iter().map(|(k, _)| (k.to_string(), "1".to_string())).collect();
+        values.insert("theme".into(), "light".into());
+        values.insert("launch_args".into(), "-debug".into());
+        let text = settings_text(&values);
+        assert!(text.starts_with("app_updates=1\nautosort_new=1\ncompact=1\n") && text.contains("\ntheme=light\n") && !text.contains("launch_args"), "{text}");
+        assert!(!text.contains("update_check=") && !text.contains("accent="), "a value it doesn't take is left out");
+    }
+
+    #[test]
+    fn hosted_servers_and_the_job_running_for_the_game() {
+        use crate::pz::host::Status;
+        let text = hosted_text([("a", Status::Running, Some(3)), ("b", Status::Stopping, None), ("c", Status::Crashed, None), ("d", Status::Starting, None), ("e", Status::Stopped, None)].into_iter());
+        assert_eq!(text, "a\trunning\t3\nb\trunning\t0\nc\tcrashed\t0\nd\tstarting\t0\ne\tstopped\t0\n");
+        assert_eq!(job_lines(), "job=\n");
+        *JOB.lock().unwrap() = ("Installing\n3 mods".into(), 1, 3);
+        assert_eq!(job_lines(), "job=Installing 3 mods\ndone=1\ntotal=3\n");
+        *JOB.lock().unwrap() = Default::default();
+    }
+
+    #[test]
+    fn a_game_elsewhere_gets_copies() {
+        let t = tempfile::tempdir().unwrap();
+        let (from, to) = (t.path().join("a"), t.path().join("b"));
+        std::fs::create_dir_all(&from).unwrap();
+        std::fs::create_dir_all(&to).unwrap();
+        for f in ["news.txt", "hosted.txt", "settings_app.txt", "app.txt", "activity_app.txt", "client.txt"] {
+            std::fs::write(from.join(f), f).unwrap();
+        }
+        mirror(&from, &to);
+        assert_eq!(std::fs::read_to_string(to.join("news.txt")).unwrap(), "news.txt");
+        assert!(to.join("hosted.txt").exists() && to.join("settings_app.txt").exists() && !to.join("app.txt").exists(), "app.txt goes its own way");
+        assert!(to.join("activity_app.txt").exists() && !to.join("client.txt").exists(), "the game writes client.txt too: never copied over it");
     }
 
     #[test]

@@ -54,6 +54,7 @@ pub fn news(paths: &Paths) -> Result<News> {
     let kept: Option<News> = std::fs::read_to_string(file(paths)).ok().and_then(|t| serde_json::from_str(&t).ok());
     let now = store::now();
     if let Some(n) = kept.as_ref().filter(|n| now.saturating_sub(n.fetched) < KEEP) {
+        for_game(paths, &n.posts, false);
         return Ok(News { fetched: n.fetched, posts: n.posts.clone(), error: String::new() });
     }
     let fresh = sources::http_get(URL).and_then(|b| parse(&String::from_utf8_lossy(&b)));
@@ -62,11 +63,28 @@ pub fn news(paths: &Paths) -> Result<News> {
             let n = News { fetched: now, posts, error: String::new() };
             std::fs::create_dir_all(&paths.data)?;
             crate::write_atomic(&file(paths), serde_json::to_string(&n)?)?;
+            for_game(paths, &n.posts, true);
             Ok(n)
         }
         (Err(e), Some(old)) if !old.posts.is_empty() => Ok(News { error: format!("{e:#}"), ..old }),
         (Err(e), _) => Err(e.context("reading Project Zomboid's news from Steam")),
     }
+}
+
+/// The posts for the PZMM - Client mod's Home: `Zomboid/Lua/pzmm/news.txt`, a line per post, newest first:
+/// `<n>\t<date>\t<build>\t<title>\t<url>\t<excerpt>`, with its picture as `img/news_<n>.png` (see `pictures`;
+/// `fresh`: Steam was just asked, so the numbers may name other posts now and the pictures are saved again).
+fn for_game(paths: &Paths, posts: &[Post], fresh: bool) {
+    let dir = super::bridge::dir(paths);
+    if !dir.is_dir() {
+        return;
+    }
+    let flat = |s: &str| s.replace(['\t', '\n', '\r'], " ");
+    let text: String = posts.iter().enumerate().map(|(i, p)| format!("{}\t{}\t{}\t{}\t{}\t{}\n", i + 1, p.date, p.build, flat(&p.title), p.url, flat(&p.excerpt))).collect();
+    if std::fs::read_to_string(dir.join("news.txt")).ok().as_deref() != Some(text.as_str()) {
+        super::bridge::write_for_game(&dir.join("news.txt"), &text);
+    }
+    super::pictures::save_later(paths, posts.iter().enumerate().map(|(i, p)| (format!("news_{}", i + 1), p.image.clone())).collect(), fresh);
 }
 
 #[derive(Deserialize)]

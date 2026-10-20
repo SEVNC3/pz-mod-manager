@@ -2,7 +2,7 @@
   import { onDestroy } from "svelte";
   import LayerIcon from "./LayerIcon.svelte";
   import Icon from "./Icon.svelte";
-  import { fmtDate, fmtNum, workshopUrl } from "./format";
+  import { fmtAgo, fmtDate, fmtNum, fmtSize, workshopUrl } from "./format";
   import { keyedError, t } from "./i18n.svelte";
   import { api, describeSource, type Candidate, type ChangeNote, type Conflict, type ModDetails, type ModRow, type Rule } from "./api";
 
@@ -25,12 +25,19 @@
     onSelect,
     onClose,
     firstSeen = 0,
+    size = 0,
+    updated = 0,
+    category = "",
   }: {
     id: string;
     mods: Map<string, ModRow>;
     busy: boolean;
     /** When it first arrived on this PC (0: unknown, not shown). */
     firstSeen?: number;
+    /** Its size and when its files last changed (0: unknown), and PZMM's category for it ("" until read). */
+    size?: number;
+    updated?: number;
+    category?: string;
     /** A search for a broken mod owns the lists: installs, Enable/Disable and Remove wait. */
     lock?: boolean;
     hasUpdate: boolean;
@@ -140,12 +147,19 @@
     if (v && !tags.some((x) => x.toLowerCase() === v.toLowerCase())) onTags(id, [...tags, v]);
   }
   const POSITIONS = ["", "on", "category"];
+  /** Mods it can't run with that are on now. */
+  const clashOn = $derived((row?.incompatible ?? []).filter((x) => mods.get(x)?.on));
 
   const facts = $derived(
     [
       [t("details.author"), d?.info.author],
       [t("details.modVersion"), d?.info.modversion],
       [t("details.needsGameVersion"), d?.info.versionMin ? t("details.versionOrNewer", { version: d.info.versionMin }) : undefined],
+      [t("details.pzmmCategory"), category],
+      [t("details.workshopId"), (d?.source ?? "").match(/^(?:workshop|steam):(\d+)/)?.[1]],
+      [t("details.updated"), fmtAgo(updated)],
+      [t("modTable.col.size"), size ? fmtSize(size) : undefined],
+      [t("details.languages"), row?.languages.join(", ")],
     ].filter((f): f is [string, string] => !!f[1]),
   );
 </script>
@@ -227,6 +241,7 @@
         <input class="add" type="text" list="pzmm-tags" placeholder={t("details.addTag")} aria-label={t("details.addTag")} onchange={(e) => addTag(e.currentTarget)} />
       </dd>
     </dl>
+    {#if clashOn.length}<p class="bad">{t("details.incompatibleOn", { names: clashOn.map((x) => mods.get(x)?.name || x).join(", ") })}</p>{/if}
     <datalist id="pzmm-tags">{#each allTags.filter((x) => !tags.includes(x)) as x}<option value={x}></option>{/each}</datalist>
 
     {#if hasUpdate && d.ours}

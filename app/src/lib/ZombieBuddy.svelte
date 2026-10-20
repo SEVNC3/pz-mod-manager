@@ -5,7 +5,7 @@
   import Icon from "./Icon.svelte";
   import { showInSettings } from "./Settings.svelte";
 
-  let { status, view, updates, busy, lock, onSetup, onRemove, onSwitch, onInstall, onUpdate, onSettings }: {
+  let { status, view, updates, busy, lock, onSetup, onRemove, onSwitch, onInstall, onUpdate, onSettings, onShowMod }: {
     status: ZbStatus | null;
     view: View | null;
     /** Mods with a Workshop update waiting. */
@@ -21,6 +21,8 @@
     onInstall: () => void;
     onUpdate: () => void;
     onSettings: () => void;
+    /** A Java mod in My mods. */
+    onShowMod: (id: string) => void;
   } = $props();
 
   const profile = $derived(view?.profile ?? "");
@@ -195,6 +197,7 @@
           {#if installedAny}
             <button class="danger" onclick={() => preview(true)} disabled={busy}><Icon name="trash" size={14} />{t("zb.removeFromGame")}</button>
           {/if}
+          <button class="quiet" onclick={() => api.openUrl(workshopUrl("3619862853"))}><img src="/brand/steam.png" alt="" width="14" height="14" class="brand-img" />{t("details.workshopPage")}</button>
           <button class="quiet" onclick={() => api.openUrl("https://github.com/zed-0xff/ZombieBuddy")}><Icon name="external" size={14} />{t("zb.about")}</button>
         </div>
       {/if}
@@ -252,7 +255,7 @@
       <ul class="java">
         {#each java as j}
           <li>
-            <strong>{j.name || j.id}</strong> <span class="mono hint">{j.jar}</span>
+            <button class="quiet link" onclick={() => onShowMod(j.id)}><strong>{j.name || j.id}</strong></button> <span class="mono hint">{j.jar}</span>
             {#if j.loader === "zombiebuddy"}
               <p class:bad={j.signature === "invalid" || j.signature === "missing"}>
                 {t(`java.sig.${j.signature}`, { signer: j.signer_name || j.signer || "" })}

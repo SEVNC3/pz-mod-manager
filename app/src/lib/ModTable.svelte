@@ -40,6 +40,10 @@
     onRename,
     onRemoveSep,
     onMenu,
+    onSepMenu,
+    sortBy,
+    onSort,
+    onHide,
   }: {
     rows: Row[];
     /** The load order (enabled mod ids): the number column shows each mod's place in it. */
@@ -83,7 +87,24 @@
     onRemoveSep: (i: number) => void;
     /** A mod row's right-click menu, at the pointer. */
     onMenu: (id: string, x: number, y: number) => void;
+    /** A separator's right-click menu, at the pointer. */
+    onSepMenu: (i: number, x: number, y: number) => void;
+    /** The list's sort (a header shows it; "order" is the library's own). */
+    sortBy: string;
+    /** A sortable header clicked. */
+    onSort: (by: string) => void;
+    /** The eye: hide the mod from the list, or show it again. */
+    onHide: (id: string) => void;
   } = $props();
+
+  /** The headers that sort, and the sort each one picks. */
+  const HEADS: [string, string, string][] = [
+    ["num", "order", "#"],
+    ["name", "name", "modTable.col.mod"],
+    ["meta", "size", "modTable.col.size"],
+    ["meta", "installed", "modTable.col.installed"],
+    ["meta", "updated", "modTable.col.lastChanged"],
+  ];
 
   let dropAt = $state<number | null>(null);
 
@@ -135,23 +156,32 @@
 </script>
 
 <table>
-  <thead class="visually-hidden">
-    <tr><th>{t("modTable.col.move")}</th><th>{t("common.enabled")}</th><th>{t("modTable.col.loadOrder")}</th><th>{t("modTable.col.mod")}</th><th>{t("modTable.col.size")}</th><th>{t("modTable.col.lastChanged")}</th><th>{t("modTable.col.sharedFiles")}</th><th>{t("modTable.col.source")}</th></tr>
+  <thead>
+    <tr>
+      <th><span class="visually-hidden">{t("modTable.col.move")}</span></th><th><span class="visually-hidden">{t("common.enabled")}</span></th><th><span class="visually-hidden">{t("modTable.col.hide")}</span></th>
+      {#each HEADS as [cls, by, key]}
+        <th class={cls} aria-sort={sortBy === by && by !== "order" ? "descending" : undefined}>
+          <!-- i18n-ignore: "#" is the load order number -->
+          <button class="head" class:on={sortBy === by} title={t("modTable.sortByTip")} onclick={() => onSort(by)}>{key === "#" ? "#" : t(key)}{#if sortBy === by && by !== "order"}<Icon name="chevron-down" size={12} />{/if}</button>
+        </th>
+      {/each}
+      <th class="overlap-head">{t("modTable.col.overwrites")}</th><th class="src">{t("modTable.col.source")}</th>
+    </tr>
   </thead>
   <tbody>
     {#each visible as { r, i }, k (r.kind === "mod" ? `m:${r.id}` : `s:${i}:${r.name}`)}
       <!-- each section is a card: a separator starts one, the row before the next separator ends it -->
       {@const start = k === 0 || r.kind === "sep" || loose(k) || loose(k - 1)}
       {@const end = k === visible.length - 1 || visible[k + 1].r.kind === "sep" || loose(k) || loose(k + 1)}
-      {#if start && k > 0}<tr class="gap" aria-hidden="true"><td colspan="8"></td></tr>{/if}
+      {#if start && k > 0}<tr class="gap" aria-hidden="true"><td colspan="10"></td></tr>{/if}
       {#if r.kind === "sep"}
         <tr class="sep" class:start class:end class:drop={dropShown === i} class:dragging={dragFrom === i} data-index={i} tabindex="0" draggable={!filtering && editingSep !== i}
           ondragstart={() => (dragFrom = i)} ondragend={() => { dragFrom = dropAt = null; }}
           ondragover={(e) => { e.preventDefault(); dropAt = i; }}
           ondrop={(e) => { e.preventDefault(); drop(i); }}
-          ondblclick={() => !busy && (editingSep = i)} onkeydown={(e) => editingSep !== i && onRowKey(e, i, r)}>
+          ondblclick={() => !busy && (editingSep = i)} oncontextmenu={(e) => { if (editingSep === i) return; e.preventDefault(); onSepMenu(i, e.clientX, e.clientY); }} onkeydown={(e) => editingSep !== i && onRowKey(e, i, r)}>
           <td class="grip" aria-hidden="true"><Icon name="grip" size={14} fill /></td>
-          <td colspan="7">
+          <td colspan="9">
             {#if editingSep === i}
               <!-- svelte-ignore a11y_autofocus -->
               <input class="tape-edit" type="text" value={r.name} autofocus aria-label={t("modTable.sepNameLabel")}
@@ -185,6 +215,11 @@
             <input type="checkbox" checked={r.on} disabled={busy} aria-label={t("modTable.enableLabel", { name: r.name || r.id })}
               onclick={(e) => e.stopPropagation()} onchange={() => onToggle(r.id)} />
           </td>
+          <td class="eye">
+            <button class="quiet icon" class:on={hidden.has(r.id)} disabled={busy} title={t(hidden.has(r.id) ? "modTable.unhideTip" : "modTable.hideTip")}
+              aria-label={t(hidden.has(r.id) ? "modTable.unhideTip" : "modTable.hideTip")} aria-pressed={hidden.has(r.id)}
+              onclick={(e) => { e.stopPropagation(); onHide(r.id); }} onkeydown={(e) => e.stopPropagation()}><Icon name={hidden.has(r.id) ? "eye-off" : "eye"} size={14} /></button>
+          </td>
           <td class="num mono">{place.get(r.id) ?? ""}</td>
           <td class="name">
             {#if favourites.has(r.id)}<span class="fav" title={t("modTable.favourite")}><Icon name="star" size={12} /></span>{/if}
@@ -208,11 +243,12 @@
             {/if}
           </td>
           <td class="meta mono">{stats[r.id] ? fmtSize(stats[r.id].size) : ""}</td>
+          <td class="meta mono">{stats[r.id]?.first_seen ? fmtDate(stats[r.id].first_seen, "short") : ""}</td>
           <td class="meta mono">{stats[r.id] ? fmtDate(stats[r.id].modified, "short") : ""}</td>
           <td class="overlap">
             {#if r.on && overlaps[r.id]}
               {@const o = overlaps[r.id]}
-              <LayerIcon wins={o.wins_over.length > 0} loses={o.loses_to.length > 0} label={overlapLabel(o)} />
+              <span class="overlaps" title={overlapLabel(o)}><LayerIcon wins={o.wins_over.length > 0} loses={o.loses_to.length > 0} label={overlapLabel(o)} /><span class="mono">{fmtNum(new Set([...o.wins_over, ...o.loses_to]).size)}</span></span>
             {/if}
           </td>
           <td class="src">
@@ -241,7 +277,7 @@
       <tr class="tail" class:drop={dropShown === rows.length} aria-hidden="true"
         ondragover={(e) => { e.preventDefault(); dropAt = rows.length; }}
         ondrop={(e) => { e.preventDefault(); drop(rows.length); }}>
-        <td colspan="8"></td>
+        <td colspan="10"></td>
       </tr>
     {/if}
   </tbody>
@@ -406,6 +442,71 @@
     width: 16px;
     height: 16px;
   }
+  /* the eye: faint until the row is pointed at, always there once the mod is hidden */
+  .eye {
+    width: 26px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .eye button {
+    padding: 2px;
+    color: var(--muted);
+    opacity: 0.4;
+  }
+  .eye button.on,
+  tr.mod:hover .eye button,
+  tr.mod:focus-within .eye button {
+    opacity: 1;
+  }
+  /* the header row: sticks above the cards while the list scrolls */
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    text-align: left;
+    white-space: nowrap;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  thead th.num,
+  thead th.meta,
+  thead th.src {
+    text-align: right;
+  }
+  .head {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+  }
+  .head:hover,
+  .head.on {
+    color: var(--text);
+  }
+  .overlap-head {
+    text-align: center;
+  }
+  .overlaps {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 12px;
+    color: var(--muted);
+  }
   .num {
     width: 40px;
     text-align: right;
@@ -481,7 +582,7 @@
   }
   /* its own column so the icons line up whatever the badge beside them says */
   .overlap {
-    width: 28px;
+    width: 44px;
     padding-left: 8px;
     padding-right: 0;
     text-align: center;

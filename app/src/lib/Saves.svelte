@@ -7,12 +7,14 @@
   import SaveTools from "./SaveTools.svelte";
   import { showInSettings } from "./Settings.svelte";
 
-  let { busy, lock = "", profile, enabledIds, onUseSave, onSettings, ask }: {
+  let { busy, lock = "", profile, enabledIds, installedIds, onUseSave, onSettings, ask }: {
     busy: boolean;
     /** Why switching profile is blocked now ("" when it isn't): Use these mods waits. */
     lock?: string;
     profile: string;
     enabledIds: string[];
+    /** Installed mod ids: a save's mods not among them are missing. */
+    installedIds: string[];
     /** Switch to a save's mods (after a preview). */
     onUseSave: (save: Save) => Promise<boolean>;
     onSettings: () => void;
@@ -41,6 +43,7 @@
   }
 
   const when = (time: number) => fmtDateTime(time);
+  const installed = $derived(new Set(installedIds));
 
   /** The save whose tools are open: "mode/name". */
   let open = $state("");
@@ -68,12 +71,14 @@
       <ul class="list">
         {#each data.saves as s (s.mode + "/" + s.name)}
           {@const key = s.mode + "/" + s.name}
+          {@const missing = s.mods.filter((id) => !installed.has(id))}
           <li>
             <span class="name">
               <strong>{s.name}</strong>
-              <span class="hint">{t("servers.saves.info", { mode: modeName(s.mode), count: s.mods.length, when: when(s.modified), diff: diff(s.mods) })}</span>
+              <span class="hint">{t("servers.saves.info", { mode: modeName(s.mode), count: s.mods.length, when: when(s.modified), diff: diff(s.mods) })}{#if s.maps.length}{" · "}{s.maps.join(", ")}{/if}{#if missing.length}{" · "}<span class="error" title={t("saves.notInstalledTip", { mods: missing.join(", ") })}>{t("saves.notInstalled", { count: missing.length })}</span>{/if}</span>
             </span>
             <span class="btns">
+              <button class="quiet" onclick={() => data && api.openPath(`${data.saves_dir}/${s.mode}/${s.name}`)} title={t("saves.openFolder")} aria-label={t("saves.openFolder")}><Icon name="folder" size={14} /></button>
               <button disabled={busy || !!lock} title={lock} onclick={() => onUseSave(s)}><Icon name="swap" size={14} />{t("servers.saves.useMods")}</button>
               <button aria-expanded={open === key} onclick={() => toggle(key)}><Icon name="settings" size={14} />{t("saves.tools")}</button>
             </span>

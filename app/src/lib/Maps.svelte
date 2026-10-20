@@ -384,6 +384,9 @@
   let mapLine = $state<string[]>([]);
   /** Each map folder's lots= (the maps it builds on), for Autosort. */
   const lotsByFolder = $derived(new Map(all.flatMap((m) => m.maps.map((f) => [f.folder, f.lots] as const))));
+  const titleByFolder = $derived(new Map(all.flatMap((m) => m.maps.map((f) => [f.folder, f.title] as const))));
+  /** The shown maps a folder's map shares cells with, by name (Map order's chip). */
+  const clashesOf = (f: string) => [...new Set((folderOwners.get(f) ?? []).flatMap((id) => [...(clashes.get(id)?.with.keys() ?? [])]))].map((id) => names.get(id) ?? id);
   const folders = $derived(shown.flatMap((m) => m.maps.map((f) => f.folder)));
   let lineFor = 0;
   $effect(() => {
@@ -869,7 +872,7 @@
           {/if}
         </div>
         <div class="row">
-          <input type="search" bind:value={search} placeholder={t("maps.searchPlaceholder")} aria-label={t("maps.searchLabel")} />
+          <input id="maps-search" type="search" bind:value={search} placeholder={t("maps.searchPlaceholder")} aria-label={t("maps.searchLabel")} />
           <select bind:value={filter} aria-label={t("maps.filterLabel")} title={t("maps.filterLabel")}>
             {#each FILTERS as [v, label]}<option value={v}>{t(label)}</option>{/each}
           </select>
@@ -916,7 +919,7 @@
               {@const clash = clashes.get(m.id)}
               {@const isShown = on || preview.has(m.id)}
               <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-              <li class:shown={isShown} class:hidden={hidden.has(m.id)} onclick={(e) => !on && !(e.target as HTMLElement).closest("button, input, a") && togglePreview(m.id)}>
+              <li class:shown={isShown} class:hidden={hidden.has(m.id)} title={m.maps.map((f) => f.description).filter(Boolean).join("\n\n") || undefined} onclick={(e) => !on && !(e.target as HTMLElement).closest("button, input, a") && togglePreview(m.id)}>
                 <input type="checkbox" checked={isShown} disabled={on} onchange={() => togglePreview(m.id)}
                   aria-label={t("maps.previewLabel", { name: nameOf(m) })} title={on ? t("maps.alwaysShownTip") : t("maps.previewTip")} />
                 <span class="name">
@@ -939,6 +942,7 @@
                 </span>
                 <span class="btns">
                   {#if isShown}<button class="quiet icon" onclick={() => toggleHidden(m.id)} title={hidden.has(m.id) ? t("maps.showOnGridTip") : t("maps.hideOnGridTip")} aria-label={hidden.has(m.id) ? t("maps.showOnGrid") : t("maps.hideOnGrid")} aria-pressed={hidden.has(m.id)}><Icon name={hidden.has(m.id) ? "eye-off" : "eye"} size={16} /></button>{/if}
+                  {#if installed}<button class="quiet icon" onclick={() => onShowMod(m.id)} title={t("maps.showInMods")} aria-label={t("maps.showInMods")}><Icon name="search" size={16} /></button>{/if}
                   {#if item}<button class="quiet icon" onclick={() => api.openUrl(workshopUrl(item))} title={t("maps.openWorkshopTip")} aria-label={t("common.workshop")}><Icon name="steam" size={16} /></button>{/if}
                   {#if installed}
                     <button disabled={busy} onclick={() => setMods([m.id], !on)} title={on ? "" : t("maps.alsoTurnsOnTip")}>{on ? t("common.disable") : t("common.enable")}</button>
@@ -1078,7 +1082,7 @@
         {#if mapLine.length}
           <h3>{t("maps.export.orderTitle")}</h3>
           <p class="hint">{@html th("maps.export.orderHint")}</p>
-          <MapOrder bind:maps={mapLine} onarrange={arranged} lotsOf={(f) => lotsByFolder.get(f) ?? []} />
+          <MapOrder bind:maps={mapLine} onarrange={arranged} lotsOf={(f) => lotsByFolder.get(f) ?? []} titleOf={(f) => titleByFolder.get(f)} {clashesOf} />
         {/if}
         <div class="row">
           <button class="primary" onclick={exportMaps} disabled={!shown.length}><Icon name="copy" size={14} />{t("maps.export.copy", { count: shown.length })}</button>

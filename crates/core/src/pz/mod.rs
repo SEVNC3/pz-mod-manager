@@ -31,6 +31,7 @@ pub mod logs;
 pub mod managers;
 pub mod maps;
 pub mod perf;
+pub mod pictures;
 pub mod mod_index;
 pub mod news;
 pub mod rcon;

@@ -658,21 +658,23 @@ fn save_state(paths: &Paths, s: &State) -> Result<()> {
     Ok(())
 }
 
-/// The servers you joined for the PZMM - Client mod's Servers tab: `Zomboid/Lua/pzmm/servers.txt`, newest first,
-/// `<name>\t<ip:game port>\t<last joined>` lines. Only where PZMM - Client is.
+/// The servers you joined for the PZMM - Client mod's Servers tab: `Zomboid/Lua/pzmm/servers.txt`, newest first, then
+/// favourites never joined: `<name>\t<ip:game port>\t<last joined>\t<fav: 1 or 0>` lines. Only where PZMM - Client is.
 pub fn servers_for_game(paths: &Paths, s: &State) {
     let dir = crate::pz::bridge::dir(paths);
     if !dir.is_dir() {
         return;
     }
     let one = |t: &str| t.replace(['\t', '\r', '\n'], " ");
+    let fav = |v: &Server| s.favourites.iter().any(|f| f.addr == v.addr);
     let text: String = s
         .history
         .iter()
+        .chain(s.favourites.iter().filter(|f| !s.history.iter().any(|h| h.addr == f.addr)))
         .map(|v| {
             let ip = v.addr.rsplit_once(':').map_or(v.addr.as_str(), |(ip, _)| ip);
             let last = s.joins.get(&v.addr).and_then(|j| j.first()).map_or(0, |j| j.time);
-            format!("{}\t{ip}:{}\t{last}\n", one(&v.name), v.port)
+            format!("{}\t{ip}:{}\t{last}\t{}\n", one(&v.name), v.port, u8::from(fav(v)))
         })
         .collect();
     super::bridge::write_for_game(&dir.join("servers.txt"), text);
@@ -691,6 +693,36 @@ pub fn set_favourite(paths: &Paths, server: &Server, on: bool) -> Result<State> 
     }
     save_state(paths, &s)?;
     Ok(s)
+}
+
+/// The server joined at `connect` (`host:port`, the game's port): as the app's favourites, history or the game's own list
+/// know it, else by that address alone. None when it isn't `host:port`.
+fn known(paths: &Paths, s: &State, connect: &str) -> Option<Server> {
+    let (host, port) = connect.rsplit_once(':')?;
+    let port: u16 = port.parse().ok()?;
+    let saved = s.favourites.iter().chain(&s.history).find(|v| v.connect() == connect).cloned();
+    saved.or_else(|| game_list(&paths.zomboid).ok()?.into_iter().find(|v| v.connect() == connect)).or_else(|| (!host.is_empty()).then(|| Server { addr: connect.into(), port, name: connect.into(), ..Default::default() }))
+}
+
+/// [`set_favourite`] for the server joined at `connect` (`host:port`, as `servers.txt` gives it): the game's star.
+pub fn set_favourite_at(paths: &Paths, connect: &str, on: bool) -> Result<State> {
+    let s: State = crate::read_json(&state_file(paths))?;
+    let Some(server) = known(paths, &s, connect) else { bail!("not a server address: {connect}") };
+    set_favourite(paths, &server, on)
+}
+
+/// A join the game made (PZMM - Client's `game.json`: the server, `host:port`, and the mods it loaded at `at`, which are
+/// the server's), noted as the app's own are, its mods the setup. Not when a join of that server was noted in the half
+/// hour before (the app's own, that started the game, or this one already). Returns whether it was noted.
+pub fn record_game_join(paths: &Paths, connect: &str, at: u64, mods: Vec<String>, items: BTreeMap<String, u64>) -> Result<bool> {
+    let s: State = crate::read_json(&state_file(paths))?;
+    let Some(server) = known(paths, &s, connect) else { return Ok(false) };
+    // ponytail: a half-hour window stands in for "the same join"; a rejoin within it isn't noted
+    if s.joins.get(&server.addr).and_then(|j| j.first()).is_some_and(|j| j.time + 1800 >= at) {
+        return Ok(false);
+    }
+    record_join(paths, &server, (!mods.is_empty()).then_some(Join { time: at, mods, maps: vec![], items }))?;
+    Ok(true)
 }
 
 /// Note a join in the history; `join` is the mod set used, `None` when it wasn't the server's own
@@ -964,7 +996,35 @@ mod tests {
         // the game's copy (PZMM - Client's servers.txt), once its folder is there
         std::fs::create_dir_all(paths.zomboid.join("Lua/pzmm")).unwrap();
         record_join(&paths, &srv, None).unwrap();
-        assert_eq!(std::fs::read_to_string(paths.zomboid.join("Lua/pzmm/servers.txt")).unwrap(), "A\t203.0.113.5:16261\t11\n");
+        assert_eq!(std::fs::read_to_string(paths.zomboid.join("Lua/pzmm/servers.txt")).unwrap(), "A\t203.0.113.5:16261\t11\t0\n");
+        // favourites: flagged on their history row, or a row of their own
+        set_favourite(&paths, &srv, true).unwrap();
+        set_favourite(&paths, &Server { addr: "b:16262".into(), port: 16262, name: "B".into(), ..Default::default() }, true).unwrap();
+        assert_eq!(std::fs::read_to_string(paths.zomboid.join("Lua/pzmm/servers.txt")).unwrap(), "A\t203.0.113.5:16261\t11\t1\nB\tb:16262\t0\t1\n");
+        // the game's star, by servers.txt's address: one PZMM knows, and one it never saw
+        assert!(set_favourite_at(&paths, "203.0.113.5:16261", false).unwrap().favourites.iter().all(|f| f.name != "A"));
+        let s = set_favourite_at(&paths, "198.51.100.7:16300", true).unwrap();
+        assert_eq!(s.favourites.last().map(|f| (f.addr.as_str(), f.port, f.connect())), Some(("198.51.100.7:16300", 16300, "198.51.100.7:16300".into())));
+        assert!(set_favourite_at(&paths, "noport", true).is_err());
+    }
+
+    #[test]
+    fn joins_made_in_the_game_are_noted_once() {
+        let (_t, paths) = crate::store::tests::temp_paths();
+        let srv = Server { addr: "203.0.113.5:27015".into(), port: 16261, name: "A".into(), ..Default::default() };
+        // the app's own join started the game: the game's report of it isn't another
+        record_join(&paths, &srv, Some(Join { time: 1000, mods: vec!["A".into()], ..Default::default() })).unwrap();
+        assert!(!record_game_join(&paths, "203.0.113.5:16261", 1300, vec!["A".into()], BTreeMap::new()).unwrap());
+        // a later one, by the server's game port: its mods are the setup
+        assert!(record_game_join(&paths, "203.0.113.5:16261", 9000, vec!["A".into(), "B".into()], [("1".to_string(), 0)].into()).unwrap());
+        assert!(!record_game_join(&paths, "203.0.113.5:16261", 9000, vec!["A".into(), "B".into()], BTreeMap::new()).unwrap(), "the same report again");
+        let s = state(&paths);
+        assert_eq!((s.history.len(), s.joins["203.0.113.5:27015"].len(), s.joins["203.0.113.5:27015"][0].mods.len()), (1, 2, 2));
+        // a vanilla server PZMM never saw: in the history, no setup
+        assert!(record_game_join(&paths, "198.51.100.7:16261", 9000, vec![], BTreeMap::new()).unwrap());
+        let s = state(&paths);
+        assert_eq!((s.history[0].addr.as_str(), s.joins.get("198.51.100.7:16261")), ("198.51.100.7:16261", None));
+        assert!(!record_game_join(&paths, "nonsense", 9000, vec![], BTreeMap::new()).unwrap());
     }
 
     /// Real servers, politely (one pass, cached): `PZMM_A2S_LIVE=ip:port,ip:port cargo test -p pzmm-core live_servers -- --ignored --nocapture`.

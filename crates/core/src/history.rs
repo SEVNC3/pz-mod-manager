@@ -60,6 +60,19 @@ fn write(paths: &Paths, all: &[Record]) {
     if let Ok(bytes) = serde_json::to_vec(all) {
         let _ = crate::write_atomic(&file(paths), bytes);
     }
+    for_game(paths, all);
+    crate::store::first_seen_known_for_game(paths);
+}
+
+/// The history for the PZMM - Client mod: `history.txt`, newest first, `<at>\t<action>\t<id>\t<name>\t<source>` lines.
+/// Only where PZMM - Client is.
+pub fn for_game(paths: &Paths, all: &[Record]) {
+    let dir = crate::pz::bridge::dir(paths);
+    if dir.is_dir() {
+        let flat = |s: &str| s.replace(['\t', '\r', '\n'], " ");
+        let text: String = all.iter().map(|r| format!("{}\t{}\t{}\t{}\t{}\n", r.at, r.action, flat(&r.id), flat(&r.name), flat(&r.source))).collect();
+        crate::pz::bridge::write_for_game(&dir.join("history.txt"), text);
+    }
 }
 
 #[cfg(test)]
@@ -72,7 +85,10 @@ mod tests {
         let paths = Paths { zomboid: t.path().join("Zomboid"), data: t.path().join("data") };
         add(&paths, "A", "Mod A", "workshop:1", "installed");
         add(&paths, "B", "Mod B", "workshop:2", "installed");
+        std::fs::create_dir_all(paths.zomboid.join("Lua/pzmm")).unwrap();
         add(&paths, "A", "", "workshop:1", "removed");
+        let game = std::fs::read_to_string(paths.zomboid.join("Lua/pzmm/history.txt")).unwrap();
+        assert!(game.lines().count() == 3 && game.lines().next().unwrap().ends_with("\tremoved\tA\tMod A\tworkshop:1"), "the game's copy, newest first: {game}");
         let l = list(&paths);
         assert_eq!(l.iter().map(|r| (r.id.as_str(), r.name.as_str(), r.action.as_str())).collect::<Vec<_>>(), [("A", "Mod A", "removed"), ("B", "Mod B", "installed"), ("A", "Mod A", "installed")]);
         assert_eq!(clear(&paths, Some(&["A".into()])).len(), 1);

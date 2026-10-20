@@ -74,6 +74,9 @@
 
 
   const installed = $derived(new Set(installedIds));
+  /** A row's Join: the server it was for, and a count that opens its details afresh each time. */
+  let joinFor = $state("");
+  let joins = $state(0);
   /** For the filters: listed mods not installed, plus every mod the server doesn't list (they may be missing too). */
   const toGet = (s: GameServer) => {
     const n = modNeed(s, installed);
@@ -125,11 +128,13 @@
     if (build !== "any" && !s.build.startsWith(build)) return false;
     if (playersFilter === "notEmpty" && !s.players) return false;
     if (playersFilter === "notFull" && s.max_players && s.players >= s.max_players) return false;
+    if (/^\d+$/.test(playersFilter) && s.players < +playersFilter) return false;
     if (pvpFilter !== "any" && s.pvp !== (pvpFilter === "pvp")) return false;
     // password and mods are known once it answered
     if ((passwordFilter !== "any" || modsFilter !== "any") && !s.probed) return false;
     if (passwordFilter !== "any" && s.password !== (passwordFilter === "locked")) return false;
     if (modsFilter === "mine" && toGet(s)) return false;
+    if (modsFilter === "missing" && !toGet(s)) return false;
     if (modsFilter === "few" && toGet(s) > maxDownload) return false;
     return true;
   }
@@ -324,7 +329,7 @@
   {/if}
   {#if lists}
     <div class="filters" role="group" aria-label={t("launcher.filtersLabel")}>
-      <input type="search" bind:value={search} placeholder={t("launcher.search")} aria-label={t("launcher.search")} />
+      <input id="servers-search" type="search" bind:value={search} placeholder={t("launcher.search")} aria-label={t("launcher.search")} />
       <select bind:value={build} aria-label={t("launcher.build")}>
         <option value="any">{t("launcher.anyBuild")}</option>
         <option value="42">{t("launcher.b42")}</option>
@@ -333,6 +338,7 @@
       <select bind:value={modsFilter} aria-label={t("launcher.mods")}>
         <option value="any">{t("launcher.anyMods")}</option>
         <option value="mine">{t("launcher.onlyMine")}</option>
+        <option value="missing">{t("launcher.missingSome")}</option>
         <option value="few">{t("launcher.atMost")}</option>
       </select>
       {#if modsFilter === "few"}
@@ -343,6 +349,7 @@
         <option value="any">{t("launcher.anyPlayers")}</option>
         <option value="notEmpty">{t("launcher.notEmpty")}</option>
         <option value="notFull">{t("launcher.notFull")}</option>
+        {#each [5, 10, 20] as n}<option value={String(n)}>{fmtNum(n)}+</option>{/each}
       </select>
       <select bind:value={passwordFilter} aria-label={t("launcher.password")}>
         <option value="any">{t("launcher.anyPassword")}</option>
@@ -404,7 +411,7 @@
               {@const mc = modsCell(s)}
               <tr class:selected={selected?.addr === s.addr} class:silent={!s.probed && !!s.error}>
                 <td class="name">
-                  <button class="pick" onclick={() => { linkPassword = ownPassword = null; selected = s; }} aria-pressed={selected?.addr === s.addr}>
+                  <button class="pick" onclick={() => { linkPassword = ownPassword = null; joinFor = ""; selected = s; }} aria-pressed={selected?.addr === s.addr}>
                     {#if s.password}<span title={t("launcher.locked")}><Icon name="lock" size={12} /></span>{/if}
                     <span>{s.name}</span>
                     {#if s.pvp}<span class="tag">{t("launcher.pvpTag")}</span>{/if}
@@ -417,7 +424,8 @@
                 <td class="n">{s.ping === null ? (s.error ? "—" : "…") : t("launcher.ms", { n: s.ping })}</td>
                 <td class="mono">{s.build}</td>
                 <td class="modscol" title={mc.tip}>{mc.text}</td>
-                <td>
+                <td class="acts">
+                  {#if s.probed && !s.error}<button class="primary" onclick={() => { linkPassword = ownPassword = null; joinFor = s.addr; joins++; selected = s; }} disabled={busy}>{t("launcher.join")}</button>{/if}
                   <button class="star" class:on={isFavourite(s)} onclick={() => toggleFavourite(s)} aria-pressed={isFavourite(s)} title={t("launcher.favourite")} aria-label={t("launcher.favourite")}>
                     <Icon name="star" size={14} fill={isFavourite(s)} />
                   </button>
@@ -436,8 +444,8 @@
   </div>
 
   {#if selected}
-    {#key selected.addr}
-      <ServerJoin server={selected} {busy} {lock} {installed} password={linkPassword} {ownPassword} joins={lists?.joins[selected.addr] ?? []} favourite={isFavourite(selected)}
+    {#key `${selected.addr} ${joins}`}
+      <ServerJoin server={selected} autoJoin={joinFor === selected.addr} {busy} {lock} {installed} password={linkPassword} {ownPassword} joins={lists?.joins[selected.addr] ?? []} favourite={isFavourite(selected)}
         onFavourite={() => selected && toggleFavourite(selected)} onClose={() => (selected = null)}
         onUpdate={(s) => (selected = s)} {onSetup} {onCheck} onJoined={refreshState} />
     {/key}
@@ -545,7 +553,8 @@
     text-align: right;
     white-space: nowrap;
   }
-  .modscol {
+  .modscol,
+  .acts {
     white-space: nowrap;
   }
   /* the design system's hover: the red fill, its text colour and a 1px edge; the picked row's chevron on the table's edge */

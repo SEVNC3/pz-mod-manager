@@ -181,6 +181,24 @@ pub fn save_preset(paths: &Paths, p: &Preset) -> Result<()> {
     }
 }
 
+/// Delete the preset `name` from the file `from` says (one of that name elsewhere stays). Any name the game or a
+/// manager saved it under, but only a preset that's there.
+pub fn delete_preset(paths: &Paths, from: &str, name: &str) -> Result<()> {
+    if !presets(paths).iter().any(|p| p.from == from && p.name == name) {
+        bail!("there's no preset called {name}");
+    }
+    match from {
+        "server" => {
+            let mut all = parse_server(&try_read(paths, SERVER)?);
+            all.retain(|(n, _)| n != name);
+            write(paths, SERVER, &write_server(&all))
+        }
+        // an empty list drops the line
+        "modManager" => write(paths, MOD_MANAGER, &set_line(&try_read(paths, MOD_MANAGER)?, name, &[], false)),
+        _ => write(paths, GAME, &set_line(&try_read(paths, GAME)?, name, &[], true)),
+    }
+}
+
 // --- favourites and hidden mods ---
 
 /// The `["Id"] = {` blocks of [B42] Mod Manager's list, and where each `hidden =` line is.
@@ -236,6 +254,20 @@ pub fn set_favourite(paths: &Paths, id: &str, on: bool) -> Result<()> {
         write(paths, MOD_MANAGER, &set_line(&mm, FAVOURITES, &toggled(list, id, on), false))?;
     }
     Ok(())
+}
+
+/// When the favourites last changed (the game's list's write, in ms; 0: never), for `app.txt`'s `fav_rev`.
+pub fn favourites_rev(paths: &Paths) -> u128 {
+    rev(paths, GAME)
+}
+
+/// When the sorting rules (pins) last changed, in ms (0: no file), for `app.txt`'s `rules_rev`.
+pub fn rules_rev(paths: &Paths) -> u128 {
+    rev(paths, RULES)
+}
+
+fn rev(paths: &Paths, name: &str) -> u128 {
+    fs::metadata(file(paths, name)).and_then(|m| m.modified()).ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_millis())
 }
 
 /// Hide or show a mod: in Mod Manager's list (PZMM keeps its own there too), and in [B42] Mod
@@ -379,11 +411,11 @@ mod tests {
         // as the Workshop mods and the game write them
         fs::create_dir_all(file(&paths, "ModManager")).unwrap();
         fs::write(file(&paths, MOD_MANAGER), "VERSION=2\r\nFriends:A;B;C\nmmFavorites:B\nmmHidden:X\n").unwrap();
-        fs::write(file(&paths, GAME), "!fav!:\\C;D;\nSolo:\\A;D;\n").unwrap();
+        fs::write(file(&paths, GAME), "!fav!:\\C;D;\nSolo:\\A;D;\nOld. one:\\A;\n").unwrap();
         fs::write(file(&paths, SERVER), "VERSION=1\r\n[Public]\r\nWorkshopItems=111;222\r\nMods=\\A;B\r\n").unwrap();
         let all = presets(&paths);
         let want = |from: &str, name: &str, mods: &[&str], ws: &[&str]| Preset { from: from.into(), name: name.into(), mods: s(mods), workshop: s(ws) };
-        assert_eq!(all, [want("modManager", "Friends", &["A", "B", "C"], &[]), want("game", "Solo", &["A", "D"], &[]), want("server", "Public", &["A", "B"], &["111", "222"])]);
+        assert_eq!(all, [want("modManager", "Friends", &["A", "B", "C"], &[]), want("game", "Solo", &["A", "D"], &[]), want("game", "Old. one", &["A"], &[]), want("server", "Public", &["A", "B"], &["111", "222"])]);
 
         // written back: replaced in place, new ones appended, the rest untouched
         save_preset(&paths, &want("modManager", "Friends", &["C", "A"], &[])).unwrap();
@@ -391,15 +423,25 @@ mod tests {
         save_preset(&paths, &want("server", "Public", &["A"], &["111"])).unwrap();
         save_preset(&paths, &want("server", "Test", &["Z"], &["9"])).unwrap();
         assert_eq!(fs::read_to_string(file(&paths, MOD_MANAGER)).unwrap(), "VERSION=2\nFriends:C;A\nmmFavorites:B\nmmHidden:X\n");
-        assert_eq!(fs::read_to_string(file(&paths, GAME)).unwrap(), "!fav!:\\C;D;\nSolo:\\A;D;\nCoop:\\E;\n", "ids as the file has them");
+        assert_eq!(fs::read_to_string(file(&paths, GAME)).unwrap(), "!fav!:\\C;D;\nSolo:\\A;D;\nOld. one:\\A;\nCoop:\\E;\n", "ids as the file has them");
         assert_eq!(
             fs::read_to_string(file(&paths, SERVER)).unwrap(),
             "VERSION=1\r\n[Public]\r\nWorkshopItems=111\r\nMods=A\r\n[Test]\r\nWorkshopItems=9\r\nMods=Z\r\n"
         );
         assert!(file(&paths, MOD_MANAGER).with_extension("txt.bak").exists(), "the original is kept");
-        assert_eq!(presets(&paths).len(), 5);
+        assert_eq!(presets(&paths).len(), 6);
         assert!(save_preset(&paths, &want("game", "a:b", &["A"], &[])).is_err());
         assert!(save_preset(&paths, &want("modManager", HIDDEN, &["A"], &[])).is_err());
+
+        // deleted from its own file only
+        delete_preset(&paths, "game", "Solo").unwrap();
+        delete_preset(&paths, "server", "Public").unwrap();
+        // a name PZMM wouldn't save, as the game saved it; nothing that isn't exactly a preset there
+        delete_preset(&paths, "game", "Old. one").unwrap();
+        assert!(delete_preset(&paths, "game", "old. one").is_err() && delete_preset(&paths, "game", "!fav!").is_err() && delete_preset(&paths, "modManager", "mmHidden").is_err());
+        assert_eq!(fs::read_to_string(file(&paths, GAME)).unwrap(), "!fav!:\\C;D;\nCoop:\\E;\n");
+        assert_eq!(fs::read_to_string(file(&paths, SERVER)).unwrap(), "VERSION=1\r\n[Test]\r\nWorkshopItems=9\r\nMods=Z\r\n");
+        assert_eq!(presets(&paths).len(), 3);
     }
 
     #[test]

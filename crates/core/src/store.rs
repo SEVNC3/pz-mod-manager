@@ -88,6 +88,18 @@ pub fn first_seen_for_game(paths: &Paths, seen: &BTreeMap<String, u64>) {
     }
 }
 
+/// [`first_seen_for_game`] from what's quick to read (the download history and PZMM's install times; the folders'
+/// creation waits for the stats run): an earlier time the file already has stays.
+pub fn first_seen_known_for_game(paths: &Paths) {
+    let file = pz::bridge::dir(paths).join("firstseen.txt");
+    let had: std::collections::HashMap<String, u64> =
+        std::fs::read_to_string(&file).unwrap_or_default().lines().filter_map(|l| l.split_once('\t')).filter_map(|(id, t)| Some((id.to_string(), t.trim().parse().ok()?))).collect();
+    let (index, first) = (load(paths).unwrap_or_default(), history_first(paths));
+    let ids: std::collections::BTreeSet<&String> = index.keys().chain(first.keys()).chain(had.keys()).collect();
+    let seen = ids.into_iter().map(|id| (id.clone(), first_seen(first.get(id).copied(), index.get(id).map_or(0, |e| e.installed_at), had.get(id).copied().unwrap_or(0)))).collect();
+    first_seen_for_game(paths, &seen);
+}
+
 /// The player's tags for the PZMM - Client mod: `Zomboid/Lua/pzmm/tags.txt`, a `<mod id>\t<tag>;<tag>` line per mod
 /// (tags never hold `;` or tabs there), where that folder is.
 pub fn tags_for_game(paths: &Paths, tags: &Tags) {
@@ -815,6 +827,15 @@ name=v2
         assert_eq!(first_seen(None, 0, 200), 200, "a subscription: only the folder");
         assert_eq!(first_seen(None, 300, 0), 300, "no folder time on this system");
         assert_eq!(first_seen(None, 0, 0), 0, "unknown: hidden");
+        // the quick write keeps the stats run's earlier times
+        let (_t, paths) = temp_paths();
+        let file = paths.zomboid.join("Lua/pzmm/firstseen.txt");
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, "A\t50\n").unwrap();
+        crate::history::add(&paths, "A", "", "workshop:1", "installed");
+        crate::history::add(&paths, "B", "", "workshop:2", "installed");
+        let text = std::fs::read_to_string(&file).unwrap();
+        assert!(text.starts_with("A\t50\nB\t") && text.lines().count() == 2, "{text}");
     }
 
     #[test]

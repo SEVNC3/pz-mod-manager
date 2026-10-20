@@ -30,10 +30,12 @@
   let error = $state("");
   let done = $state("");
   let working = $state(false);
-  const REASONS = ["manual", "launch", "exit", "interval", "crash", "restore", "repair", "reset"];
+  const REASONS = ["manual", "launch", "exit", "interval", "crash", "restore", "repair", "reset", "delete"];
   const RESETS = ["zombies", "time", "animals"];
   /** Screenshots as object URLs: "" for the save, else by backup file. */
   let thumbs = $state<Record<string, string>>({});
+  /** The save's new name, while Rename is open. */
+  let renaming = $state<string | null>(null);
   /** The backup being named, and the name typed. */
   let naming = $state<{ file: string; value: string } | null>(null);
 
@@ -93,6 +95,20 @@
     if (!slot) return;
     await run(() => api.saveBackupName(mode, name, b.file, slot, copy), t(copy ? "saves.copiedAs" : "saves.renamed", { slot }));
     if (!error) naming = null;
+  }
+
+  async function renameSave() {
+    const to = renaming?.trim() ?? "";
+    if (!to || to === name) return (renaming = null);
+    await run(() => api.saveRename(mode, name, to), "");
+    if (!error) onChanged();
+  }
+
+  /** Back the save up, then delete it: it stays under the deleted saves, restorable. */
+  async function deleteSave() {
+    if ((await ask(t("saves.deleteSaveTitle", { name }), [t("saves.deleteSaveWhat"), t("saves.closeGame")], [{ label: t("common.delete"), icon: "trash" }])) !== 0) return;
+    await run(() => api.saveDelete(mode, name), "");
+    if (!error) onChanged();
   }
 
   async function reset(what: string) {
@@ -200,6 +216,21 @@
     </div>
   {/if}
 
+  {#if mods}
+    {#if renaming === null}
+      <span class="btns">
+        <button onclick={() => (renaming = name)} disabled={working}><Icon name="pencil" size={14} />{t("saves.renameSave")}</button>
+        <button class="danger" onclick={deleteSave} disabled={working}><Icon name="trash" size={14} />{t("common.delete")}</button>
+      </span>
+    {:else}
+      <form class="row" onsubmit={(e) => (e.preventDefault(), renameSave())}>
+        <!-- svelte-ignore a11y_autofocus -->
+        <input type="text" bind:value={renaming} maxlength="60" autofocus aria-label={t("saves.newName")} />
+        <button class="primary" type="submit" disabled={working || !renaming.trim()}>{t("saves.rename")}</button>
+        <button type="button" class="quiet" onclick={() => (renaming = null)}>{t("common.cancel")}</button>
+      </form>
+    {/if}
+  {/if}
   {#if PARTS.length > 1}
     <div class="subtabs" role="tablist" aria-label={t("saves.toolsLabel")} tabindex="-1" onkeydown={(e) => arrowPick(e, [...PARTS], part, (v) => (part = v as typeof part))}>
       {#each PARTS as id}

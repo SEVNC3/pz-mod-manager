@@ -7,7 +7,14 @@
   // a Map= line (Servers & saves, Maps): drag, Alt+arrows or the buttons to arrange; Muldraugh stays last
   // `onarrange`: the player moved something (not called when `maps` is set from outside)
   // `lotsOf`: a folder's map.info lots= (the maps it builds on), for Autosort
-  let { maps = $bindable(), onarrange, lotsOf = () => [] }: { maps: string[]; onarrange?: (maps: string[]) => void; lotsOf?: (folder: string) => string[] } = $props();
+  // `titleOf`, `clashesOf`: a folder's map.info title and the maps it shares cells with (shown when given)
+  let { maps = $bindable(), onarrange, lotsOf = () => [], titleOf, clashesOf }: {
+    maps: string[];
+    onarrange?: (maps: string[]) => void;
+    lotsOf?: (folder: string) => string[];
+    titleOf?: (folder: string) => string | undefined;
+    clashesOf?: (folder: string) => string[];
+  } = $props();
 
   let mapFrom = $state<number | null>(null);
   let mapAt = $state<number | null>(null);
@@ -45,13 +52,16 @@
 <ol class="drag-list maps" role="listbox" aria-label={t("mapOrder.label")}>
   {#each maps as m, i (m)}
     {@const fixed = m === BASE}
+    {@const title = titleOf?.(m)}
+    {@const clash = clashesOf?.(m) ?? []}
     <li role="option" aria-selected="false" class:drop={mapAt === i} class:dragging={mapFrom === i} class:fixed draggable={!fixed} tabindex="0"
       title={fixed ? t("mapOrder.fixedTip") : undefined}
       onkeydown={(e) => mapKey(e, i)}
       ondragstart={() => (mapFrom = i)} ondragend={() => { mapFrom = mapAt = null; }}
       ondragover={(e) => { e.preventDefault(); mapAt = i; }}
       ondrop={(e) => { e.preventDefault(); dropMap(i); }}>
-      <span class="num mono">{i + 1}</span>{m}
+      <span class="num mono">{i + 1}</span>{#if title && title !== m}{title} <span class="folder mono">{m}</span>{:else}{m}{/if}
+      {#if clash.length}<span class="clash" title={clash.join("\n")}>{t("mapOrder.clashes", { count: clash.length })}</span>{/if}
       {#if fixed}<span class="pin"><Icon name="lock" size={12} />{t("mapOrder.fixed")}</span>
       {:else}
         <span class="moves">
@@ -79,6 +89,20 @@
   }
   .maps li:hover .num {
     color: var(--on-selected);
+  }
+  .folder {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .clash {
+    font-size: 11px;
+    padding: 0 5px;
+    border-radius: 4px;
+    color: var(--danger);
+    border: 1px solid currentColor;
+  }
+  .maps li:hover :is(.folder, .clash) {
+    color: inherit;
   }
   .moves,
   .pin {

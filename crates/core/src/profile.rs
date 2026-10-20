@@ -769,6 +769,11 @@ pub fn snapshot(paths: &Paths, name: &str, label: &str) -> Result<()> {
     for old in snapshot_ids(paths, name).into_iter().skip(SNAPSHOTS) {
         fs::remove_file(d.join(format!("{old}.json")))?;
     }
+    // the active profile's: the game's Snapshots list it at once
+    let bridge = crate::pz::bridge::dir(paths);
+    if p.name.eq_ignore_ascii_case(&active_name(paths)) && bridge.is_dir() {
+        snapshots_for_game(paths, &bridge, &p.name);
+    }
     Ok(())
 }
 
@@ -919,6 +924,10 @@ pub fn sync(paths: &Paths) -> Result<(Profile, bool)> {
         && set_map_order(paths, &p.name, &g.map_folders())?
     {
         crate::say!("mapOrderAdopted", "Took the map order arranged in the game.");
+    }
+    // the game's own Accept moves default.txt's maps too
+    if game.is_some() {
+        maps_for_game(paths);
     }
     let took = game_sections(paths, &mut p);
     let changed = game.is_some_and(|game| p.adopt(&game.mods)) || took;
@@ -1086,14 +1095,35 @@ pub fn apply(paths: &Paths, profile: &Profile, mods: Option<&std::collections::B
 }
 
 /// The active profile's library (its sections and mods, as My mods shows them) for the PZMM - Client
-/// mod's in-game mod screen: `Zomboid/Lua/pzmm/library.txt`, where that folder is (the mod or the app's start makes it).
+/// mod's in-game mod screen: `Zomboid/Lua/pzmm/library.txt`, where that folder is (the mod or the app's start makes it),
+/// with its load order and snapshots.
 pub fn library_for_game(paths: &Paths, p: &Profile) {
     let dir = crate::pz::bridge::dir(paths);
     if dir.is_dir() {
         crate::pz::bridge::write_for_game(&dir.join("library.txt"), format!("# PZMM profile: {}\n{}", p.name, p.to_text()));
         // the load order (library.txt only says on or off): the game's "Use PZMM's mods" takes PZMM's places too
         crate::pz::bridge::write_for_game(&dir.join("order.txt"), p.enabled().iter().map(|id| format!("{id}\n")).collect::<String>());
+        snapshots_for_game(paths, &dir, &p.name);
+        maps_for_game(paths);
     }
+}
+
+/// The active profile's `Map=` order (default.txt's `maps` block, as `apply` wrote it) for the game's "Use PZMM's mods":
+/// `maps.txt`, a map folder per line. Written when it differs, where PZMM - Client is.
+pub fn maps_for_game(paths: &Paths) {
+    let file = crate::pz::bridge::dir(paths).join("maps.txt");
+    let text: String = pz::read_default(&paths.default_txt()).map_folders().iter().map(|m| format!("{m}\n")).collect();
+    if file.parent().is_some_and(std::path::Path::is_dir) && fs::read_to_string(&file).ok() != Some(text.clone()) {
+        crate::pz::bridge::write_for_game(&file, text);
+    }
+}
+
+/// Profile `name`'s snapshots for the game, in bridge folder `dir`: `snapshots.txt`, newest first,
+/// `<id>\t<time>\t<reason>\t<on>/<n>` (the label it was kept under; mods on, of how many).
+fn snapshots_for_game(paths: &Paths, dir: &std::path::Path, name: &str) {
+    let flat = |s: &str| s.replace(['\t', '\r', '\n'], " ");
+    let snaps: String = snapshots(paths, name).iter().map(|s| format!("{}\t{}\t{}\t{}/{}\n", s.id, s.time, flat(&s.label), s.enabled, s.mods)).collect();
+    crate::pz::bridge::write_for_game(&dir.join("snapshots.txt"), snaps);
 }
 
 /// Tell the PZMM - Client mod the app is installed and running: `Zomboid/Lua/pzmm/app.txt` (game Lua can
@@ -1107,15 +1137,21 @@ pub fn app_for_game(paths: &Paths, version: &str) {
         let name = active_name(paths);
         // busy: the game's requests are still being handled (queued, or a question about one is open), so its
         // sorting edits wait for PZMM rather than giving up. default_rev: when default.txt last changed, so the game
-        // can tell PZMM changed the mod list since its screen opened.
+        // can tell PZMM changed the mod list since its screen opened. job: the download or install running (`bridge::JOB`).
+        // fav_rev: when the favourites last changed (`managers::favourites_rev`); rules_rev: the pins (`managers::rules_rev`).
+        // bisect: the app's search for a broken mod runs.
         let busy = crate::pz::bridge::GAME_BUSY.load(std::sync::atomic::Ordering::Relaxed) || dir.join("requests.queue").exists();
         let rev = fs::metadata(paths.default_txt()).and_then(|m| m.modified()).ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs());
         let (accent, theme) = crate::pz::bridge::LOOK.lock().unwrap_or_else(|e| e.into_inner()).clone();
         let text = format!(
-            "version={version}\nproto=1\nrunning_at={}\nprofile={name}\nkind={}\nbusy={}\ndefault_rev={rev}\naccent={accent}\ntheme={theme}\n",
+            "version={version}\nproto=1\nrunning_at={}\nprofile={name}\nkind={}\nbusy={}\ndefault_rev={rev}\nfav_rev={}\nrules_rev={}\nbisect={}\naccent={accent}\ntheme={theme}\n{}",
             crate::store::now(),
             kind_of(paths, &name),
-            u8::from(busy)
+            u8::from(busy),
+            crate::pz::managers::favourites_rev(paths),
+            crate::pz::managers::rules_rev(paths),
+            u8::from(crate::pz::bridge::BISECT.load(std::sync::atomic::Ordering::Relaxed)),
+            crate::pz::bridge::job_lines()
         );
         let _ = crate::write_atomic(&dir.join("app.txt"), text);
         // a folder made since PZMM started (a profile's own game folder, on its first run): what the game reads from it
@@ -1227,6 +1263,33 @@ mod tests {
         app_for_game(&paths, "1.2.7");
         let text = std::fs::read_to_string(&file).unwrap();
         assert!(text.starts_with("version=1.2.7\nproto=1\nrunning_at=") && text.contains("\nprofile=Default\n"), "{text}");
+        assert!(text.contains("\nfav_rev=0\nrules_rev=0\nbisect=0\n"), "no favourites yet, no pins, no search: {text}");
+        // a star moves fav_rev; the app's search for a broken mod says bisect=1
+        crate::pz::managers::set_favourite(&paths, "A", true).unwrap();
+        crate::pz::bridge::BISECT.store(true, std::sync::atomic::Ordering::Relaxed);
+        app_for_game(&paths, "1.2.7");
+        crate::pz::bridge::BISECT.store(false, std::sync::atomic::Ordering::Relaxed);
+        let text = std::fs::read_to_string(&file).unwrap();
+        assert!(!text.contains("\nfav_rev=0\n") && text.contains("\nbisect=1\n"), "{text}");
+        // a pin (sorting_rules.txt) moves rules_rev
+        std::fs::write(paths.zomboid.join("Lua/sorting_rules.txt"), "[A]\n").unwrap();
+        app_for_game(&paths, "1.2.7");
+        assert!(!std::fs::read_to_string(&file).unwrap().contains("\nrules_rev=0\n"));
+    }
+
+    #[test]
+    fn a_snapshot_of_the_active_profile_reaches_the_game() {
+        let (_t, paths) = temp_paths();
+        let file = paths.zomboid.join("Lua/pzmm/snapshots.txt");
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        apply(&paths, &Profile::parse("Default", "+A\n-B\n")).unwrap();
+        snapshot(&paths, "Default", "manual").unwrap();
+        let text = std::fs::read_to_string(&file).unwrap();
+        let f: Vec<&str> = text.trim_end().split('\t').collect();
+        assert_eq!((f.len(), f[2], f[3]), (4, "manual", "1/2"), "{text}");
+        save(&paths, &Profile::parse("Other", "+A\n")).unwrap();
+        snapshot(&paths, "Other", "manual").unwrap();
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), text, "another profile's isn't the game's");
     }
 
     #[test]
@@ -1239,6 +1302,19 @@ mod tests {
         std::fs::create_dir_all(file.parent().unwrap()).unwrap();
         apply(&paths, &p).unwrap();
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "# PZMM profile: Solo\n# --- Frameworks & libraries\n+A\n-B\n");
+    }
+
+    #[test]
+    fn the_client_mod_gets_the_profiles_snapshots() {
+        let (_t, paths) = temp_paths();
+        std::fs::create_dir_all(paths.zomboid.join("Lua/pzmm")).unwrap();
+        let p = Profile::parse("Default", "+A\n-B\n");
+        apply(&paths, &p).unwrap();
+        snapshot(&paths, "Default", "auto\tsort").unwrap();
+        apply(&paths, &p).unwrap();
+        let text = std::fs::read_to_string(paths.zomboid.join("Lua/pzmm/snapshots.txt")).unwrap();
+        let f: Vec<&str> = text.trim_end().split('\t').collect();
+        assert_eq!((f.len(), f[2], f[3], text.lines().count()), (4, "auto sort", "1/2", 1), "{text}");
     }
 
     #[test]
@@ -1364,11 +1440,13 @@ mod tests {
             fs::create_dir_all(d.join("media/maps").join(map)).unwrap();
             fs::write(d.join("mod.info"), format!("id={id}\n")).unwrap();
         }
+        fs::create_dir_all(paths.zomboid.join("Lua/pzmm")).unwrap();
         apply(&paths, &Profile::parse("Default", "+A\n+B\n")).unwrap();
         assert_eq!(pz::read_default(&paths.default_txt()).maps, "\n    map = Town A,\n    map = Town B,\n", "never arranged: the enabled maps in load order");
         set_map_order(&paths, "Default", &ids(&["Town B", "Off", "Town A", "Muldraugh, KY"])).unwrap();
         apply(&paths, &Profile::parse("Default", "+A\n+B\n")).unwrap();
         assert_eq!(pz::read_default(&paths.default_txt()).maps, "\n    map = Town B,\n    map = Town A,\n", "enabled maps only, Muldraugh left to the game");
+        assert_eq!(fs::read_to_string(paths.zomboid.join("Lua/pzmm/maps.txt")).unwrap(), "Town B\nTown A\n", "the game's copy, in Map= order");
         // a map that leaves the arrangement keeps its place in the saved order
         set_map_order(&paths, "Default", &ids(&["Town A", "Town B", "Muldraugh, KY"])).unwrap();
         assert_eq!(map_order(&paths, "Default"), ids(&["Town A", "Town B", "Off", "Muldraugh, KY"]));

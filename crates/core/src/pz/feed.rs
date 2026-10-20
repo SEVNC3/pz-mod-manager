@@ -13,7 +13,7 @@ use crate::store;
 
 /// Change-note pages fetched per call at most (the rest wait for "load more"): Steam serves one
 /// item's notes per request.
-const FETCH: usize = 40;
+const FETCH: usize = 10;
 const DAY: u64 = 24 * 60 * 60;
 
 #[derive(Default, Serialize, Deserialize)]
@@ -121,14 +121,14 @@ pub struct Feed {
     pub seen: u64,
 }
 
-/// A number PZMM - Client keeps in `Zomboid/Lua/pzmm/<name>` (0 when there's none).
+/// A number PZMM - Client keeps in `Zomboid/Lua/pzmm/<name>`, in the folder of the game running now (0 when there's none).
 fn game_number(paths: &Paths, name: &str) -> u64 {
-    std::fs::read_to_string(crate::pz::bridge::dir(paths).join(name)).ok().and_then(|t| t.trim().parse::<f64>().ok()).filter(|n| n.is_finite() && *n > 0.0).map_or(0, |n| n as u64)
+    std::fs::read_to_string(crate::pz::bridge::game_dir(paths).join(name)).ok().and_then(|t| t.trim().parse::<f64>().ok()).filter(|n| n.is_finite() && *n > 0.0).map_or(0, |n| n as u64)
 }
 
 /// What's new was read up to the update at `at` (in the app): the game's badge clears too.
 pub fn set_seen(paths: &Paths, at: u64) {
-    let dir = crate::pz::bridge::dir(paths);
+    let dir = crate::pz::bridge::game_dir(paths);
     if dir.is_dir() && at > game_number(paths, "feedseen.txt") {
         super::bridge::write_for_game(&dir.join("feedseen.txt"), at.to_string());
     }
@@ -147,9 +147,14 @@ pub fn feed(paths: &Paths, mods: &BTreeMap<String, store::Row>, notes: bool) -> 
     }
     let ids: Vec<&str> = items.keys().copied().collect();
     let mut updated = vec![];
+    let mut pics = vec![];
     for chunk in ids.chunks(100) {
-        updated.extend(steam_workshop::details(chunk)?.into_iter().filter(|d| d.time_updated > since));
+        let got = steam_workshop::details(chunk)?;
+        // every installed item's preview, for the game's details and What's new (see `pictures`)
+        pics.extend(got.iter().map(|d| (d.id.clone(), d.preview_url.clone())));
+        updated.extend(got.into_iter().filter(|d| d.time_updated > since));
     }
+    super::pictures::save_later(paths, pics, false);
     updated.sort_by_key(|d| std::cmp::Reverse(d.time_updated));
 
     let index = store::load(paths)?;
@@ -216,7 +221,8 @@ fn for_game(paths: &Paths, f: &Feed) {
 
 fn game_text(f: &Feed) -> String {
     let flat = |s: &str| s.replace('\\', "\\\\").replace('\r', "").replace('\n', "\\n").replace('\t', " ");
-    let mut out = format!("since={}\nbasis={}\nat={}\n", f.since, f.basis, store::now());
+    // more: entries whose notes aren't loaded yet (what `feed\tmore` loads next)
+    let mut out = format!("since={}\nbasis={}\nat={}\nmore={}\n", f.since, f.basis, store::now(), f.unloaded);
     for e in &f.entries {
         out += &format!("entry\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n", e.item, e.updated, u8::from(e.pending), e.risks.join(","), flat(&e.from), flat(&e.to), flat(&e.title), u8::from(e.loaded));
         out += &format!("mods\t{}\n", e.mods.join(","));
@@ -446,7 +452,7 @@ mod tests {
         };
         let text = game_text(&f);
         let (head, rest) = text.split_once("entry").unwrap();
-        assert!(head.starts_with("since=10\nbasis=launch\nat="), "{head}");
+        assert!(head.starts_with("since=10\nbasis=launch\nat=") && head.ends_with("\nmore=0\n"), "{head}");
         assert_eq!(format!("entry{rest}"), "entry\t42\t20\t1\tmap,notes\t\t\tCool Mod\t0\nmods\tA,B\nnote\t15\tfixed\\nthings \\\\o/\n");
     }
 

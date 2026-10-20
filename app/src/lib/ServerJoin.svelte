@@ -13,7 +13,7 @@
   import { arrowPick, trap } from "./ui";
   import Icon from "./Icon.svelte";
 
-  let { server, busy, lock, installed, password, ownPassword = null, joins, favourite, onFavourite, onClose, onUpdate, onSetup, onCheck, onJoined }: {
+  let { server, autoJoin = false, busy, lock, installed, password, ownPassword = null, joins, favourite, onFavourite, onClose, onUpdate, onSetup, onCheck, onJoined }: {
     server: GameServer;
     busy: boolean;
     lock: string;
@@ -31,6 +31,8 @@
     /** The check Launch runs, on the profile you join with. */
     onCheck: () => Promise<boolean>;
     onJoined: () => void;
+    /** Opened by a list row's Join: join at once (set up first when it runs mods). */
+    autoJoin?: boolean;
   } = $props();
 
   const TABS = $derived(["mods", "rules", "players", ...(joins.length ? ["history"] : [])]);
@@ -182,7 +184,12 @@
   const RULES = ["open", "public", "pvp", "version", "modCount", "lastWipe"];
 
   onMount(() => {
-    if (server.probed) resolve();
+    const ready = server.probed ? resolve() : Promise.resolve();
+    if (autoJoin)
+      ready.then(() => {
+        if (!server.mod_count) join(true);
+        else if (mods && !lock) join(false);
+      });
     if (server.password) api.serverPasswordSaved(connect).then((v) => (passwordSaved = v)).catch(() => {});
   });
 

@@ -49,51 +49,91 @@ impl Source {
     }
 }
 
-/// Hosts that still answered HTTP 429 after the backoffs, and when: for a minute their requests
-/// fail at once, so a batch (a collection's pages) doesn't wait out the backoffs item by item.
-static REFUSED: std::sync::Mutex<Vec<(String, std::time::Instant)>> = std::sync::Mutex::new(vec![]);
+/// Per host, shared by every thread: no request before the time Steam's last HTTP 429 asked for, and
+/// how many 429s in a row (each doubles the wait), so concurrent commands back off together.
+type Cooldowns = std::collections::HashMap<String, (std::time::Instant, u32)>;
+static COOL: std::sync::Mutex<Option<Cooldowns>> = std::sync::Mutex::new(None);
+
+thread_local! {
+    /// The Retry-After (seconds) of the 429 just seen on this thread (see [`status_ok`]).
+    static RETRY_AFTER: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+}
+
+/// A cooldown up to this is waited out; a longer one fails at once (a batch doesn't sit out each item).
+const WAIT_OUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// How long `url`'s host is still cooling down after a 429.
+pub(crate) fn cooling(url: &str) -> Option<std::time::Duration> {
+    let c = COOL.lock().unwrap_or_else(|e| e.into_inner());
+    c.as_ref()?.get(host(url)).and_then(|(until, _)| until.checked_duration_since(std::time::Instant::now()))
+}
+
+/// A reply read with `http_status_as_error(false)`, as ureq would give it, keeping a 429's Retry-After for [`polite`].
+pub(crate) fn status_ok(r: ureq::http::Response<ureq::Body>) -> Result<ureq::http::Response<ureq::Body>, ureq::Error> {
+    let s = r.status().as_u16();
+    if s == 429 {
+        RETRY_AFTER.set(r.headers().get("retry-after").and_then(|v| v.to_str().ok()).and_then(|v| v.trim().parse().ok()));
+    }
+    if s >= 400 { Err(ureq::Error::StatusCode(s)) } else { Ok(r) }
+}
 
 fn host(url: &str) -> &str {
     url.split('/').nth(2).unwrap_or(url)
 }
 
-/// Run an HTTP request with Steam etiquette: at most one Steam request every 350 ms
-/// (shared across threads), and on HTTP 429 back off (2 s, then 5 s) before giving up.
+/// Run an HTTP request with Steam etiquette: Steam's API at most every 350 ms and its web pages at most
+/// every second (each shared across threads), and after an HTTP 429 the host's cooldown (see [`COOL`]):
+/// Retry-After when Steam gives one, else 2, 4, 8... s (up to 2 minutes), waited out when short.
 pub(crate) fn polite<T>(url: &str, mut send: impl FnMut() -> Result<T, ureq::Error>) -> Result<T> {
     use std::sync::Mutex;
     use std::time::{Duration, Instant};
-    static LAST_STEAM: Mutex<Option<Instant>> = Mutex::new(None);
+    static LAST_API: Mutex<Option<Instant>> = Mutex::new(None);
+    static LAST_PAGE: Mutex<Option<Instant>> = Mutex::new(None);
     const LIMITED: &str = "Steam is limiting requests right now (HTTP 429). Wait a minute and try again.";
-    let steam = url.contains("steamcommunity.com") || url.contains("steampowered.com");
-    {
-        let mut refused = REFUSED.lock().unwrap_or_else(|e| e.into_inner());
-        refused.retain(|(_, at)| at.elapsed() < Duration::from_secs(60));
-        if refused.iter().any(|(h, _)| h == host(url)) {
-            bail!("{LIMITED}");
+    let lane = if url.contains("steampowered.com") {
+        Some((&LAST_API, Duration::from_millis(350)))
+    } else if url.contains("steamcommunity.com") {
+        Some((&LAST_PAGE, Duration::from_secs(1)))
+    } else {
+        None
+    };
+    for _ in 0..3 {
+        if let Some(left) = cooling(url) {
+            if left > WAIT_OUT {
+                bail!("{LIMITED}");
+            }
+            crate::say!("steamWait", "Steam is limiting requests: trying again in {seconds} s", seconds = left.as_secs_f32().ceil() as u64);
+            std::thread::sleep(left);
         }
-    }
-    for wait in [2, 5, 0] {
-        if steam {
-            let mut last = LAST_STEAM.lock().unwrap_or_else(|e| e.into_inner());
-            if let Some(gap) = last.and_then(|t| Duration::from_millis(350).checked_sub(t.elapsed())) {
+        if let Some((last, every)) = lane {
+            let mut last = last.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(gap) = last.and_then(|t| every.checked_sub(t.elapsed())) {
                 std::thread::sleep(gap);
             }
             *last = Some(Instant::now());
         }
+        RETRY_AFTER.set(None);
         match send() {
-            Ok(v) => return Ok(v),
-            Err(ureq::Error::StatusCode(429)) if wait > 0 => {
-                crate::say!("steamWait", "Steam is limiting requests: trying again in {seconds} s", seconds = wait);
-                std::thread::sleep(Duration::from_secs(wait))
+            Ok(v) => {
+                // a cooldown that's over starts again from 2 s; one another thread's 429 started meanwhile stays
+                if let Some(c) = COOL.lock().unwrap_or_else(|e| e.into_inner()).as_mut()
+                    && c.get(host(url)).is_some_and(|(until, _)| *until <= Instant::now())
+                {
+                    c.remove(host(url));
+                }
+                return Ok(v);
             }
             Err(ureq::Error::StatusCode(429)) => {
-                REFUSED.lock().unwrap_or_else(|e| e.into_inner()).push((host(url).into(), Instant::now()));
-                bail!("{LIMITED}")
+                let mut c = COOL.lock().unwrap_or_else(|e| e.into_inner());
+                let e = c.get_or_insert_with(Default::default).entry(host(url).to_string()).or_insert((Instant::now(), 0));
+                e.1 += 1;
+                let secs = RETRY_AFTER.take().unwrap_or(1 << e.1.min(7)).min(300);
+                e.0 = e.0.max(Instant::now() + Duration::from_secs(secs));
             }
             Err(e) => return Err(e).with_context(|| format!("requesting {url}")),
         }
     }
-    unreachable!()
+    bail!("{LIMITED}")
 }
 
 /// Longest wait for one web call (connecting: `CONNECT`); downloads get `DOWNLOAD`.
@@ -165,13 +205,13 @@ pub(crate) fn download(url: &str) -> Result<Vec<u8>> {
 
 fn get(url: &str, limit: std::time::Duration) -> Result<Vec<u8>> {
     polite(url, || {
-        let mut req = agent().get(url).config().timeout_global(Some(limit)).build().header("User-Agent", crate::USER_AGENT);
+        let mut req = agent().get(url).config().timeout_global(Some(limit)).http_status_as_error(false).build().header("User-Agent", crate::USER_AGENT);
         if url.starts_with("https://api.github.com/")
             && let Some(token) = crate::settings::github_token()
         {
             req = req.header("Authorization", &format!("Bearer {token}"));
         }
-        req.call()?.body_mut().with_config().limit(2 << 30).read_to_vec()
+        status_ok(req.call()?)?.body_mut().with_config().limit(2 << 30).read_to_vec()
     })
 }
 
@@ -431,6 +471,8 @@ pub fn expand_workshop(paths: &Paths, ids: Vec<String>) -> (Vec<String>, Vec<Str
         }
         crate::progress(seen.len() - 1, seen.len() + queue.len());
         out.push(id.clone());
+        // this and the next 99 in one details request: only the ones with required items get a page read
+        steam_workshop::warm(&std::iter::once(id.as_str()).chain(queue.iter().map(String::as_str)).take(100).collect::<Vec<_>>());
         match steam_workshop::required_items(&id) {
             Ok(req) => {
                 for r in req.into_iter().filter(|r| !have.contains(r) && !seen.contains(r)) {
@@ -475,7 +517,7 @@ pub fn check_updates(paths: &Paths) -> Result<Vec<String>> {
         .collect();
     let items: Vec<&str> = ours.iter().map(|o| o.1).collect::<HashSet<_>>().into_iter().collect();
     let updated: std::collections::HashMap<String, u64> =
-        items.chunks(100).map(steam_workshop::details).collect::<Result<Vec<_>>>()?.concat().into_iter().map(|i| (i.id, i.time_updated)).collect();
+        items.chunks(100).map(steam_workshop::details_fresh).collect::<Result<Vec<_>>>()?.concat().into_iter().map(|i| (i.id, i.time_updated)).collect();
     Ok(ours.into_iter().filter(|(_, item, at)| updated.get(*item).is_some_and(|t| t > at)).map(|(id, ..)| id.clone()).collect())
 }
 
@@ -588,7 +630,9 @@ pub(crate) fn fake_http(routes: Vec<(&'static str, u16, String)>) -> (String, Se
             let (status, reply) = routes.iter().find(|(p, ..)| first.starts_with(p)).map_or((404, "{}".to_string()), |(_, st, b)| (*st, b.clone()));
             log.lock().unwrap().push((first, String::from_utf8(body).unwrap()));
             let mut s = s;
-            let _ = write!(s, "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{reply}", reply.len());
+            // a reply "retry-after:N" is sent as that header instead
+            let extra = reply.strip_prefix("retry-after:").map(|n| format!("Retry-After: {n}\r\n")).unwrap_or_default();
+            let _ = write!(s, "HTTP/1.1 {status} X\r\n{extra}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{reply}", reply.len());
         }
     });
     (base, seen)
@@ -671,11 +715,50 @@ mod tests {
     }
 
     #[test]
-    fn a_host_refusing_requests_fails_fast() {
+    fn a_host_cooling_down_fails_fast() {
         let (base, seen) = fake_http(vec![]);
-        REFUSED.lock().unwrap().push((host(&base).into(), std::time::Instant::now()));
+        COOL.lock().unwrap().get_or_insert_with(Default::default).insert(host(&base).into(), (std::time::Instant::now() + std::time::Duration::from_secs(60), 3));
         let e = http_get(&format!("{base}/page")).unwrap_err().to_string();
         assert!(e.contains("HTTP 429") && seen.lock().unwrap().is_empty(), "{e}");
+    }
+
+    #[test]
+    fn a_success_clears_only_a_cooldown_that_is_over() {
+        use std::time::{Duration, Instant};
+        let url = "http://cooldown-kept.invalid/x";
+        let cool = |until: Instant| COOL.lock().unwrap().get_or_insert_with(Default::default).insert(host(url).into(), (until, 3));
+        // another thread's 429 while this request was out
+        polite(url, || Ok(cool(Instant::now() + Duration::from_secs(60)))).unwrap();
+        assert!(cooling(url).is_some_and(|left| left > Duration::from_secs(50)), "an active cooldown stays");
+        cool(Instant::now());
+        polite(url, || Ok(())).unwrap();
+        assert!(COOL.lock().unwrap().as_ref().unwrap().get(host(url)).is_none(), "one that's over is cleared");
+    }
+
+    #[test]
+    fn a_429_cools_the_host_down_for_every_thread_by_its_retry_after() {
+        let (base, seen) = fake_http(vec![("GET /busy", 429, "retry-after:30".into())]);
+        // Retry-After 30 s: past what's waited out, so the first 429 gives up and the host stays cooling
+        let e = http_get(&format!("{base}/busy")).unwrap_err().to_string();
+        assert!(e.contains("HTTP 429"), "{e}");
+        assert_eq!(seen.lock().unwrap().len(), 1, "one request, then the cooldown");
+        let left = cooling(&base).unwrap();
+        assert!(left > std::time::Duration::from_secs(25), "{left:?}");
+        // another thread asking the same host doesn't reach it
+        let url = format!("{base}/other");
+        assert!(std::thread::spawn(move || http_get(&url)).join().unwrap().is_err());
+        assert_eq!(seen.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_short_cooldown_is_waited_out_and_doubles_without_retry_after() {
+        let (base, seen) = fake_http(vec![("GET /busy", 429, "{}".into())]);
+        let start = std::time::Instant::now();
+        assert!(http_get(&format!("{base}/busy")).is_err());
+        // 2 s, then 4 s waited out, then 8 s left on the host
+        assert_eq!(seen.lock().unwrap().len(), 3);
+        assert!(start.elapsed() >= std::time::Duration::from_secs(6), "{:?}", start.elapsed());
+        assert!(cooling(&base).unwrap() > std::time::Duration::from_secs(6));
     }
 
     #[test]

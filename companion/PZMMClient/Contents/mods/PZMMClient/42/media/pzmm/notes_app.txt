@@ -1,6 +1,8 @@
-# 1.2.8
-- Antivirus, a VPN or a work network no longer breaks downloads with "invalid peer certificate". PZMM trusts the same certificates your PC does now, and if something still blocks it, it tells you what to turn off. Thanks Yagoyuki on Discord.
-- Find the broken mod keeps mods that need each other together. Viewpoint and its add-ons, or a car framework and its cars, get tested as one group, so it can't blame the wrong mod. It also starts with the mods you added last. Thanks Lyven Ka Vinsxy on the Workshop page.
-- Mod details show First seen, the day the mod landed on your PC, and Date installed sorts by it. Thanks GhostyAshes on Discord.
-- Writing your mods to a server shows a checklist. Untick what the server shouldn't get, like client-side add-ons, and it's remembered for that server. Mods that need Viewpoint or ZombieBuddy get a "client-side add-on?" tag. Thanks newbee on Discord.
-- Workshop pictures that fail to load try again, then say so instead of leaving a blank box. Gentle_Hilt, if you still get blanks, send me what Copy diagnostics gives you (Settings > About).
+# 1.3.0
+- "Steam is limiting requests" should be rare now. PZMM asks Steam once and shares the answer, and when Steam does say slow down, everything waits together instead of piling on. A repeat Maps scan reads 1 or 2 pages instead of about 59.
+- My mods has proper columns: Size, Installed, Last changed and Overwrites. Click a header to sort by it, click again for your own order.
+- An eye next to each tickbox hides a mod from the list without turning it off. Handy for the parts of a mod you never touch, like the other presets of a texture pack. Find them again under Hidden.
+- The Workshop panel flicks through a mod's pictures with arrows.
+- New filters: Added and Updated in the last day, week or month, and Has an update.
+- Lots of small things the in-game manager already had: Join on server rows, more player filters, Rename and Delete for saves (it backs the save up first), a right-click menu on sections, more facts in mod details, and an Open mods folder button.
+- The in-game manager can hand jobs to the app now: remove a mod, install one by its mod ID, import a share code, run your hosted server and more. The app asks you first for anything that changes your setup.

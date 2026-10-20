@@ -340,27 +340,27 @@ fn cached(key: String, fetch: impl FnOnce() -> Result<Vec<u8>>) -> Result<Vec<u8
     cached_if(key, fetch, |_| true)
 }
 
-/// [`cached`], keeping only an answer `good` accepts (a busy Steam's error page isn't kept for later asks).
+/// [`cached`], keeping an answer `good` refuses (a busy Steam's error page) for `BAD` only: asked again soon
+/// after, not straight away, which would keep Steam busy.
 fn cached_if(key: String, fetch: impl FnOnce() -> Result<Vec<u8>>, good: impl Fn(&[u8]) -> bool) -> Result<Vec<u8>> {
     use std::time::{Duration, Instant};
     const KEEP: Duration = Duration::from_secs(5 * 60);
+    const BAD: Duration = Duration::from_secs(45);
     // ponytail: in memory for the session only; persist to disk if restarts still hit 429s
-    type Answers = std::collections::HashMap<String, (Instant, Vec<u8>)>;
+    type Answers = std::collections::HashMap<String, (Instant, Duration, Vec<u8>)>;
     static CACHE: std::sync::Mutex<Option<Answers>> = std::sync::Mutex::new(None);
-    if let Some((_, hit)) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|c| c.get(&key)).filter(|(at, _)| at.elapsed() < KEEP) {
+    if let Some((_, _, hit)) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|c| c.get(&key)).filter(|(at, keep, _)| at.elapsed() < *keep) {
         return Ok(hit.clone());
     }
     let got = fetch()?;
-    if !good(&got) {
-        return Ok(got);
-    }
+    let keep = if good(&got) { KEEP } else { BAD };
     let mut c = CACHE.lock().unwrap_or_else(|e| e.into_inner());
     let c = c.get_or_insert_with(Default::default);
-    c.retain(|_, (at, _)| at.elapsed() < KEEP);
-    if c.len() >= 64 && let Some(oldest) = c.iter().min_by_key(|(_, (at, _))| *at).map(|(k, _)| k.clone()) {
+    c.retain(|_, (at, keep, _)| at.elapsed() < *keep);
+    if c.len() >= 64 && let Some(oldest) = c.iter().min_by_key(|(_, (at, ..))| *at).map(|(k, _)| k.clone()) {
         c.remove(&oldest);
     }
-    c.insert(key, (Instant::now(), got.clone()));
+    c.insert(key, (Instant::now(), keep, got.clone()));
     Ok(got)
 }
 
@@ -369,14 +369,19 @@ fn cached_get(url: &str) -> Result<Vec<u8>> {
 }
 
 fn post_form(url: &str, body: &str) -> Result<Value> {
-    // not cached: update checks and installs need what Steam says now
+    // not cached here: details are, briefly, in `lookup_at`
     let bytes = super::polite(url, || {
-        super::agent()
-            .post(url)
-            .header("User-Agent", crate::USER_AGENT)
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .send(body)?
-            .body_mut()
+        super::status_ok(
+            super::agent()
+                .post(url)
+                .config()
+                .http_status_as_error(false)
+                .build()
+                .header("User-Agent", crate::USER_AGENT)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .send(body)?,
+        )?
+        .body_mut()
             .with_config()
             .limit(64 << 20)
             .read_to_vec()
@@ -392,9 +397,14 @@ fn id_list(key: &str, ids: &[&str]) -> String {
     body
 }
 
-/// Current details (title, last update, ...) for items by id.
+/// Current details (title, last update, ...) for items by id: what Steam said in the last `FRESH`, if it was asked.
 pub fn details(ids: &[&str]) -> Result<Vec<Item>> {
     Ok(lookup(ids)?.0)
+}
+
+/// [`details`] straight from Steam (an update check the player asked for).
+pub fn details_fresh(ids: &[&str]) -> Result<Vec<Item>> {
+    Ok(lookup_at(DETAILS, ids, true)?.0)
 }
 
 /// Items that aren't plainly public, by id: "gone" (Steam doesn't serve it: removed, or made
@@ -403,11 +413,73 @@ pub type Status = Vec<(String, &'static str)>;
 
 /// [`details`], and the items' [`Status`].
 pub fn lookup(ids: &[&str]) -> Result<(Vec<Item>, Status)> {
+    lookup_at(DETAILS, ids, false)
+}
+
+const DETAILS: &str = "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/";
+/// How long a detail Steam gave answers later asks (launch, the feed, the game's requests and the panel ask for
+/// the same items within seconds of each other).
+const FRESH: std::time::Duration = std::time::Duration::from_secs(90);
+/// Per id, what Steam last said: when, the item (None: not served), its [`Status`] kind ("" when public).
+type Known = std::collections::HashMap<String, (std::time::Instant, Option<Item>, &'static str)>;
+static KNOWN: std::sync::Mutex<Option<Known>> = std::sync::Mutex::new(None);
+
+/// Ask Steam for the details of those of `ids` it wasn't asked about lately (100 per request), so
+/// [`required_items`] reads only the pages of items that have some. Failing only costs the page reads.
+pub fn warm(ids: &[&str]) {
+    let _ = lookup(ids);
+}
+
+/// Whether `id` has required items, by the details Steam gave in the last `FRESH` (None: not asked).
+fn has_required(id: &str) -> Option<bool> {
+    let k = KNOWN.lock().unwrap_or_else(|e| e.into_inner());
+    k.as_ref()?.get(id).filter(|(at, ..)| at.elapsed() < FRESH).map(|(_, item, _)| item.as_ref().is_some_and(|i| i.num_children > 0))
+}
+
+/// [`lookup`] at `url`: only ids not answered in the last `FRESH` (all of them when `fresh`) go to Steam, and
+/// one lookup runs at a time, so a second asker for the same ids waits for the first and is answered from it.
+fn lookup_at(url: &str, ids: &[&str], fresh: bool) -> Result<(Vec<Item>, Status)> {
     if ids.is_empty() {
         return Ok(Default::default());
     }
-    let v = post_form("https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/", &id_list("itemcount", ids))?;
-    Ok(parse_details(&v))
+    static ASKING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _one = ASKING.lock().unwrap_or_else(|e| e.into_inner());
+    let known = || KNOWN.lock().unwrap_or_else(|e| e.into_inner());
+    let missing: Vec<&str> = {
+        let mut k = known();
+        let k = k.get_or_insert_with(Default::default);
+        k.retain(|_, (at, ..)| at.elapsed() < FRESH);
+        ids.iter().copied().filter(|id| fresh || !k.contains_key(*id)).collect()
+    };
+    for part in missing.chunks(100) {
+        // KNOWN isn't held while Steam answers: `has_required` reads it meanwhile
+        let (items, status) = parse_details(&post_form(url, &id_list("itemcount", part))?);
+        let mut k = known();
+        let k = k.get_or_insert_with(Default::default);
+        let now = std::time::Instant::now();
+        for id in part {
+            k.insert(id.to_string(), (now, None, ""));
+        }
+        for (id, kind) in status {
+            k.entry(id).or_insert((now, None, "")).2 = kind;
+        }
+        for i in items {
+            let id = i.id.clone();
+            k.entry(id).or_insert((now, None, "")).1 = Some(i);
+        }
+    }
+    let mut k = known();
+    let k = k.get_or_insert_with(Default::default);
+    let (mut items, mut status) = (vec![], vec![]);
+    for id in ids {
+        if let Some((_, item, kind)) = k.get(*id) {
+            items.extend(item.clone());
+            if !kind.is_empty() {
+                status.push((id.to_string(), *kind));
+            }
+        }
+    }
+    Ok((items, status))
 }
 
 fn parse_details(v: &Value) -> (Vec<Item>, Status) {
@@ -464,6 +536,10 @@ pub fn required_items(id: &str) -> Result<Vec<String>> {
     static CACHE: std::sync::Mutex<Option<std::collections::HashMap<String, Vec<String>>>> = std::sync::Mutex::new(None);
     if let Some(hit) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|c| c.get(id)) {
         return Ok(hit.clone());
+    }
+    // Steam's details (see `warm`) count them: an item with none costs no page read
+    if has_required(id) == Some(false) {
+        return Ok(vec![]);
     }
     let url = format!("https://steamcommunity.com/sharedfiles/filedetails/?id={id}");
     // an item's own page (its title is there): an error page says nothing about what it requires
@@ -871,6 +947,52 @@ mod tests {
         assert!(newly_updated(&mut seen, vec![item(100)]).is_empty());
         assert_eq!(newly_updated(&mut seen, vec![item(200)]).len(), 1);
         assert!(newly_updated(&mut seen, vec![item(200)]).is_empty());
+    }
+
+    #[test]
+    fn details_are_asked_once_for_everyone_until_they_go_stale() {
+        let reply = |ids: &[&str]| format!(r#"{{"response":{{"publishedfiledetails":[{}]}}}}"#, ids.iter().map(|i| format!(r#"{{"publishedfileid":"{i}","result":1,"title":"T{i}","time_updated":5}}"#)).collect::<Vec<_>>().join(","));
+        let (base, seen) = crate::sources::fake_http(vec![("POST /d", 200, reply(&["9100000001", "9100000002"])), ("POST /e", 200, reply(&["9100000003"]))]);
+        let url = format!("{base}/d");
+        // two at once: one request, and both answered
+        let a = { let url = url.clone(); std::thread::spawn(move || lookup_at(&url, &["9100000001", "9100000002"], false).unwrap().0.len()) };
+        let b = { let url = url.clone(); std::thread::spawn(move || lookup_at(&url, &["9100000001", "9100000002"], false).unwrap().0.len()) };
+        assert_eq!((a.join().unwrap(), b.join().unwrap()), (2, 2));
+        assert_eq!(seen.lock().unwrap().len(), 1, "the second asker was answered from the first");
+        // only the missing id is asked for
+        let (got, _) = lookup_at(&format!("{base}/e"), &["9100000002", "9100000003"], false).unwrap();
+        assert_eq!(got.iter().map(|i| i.id.as_str()).collect::<Vec<_>>(), ["9100000002", "9100000003"], "in the order asked");
+        let asked = seen.lock().unwrap().last().unwrap().1.clone();
+        assert!(asked.contains("itemcount=1") && asked.contains("9100000003"), "{asked}");
+        // an update check asks Steam again
+        lookup_at(&url, &["9100000001"], true).unwrap();
+        assert_eq!(seen.lock().unwrap().len(), 3);
+        // gone stale: asked again
+        KNOWN.lock().unwrap().as_mut().unwrap().get_mut("9100000002").unwrap().0 -= FRESH;
+        lookup_at(&url, &["9100000002"], false).unwrap();
+        assert_eq!(seen.lock().unwrap().len(), 4);
+    }
+
+    #[test]
+    fn an_item_steam_counts_no_required_items_for_costs_no_page() {
+        let now = std::time::Instant::now();
+        let item = |n| Some(Item { id: "9200000001".into(), num_children: n, ..Default::default() });
+        KNOWN.lock().unwrap().get_or_insert_with(Default::default).insert("9200000001".into(), (now, item(0), ""));
+        assert_eq!(required_items("9200000001").unwrap(), Vec::<String>::new(), "answered without Steam");
+        assert_eq!(has_required("9200000001"), Some(false));
+        KNOWN.lock().unwrap().as_mut().unwrap().insert("9200000001".into(), (now, item(2), ""));
+        assert_eq!(has_required("9200000001"), Some(true), "one with some has its page read");
+        assert_eq!(has_required("9200000009"), None, "unknown: its page is read, as before");
+    }
+
+    #[test]
+    fn a_busy_page_is_kept_briefly() {
+        let n = std::cell::Cell::new(0);
+        let fetch = || { n.set(n.get() + 1); Ok(b"busy".to_vec()) };
+        let key = "test:busy-page".to_string();
+        cached_if(key.clone(), fetch, |b| b != b"busy").unwrap();
+        cached_if(key, fetch, |b| b != b"busy").unwrap();
+        assert_eq!(n.get(), 1, "the second ask, just after, waits out the busy answer");
     }
 
     #[test]

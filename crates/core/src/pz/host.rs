@@ -757,6 +757,7 @@ pub fn lines_with(paths: &Paths, lines: &ServerMods, input: &str, build: u8, fir
             new.push(i);
         }
     }
+    steam_workshop::warm(&new.iter().map(String::as_str).collect::<Vec<_>>());
     let required = missing_required(&lines.workshop, &new, |id| {
         steam_workshop::required_items(id).unwrap_or_else(|e| {
             crate::log!("error: what workshop:{id} requires: {e:#}");

@@ -95,6 +95,9 @@ pub struct MapFolder {
     /// map.info `lots=`: map folders it builds on (usually `Muldraugh, KY`).
     pub lots: Vec<String>,
     pub cells: Vec<Cell>,
+    /// map.info `description=` (None: kept from before PZMM read it, so read again).
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 /// A mod with map folders (installed, or checked on the Workshop without installing).
@@ -152,7 +155,8 @@ fn parse_map_info(folder: &str, info: &str, title_at: impl FnOnce(&str) -> Strin
     if title.is_empty() {
         title = folder.to_string();
     }
-    MapFolder { folder: folder.to_string(), title, lots, cells: vec![] }
+    let description = Some(info.lines().find_map(|l| value(l, "description")).unwrap_or_default());
+    MapFolder { folder: folder.to_string(), title, lots, cells: vec![], description }
 }
 
 /// One map folder, read from disk.
@@ -228,7 +232,7 @@ impl Cache {
         let key = dir.to_string_lossy().into_owned();
         let stamp = stamp(dir);
         let entry = match self.old.get(&key) {
-            Some(e) if e.stamp == stamp => e.clone(),
+            Some(e) if e.stamp == stamp && e.map.description.is_some() => e.clone(),
             _ => Entry { stamp, map: read_folder(dir) },
         };
         let map = entry.map.clone();
@@ -1091,7 +1095,8 @@ pub(crate) fn browse_patiently(q: &steam_workshop::Query, stop: &AtomicBool) -> 
         if !matches!(got, Some(Err(_))) || stopped() {
             break;
         }
-        pause(wait, stopped);
+        // and at least Steam's cooldown, which would fail the read again at once
+        pause(wait.max(crate::sources::cooling("https://steamcommunity.com/").map_or(0, |d| d.as_secs() + 1)), stopped);
         got = browse();
     }
     got.filter(|_| !stopped())
@@ -1120,28 +1125,49 @@ fn unread(old: Option<&Checked>, item: &Item, why: String) -> Checked {
     }
 }
 
-/// Every Map-tagged Workshop item (all result pages, both builds), then the file lists of the
-/// ones not read yet or updated since, most subscribed first, up to `READERS` at once on one
+/// When the last scan that ran to the end started (maps-listed.txt): the next one lists only what changed since.
+fn listed_file(paths: &Paths) -> PathBuf {
+    paths.data.join("maps-listed.txt")
+}
+
+/// A scan that started at `started` ran to the end (`complete`: not stopped, no read failed on the network): the
+/// next one lists only what changed since. One that didn't leaves the last time as it was.
+fn mark_listed(paths: &Paths, started: u64, complete: bool) -> Result<()> {
+    if complete {
+        fs::write(listed_file(paths), started.to_string())?;
+    }
+    Ok(())
+}
+
+/// A page of the listing (last updated first) that reaches back past `since` (a day early, for clocks and
+/// Steam's caches) ends it: everything older was listed, and read, by the scan that finished then.
+fn listed_back_to(page: &[Item], since: Option<u64>) -> bool {
+    since.is_some_and(|s| page.last().is_some_and(|i| i.time_updated < s.saturating_sub(24 * 60 * 60)))
+}
+
+/// Every Map-tagged Workshop item (all result pages, both builds; after a scan that finished, only those updated
+/// since), then the file lists of the ones not read yet or updated since, most subscribed first, up to `READERS` at once on one
 /// anonymous Steam session; each read serves both builds. Results are saved as it goes;
 /// setting `stop` ends it (waits included).
 pub fn scan_workshop(paths: &Paths, stop: &AtomicBool, progress: &mut dyn FnMut(&Progress)) -> Result<Progress> {
     let stopped = || stop.load(Relaxed);
     let mut p = Progress { phase: "listing", ..Default::default() };
     let mut items: Vec<Item> = vec![];
+    let (started, since) = (crate::store::now(), fs::read_to_string(listed_file(paths)).ok().and_then(|s| s.trim().parse().ok()));
     for page in 1.. {
-        let q = steam_workshop::Query { required: vec!["Map".into()], sort: "mostrecent".into(), per_page: 50, page, ..Default::default() };
+        let q = steam_workshop::Query { required: vec!["Map".into()], sort: "lastupdated".into(), per_page: 50, page, ..Default::default() };
         let Some(got) = browse_patiently(&q, stop) else { return Ok(p) };
         let got = got?;
-        let empty = got.items.is_empty();
+        let (empty, enough) = (got.items.is_empty(), listed_back_to(&got.items, since));
         for i in got.items {
-            // newest first: an upload during the scan shifts the pages, repeating an item
+            // newest first: an update during the scan shifts the pages, repeating an item
             if !items.iter().any(|o| o.id == i.id) {
                 items.push(i);
             }
         }
         (p.done, p.total) = (items.len(), got.total as usize);
         progress(&p);
-        if empty || items.len() >= p.total {
+        if empty || enough || items.len() >= p.total {
             break;
         }
     }
@@ -1165,6 +1191,8 @@ pub fn scan_workshop(paths: &Paths, stop: &AtomicBool, progress: &mut dyn FnMut(
     todo.sort_by_key(|i| std::cmp::Reverse(i.subscriptions));
     p = Progress { phase: "reading", total: todo.len(), failed, ..Default::default() };
     progress(&p);
+    // a read that failed on the network isn't saved: the next scan must list it again
+    let mut net_failed = false;
     if !todo.is_empty() && !stopped() {
         let session = match Session::open(stop) {
             Err(_) if stopped() => return Ok(p),
@@ -1209,6 +1237,7 @@ pub fn scan_workshop(paths: &Paths, stop: &AtomicBool, progress: &mut dyn FnMut(
                         Err(e) => {
                             crate::log!("workshop:{} ({}): {e:#}", i.id, i.title);
                             p.failed += 1;
+                            net_failed |= net;
                             if !net {
                                 batch.insert(i.id.clone(), unread(old.get(&i.id), i, format!("{e:#}")));
                             } else if streak.load(Relaxed) >= 5 {
@@ -1229,6 +1258,7 @@ pub fn scan_workshop(paths: &Paths, stop: &AtomicBool, progress: &mut dyn FnMut(
         })?;
         save_checked(paths, batch)?;
     }
+    mark_listed(paths, started, !stopped() && !net_failed)?;
     p.phase = "done";
     progress(&p);
     Ok(p)
@@ -1545,7 +1575,7 @@ mod tests {
         touch(&m.join("media/maps/Riverboat/43_3.lotheader"));
         touch(&m.join("media/maps/Riverboat/world_43_3.lotpack"));
         touch(&m.join("media/maps/Riverboat/chunkdata_43_3.bin"));
-        fs::write(m.join("media/maps/Riverboat/map.info"), "title=Riverboat\nlots=Muldraugh, KY\nlots=Other\n").unwrap();
+        fs::write(m.join("media/maps/Riverboat/map.info"), "title=Riverboat\ndescription=A riverboat on the Ohio.\nlots=Muldraugh, KY\nlots=Other\n").unwrap();
         touch(&m.join("common/media/maps/Riverboat/51_4.lotheader"));
         touch(&m.join("common/media/maps/Riverboat/world_51_4.lotpack"));
         touch(&m.join("common/media/maps/Riverboat/world_52_4.lotpack"));
@@ -1557,7 +1587,10 @@ mod tests {
 
         let mut cache = Cache::default();
         let b41 = mod_maps(&m, 41, &mut cache);
-        assert_eq!(b41, [MapFolder { folder: "Riverboat".into(), title: "Riverboat".into(), lots: vec!["Muldraugh, KY".into(), "Other".into()], cells: vec![(43, 3)] }]);
+        assert_eq!(
+            b41,
+            [MapFolder { folder: "Riverboat".into(), title: "Riverboat".into(), lots: vec!["Muldraugh, KY".into(), "Other".into()], cells: vec![(43, 3)], description: Some("A riverboat on the Ohio.".into()) }]
+        );
         let b42 = mod_maps(&m, 42, &mut cache);
         assert_eq!(b42.len(), 1);
         assert_eq!((b42[0].title.as_str(), b42[0].cells.as_slice()), ("Louisville Riverboat", [(51, 4), (52, 4)].as_slice()));
@@ -1681,7 +1714,7 @@ mod tests {
         assert_eq!(n41, 2, "Riverboat and Tiles are B41 mods (a mod pack of two)");
         assert_eq!(b41.len(), 1, "Spawn has no B41 mod.info; Tiles has no maps");
         assert_eq!((b41[0].id.as_str(), b41[0].source.as_str()), ("Riverboat41", "workshop:2963883586"));
-        assert_eq!(b41[0].maps, [MapFolder { folder: "Riverboat".into(), title: "Riverboat".into(), lots: vec!["Muldraugh, KY".into()], cells: vec![(43, 3)] }]);
+        assert_eq!(b41[0].maps, [MapFolder { folder: "Riverboat".into(), title: "Riverboat".into(), lots: vec!["Muldraugh, KY".into()], cells: vec![(43, 3)], description: Some(String::new()) }]);
         let (b42, n42) = from_listing("2963883586", &files, 42, &mut read).unwrap();
         assert_eq!(n42, 2);
         assert_eq!(b42.len(), 2);
@@ -1729,6 +1762,16 @@ mod tests {
         assert!(stale(Some(&unread(Some(&good), &item, "x".into())), 20), "read again next scan");
         let fresh = unread(None, &item, "x".into());
         assert!(fresh.builds.is_empty() && fresh.updated == 20 && !stale(Some(&fresh), 20), "nothing to keep: waits for an update");
+    }
+
+    #[test]
+    fn a_scan_lists_back_to_the_last_finished_one() {
+        let page = |t: &[u64]| t.iter().map(|&time_updated| Item { time_updated, ..Default::default() }).collect::<Vec<_>>();
+        let day = 24 * 60 * 60;
+        assert!(!listed_back_to(&page(&[10 * day, 9 * day]), None), "no finished scan: everything is listed");
+        assert!(!listed_back_to(&page(&[10 * day, 9 * day]), Some(9 * day)), "a day's margin");
+        assert!(listed_back_to(&page(&[10 * day, 7 * day]), Some(9 * day)), "past it: the rest was listed then");
+        assert!(!listed_back_to(&[], Some(9 * day)));
     }
 
     #[test]
@@ -1872,6 +1915,15 @@ mod tests {
         });
         assert!(got.is_none());
         assert!(start.elapsed() < std::time::Duration::from_secs(2));
+    }
+
+    #[test]
+    fn only_a_complete_scan_is_marked_listed() {
+        let (_t, paths) = store::tests::temp_paths();
+        fs::create_dir_all(&paths.data).unwrap();
+        mark_listed(&paths, 5, true).unwrap();
+        mark_listed(&paths, 9, false).unwrap();
+        assert_eq!(fs::read_to_string(listed_file(&paths)).unwrap(), "5", "a scan with network failures lists again from the last complete one");
     }
 
     #[test]

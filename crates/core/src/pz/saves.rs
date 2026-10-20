@@ -454,6 +454,57 @@ pub fn reset(paths: &Paths, mode: &str, name: &str, what: &str, keep: u32) -> Re
     Ok(files.len())
 }
 
+/// Rename a save's folder (the game lists saves by it), its backups along with it. The game must be
+/// closed: the caller checks.
+pub fn rename(paths: &Paths, mode: &str, name: &str, to: &str) -> Result<()> {
+    let to = to.trim();
+    let (from, dest) = (dir(paths, mode, name)?, dir(paths, mode, to)?);
+    if !from.join("mods.txt").is_file() {
+        bail!("save {mode}/{name} not found");
+    }
+    // raid -> Raid on Windows: the same folder
+    let case_only = name != to && fs::canonicalize(&dest).ok().is_some_and(|d| fs::canonicalize(&from).ok() == Some(d));
+    if dest.exists() && !case_only {
+        bail!("there's already a save called {to}");
+    }
+    let (old, new) = (backup_dir(paths, mode, name)?, backup_dir(paths, mode, to)?);
+    // a deleted save's backups under that name: they'd be taken for this one's
+    if new.exists() && !case_only {
+        bail!("there are backups of a save called {to} already");
+    }
+    rename_dir(&from, &dest, case_only).with_context(|| format!("renaming {name} (is the game running?)"))?;
+    if old.is_dir()
+        && let Err(e) = rename_dir(&old, &new, case_only)
+    {
+        crate::log!("couldn't move the backups in {} to {}: {e}", old.display(), new.display());
+    }
+    backups_for_game(paths);
+    Ok(())
+}
+
+/// `from` as `to`; `case_only` (the same folder on Windows) through a temporary name, as `profile::rename` does.
+fn rename_dir(from: &Path, to: &Path, case_only: bool) -> std::io::Result<()> {
+    if !case_only {
+        return fs::rename(from, to);
+    }
+    let tmp = from.with_file_name(format!("{}.renaming", from.file_name().unwrap_or_default().to_string_lossy()));
+    fs::rename(from, &tmp)?;
+    fs::rename(&tmp, to)
+}
+
+/// Back the save up ("delete"), then remove its folder: it shows among the deleted saves, its backups
+/// kept. The game must be closed: the caller checks.
+pub fn delete(paths: &Paths, mode: &str, name: &str, keep: u32) -> Result<()> {
+    let save = dir(paths, mode, name)?;
+    if !save.join("mods.txt").is_file() {
+        bail!("save {mode}/{name} not found");
+    }
+    back_up(paths, mode, name, "delete", "", keep)?;
+    fs::remove_dir_all(&save).with_context(|| format!("deleting {} (is the game running?)", save.display()))?;
+    backups_for_game(paths);
+    Ok(())
+}
+
 /// Copy the save as `<name>_modded` (`_modded 2`... when taken) and give the copy these mods and
 /// maps (see `set_mods`); the original stays as it is. The copy's name.
 pub fn clone_with_mods(paths: &Paths, mode: &str, name: &str, ids: &[String], maps: &[String], b41: bool) -> Result<String> {
@@ -893,6 +944,35 @@ mod tests {
         assert!(s.join("mods.txt").is_file());
         delete_backup(&paths, m, n, &slot.file).unwrap();
         assert!(delete_backup(&paths, m, n, &s.join("mods.txt")).is_err());
+    }
+
+    #[test]
+    fn rename_and_delete_keep_the_backups() {
+        let (_t, paths) = crate::store::tests::temp_paths();
+        save(&paths);
+        let (m, n) = ("Sandbox", "2026-10-10_12-00-00");
+        back_up(&paths, m, n, "manual", "", 0).unwrap();
+        fs::create_dir_all(paths.zomboid.join("Saves/Sandbox/Taken")).unwrap();
+        assert!(rename(&paths, m, n, "Taken").is_err() && rename(&paths, m, n, "a/b").is_err());
+        // a deleted save's backups under the new name: not mixed with these
+        let gone = backup_dir(&paths, m, "Gone").unwrap();
+        fs::create_dir_all(&gone).unwrap();
+        assert!(rename(&paths, m, n, "Gone").is_err() && dir(&paths, m, n).unwrap().join("mods.txt").is_file(), "refused before the save moved");
+        rename(&paths, m, n, " raid ").unwrap();
+        // only the case changes (the same folder on Windows)
+        rename(&paths, m, "raid", "Raid").unwrap();
+        let names: Vec<String> = fs::read_dir(paths.zomboid.join("Saves/Sandbox")).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        assert!(names.contains(&"Raid".to_string()) && !names.contains(&"raid".to_string()), "{names:?}");
+        assert!(dir(&paths, m, "Raid").unwrap().join("mods.txt").is_file() && !dir(&paths, m, n).unwrap().exists());
+        assert_eq!(backups(&paths, m, "Raid").unwrap().len(), 1, "its backups moved with it");
+
+        delete(&paths, m, "Raid", 0).unwrap();
+        assert!(!dir(&paths, m, "Raid").unwrap().exists());
+        let mut kept: Vec<String> = backups(&paths, m, "Raid").unwrap().into_iter().map(|b| b.reason).collect();
+        kept.sort();
+        assert_eq!(kept, ["delete", "manual"], "backed up first");
+        assert_eq!(deleted_with_backups(&paths), [(m.to_string(), "Raid".to_string())]);
+        assert!(delete(&paths, m, "Raid", 0).is_err(), "nothing left to delete");
     }
 
     #[test]
