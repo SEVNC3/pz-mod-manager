@@ -600,8 +600,9 @@ mod tests {
         assert_eq!((w.title.as_str(), w.tags.clone()), ("My Mod", vec!["Build 42".to_string()]));
         assert!(poster(&src).is_some());
 
-        let (dest, skipped) = build(&src, &out, &Upload { description: "line 1\nline 2".into(), ..w.clone() }, Some(PNG256)).unwrap();
+        let (dest, mut skipped) = build(&src, &out, &Upload { description: "line 1\nline 2".into(), ..w.clone() }, Some(PNG256)).unwrap();
         assert_eq!(dest, out.join("MyMod"));
+        skipped.sort(); // folder listing order differs by OS
         assert_eq!(skipped, [".git", "build.bat"]);
         assert!(dest.join("Contents/mods/MyMod/42/mod.info").is_file() && !dest.join("Contents/mods/MyMod/.git").exists());
         let txt = fs::read_to_string(dest.join("workshop.txt")).unwrap();

@@ -1110,8 +1110,10 @@ javaJarFile=media/java/client/Viewpoint.jar
         std::fs::write(dir.join("media/java/Old.jar"), &hidden).unwrap();
         let row = Row { id: "Mod".into(), dir: dir.clone(), info: dir.join("42/mod.info"), ..Default::default() };
         let found = scan_folder(&row, &HashSet::new());
-        let got: Vec<(&str, &str)> = found.iter().map(|f| (f.key, f.vars["what"].as_str())).collect();
-        assert_eq!(got, [("modCodeFile", "42/media/extra.jar"), ("javaProcess", "java.lang.Runtime.exec"), ("javaShell", "powershell"), ("modCodeFile", "42/x.dll")], "the declared jar is left to inspect()");
+        let mut got: Vec<(&str, &str)> = found.iter().map(|f| (f.key, f.vars["what"].as_str())).collect();
+        got.sort(); // folder listing order differs by OS
+        assert_eq!(got, [("javaProcess", "java.lang.Runtime.exec"), ("javaShell", "powershell"), ("modCodeFile", "42/media/extra.jar"), ("modCodeFile", "42/x.dll")], "the declared jar is left to inspect()");
+        let found: Vec<_> = found.into_iter().filter(|f| f.vars["what"] == "42/media/extra.jar").collect();
         assert_eq!(found[0].action, Some(super::super::doctor::Action::Dismiss(sha256(&hidden))));
 
         // dismissed by the file's SHA-256: gone until the file changes
