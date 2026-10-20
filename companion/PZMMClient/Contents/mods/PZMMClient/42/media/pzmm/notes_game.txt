@@ -1,3 +1,23 @@
+# 0.2.2
+- This screen is laid out like the app now. Tabs, buttons and panels sit where they do in PZMM, so if you know one you know the other.
+- My mods has an eye next to each tickbox. Click it to hide mods you don't want to see, like the versions of a texture pack you don't use. Hidden lists them. Hiding never turns a mod off.
+- Size, Installed, Last changed and Overwrites have their own columns. Click a header to sort by it.
+- Paste a Workshop link, collection or ID into the box at the top and press Install.
+- Import takes a share code, a mod preset or a collection link.
+- Play and Join check your mods first and ask if something's wrong.
+- Pin a mod's place in the load order from its right-click menu.
+- A mod's details show its Workshop pictures, with arrows when there's more than one, and what changed since your version.
+- The Maps grid has the world map under it: water, roads and buildings, from each map's own data.
+- Filters has Added and Updated (last 24 hours, 7 or 30 days) and Has an update.
+- Home shows news from The Indie Stone, and Direct connect takes a pzmm://join link.
+- It asks Steam about your mods far less often, so Steam should make you wait a lot less.
+- What you change in the app now shows here while this screen is open: map order, hidden mods, favourites, sorting rules and settings.
+- Ctrl+PgUp and Ctrl+PgDn switch tabs. PgUp and PgDn scroll.
+- Fixed: hiding a mod in the app while this screen was open got undone by the next hide here.
+- Fixed: a map order changed in the app went back to the old one when you pressed Accept. My bad.
+- The new bits want PZMM 1.3.0. Older versions of the app still work, they just don't do the new hand-offs.
+- Got an idea or a bug? Tell me on Discord or the Workshop page.
+
 # 0.2.1
 - Find the broken mod keeps mods that need each other together now. Viewpoint and its add-ons, or a car pack and its framework, go off and on as one, so nothing loses a requirement halfway through. Lyven Ka Vinsxy caught this on the Workshop page. Cheers.
 - It also tries the mods you added most recently first, and a mod's details show when it first landed on your PC. GhostyAshes asked for that on Discord. Needs the app, which knows the dates.

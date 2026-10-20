@@ -20,7 +20,7 @@ local C = {
     bg = hex("121212"), panel = hex("1a1a1a"), raised = hex("242424"), line = hex("2e2e2e"), edge = hex("5a5a56"),
     text = hex("e8e8e6"), muted = hex("9b9b97"), accent = hex("6e080c"), accentHover = hex("842d30"), accentText = hex("fc4541"),
     hover = hex("3a1214"), banner = hex("322220"), onSelected = hex("ffffff"), dropEdge = hex("842d30"), ok = hex("3fb950"), warn = hex("f0883e"), danger = hex("e5604f"),
-    black = hex("000000"), desc = hex("dcdcda"), onAccent = hex("ffffff"), grid = hex("ffffff"), focus = hex("ffffff", 0.85),
+    black = hex("000000"), desc = hex("dcdcda"), mapWater = hex("4fa3a5"), mapRoad = hex("7d7a72"), mapBuilding = hex("a08a68"), onAccent = hex("ffffff"), grid = hex("ffffff"), focus = hex("ffffff", 0.85),
 }
 local function copy(c, a) return { r = c.r, g = c.g, b = c.b, a = a or c.a } end
 
@@ -31,9 +31,11 @@ local SHADOW = { k = 1 }
 local GRID = { major = 0.09, minor = 0.035 }
 local PALETTES = {
     dark = { bg = "121212", panel = "1a1a1a", raised = "242424", line = "2e2e2e", edge = "5a5a56", text = "e8e8e6", muted = "9b9b97",
-        onSelected = "ffffff", danger = "e5604f", ok = "3fb950", warn = "f0883e", desc = "dcdcda", grid = "ffffff" },
+        onSelected = "ffffff", danger = "e5604f", ok = "3fb950", warn = "f0883e", desc = "dcdcda", grid = "ffffff",
+        mapWater = "4fa3a5", mapRoad = "7d7a72", mapBuilding = "a08a68" },
     light = { bg = "e9ece8", panel = "f5f6f3", raised = "ffffff", line = "cdd4ce", edge = "9aa59d", text = "1b2124", muted = "59665f",
-        onSelected = "1b2124", danger = "b2402f", ok = "1a7f37", warn = "bc4c00", desc = "2c3438", grid = "1b2124" },
+        onSelected = "1b2124", danger = "b2402f", ok = "1a7f37", warn = "bc4c00", desc = "2c3438", grid = "1b2124",
+        mapWater = "2c8587", mapRoad = "8e8a7f", mapBuilding = "b39770" },
 }
 local function setRgb(c, v) c.r, c.g, c.b = v.r, v.g, v.b end
 --- `t` of the way from colour a to colour b.
@@ -156,17 +158,18 @@ local LINKS = {
 }
 -- the app's top bar actions the game can do too: { id, icon, tooltip }
 local ACTIONS = {
-    { "share", tex("icon_share"), "Copy mod list\nYour enabled mods as a Mod Manager preset (the game's Presets > Add takes it) or a PZMM share code.", T("act_share", "Share") },
+    { "share", tex("icon_share"), "Copy mod list\nYour enabled mods as a Mod Manager preset (the game's Presets > Add takes it) or a PZMM share code, or save them as a preset in the game's mod menu.", T("act_share", "Share") },
+    { "import", tex("tb_download"), T("act_import_tip", "Import\nA share code, a Workshop collection or item links, or a preset shared from the game's mod menu: PZMM makes a profile of it; without PZMM it becomes this list."), T("act_import", "Import") },
     { "refresh", tex("icon_refresh"), "Rescan mods\nPicks up mods Steam downloaded, or you added, since this screen opened.", T("act_rescan", "Rescan") },
-    { "folder", tex("icon_folder"), "Open mods folder\nZomboid/mods, where mods you made or downloaded by hand go.", T("act_folder", "Folder") },
 }
 -- the PZMM section labels, rendered in the app's style; any other name gets a tape drawn here
 K.TAPE_L, K.TAPE_M, K.TAPE_R = tex("tape_l"), tex("tape_m"), tex("tape_r")
 -- the app's list icons, white, drawn tinted: grip dots, fold chevrons, the hover marker and the drop feather
 -- the app's toolbar icons (tb_<name>), white, drawn tinted
 local TB = {}
-for _, n in ipairs({ "layers", "filter", "sort", "plus", "pulse", "x", "undo", "redo", "check", "chev_up", "chev_down", "copy", "alert", "trash", "download", "play", "update", "overlap", "lock", "search", "tag", "folder", "star", "steam", "swap", "settings", "external", "link", "maximize", "minimize", "pencil", "eye", "server", "info" }) do TB[n] = tex("tb_" .. n) end
+for _, n in ipairs({ "layers", "filter", "sort", "plus", "pulse", "x", "undo", "redo", "check", "chev_up", "chev_down", "copy", "alert", "trash", "download", "play", "update", "overlap", "lock", "search", "tag", "folder", "star", "steam", "swap", "settings", "external", "link", "maximize", "minimize", "pencil", "eye", "eye_off", "server", "info" }) do TB[n] = tex("tb_" .. n) end
 K.GRIP, K.CHEV_DOWN, K.CHEV_RIGHT, K.SEL_MARK, K.FEATHER = tex("grip"), tex("chev_down"), tex("chev_right"), tex("marker"), tex("feather")
+K.CHEV_LEFT = tex("chev_left")
 local MARKER = (function()
     local ok, f = pcall(function() return UIFont.Handwritten end)
     return ok and f or UIFont.Medium
@@ -292,23 +295,27 @@ end
 --- This mod's own settings (the Settings tab), in Zomboid/Lua/pzmm/client.txt as key=1 or key=0.
 --- PZMM's Settings write the same file: it's read again every few seconds at the main menu, so a change
 --- there shows here.
-local SETTINGS = { logo = true, watermark = true, news = true, tips = true, large = false, ids = false, favfirst = false, compact = false }
+local SETTINGS = { logo = true, watermark = true, news = true, tips = true, large = false, ids = false, favfirst = false, compact = false, pfwarn = true }
 local settingsAt = 0
 local settingsChanged = false
 local function loadSettings()
     settingsAt = getTimestampMs()
     local before = {}
     for k, v in pairs(SETTINGS) do before[k] = v end
+    local pf = {}
     pcall(function()
         local r = getFileReader("pzmm/client.txt", false)
         if not r then return end
         local line = r:readLine()
         while line do
-            local k, v = line:match("^(%w+)=(%d)$")
-            if k and SETTINGS[k] ~= nil then SETTINGS[k] = v == "1" end
+            local k, v = line:match("^([^=]+)=(%d)$")
+            if k and SETTINGS[k] ~= nil then SETTINGS[k] = v == "1"
+            elseif k and k:sub(1, 7) == "pfwarn." then pf[k] = v == "1" or nil end
             line = r:readLine()
         end
         r:close()
+        -- launch warnings not to ask about again, per profile and warning (pfwarn.<profile>.<warning>=1)
+        K.PFWARN = pf
     end)
     for k, v in pairs(SETTINGS) do if before[k] ~= v then settingsChanged = true end end
 end
@@ -322,8 +329,8 @@ local function saveSettings(key)
         if r then
             local line = r:readLine()
             while line do
-                local k, v = line:match("^(%w+)=(%d)$")
-                if k then out[k] = v == "1" end
+                local k, v = line:match("^([^=]+)=(%d)$")
+                if k and k:sub(1, 7) ~= "pfwarn." then out[k] = v == "1" end
                 line = r:readLine()
             end
             r:close()
@@ -332,6 +339,7 @@ local function saveSettings(key)
             if k == key or out[k] == nil then out[k] = v end
             SETTINGS[k] = out[k]
         end
+        for k, v in pairs(K.PFWARN or {}) do if v then out[k] = true end end
         local w = getFileWriter("pzmm/client.txt", true, false)
         for k, v in pairs(out) do w:write(k .. "=" .. (v and "1" or "0") .. "\n") end
         w:close()
@@ -545,6 +553,7 @@ end
 --- mapQuery and serverFilter; My mods' are put away while they're away).
 function K.swapSearch(ui)
     local want = (ui.page == "maps" or ui.page == "servers") and ui.page or "mods"
+    if want == "servers" and ui:srvPageNow() == "direct" then want = "direct" end
     if want == ui.searchOwner then return end
     if ui.searchOwner == "mods" then ui.modsText = ui.search:getText() end
     ui.searchOwner = want
@@ -552,12 +561,29 @@ function K.swapSearch(ui)
     if want == "maps" then
         words, hint = ui.mapQuery or "", "Search map mods"
     elseif want == "servers" then
-        words, hint = ui.serverFilter or "", "Search servers"
+        words, hint = ui.serverFilter or "", T("srv_search", "Search by name")
+    elseif want == "direct" then
+        words, hint = ui.directText or "", "203.0.113.5:16261"
     end
     ui.search:setText(words)
     pcall(function() ui.search:unfocus() end)
     pcall(function() ui.search.javaObject:setPlaceholderText(hint) end)
     if want == "mods" then ui:updateView() end
+end
+--- Bring the page's search into view for "/" or Ctrl+F: My mods', Maps' (in Map mods), Servers' (on a list or
+--- Direct connect). False on a page without one.
+function K.findSearch(ui)
+    if ui.page == "maps" then
+        if (ui.mapTab or "mods") ~= "mods" then ui.mapTab, ui.mapSideScroll = "mods", 0 end
+        ui.mapSideScroll = 0
+        return true
+    elseif ui.page == "servers" then
+        local p = ui:srvPageNow()
+        if p ~= "browse" and p ~= "favs" and p ~= "history" and p ~= "direct" then ui.srvPage = "browse" end
+        ui.feedScroll = 0
+        return true
+    end
+    return ui.page == "mods"
 end
 --- The search box inside a page's bar (Maps, Servers) at x, y, w: its box, icon and the entry over them (shown
 --- only while the bar is in the frame top .. top + bh). Returns w.
@@ -726,11 +752,24 @@ local function readHidden()
     return set, lines
 end
 
---- Write the hidden set back, keeping the file's other lines (presets, favourites).
+--- Write the hidden set back, keeping the file's other lines (presets, favourites). Only what the game changed since
+--- the screen opened (K.openHidden) goes over the file as it is now: PZMM may hide or show mods meanwhile.
 local function writeHidden(set)
-    local _, lines = readHidden()
+    local now0, lines = readHidden()
+    local base = K.openHidden
+    if not base then
+        base = {}
+        for id in pairs(now0) do base[id] = true end
+    end
+    for id in pairs(set) do if not base[id] then now0[id] = true end end
+    for id in pairs(base) do if not set[id] then now0[id] = nil end end
+    -- what's kept is the new baseline, and what the screen shows
+    K.openHidden = {}
+    for id in pairs(now0) do K.openHidden[id] = true end
+    for id in pairs(set) do set[id] = nil end
+    for id in pairs(now0) do set[id] = true end
     local ids = {}
-    for id in pairs(set) do ids[#ids + 1] = id end
+    for id in pairs(now0) do ids[#ids + 1] = id end
     table.sort(ids)
     local out, done = {}, false
     for _, l in ipairs(lines) do
@@ -986,14 +1025,15 @@ local PAGES = {
 }
 local PAGE = {}
 for _, pg in ipairs(PAGES) do PAGE[pg[1]] = pg end
-local TABS = { "All", "Enabled", "Disabled", "Problems" }
+local TABS = { "All", "Enabled", "Disabled", "Problems", "Hidden" }
 K.TAB_TIPS = {
     All = T("filter_all_tip", "All\nEvery mod the game found."),
     Enabled = T("filter_enabled_tip", "Enabled\nMods that load with your next game."),
     Disabled = T("filter_disabled_tip", "Disabled\nMods you have but aren't loading."),
     Problems = T("filter_problems_tip", "Problems\nMods that can't load on this build of the game, or clash with another mod."),
+    Hidden = T("filter_hidden_tip", "Hidden\nMods you've hidden. They keep their place in the list and load as they are set."),
 }
-K.TAB_NAMES = { All = T("filter_all", "All"), Enabled = T("filter_enabled", "Enabled"), Disabled = T("filter_disabled", "Disabled"), Problems = T("filter_problems", "Problems") }
+K.TAB_NAMES = { All = T("filter_all", "All"), Enabled = T("filter_enabled", "Enabled"), Disabled = T("filter_disabled", "Disabled"), Problems = T("filter_problems", "Problems"), Hidden = T("filter_hidden", "Hidden") }
 --- Required mods that aren't installed at all (set by updateView: id -> true).
 local MISSING = {}
 local function missingReqs(d)
@@ -1095,10 +1135,16 @@ function PZMMMods:createChildren()
             self.serverFilter = txt ~= "" and txt or nil
             return
         end
+        if self.searchOwner == "direct" then
+            self.directText = txt
+            return
+        end
         self.scroll = 0
         self:updateView()
     end
     pcall(function() self.search.javaObject:setPlaceholderText("Search mods  ( / )") end)
+    -- Enter in Direct connect's address looks it up
+    self.search.onCommandEntered = function() if self.searchOwner == "direct" then self:directLookUp() end end
     self.searchOwner = "mods"
     self:addChild(self.search)
     self.homeSearch = ISTextEntryBox:new("", 0, 0, 100, BAR - 4)
@@ -1111,6 +1157,27 @@ function PZMMMods:createChildren()
     pcall(function() self.homeSearch.javaObject:setPlaceholderText("Search") end)
     self.homeSearch:setVisible(false)
     self:addChild(self.homeSearch)
+    -- the header's Install box, as the app's: Enter installs what was pasted
+    self.installBox = ISTextEntryBox:new("", 0, 0, 100, BAR - 4)
+    self.installBox.font = SMALL
+    self.installBox:initialise()
+    self.installBox:instantiate()
+    self.installBox.backgroundColor = copy(C.raised, 0)
+    self.installBox.borderColor = copy(C.line, 0)
+    self.installBox.onCommandEntered = function() self:installTyped() end
+    pcall(function() self.installBox.javaObject:setPlaceholderText(T("install_placeholder", "Paste a Workshop link, collection or ID")) end)
+    self:addChild(self.installBox)
+    -- Browse Workshop's search box (Enter searches)
+    self.wsSearch = ISTextEntryBox:new("", 0, 0, 100, BAR - 4)
+    self.wsSearch.font = SMALL
+    self.wsSearch:initialise()
+    self.wsSearch:instantiate()
+    self.wsSearch.backgroundColor = copy(C.raised, 0)
+    self.wsSearch.borderColor = copy(C.line, 0)
+    self.wsSearch.onCommandEntered = function() self:wsSearchGo() end
+    pcall(function() self.wsSearch.javaObject:setPlaceholderText(T("ws_search_placeholder", "Search the Workshop")) end)
+    self.wsSearch:setVisible(false)
+    self:addChild(self.wsSearch)
 
     -- Back and the game's own screen at the top right, where the app's window has Minimise and Close
     local back, vanilla = getText("UI_btn_back"), T("vanilla", "Game's mod screen")
@@ -1171,7 +1238,7 @@ function PZMMMods:updateView()
             self.nghost = self.nghost + 1
         end
     end
-    local counts = { All = 0, Enabled = 0, Disabled = 0, Problems = 0 }
+    local counts = { All = 0, Enabled = 0, Disabled = 0, Problems = 0, Hidden = 0 }
     self.needed = {}
     for _, d in ipairs(all) do
         counts.All = counts.All + 1
@@ -1184,9 +1251,11 @@ function PZMMMods:updateView()
             pcall(function() d.author = tostring(d.modInfo:getAuthor() or "") end)
         end
         local match = q == "" or d.name:lower():find(q, 1, true) or d.modId:lower():find(q, 1, true) or d.author:lower():find(q, 1, true)
+        -- hidden mods: only under Hidden, Problems or a search that finds them, as the app's
         local hid = self.hidden and self.hidden[d.modId] or false
-        local shown = (self.filterHidden and hid) or (not self.filterHidden and not hid)
-        if match and shown and (not keep or keep(d)) and (not self.favOnly or d.favorite) and (not self.filterKind or K.hasKind(self, d, self.filterKind)) and (not self.langOnly or d.hasLang) and (not self.filterTag or self:hasTag(d, self.filterTag)) then
+        if hid then counts.Hidden = counts.Hidden + 1 end
+        local shown = hid == (self.tab == "Hidden") or (hid and (q ~= "" or self.tab == "Problems"))
+        if match and shown and (not keep or keep(d)) and (not self.favOnly or d.favorite) and (not self.filterKind or K.hasKind(self, d, self.filterKind)) and (not self.langOnly or d.hasLang) and (not self.filterTag or self:hasTag(d, self.filterTag)) and K.dateOk(self, d) then
             local name = lib and (lib.of[d.modId] or "Other") or K.SOURCES[source(d)]
             table.insert(byGroup[section(name)], d)
         end
@@ -1213,7 +1282,7 @@ function PZMMMods:updateView()
                 if by == "size" and a.sSize ~= b.sSize then return a.sSize > b.sSize end
                 if by == "changed" and a.sChanged ~= b.sChanged then return a.sChanged > b.sChanged end
                 if by == "installed" then
-                    local ia, ib = self.installed and self.installed[a.modId] or 0, self.installed and self.installed[b.modId] or 0
+                    local ia, ib = K.installedAt(self, a) or 0, K.installedAt(self, b) or 0
                     if ia ~= ib then return ia > ib end
                 end
                 if by == "enabled" and a.isActive ~= b.isActive then return a.isActive end
@@ -1291,10 +1360,10 @@ end
 
 -- --- the layout: header, toolbar, the list (left), the load order or a mod's details (right), footer
 
-K.MODS_NOTICE = T("notice_mods", "installing from a zip, folder, GitHub or a link, removing a mod and rolling one back, change notes in a mod's details, the game's error log, profiles (new, rename, copy, delete), snapshots and pinning a mod's place, importing a profile (a share code, a Workshop collection or another manager's list), removing unused server profiles and setting up Project Viewpoint, download history, reinstall and cancel, unsubscribing on the Workshop page, subscriber count, Mod ID matches and listed by the author in details, the launch pre-flight check (fix and play, launch anyway, turn off those mods, trust files, don't ask again), the Check setup findings the game doesn't raise (the code risk scan with its risk tier and trust files, a Workshop item that is gone, banned or hidden, Lua syntax errors, duplicate copies and mod.info problems; server config findings: mods missing from or extra in a server's ini, build and requirement mismatches; game and launcher checks: the game's jar and classes, the launch flag, Java options, ZombieBuddy changed or broken, folders that don't exist; and map folder and overlap findings) and the desktop-only Check setup fixes (switch build, find a B42 version, verify game files, remove the extra copy, unsubscribe the others, get the original, update the game).")
+K.MODS_NOTICE = T("notice_mods3", "installing from a zip, folder, GitHub or a link, the game's error log, removing unused server profiles and setting up Project Viewpoint, reinstall, subscriber count, Mod ID matches and listed by the author in details, trusting files at launch and the desktop-only Check setup fixes (switch build, find a B42 version, verify game files, remove the extra copy, unsubscribe the others, get the original, update the game).")
 function PZMMMods:listBox()
     local w = self.width - PAD * 2 - SIDE
-    local y = TOP + FILTERS + self:modsNoticeH() + 12
+    local y = TOP + FILTERS + self:modsNoticeH() + 12 + K.colH()
     return PAD, y, w, self.height - BOTTOM - y
 end
 -- the right panel is flat and full height, flush with the screen's edge
@@ -1304,6 +1373,85 @@ function PZMMMods:sideBox()
     return self.width - SIDE, y, SIDE, self.height - BOTTOM - y
 end
 local function entryHeight(e, i) return e.head and (HEAD + (i > 1 and GAP or 0)) or ROW end
+
+--- The list's header row, as the app's table: its height (it sits above the list, not scrolled).
+function K.colH() return H_SMALL + 12 end
+K.COL_NAMES = { num = "#", mod = T("col_mod", "Mod"), size = T("col_size", "Size"), installed = T("col_installed", "Installed"),
+    changed = T("col_changed", "Last changed"), ovl = T("col_overwrites", "Overwrites"), src = T("col_source", "Source") }
+for k, v in pairs(K.COL_NAMES) do K.COL_NAMES[k] = v:upper() end
+-- in order, with the sort each one's header click picks (Overwrites and Source don't sort)
+K.HEADS = { { "num", "order" }, { "mod", "name" }, { "size", "size" }, { "installed", "installed" }, { "changed", "changed" }, { "ovl" }, { "src" } }
+--- The columns of a row at x, w wide: id -> { x0, x1 }. grip 22, checkbox 28, eye 26, # 40, Mod the rest; from the
+--- right Source (the widest shown last frame), Overwrites 44, and only from 760 px Last changed, Installed and Size,
+--- 78 each. A column is at least as wide as its header (and its sort chevron), as a table's are.
+function K.cols(ui, x, w)
+    local function hw(id, min) return math.max(min, width(K.COL_NAMES[id]) + 22) end
+    local c = {}
+    local r = x + w - 16
+    -- ponytail: Source fits last frame's rows (one frame late when a wider chip appears)
+    c.src = { r - math.max(ui.srcCol or 0, width(K.COL_NAMES.src)), r }
+    r = c.src[1] - 8
+    c.ovl = { r - hw("ovl", 44), r }
+    r = c.ovl[1]
+    if w >= 760 then
+        for _, id in ipairs({ "changed", "installed", "size" }) do
+            c[id] = { r - hw(id, 78), r }
+            r = c[id][1]
+        end
+    end
+    c.grip, c.box, c.eye, c.num = { x + 4, x + 26 }, { x + 26, x + 54 }, { x + 54, x + 80 }, { x + 80, x + 120 }
+    c.mod = { x + 124, r - 8 }
+    return c
+end
+--- The header row: small capitals; a sortable one sorts by its column, again for the library order (a chevron on it).
+function K.drawHeads(ui, x, y, w, mx, my)
+    local c = K.cols(ui, x, w)
+    local hh = K.colH()
+    local by0 = ui.sortBy or "order"
+    local ty = y + math.floor((hh - H_SMALL) / 2)
+    ui.colHits = {}
+    for _, h in ipairs(K.HEADS) do
+        local box = c[h[1]]
+        if box then
+            local label = K.COL_NAMES[h[1]]
+            local on = h[2] ~= nil and by0 == h[2]
+            local chev = on and h[2] ~= "order" and K.CHEV_DOWN
+            local lw = width(label) + (chev and 14 or 0)
+            local lx = box[2] - lw
+            if h[1] == "mod" then lx = box[1] elseif h[1] == "ovl" then lx = box[1] + math.floor((box[2] - box[1] - lw) / 2) end
+            local over = h[2] ~= nil and mx >= box[1] and mx < box[2] and my >= y and my < y + hh
+            local tc = (on or over) and C.text or C.muted
+            bold(ui, label, lx, ty, tc)
+            if chev then ui:drawTextureScaled(chev, lx + width(label) + 2, ty + math.floor((H_SMALL - 12) / 2), 12, 12, 1, tc.r, tc.g, tc.b) end
+            if h[2] then
+                if over then tip(ui, T("sort_by_tip", "Sort by this column (click again for the library order)")) end
+                ui.colHits[#ui.colHits + 1] = { h[2], box[1], y, box[2] - box[1], hh }
+            end
+        end
+    end
+end
+--- A header's click: sort by its column, or back to the library order when it's the one sorted by.
+function K.colSort(ui, by)
+    ui.sortBy = (by == (ui.sortBy or "order")) and "order" or by
+    ui.scroll = 0
+    ui:updateView()
+end
+--- When mod `d` arrived: firstseen.txt (the app's), else when PZMM installed it; nil when unknown.
+function K.installedAt(ui, d) return (ui.firstSeen and ui.firstSeen[d.modId]) or (ui.installed and ui.installed[d.modId]) end
+--- A size in bytes as the app's: KB, MB or GB ("" when unknown).
+function K.fmtSize(b)
+    if not b or b <= 0 then return "" end
+    if b >= 1073741824 then return (math.floor(b / 107374182.4) / 10) .. " GB" end
+    if b >= 1048576 then return (math.floor(b / 104857.6) / 10) .. " MB" end
+    return math.max(1, math.floor(b / 1024 + 0.5)) .. " KB"
+end
+--- A date as the app's short one, "5 Oct 25" ("" when unknown).
+function K.fmtDate(t)
+    if not t or t <= 0 then return "" end
+    local ok, s = pcall(os.date, "%d %b %y", K.LT(t))
+    if not ok then return "" end
+    return (tostring(s):gsub("^0", ""))
+end
 
 function PZMMMods:prerender()
     local ok, err = pcall(self.prerenderScreen, self)
@@ -1323,13 +1471,19 @@ function PZMMMods:prerenderScreen()
     rect(self, 0, 0, self.width, self.height, C.bg, 1)
     K.tint(self.search)
     K.tint(self.homeSearch)
+    K.tint(self.installBox)
+    if self.wsSearch then
+        K.tint(self.wsSearch)
+        self.wsSearch:setVisible(false)
+    end
     self.noticeHits = nil
     -- a new page reads its lists again (Home's servers, servers.txt)
     if self.page ~= self.lastPage then
         self.lastPage = self.page
         self.homeList, self.recent, self.srvCache, self.libLists, self.homeCheck = nil, nil, nil, nil, nil
-        K.swapSearch(self)
     end
+    -- (Servers' Direct connect page has the box for its address)
+    K.swapSearch(self)
     -- words that came without a key press (a paste) filter too
     if self.search:getText() ~= self.searchSeen then self.search.onTextChange() end
     -- the blueprint grid, in the page body only (the filter bar stays flat): 24 px minors, 96 px majors
@@ -1379,8 +1533,14 @@ function PZMMMods:prerenderScreen()
     for _, a in ipairs(ACTIONS) do if not a.app or self.app then shown[#shown + 1] = a end end
     local full = -4
     for _, a in ipairs(shown) do full = full + width(a[4]) + 46 + 4 end
-    local labelled = self.vanilla:getX() - 16 - full >= pend + 16
-    local ax = self.vanilla:getX() - 16 - (labelled and full or #shown * (BAR + 4) - 4)
+    -- then the Install box, as the app's (it goes first when the row is short)
+    local ib, il = self.installBox, T("install_btn", "Install")
+    local ibw, iw = width(il) + 48, 260
+    local ibx = self.vanilla:getX() - 16 - ibw - 8 - iw
+    local boxOn = ib ~= nil and ibx - 16 - (#shown * (BAR + 4) - 4) >= pend + 16
+    local aright = boxOn and ibx - 16 or self.vanilla:getX() - 16
+    local labelled = aright - full >= pend + 16
+    local ax = aright - (labelled and full or #shown * (BAR + 4) - 4)
     local mxa, mya = self:getMouseX(), self:getMouseY()
     self.actionBoxes = {}
     for _, a in ipairs(shown) do
@@ -1388,6 +1548,27 @@ function PZMMMods:prerenderScreen()
         if over then tip(self, a[3]) end
         self.actionBoxes[#self.actionBoxes + 1] = { a[1], ax, py, aw }
         ax = ax + aw + 4
+    end
+    self.installHit = nil
+    if ib then
+        ib:setVisible(boxOn)
+        if boxOn then
+            round(self, ibx, py, iw, BAR, 6, C.raised)
+            local focused = false
+            pcall(function() focused = ib:isFocused() end)
+            outline(self, ibx, py, iw, BAR, 6, focused and C.focus or C.line)
+            if focused then outline(self, ibx - 1, py - 1, iw + 2, BAR + 2, 6, C.focus) end
+            ib:setX(ibx + 8)
+            ib:setY(py + 4)
+            ib:setWidth(iw - 16)
+            local bx = ibx + iw + 8
+            local _, _, over = flatButton(self, il, bx, py, mxa, mya, ib:getText():find("%S") and "primary" or nil, TB.download)
+            if over then
+                tip(self, self.app and "Install\nWorkshop links, collections or IDs, several at once: PZMM installs them once you say yes."
+                    or "Install\nWorkshop links, collections or IDs, several at once: each shows in Browse Workshop, and one opens in Steam to subscribe.")
+            end
+            self.installHit = { x = bx, y = py, w = ibw, h = BAR }
+        end
     end
 
     -- its tab bar: My mods, the active tab (soft red fill, light edges, white underline)
@@ -1441,6 +1622,22 @@ function PZMMMods:prerenderScreen()
     local lx = self.width - PAD - #LINKS * 36 + 4
     local ly = ROW1 + (ROW2 - BAR) / 2
     local mx0, my0 = self:getMouseX(), self:getMouseY()
+    -- before the links, as the app's: Update N mods (or Check for updates), then Play; what doesn't fit after the tabs stays out
+    self.tabActs = {}
+    do
+        local ax = lx - 12
+        local acts = K.tabActions(self)
+        for i = #acts, 1, -1 do
+            local a = acts[i]
+            local aw = width(a.label) + 28 + (a.icon and 20 or 0)
+            if ax - aw < tx + 12 then break end
+            ax = ax - aw
+            local _, _, over = flatButton(self, a.label, ax, ly, mx0, my0, a.kind, a.icon)
+            if over then tip(self, a.tip) end
+            table.insert(self.tabActs, 1, { x = ax, y = ly, w = aw, h = BAR, fn = a.fn })
+            ax = ax - 8
+        end
+    end
     self.linkBoxes = {}
     for _, l in ipairs(LINKS) do
         local over = mx0 >= lx and mx0 < lx + BAR and my0 >= ly and my0 < ly + BAR
@@ -1484,7 +1681,7 @@ function PZMMMods:prerenderScreen()
     local labels, segW = {}, 0
     for i, t in ipairs(TABS) do
         local n = self.counts and self.counts[t] or 0
-        labels[i] = (t == "Problems" and n > 0) and (K.TAB_NAMES[t] .. " (" .. n .. ")") or K.TAB_NAMES[t]
+        labels[i] = ((t == "Problems" or t == "Hidden") and n > 0) and (K.TAB_NAMES[t] .. " (" .. n .. ")") or K.TAB_NAMES[t]
         segW = segW + width(labels[i]) + 24
     end
     local mx, my = self:getMouseX(), self:getMouseY()
@@ -1651,7 +1848,41 @@ local function clock(t)
 end
 
 --- The activity bar at the bottom, as the app's: the toggle (with a red dot for an error you haven't seen),
---- the newest line, and Copy. Drawn in the footer, left of what isn't saved yet and Accept.
+--- the newest line, Expand and Copy. Drawn in the footer, left of what isn't saved yet and Accept.
+--- PZMM's download history (Zomboid/Lua/pzmm/history.txt, newest first: "<at>\t<action>\t<id>\t<name>\t<source>").
+function K.readHistory()
+    local out = {}
+    pcall(function()
+        local r = getFileReader("pzmm/history.txt", false)
+        if not r then return end
+        local line = r:readLine()
+        while line do
+            local f = fields(line)
+            if tonumber(f[1]) and (f[2] or "") ~= "" then out[#out + 1] = { at = tonumber(f[1]), action = f[2], id = f[3] or "", name = (f[4] or "") ~= "" and f[4] or (f[3] or ""), source = f[5] or "" } end
+            line = r:readLine()
+        end
+        r:close()
+    end)
+    return out
+end
+--- The footer's Download history: the latest 20, then the whole of it in PZMM.
+function PZMMMods:historyMenu()
+    local list = K.readHistory()
+    local items = { { T("history_title", "Download history"), heading = true } }
+    if #list == 0 then items[#items + 1] = { T("history_none", "Nothing downloaded yet."), disabled = true } end
+    for i, h in ipairs(list) do
+        if i > 20 then break end
+        local hid = h.id
+        items[#items + 1] = { K.ago(h.at) .. ": " .. h.action .. " " .. h.name, function()
+            local d = self.model.mods[hid]
+            if d then self.page, self.selected, self.checkOpen = "mods", d, false end
+        end }
+    end
+    items[#items + 1] = false
+    items[#items + 1] = { T("open_in_pzmm", "Open in PZMM"), function() self:request("open\thistory", "PZMM asked to open.") end, icon = TB.play }
+    self:menu(items)
+end
+
 function PZMMMods:drawActivityBar(right)
     local mx, my = self:getMouseX(), self:getMouseY()
     local fy = self.height - BOTTOM
@@ -1681,7 +1912,7 @@ function PZMMMods:drawActivityBar(right)
     if self:waiting() then dc, da = C.accentText, 0.4 + 0.6 * (math.sin(getTimestampMs() / 250) + 1) / 2 end
     round(self, tx + 34, by + math.floor((BAR - 8) / 2), 8, 8, 3, dc, da)
     bold(self, label, tx + 50, by + (BAR - H_SMALL) / 2, C.text)
-    if over then tip(self, "Activity\nWhat you did here, and what PZMM did that reaches the game. The app also has the download history and Cancel.") end
+    if over then tip(self, "Activity\nWhat you did here, and what PZMM did that reaches the game.") end
     self.logToggle = { x = tx, y = by, w = tw, h = BAR }
     -- Copy, at the right of the bar
     local cx = right - BAR
@@ -1693,6 +1924,45 @@ function PZMMMods:drawActivityBar(right)
     end
     if TB.copy then self:drawTextureScaled(TB.copy, cx + math.floor((BAR - 16) / 2), by + math.floor((BAR - 16) / 2), 16, 16, #log > 0 and 1 or 0.35, C.text.r, C.text.g, C.text.b) end
     self.logCopy = { x = cx, y = by, w = BAR, h = BAR }
+    -- Expand, left of Copy: opens the activity at full height (or back to the short list)
+    local ex = cx - 4 - BAR
+    local big = self.logOpen and self.logExpanded
+    local _, overE = toolButton(self, big and TB.minimize or TB.maximize, nil, ex, by, mx, my)
+    if overE then tip(self, big and "Collapse\nBack to the short list." or "Expand activity\nThe list at full height.") end
+    self.logExpand = { x = ex, y = by, w = BAR, h = BAR }
+    cx = ex
+    self.footHits = {}
+    -- Download history, left of Expand (PZMM's history.txt)
+    if self.app then
+        local hx = cx - 4 - BAR
+        local _, overH = toolButton(self, TB.download, nil, hx, by, mx, my)
+        if overH then tip(self, T("history_title", "Download history") .. "\nWhat PZMM installed, updated and removed.") end
+        self.footHits[#self.footHits + 1] = { x = hx, y = by, w = BAR, h = BAR, fn = function() self:historyMenu() end }
+        cx = hx
+    end
+    -- PZMM's download running: what, how far, and Cancel
+    local job = self.app and self.app.job or ""
+    if job ~= "" then
+        local cl = T("job_cancel", "Cancel")
+        local cw = width(cl) + 28
+        cx = cx - 8 - cw
+        local _, _, co = flatButton(self, cl, cx, by, mx, my, "quiet")
+        if co then tip(self, "Cancel\nStops PZMM's download.") end
+        self.footHits[#self.footHits + 1] = { x = cx, y = by, w = cw, h = BAR, fn = function() self:request("cancel", "Cancel asked for.", true) end }
+        local done, total = tonumber(self.app.done) or 0, tonumber(self.app.total) or 0
+        local msg = job .. (total > 0 and (" " .. done .. "/" .. total) or "")
+        local jx = tx + tw + 12
+        local room = cx - 12 - jx
+        text(self, fit(msg, room - 132), jx, by + (BAR - H_SMALL) / 2, C.text)
+        local bx2 = jx + math.min(width(msg), room - 132) + 12
+        if total > 0 and bx2 + 120 <= cx - 12 then
+            local by2 = by + math.floor((BAR - 6) / 2)
+            round(self, bx2, by2, 120, 6, 3, C.line)
+            local fw = math.floor(120 * math.min(1, done / total))
+            if fw > 0 then round(self, bx2, by2, fw, 6, 3, C.accentText) end
+        end
+        return
+    end
     -- while PZMM hasn't answered: what it waits for, and a bar with a segment sweeping along it
     local lx = tx + tw + 12
     if self:waiting() then
@@ -1727,7 +1997,7 @@ function K.logShows(f, k)
     return k == f
 end
 
---- The open activity: a bar with the kind filters and Expand, then every line with its time, repeats as one
+--- The open activity: a bar with the kind filters, then every line with its time, repeats as one
 --- with a count, newest at the bottom. It scrolls (the wheel), and stays at the newest unless you scrolled up.
 --- Expanded, it fills the screen above the footer.
 function PZMMMods:drawActivity()
@@ -1759,10 +2029,6 @@ function PZMMMods:drawActivity()
         tx = tx + tw
     end
     outline(self, PAD, ty, segW, BAR, 6, C.line)
-    local ex = pw - PAD - BAR
-    local _, over = toolButton(self, self.logExpanded and TB.minimize or TB.maximize, nil, ex, ty, mx, my)
-    if over then tip(self, self.logExpanded and "Collapse\nBack to the short list." or "Expand activity\nThe list at full height.") end
-    self.logHits[#self.logHits + 1] = { x = ex, y = ty, w = BAR, h = BAR, fn = function() self.logExpanded, self.logScroll = not self.logExpanded, 0 end }
     rect(self, px, py + head - 1, pw, 1, C.line, 0.6)
     local rows = {}
     for _, e in ipairs(PZMMMods.log) do
@@ -1862,8 +2128,12 @@ function PZMMMods:drawList()
     if self.langOnly and not self.langDone then self:scanLang() end
     self.ovOf = self:overlaps()
     local lx, ly, lw, lh = self:listBox()
-    self:setStencilRect(lx - 6, ly, lw + 6, lh)
     local mx, my = self:getMouseX(), self:getMouseY()
+    -- the header row (Source as wide as the widest source drawn last frame)
+    if (self.srcSeen or 0) > 0 then self.srcCol = self.srcSeen end
+    self.srcSeen = 0
+    K.drawHeads(self, lx, ly - K.colH(), lw - 14, mx, my)
+    self:setStencilRect(lx - 6, ly, lw + 6, lh)
     -- rows scrolled out of sight aren't hovered (a drag still follows the mouse)
     local dmy = my
     if mx < lx or mx >= lx + lw or my < ly or my >= ly + lh then my = -1e9 end
@@ -2098,14 +2368,31 @@ end
 local SORTS = { { "order", T("sort_library", "Library order") }, { "name", T("srv_by_name", "Name") }, { "enabled", T("sort_enabled", "Enabled first") }, { "status", T("sort_problems", "Problems first") },
     { "size", T("sort_size", "Size") }, { "changed", T("sort_changed", "Last changed") }, { "installed", T("sort_installed", "Date installed") } }
 
+-- Filters > Added / Updated (a window in seconds, by when PZMM first saw it / Steam last updated it) and Has an update, as
+-- the app's: not remembered, as they're relative to now
+K.WINDOWS = { { 86400, T("within1", "Last 24 hours") }, { 7 * 86400, T("within7", "Last 7 days") }, { 30 * 86400, T("within30", "Last 30 days") } }
+function K.windowName(s) for _, w in ipairs(K.WINDOWS) do if w[1] == s then return w[2] end end return "" end
+function K.dateOk(ui, d)
+    if not (ui.addedIn or ui.updatedIn or ui.updOnly) then return true end
+    local now = math.floor(getTimestampMs() / 1000)
+    if ui.addedIn then
+        local t = ui.firstSeen and ui.firstSeen[d.modId]
+        if not t or now - t > ui.addedIn then return false end
+    end
+    local st = (ui.updatedIn or ui.updOnly) and ui:steamOf(d)
+    if ui.updatedIn and not (st and (st.updated or 0) > 0 and now - st.updated <= ui.updatedIn) then return false end
+    if ui.updOnly and not (st and st.state == "NeedsUpdate") then return false end
+    return true
+end
+
 --- Whether the list isn't all of it in library order (a search, a tab, a filter or a sort): drags need it to be.
 function PZMMMods:filtering()
     local q = self.search and self.search:getText() or ""
-    return q ~= "" or self.tab ~= "All" or self.favOnly or self.filterHidden or self.filterKind ~= nil or self.langOnly == true or self.filterTag ~= nil or (self.sortBy or "order") ~= "order"
+    return q ~= "" or self.tab ~= "All" or self.favOnly or self.filterKind ~= nil or self.langOnly == true or self.filterTag ~= nil or self.addedIn ~= nil or self.updatedIn ~= nil or self.updOnly == true or (self.sortBy or "order") ~= "order"
 end
 
---- The list's toolbar, as the app's: Group by category (PZMM's categories), Filters, Sort and New section after
---- the tabs; Clear filters, Check setup, Undo and Redo at the right.
+--- The list's toolbar, as the app's: Group by category (PZMM's categories), Filters, Sort, Install missing and Fix
+--- load order (when there's something to do) after the tabs; Clear filters, Check setup, Undo, Redo and More at the right.
 function PZMMMods:drawTools(x, y, mx, my)
     self.toolBoxes = {}
     local function add(id, icon, label, tipText, on, off, primary)
@@ -2121,6 +2408,11 @@ function PZMMMods:drawTools(x, y, mx, my)
         else
             w, over = toolButton(self, icon, label, x, y, mx, my, on, off)
         end
+        if id == "more" then
+            -- the app's More: three dots
+            local c = over and C.onSelected or C.text
+            for i = -1, 1 do rect(self, x + math.floor(BAR / 2) - 1 + i * 5, y + math.floor(BAR / 2) - 1, 3, 3, c, 1) end
+        end
         if over then tip(self, tipText) end
         self.toolBoxes[#self.toolBoxes + 1] = { id, x, y, w, BAR, off }
         return w
@@ -2129,11 +2421,18 @@ function PZMMMods:drawTools(x, y, mx, my)
     for _, o in ipairs(SORTS) do if o[1] == (self.sortBy or "order") then sortName = o[2] end end
     local left = {}
     left[#left + 1] = { "group", TB.layers, T("tool_group", "Group by category"), T("tool_group_tip_title", "Group by category") .. "\nOne section per category: Frameworks & libraries first, Translations last. Asks first if you have sections of your own." }
-    local nf = (self.favOnly and 1 or 0) + (self.filterHidden and 1 or 0) + (self.filterKind and 1 or 0) + (self.langOnly and 1 or 0) + (self.filterTag and 1 or 0)
-    left[#left + 1] = { "filters", TB.filter, nf > 0 and ("Filters (" .. nf .. ")") or "Filters", "Filters\nFavourites, hidden mods, kinds and tags. Search finds authors too.", nf > 0 }
+    local nf = (self.favOnly and 1 or 0) + (self.filterKind and 1 or 0) + (self.langOnly and 1 or 0) + (self.filterTag and 1 or 0)
+        + (self.addedIn and 1 or 0) + (self.updatedIn and 1 or 0) + (self.updOnly and 1 or 0)
+    left[#left + 1] = { "filters", TB.filter, nf > 0 and ("Filters (" .. nf .. ")") or "Filters", "Filters\nFavourites, kinds and tags. Search finds authors too.", nf > 0 }
     left[#left + 1] = { "sort", TB.sort, sortName, "Sort the list\nWithin each section. Drag mods in library order." }
-    left[#left + 1] = { "section", TB.plus, T("tool_section", "New section"), T("tool_section_tip_title", "New section") .. "\nAt the end of the list, or under the picked mod's section." }
-    left[#left + 1] = { "presets", TB.layers, T("tool_presets", "Presets"), T("tool_presets_tip_title", "Presets") .. "\nThe game's mod presets: load one, save what's on now, or add one a friend sent (copied text)." }
+    -- required mods that aren't installed: PZMM can install the ones Steam told us about
+    local missing = self:missingItems()
+    if self.app and #missing > 0 then
+        left[#left + 1] = { "installMissing", TB.download, T("tool_install_missing", "Install missing mods (%1)", #missing), "Install missing\nOpens PZMM, which installs the Workshop items your enabled mods need once you say yes.", false, false, true }
+    end
+    if (self.ofixable or 0) > 0 then
+        left[#left + 1] = { "fixOrder", TB.check, T("tool_fix_order", "Fix load order"), "Fix load order\nTurns on what's needed and moves as little as it can so every requirement and load rule holds." }
+    end
     -- several picked: what to do with them, instead
     local np = 0
     for _ in pairs(self.picked) do np = np + 1 end
@@ -2141,23 +2440,40 @@ function PZMMMods:drawTools(x, y, mx, my)
         bold(self, np .. " selected", x, y + (BAR - H_SMALL) / 2, C.text)
         x = x + width(np .. " selected") + 12
         left = {
-            { "bulkOn", TB.check, "Enable", "Enable\nTurn the picked mods on (and what they need)." },
-            { "bulkOff", TB.x, "Disable", "Disable\nTurn just the picked mods off." },
+            { "bulkOn", TB.check, T("menu_enable", "Enable"), "Enable\nTurn the picked mods on (and what they need)." },
+            { "bulkOff", TB.x, T("menu_disable", "Disable"), "Disable\nTurn just the picked mods off." },
+            { "leaveFavs" },
             { "bulkMove", TB.layers, "Move to", "Move to\nA section, the top or the bottom of the list.", false, self:filtering() },
-            { "bulkHide", TB.filter, self.filterHidden and "Show again" or "Hide", "Hide\nOut of the list (Filters > Hidden shows them). Mod Manager and PZMM hide them too." },
+            self.app and { "bulkRemove", TB.trash, T("menu_remove", "Remove"), "Remove\nPZMM removes its copies of the picked mods (it asks first); Steam subscriptions are unsubscribed on their Workshop pages." } or nil,
+            { "bulkHide", TB.filter, K.pickedHidden(self) and "Show again" or "Hide", "Hide\nOut of the list (Hidden shows them). Mod Manager and PZMM hide them too." },
             { "bulkClear", TB.x, "Clear", "Clear\nUnpick them." },
         }
     end
+    local kept = {}
+    for i = 1, 20 do if left[i] then kept[#kept + 1] = left[i] end end
+    left = kept
     for _, b in ipairs(left) do
-        x = x + add(b[1], b[2], b[3], b[4], b[5], b[6]) + 8
+        if b[1] == "leaveFavs" then
+            local label = T("tool_leave_favs", "Leave favourites")
+            local lw = BOX + 8 + width(label) + 8
+            checkbox(self, x, y + (BAR - BOX) / 2, self.leaveFavs)
+            text(self, label, x + BOX + 8, y + (BAR - H_SMALL) / 2, C.text)
+            if mx >= x and mx < x + lw and my >= y and my < y + BAR then tip(self, label .. "\nEnable and Disable skip your favourites.") end
+            self.toolBoxes[#self.toolBoxes + 1] = { "leaveFavs", x, y, lw, BAR }
+            x = x + lw + 8
+        else
+            x = x + add(b[1], b[2], b[3], b[4], b[5], b[6], b[7]) + 8
+        end
         if b[1] == "filters" and np < 2 then
             -- each active filter as a chip: click to clear it
             local active = {}
             if self.favOnly then active[#active + 1] = { "unfav", T("home_favourites", "Favourites") } end
-            if self.filterHidden then active[#active + 1] = { "unhidden", T("filter_hidden", "Hidden") } end
             if self.filterKind then active[#active + 1] = { "uncat", self.filterKind } end
             if self.langOnly then active[#active + 1] = { "unlang", T("filter_lang", "In my language") } end
             if self.filterTag then active[#active + 1] = { "untag", self.filterTag } end
+            if self.updOnly then active[#active + 1] = { "unupd", T("filter_updates", "Has an update") } end
+            if self.addedIn then active[#active + 1] = { "unadded", T("added_chip", "Added: %1", K.windowName(self.addedIn)) } end
+            if self.updatedIn then active[#active + 1] = { "unupdated", T("changed_chip", "Updated: %1", K.windowName(self.updatedIn)) } end
             local ch = BAR - 2
             local cy = y + 1
             for _, a in ipairs(active) do
@@ -2173,29 +2489,12 @@ function PZMMMods:drawTools(x, y, mx, my)
             if #active > 0 then x = x + 4 end
         end
     end
-    if np >= 2 then
-        local label = T("tool_leave_favs", "Leave favourites")
-        local lw = BOX + 8 + width(label) + 8
-        checkbox(self, x, y + (BAR - BOX) / 2, self.leaveFavs)
-        text(self, label, x + BOX + 8, y + (BAR - H_SMALL) / 2, C.text)
-        if mx >= x and mx < x + lw and my >= y and my < y + BAR then tip(self, label .. "\nEnable and Disable skip your favourites.") end
-        self.toolBoxes[#self.toolBoxes + 1] = { "leaveFavs", x, y, lw, BAR }
-        x = x + lw + 8
-    end
     local right = {}
-    local upd = self:waitingUpdates()
-    if self.app and #upd > 0 then
-        right[#right + 1] = { "updateAll", TB.download, "Update all (" .. #upd .. ")", "Update all\nOpens PZMM, which updates the " .. #upd .. " Workshop items waiting for an update once you say yes.", false, false, true }
-    end
-    -- required mods that aren't installed: PZMM can install the ones Steam told us about
-    local ids = self:missingItems()
-    if self.app and #ids > 0 then
-        right[#right + 1] = { "installMissing", TB.download, "Install missing mods (" .. #ids .. ")", "Install missing\nOpens PZMM, which installs the Workshop items your enabled mods need once you say yes.", false, false, true }
-    end
     if self:filtering() then right[#right + 1] = { "clear", TB.x, T("tool_clear", "Clear filters"), T("tool_clear_tip_title", "Clear filters") .. "\nClear the search and filter, and sort by library order, to reorder." } end
     right[#right + 1] = { "check", TB.pulse, T("tool_check", "Check setup"), T("tool_check_tip_title", "Check setup") .. "\nChecks your enabled mods: what can't load, what's missing or off, what clashes, the load order and Steam's downloads. Each problem comes with its fix.", self.checkOpen }
     right[#right + 1] = { "undo", TB.undo, nil, "Undo\nUndo the last list change.", false, #self.undos == 0 }
     right[#right + 1] = { "redo", TB.redo, nil, "Redo", false, #self.redos == 0 }
+    right[#right + 1] = { "more", nil, nil, "More\nSelect all, New section and the list's shortcuts." }
     local _, _, lw = self:listBox()
     local rx = PAD + lw
     local lim = x
@@ -2232,6 +2531,37 @@ function PZMMMods:missingItems()
     return ids
 end
 
+--- The tab bar's buttons before the links, as the app's: Update N mods when Steam says some wait (else Check for
+--- updates, "Checking..." while Steam is asked), then Play, as Home's. Each { label, icon, kind, tip, fn }.
+function K.tabActions(ui)
+    local n = #ui:waitingUpdates()
+    local first
+    if n > 0 then
+        first = { label = n == 1 and T("tab_update_one", "Update 1 mod") or T("tab_update_n", "Update %1 mods", n), icon = TB.download, kind = "primary",
+            tip = ui.app and "Update\nOpens PZMM, which updates the Workshop items waiting for an update once you say yes."
+                or "Update\nSteam downloads them when it next can: restarting Steam or the game gets them now.",
+            fn = function() ui:updateMods() end }
+    else
+        local asking = ui.steamState == "asking"
+        first = { label = asking and T("tab_checking", "Checking...") or T("tab_check", "Check for updates"), icon = TB.update,
+            tip = "Check for updates\nAsk the Workshop whether any mod has a newer version.", fn = function() if ui.steamState ~= "asking" then ui:querySteam(true) end end }
+    end
+    return { first, { label = T("home_play", "Play"), icon = TB.play, tip = "Play\nAs Home's Play: your latest save, else a new game.", fn = function() ui:playLatest() end } }
+end
+--- Update what Steam says waits: PZMM does it, else Steam does when it next can.
+function PZMMMods:updateMods()
+    local ids = self:waitingUpdates()
+    if #ids == 0 then return end
+    if self.app then return self:request("install\t" .. table.concat(ids, ","), #ids .. (#ids == 1 and " update" or " updates") .. " asked for.") end
+    self:say("Steam downloads " .. (#ids == 1 and "the update" or ("the " .. #ids .. " updates")) .. " when it next can: restart Steam or the game to get " .. (#ids == 1 and "it" or "them") .. " now.")
+end
+--- Home's Play: the latest save (through Accept / Discard first), else a new game.
+function PZMMMods:playLatest()
+    if self.latest == nil then self.latest = getLatestSave() or false end
+    local l = self.latest
+    self:play((l and l[1] and l[2]) and "LATESTSAVE" or "SOLO")
+end
+
 --- The Workshop items Steam says have an update waiting, once a second.
 function PZMMMods:waitingUpdates()
     local t = getTimestampMs()
@@ -2255,17 +2585,11 @@ end
 function PZMMMods:onTool(id, mx, my)
     if id == "leaveFavs" then
         self.leaveFavs = not self.leaveFavs
-    elseif id == "updateAll" then
-        local ids = self:waitingUpdates()
-        if #ids > 0 then self:request("install\t" .. table.concat(ids, ","), #ids .. " updates asked for.") end
     elseif id == "installMissing" then
         local ids = self:missingItems()
         if #ids > 0 then self:request("install\t" .. table.concat(ids, ","), #ids .. " items asked for.") end
     elseif id == "unfav" then
         self.favOnly, self.scroll = false, 0
-        self:updateView()
-    elseif id == "unhidden" then
-        self.filterHidden, self.scroll = false, 0
         self:updateView()
     elseif id == "unlang" then
         self.langOnly, self.scroll = false, 0
@@ -2276,24 +2600,34 @@ function PZMMMods:onTool(id, mx, my)
     elseif id == "untag" then
         self.filterTag, self.scroll = nil, 0
         self:updateView()
+    elseif id == "unupd" or id == "unadded" or id == "unupdated" then
+        if id == "unupd" then self.updOnly = false elseif id == "unadded" then self.addedIn = nil else self.updatedIn = nil end
+        self.scroll = 0
+        self:updateView()
     elseif id == "group" then
         self:groupByCategory()
     elseif id == "filters" then
-        local nh = 0
-        for _ in pairs(self.hidden or {}) do nh = nh + 1 end
         local function redo() self.scroll = 0; self:updateView() end
         local items = {
             { T("filter_show", "Show"), heading = true },
             { T("home_favourites", "Favourites"), function() self.favOnly = not self.favOnly; redo() end, function() return self.favOnly == true end, keep = true },
-            { T("filter_hidden", "Hidden") .. (nh > 0 and (" (" .. nh .. ")") or ""), function() self.filterHidden = not self.filterHidden; redo() end, function() return self.filterHidden == true end, keep = true },
             { T("filter_lang", "In my language"), function()
                 self.langOnly = not self.langOnly
                 self.langDone = false
                 redo()
             end, function() return self.langOnly == true end, keep = true },
+            { (function() local n = #self:waitingUpdates() return n > 0 and T("filter_updates_n", "Has an update (%1)", n) or T("filter_updates", "Has an update") end)(), function() self.updOnly = not self.updOnly; redo() end, function() return self.updOnly == true end, keep = true },
+        }
+        for _, f in ipairs({ { "addedIn", T("added_heading", "Added") }, { "updatedIn", T("changed_heading", "Updated") } }) do
+            items[#items + 1] = { f[2], heading = true }
+            for _, w in ipairs(K.WINDOWS) do
+                items[#items + 1] = { w[2], function() self[f[1]] = self[f[1]] ~= w[1] and w[1] or nil; redo() end, function() return self[f[1]] == w[1] end, keep = true }
+            end
+        end
+        for _, it in ipairs({
             { T("filter_kind", "Kind"), heading = true },
             { T("filter_any_kind", "Any kind"), function() self.filterKind = nil; redo() end, function() return self.filterKind == nil end, keep = true },
-        }
+        }) do items[#items + 1] = it end
         for _, c in ipairs(K.kindNames()) do
             items[#items + 1] = { c, function() self.filterKind = self.filterKind ~= c and c or nil; redo() end, function() return self.filterKind == c end, keep = true }
         end
@@ -2319,16 +2653,28 @@ function PZMMMods:onTool(id, mx, my)
         self:menu(items, mx, my)
     elseif id == "sort" then
         local items = {}
+        local seen = false
+        for _ in pairs(self.firstSeen or {}) do seen = true; break end
         for _, o in ipairs(SORTS) do
-            if o[1] ~= "installed" or self.hasInstalled then
+            if o[1] ~= "installed" or self.hasInstalled or seen then
                 items[#items + 1] = { o[2], function() self.sortBy = o[1]; self:updateView() end, (self.sortBy or "order") == o[1] }
             end
         end
         self:menu(items, mx, my)
-    elseif id == "section" then
-        self:newSection()
-    elseif id == "presets" then
-        self:presetMenu(mx, my)
+    elseif id == "fixOrder" then
+        self:fixOrder()
+    elseif id == "more" then
+        local items = {
+            { T("menu_select_all", "Select all"), function() self:selectShown() end },
+            { T("tool_section", "New section"), function() self:newSection() end },
+        }
+        -- the game's presets: copy or delete one
+        for _, it in ipairs(self:presetItems(mx, my)) do items[#items + 1] = it end
+        for _, it in ipairs({
+            false,
+            { T("menu_list_hint", "Drag or Alt+Up/Down to organise, Space toggles, Ctrl/Shift+click selects"), disabled = true },
+        }) do items[#items + 1] = it end
+        self:menu(items, mx, my)
     elseif id == "bulkOn" or id == "bulkOff" then
         local snap = self:snapshot()
         local on = id == "bulkOn"
@@ -2354,19 +2700,24 @@ function PZMMMods:onTool(id, mx, my)
         items[#items + 1] = { "Bottom of the list", function() self:moveMany(PZMMMods.MOVE_BOTTOM) end }
         self:menu(items, mx, my)
     elseif id == "bulkHide" then
-        local hide = not self.filterHidden
+        local hide = not K.pickedHidden(self)
         for mid in pairs(self.picked) do self.hidden[mid] = hide or nil end
         writeHidden(self.hidden)
         self.picked = {}
         self:updateView()
-        self:say(hide and "Hidden: Filters > Hidden shows them." or "Shown again.")
+        self:say(hide and "Hidden: Hidden shows them." or "Shown again.")
+    elseif id == "bulkRemove" then
+        local list = {}
+        for mid in pairs(self.picked) do if self.model.mods[mid] then list[#list + 1] = self.model.mods[mid] end end
+        table.sort(list, byName)
+        self:removeMods(list)
     elseif id == "bulkClear" then
         self.picked = {}
     elseif id == "clear" then
         self.search:setText("")
         self.langOnly = false
-        self.filterTag = nil
-        self.tab, self.favOnly, self.filterHidden, self.filterKind, self.sortBy, self.scroll = "All", false, false, nil, "order", 0
+        self.filterTag, self.addedIn, self.updatedIn, self.updOnly = nil, nil, nil, false
+        self.tab, self.favOnly, self.filterKind, self.sortBy, self.scroll = "All", false, nil, "order", 0
         self:updateView()
     elseif id == "check" then
         self.checkOpen = not self.checkOpen
@@ -2516,7 +2867,7 @@ local function readFindings()
                     start = i + 1
                 end
                 if #p >= 3 then
-                    local e = { level = p[1], mod = p[2] ~= "-" and p[2] or nil, text = p[3], fixes = {} }
+                    local e = { level = p[1], mod = p[2] ~= "-" and p[2] or nil, text = p[3], fixes = {}, raw = p[1] .. "\t" .. p[2] .. "\t" .. p[3] }
                     for i = 4, #p - 1, 2 do e.fixes[#e.fixes + 1] = { id = p[i], label = p[i + 1] } end
                     f.list[#f.list + 1] = e
                 end
@@ -2546,8 +2897,8 @@ end
 function PZMMMods:checkSetup()
     local mods, out = self.model.mods, {}
     -- grp = { tpl = "%1 can't load...", d = the mod }: the same finding on several mods becomes one line
-    local function add(level, text, fixes, id, grp) out[#out + 1] = { level = level, text = text, fixes = fixes or {}, key = stableKey(level, id, text), grp = grp } end
-    local function off(d) return { "Disable " .. d.name, function() self:toggle(d) end } end
+    local function add(level, text, fixes, id, grp, wid) out[#out + 1] = { level = level, text = text, fixes = fixes or {}, key = stableKey(level, id, text), grp = grp, wid = wid or id } end
+    local function off(d) return { "Disable " .. d.name, function() self:toggle(d) end, off = d } end
     local pairsSeen = {}
     local names = {}
     for _, d in pairs(mods) do names[#names + 1] = d end
@@ -2609,7 +2960,7 @@ function PZMMMods:checkSetup()
     local wrong = 0
     for _, p in pairs(self.oprob or {}) do if p[2] then wrong = wrong + 1 end end
     if wrong > 0 then
-        add("warn", wrong .. (wrong == 1 and " mod loads" or " mods load") .. " in the wrong order for its requirements or load rules.", { { "Fix load order", function() self:fixOrder() end, safe = "order" } })
+        add("warn", wrong .. (wrong == 1 and " mod loads" or " mods load") .. " in the wrong order for its requirements or load rules.", { { "Fix load order", function() self:fixOrder() end, safe = "order" } }, nil, nil, "order")
     end
     -- Java mods without ZombieBuddy running
     local zbOn = false
@@ -2621,7 +2972,7 @@ function PZMMMods:checkSetup()
         for _, j in ipairs(list) do if j.d.isActive then on = on + 1 end end
         if done and on > 0 then
             add("warn", on .. (on == 1 and " enabled mod ships" or " enabled mods ship") .. " Java, but ZombieBuddy isn't running: " .. (on == 1 and "it" or "they") .. " won't fully load.",
-                { { "Java mods", function() self.page = "java" end } })
+                { { "Java mods", function() self.page = "java" end } }, nil, nil, "java")
         end
     end
     -- identical findings (the same words about different mods) in one line, its fix turning them all off
@@ -2645,8 +2996,9 @@ function PZMMMods:checkSetup()
                 local ds = g.ds
                 g.f.fixes = g.f.level == "error" and { { "Turn off " .. #ds .. " mods", function()
                     for _, d in ipairs(ds) do if d.isActive then self:toggle(d) end end
-                end } } or {}
+                end, offs = ds } } or {}
                 g.f.key = stableKey(g.f.level, g.ds[1].modId .. "+", g.f.text)
+                g.f.wid = tostring(g.f.wid) .. "+"
             end
         end
         local scanning = out.scanning
@@ -2662,14 +3014,78 @@ function PZMMMods:checkSetup()
     return out
 end
 
-K.LEVEL_COLOUR = { error = "danger", warn = "warn", info = "muted" }
+K.LEVEL_COLOUR = { error = "danger", risk = "danger", warn = "warn", info = "muted" }
 -- the app's severities: what each group is called, and what it means
-K.LEVEL_NAME = { error = T("check_broken", "Broken"), warn = T("check_check", "Check"), info = T("check_low", "Low") }
+K.LEVEL_NAME = { error = T("check_broken", "Broken"), risk = T("check_risk", "Risk"), warn = T("check_check", "Check"), info = T("check_low", "Low") }
 K.LEVEL_HINT = {
     error = T("check_broken_hint", "The game won't load these, or won't start"),
+    risk = T("check_risk_hint", "Code that could reach your files or the internet: trust it only if you know the mod"),
     warn = T("check_check_hint", "May misbehave in game"),
     info = T("check_low_hint", "Worth knowing; nothing to fix"),
 }
+K.LEVELS = { "error", "risk", "warn", "info" }
+--- Every finding to show: the game's own, then PZMM's last check's (findings.txt; its fixes run in PZMM), each in
+--- its severity (an unknown level is Low).
+function PZMMMods:checkAll(list)
+    local all = {}
+    for _, f in ipairs(list) do all[#all + 1] = f end
+    for _, f in ipairs(self.app and self.pf and self.pf.list or {}) do
+        -- hidden in PZMM (level hidden-warn, hidden-info): under Show hidden, unless a Show again is on its way;
+        -- an It's fine on its way hides one. Once findings.txt says so, that request is done.
+        local lv = f.level:match("^hidden%-(.+)$")
+        local raw = lv and (f.raw:gsub("^hidden%-", "")) or f.raw
+        local gone = (lv and not (self.shownRaw and self.shownRaw[raw])) or (not lv and self.hiddenRaw and self.hiddenRaw[raw]) or false
+        if lv and self.hiddenRaw then self.hiddenRaw[raw] = nil end
+        if not lv and self.shownRaw then self.shownRaw[raw] = nil end
+        lv = lv or f.level
+        local fixes = {}
+        for _, fx in ipairs(f.fixes) do
+            fixes[#fixes + 1] = { fx.label, function() self:request("fix\t" .. fx.id, fx.label .. " asked for.") end }
+        end
+        all[#all + 1] = { level = K.LEVEL_NAME[lv] and lv or "info", text = f.text, fixes = fixes, key = "pzmm:" .. stableKey(lv, f.mod, f.text), mod = f.mod, pzmm = true, raw = raw, appHidden = gone }
+    end
+    return all
+end
+--- Check setup's footer, as the app's: Read the log (PZMM), Find the broken mod, Check again, Fix N safely and Run
+--- PZMM's full check, wrapping. With no `y`, only its height; drawn, its buttons go first in hits (over the list).
+function PZMMMods:checkFoot(x, y, w)
+    local b = {}
+    if self.app then
+        b[#b + 1] = { T("check_log", "Read the log"), "quiet", TB.info, "Read the log\nOpens PZMM on the game's log: its first error and the mods it points at.", function() self:request("open\tlog", "PZMM asked to open the game's log.") end }
+    end
+    if not self.bisect then
+        b[#b + 1] = { T("findings_find", "Find the broken mod"), "quiet", TB.search, "Find the broken mod\nTurns off half of your mods at a time, keeping mods that need each other together, and asks whether the problem still happens, until one mod or group is left. Your mod list is restored after.", function() self:bisectStart() end }
+    end
+    b[#b + 1] = { T("check_again", "Check again"), "quiet", TB.pulse, "Check again\nLooks at your enabled mods once more.", function() self.findings, self.pfAt = nil, nil end }
+    local cs = self.checkSafe
+    if cs and cs.n > 0 then
+        local label = T("check_fix_safe", "Fix %1 safely", cs.n)
+        b[#b + 1] = { label, "primary", TB.check, label .. "\nTurns on what your enabled mods need and fixes the load order. Nothing is turned off or removed; Undo takes it back.", function() self:fixSafely(cs.ons, cs.order) end }
+    end
+    if self.app then
+        local label = T("check_full", "Run PZMM's full check")
+        b[#b + 1] = { label, nil, nil, label .. "\nOpens PZMM on Check setup: it also checks server configs, overlapping files and game files.", function() self:request("check", "Check setup asked for.") end }
+    end
+    local pos, rx, ry = {}, x, 0
+    for i, a in ipairs(b) do
+        local bw = width(a[1]) + 28 + (a[3] and 20 or 0)
+        if rx > x and rx + bw > x + w then rx, ry = x, ry + BAR + 6 end
+        pos[i] = { rx, ry, bw }
+        rx = rx + bw + 6
+    end
+    local h = ry + BAR + 24
+    if not y then return h end
+    local mx, my = self:getMouseX(), self:getMouseY()
+    rect(self, x - 18, y, w + 36, h, C.panel, 1)
+    rect(self, x - 18, y, w + 36, 1, C.line, 1)
+    for i, a in ipairs(b) do
+        local px, py, bw = pos[i][1], y + 12 + pos[i][2], pos[i][3]
+        local _, _, over = flatButton(self, a[1], px, py, mx, my, a[2], a[3])
+        if over then tip(self, a[4]) end
+        table.insert(self.hits, 1, { kind = "fn", fn = a[5], x = px, y = py, w = bw, h = BAR })
+    end
+    return h
+end
 
 
 --- The side panel's Check setup: what the game finds, each with its fixes, then PZMM's last check (its own
@@ -2677,39 +3093,37 @@ K.LEVEL_HINT = {
 local function pfKey(f) return "pzmm:" .. stableKey(f.level, f.mod, f.text) end
 function PZMMMods:drawCheck(x, y, w, bottom)
     local mx, my = self:getMouseX(), self:getMouseY()
-    -- Close, with a quiet Check again beside it
     local cxw = width("Close") + 28
     local _, _, cover = flatButton(self, "Close", x + w - cxw, y, mx, my, "quiet")
     if cover then tip(self, "Close\nBack to the load order.") end
     self.hits[#self.hits + 1] = { kind = "fn", fn = function() self.checkOpen = false end, x = x + w - cxw, y = y, w = cxw, h = BAR }
-    local again = T("check_again", "Check again")
-    local aw = width(again) + 48
-    local ax = x + w - cxw - 8 - aw
-    local _, _, aover = flatButton(self, again, ax, y, mx, my, "quiet", TB.pulse)
-    if aover then tip(self, "Check again\nLooks at your enabled mods once more.") end
-    self.hits[#self.hits + 1] = { kind = "fn", fn = function() self.findings, self.pfAt = nil, nil end, x = ax, y = y, w = aw, h = BAR }
     bold(self, "Check setup", x, y + (BAR - H_MEDIUM) / 2, C.text, MEDIUM)
     y = y + BAR + 10
-    y = self:drawBisect(x, y, w, mx, my)
     -- not kept while the Java scan is still running: it would miss what the scan finds
     if self.findings and self.findings.scanning then
         local _, done = self:javaMods()
         if done then self.findings = nil end
     end
     self.findings = self.findings or self:checkSetup()
-    local list = self.findings
     self.ignored = self.ignored or self:loadIgnored()
+    -- PZMM's findings.txt, read at most every 2 s (drawn every frame)
+    local t = getTimestampMs()
+    if self.app and (not self.pfAt or t - self.pfAt > 2000) then self.pfAt, self.pf = t, readFindings() end
+    local list = self:checkAll(self.findings)
     -- a finding marked "It's fine" is hidden (kept in Zomboid/Lua/pzmm/ignored.txt) unless Show hidden is on.
     -- Its sentence at the left, its fixes in a column at the right, a line under it.
-    local function finding(level, txt, fixes, key)
-        local ign = self.ignored[key]
+    local function finding(level, txt, fixes, key, raw, apph)
+        local ign = self.ignored[key] or apph
         local c = ign and C.muted or C[K.LEVEL_COLOUR[level] or "muted"]
         local ind = 12
         local all = {}
         for _, f in ipairs(fixes) do all[#all + 1] = f end
-        -- "It's fine" only for what isn't an error
-        if level ~= "error" then
+        -- "It's fine" only for Check and Low, as the app's
+        if level == "warn" or level == "info" then
             all[#all + 1] = { ign and T("check_unfine", "Show again") or T("check_fine", "It's fine"), function()
+                -- PZMM's finding, with PZMM: it keeps it hidden (findings.txt comes back without it)
+                if raw and self.app and apph then return self:unhideFinding(raw) end
+                if raw and self.app and not ign then return self:hideFinding(raw) end
                 self.ignored[key] = (not ign) or nil
                 self:saveIgnored()
             end, quiet = true }
@@ -2730,55 +3144,36 @@ function PZMMMods:drawCheck(x, y, w, bottom)
             local bx = x + w - bw
             local _, _, over = flatButton(self, label, bx, by, mx, my, f.quiet and "quiet" or (i == 1) and "primary" or nil)
             if over and f.quiet then tip(self, ign and "Show again\nPuts this finding back in the list." or "It's fine\nHides this finding. Show hidden brings it back.") end
-            self.hits[#self.hits + 1] = { kind = "fn", fn = function() f[2](); self.findings = nil end, x = bx, y = by, w = bw, h = BAR }
+            if by < bottom then self.hits[#self.hits + 1] = { kind = "fn", fn = function() f[2](); self.findings = nil end, x = bx, y = by, w = bw, h = BAR } end
             by = by + BAR + 6
         end
-        -- a 2 px bar down its left in the level's colour (none for info)
-        if level == "error" or level == "warn" then rect(self, x, y0, 2, rh, c, 1) end
+        -- a 2 px bar down its left in the level's colour (none for Low)
+        if level ~= "info" then rect(self, x, y0, 2, rh, c, 1) end
         y = y + rh + 8
         rect(self, x, y, w, 1, C.line, 1)
         y = y + 9
     end
-    local visible, hidden = {}, 0
+    local visible, live, hidden = {}, {}, 0
     for _, f in ipairs(list) do
-        if self.ignored[f.key] then
+        if self.ignored[f.key] or f.appHidden then
             hidden = hidden + 1
             if self.showIgnored then visible[#visible + 1] = f end
         else
             visible[#visible + 1] = f
+            live[#live + 1] = f
         end
     end
-    for _, f in ipairs(self.pf and self.pf.list or {}) do
-        if self.ignored[pfKey(f)] then hidden = hidden + 1 end
-    end
+    local ons, order, n = self:safeFixes(live)
+    self.checkSafe = { ons = ons, order = order, n = n }
     if #visible == 0 then
         text(self, T("check_none", "No problems found."), x, y, C.muted)
         y = y + H_SMALL + 16
     else
-        local e, wn = 0, 0
-        for _, f in ipairs(visible) do
-            if not self.ignored[f.key] then
-                if f.level == "error" then e = e + 1 elseif f.level == "warn" then wn = wn + 1 end
-            end
-        end
-        local nlive = 0
-        for _, f in ipairs(visible) do if not self.ignored[f.key] then nlive = nlive + 1 end end
-        text(self, nlive == 1 and T("check_summary_one", "1 thing to look at") or T("check_summary", "%1 things to look at", nlive), x, y, C.muted)
+        text(self, #live == 1 and T("check_summary_one", "1 thing to look at") or T("check_summary", "%1 things to look at", #live), x, y, C.muted)
         y = y + H_SMALL + 12
-        local live = {}
-        for _, f in ipairs(visible) do if not self.ignored[f.key] then live[#live + 1] = f end end
-        local ons, order, n = self:safeFixes(live)
-        if n > 0 then
-            local label = T("check_fix_safe", "Fix %1 safely", n)
-            local bw = width(label) + 28
-            local _, _, over = flatButton(self, label, x, y, mx, my, "primary")
-            if over then tip(self, label .. "\nTurns on what your enabled mods need and fixes the load order. Nothing is turned off or removed; Undo takes it back.") end
-            self.hits[#self.hits + 1] = { kind = "fn", fn = function() self:fixSafely(ons, order) end, x = x, y = y, w = bw, h = BAR }
-            y = y + BAR + 12
-        end
         -- grouped by how bad: each group folds (the low ones start folded), with a tone pill, how many and what it means
         self.checkFold = self.checkFold or { info = true }
-        for _, lv in ipairs({ "error", "warn", "info" }) do
+        for _, lv in ipairs(K.LEVELS) do
             local group = {}
             for _, f in ipairs(visible) do if f.level == lv then group[#group + 1] = f end end
             if #group > 0 then
@@ -2796,11 +3191,12 @@ function PZMMMods:drawCheck(x, y, w, bottom)
                 text(self, count, cx2, y + (hh - H_SMALL) / 2, C.muted)
                 local hx2 = cx2 + width(count) + 8
                 text(self, fit(K.LEVEL_HINT[lv], x + w - hx2), hx2, y + (hh - H_SMALL) / 2, C.muted)
+                if mx >= x and mx < x + w and my >= y and my < y + hh then tip(self, name .. "\n" .. K.LEVEL_HINT[lv]) end
                 local lvx = lv
                 self.hits[#self.hits + 1] = { kind = "fn", fn = function() self.checkFold[lvx] = not self.checkFold[lvx] or nil end, x = x, y = y, w = w, h = hh }
                 y = y + hh + 8
                 if not closed then
-                    for _, f in ipairs(group) do finding(f.level, f.text, f.fixes, f.key) end
+                    for _, f in ipairs(group) do finding(f.level, f.text, f.fixes, f.key, f.raw, f.appHidden) end
                 end
             end
         end
@@ -2812,48 +3208,37 @@ function PZMMMods:drawCheck(x, y, w, bottom)
         self.hits[#self.hits + 1] = { kind = "fn", fn = function() self.showIgnored = not self.showIgnored end, x = x, y = y, w = bw, h = BAR }
         y = y + BAR + 12
     end
-    -- PZMM's own check: its last findings (fixes run in PZMM), and a fresh run
+    -- when PZMM last checked (its findings are in the groups above)
     if self.app then
-        rect(self, x, y, w, 1, C.line, 1)
-        y = y + 12
-        bold(self, "From PZMM", x, y, C.text)
-        y = y + H_SMALL + 4
-        -- drawn every frame: PZMM's findings.txt is read at most every 2 s
-        local t = getTimestampMs()
-        if not self.pfAt or t - self.pfAt > 2000 then self.pfAt, self.pf = t, readFindings() end
         local pf = self.pf
-        if not (pf and pf.at and pf.at > 0) then
-            text(self, "No check yet.", x, y, C.muted)
-            y = y + H_SMALL + 10
-        else
+        local line = "PZMM hasn't checked yet: Run PZMM's full check, below."
+        if pf and pf.at and pf.at > 0 then
             local mins = math.floor((now() - pf.at) / 60)
-            text(self, "Its last check, " .. (mins < 1 and "just now" or mins < 60 and (mins .. " min ago") or mins < 1440 and (math.floor(mins / 60) .. " h ago") or (math.floor(mins / 1440) .. " days ago")) .. ": server configs, files and more.", x, y, C.muted)
-            y = y + H_SMALL + 10
-            local shown = 0
-            for _, f in ipairs(pf.list) do
-                local key = pfKey(f)
-                if not self.ignored[key] or self.showIgnored then
-                    shown = shown + 1
-                    local fixes = {}
-                    for _, fx in ipairs(f.fixes) do
-                        fixes[#fixes + 1] = { fx.label, function() self:request("fix\t" .. fx.id, fx.label .. " asked for.") end }
-                    end
-                    finding(f.level, f.text, fixes, key)
-                end
-            end
-            if shown == 0 then
-                text(self, "PZMM found nothing wrong.", x, y, C.muted)
-                y = y + H_SMALL + 12
-            end
+            line = "With PZMM's last check, " .. (mins < 1 and "just now" or mins < 60 and (mins .. " min ago") or mins < 1440 and (math.floor(mins / 60) .. " h ago") or (math.floor(mins / 1440) .. " days ago")) .. ": server configs, files and more."
         end
-        local label = T("check_full", "Run PZMM's full check")
-        local bw = width(label) + 28
-        local _, _, over = flatButton(self, label, x, y, mx, my)
-        if over then tip(self, label .. "\nOpens PZMM on Check setup: it also checks server configs, overlapping files and game files.") end
-        self.hits[#self.hits + 1] = { kind = "fn", fn = function() self:request("check", "Check setup asked for.") end, x = x, y = y, w = bw, h = BAR }
-        y = y + BAR
+        for _, l in ipairs(wrap(line, w)) do
+            text(self, l, x, y, C.muted)
+            y = y + H_SMALL + 2
+        end
     end
     return y
+end
+
+--- Mark one of PZMM's findings "It's fine" in PZMM (quiet): `raw` is its findings.txt line's first three columns.
+function PZMMMods:hideFinding(raw)
+    self.hiddenRaw = self.hiddenRaw or {}
+    self.hiddenRaw[raw] = true
+    local id = self:request("hide\t" .. raw, "", true)
+    if id then self.afterAck[id] = { function() self.pfAt = nil end, T("check_fine", "It's fine"), nil, nil, nil, function() self.hiddenRaw[raw] = nil end } end
+end
+
+--- Show one of PZMM's hidden findings again in PZMM (quiet): `raw` is its line's first three columns, the level
+--- without "hidden-".
+function PZMMMods:unhideFinding(raw)
+    self.shownRaw = self.shownRaw or {}
+    self.shownRaw[raw] = true
+    local id = self:request("unhide\t" .. raw, "", true)
+    if id then self.afterAck[id] = { function() self.pfAt = nil end, T("check_unfine", "Show again"), nil, nil, nil, function() self.shownRaw[raw] = nil end } end
 end
 
 --- Findings marked "It's fine": Zomboid/Lua/pzmm/ignored.txt, one key per line. Returns the set.
@@ -2901,56 +3286,52 @@ function PZMMMods:safeFixes(list)
     return ons, order, n
 end
 
---- The game's presets (pz_modlist_settings.cfg, through its model): load, save, add from the clipboard, delete.
-function PZMMMods:presetMenu(mx, my)
+--- The game's presets (pz_modlist_settings.cfg, through its model), by name.
+function PZMMMods:presetNames()
     local names = {}
     for name, _ in pairs(self.model.presets or {}) do names[#names + 1] = name end
     table.sort(names, function(a, b) return a:lower() < b:lower() end)
-    local items = {}
-    for _, name in ipairs(names) do items[#items + 1] = { "Load " .. name, function() self:loadPreset(name) end } end
-    if #items > 0 then items[#items + 1] = false end
-    items[#items + 1] = { "Save what's on as a preset", function()
-        self:prompt("Save as preset", (self.lib and self.lib.profile) or "My mods", "Save", function(name)
-            name = (name or ""):gsub("^%s+", ""):gsub("%s+$", ""):gsub("[:\r\n]", " ")
-            if name == "" then return end
-            local data = {}
-            for id, d in pairs(self.model.mods) do if d.isActive then data[id] = id end end
-            self.model.presets[name] = data
-            self:savePresets()
-            self:say(name .. " saved as a preset.")
-        end)
-    end }
-    items[#items + 1] = { "Add a preset from copied text", function()
-        local line = ""
-        pcall(function() line = tostring(Clipboard.getClipboard() or "") end)
-        line = line:gsub("[\r\n].*$", "")
-        local name, ids = line:match("^([^:]+):(.*)$")
-        if not name or name:gsub("%s", "") == "" then
-            self:say("Copy a preset first: a name, a colon, then mod IDs with ; after each.")
-            return
-        end
-        local data, n = {}, 0
-        for id in ids:gmatch("[^;]+") do data[id], n = id, n + 1 end
-        self.model.presets[name] = data
-        self:savePresets()
-        self:say(name .. " added: " .. n .. " mods. Load it from Presets.")
-    end }
-    if #names > 0 then
-        items[#items + 1] = { "Copy a preset...", function()
+    return names
+end
+--- A preset of mod ids, kept with the game's (its Presets list shows it too).
+function PZMMMods:addPreset(name, ids)
+    local data = {}
+    for _, id in ipairs(ids) do data[id] = id end
+    self.model.presets[name] = data
+    self:savePresets()
+end
+--- Share > Save what's on as a preset: asks its name.
+function PZMMMods:savePresetAs()
+    self:prompt(T("preset_save_title", "Save as preset"), (self.lib and self.lib.profile) or "My mods", T("preset_save", "Save"), function(name)
+        name = (name or ""):gsub("^%s+", ""):gsub("%s+$", ""):gsub("[:\r\n]", " ")
+        if name == "" then return end
+        local ids = {}
+        for id, d in pairs(self.model.mods) do if d.isActive then ids[#ids + 1] = id end end
+        self:addPreset(name, ids)
+        self:say(name .. " saved as a preset.")
+    end)
+end
+--- The ... menu's preset items: Copy a preset and Delete a preset (none without presets).
+function PZMMMods:presetItems(mx, my)
+    local names = self:presetNames()
+    if #names == 0 then return {} end
+    return {
+        false,
+        { T("preset_copy", "Copy a preset..."), function()
             local sub = {}
             for _, name in ipairs(names) do
                 sub[#sub + 1] = { name, function()
                     pcall(function() Clipboard.setClipboard(self.model:getPresetShareText(name)) end)
-                    self:say(name .. " copied: paste it to a friend, or into Presets > Add.")
+                    self:say(name .. " copied: paste it to a friend, or into Import.")
                 end }
             end
             self:menu(sub, mx, my)
-        end }
-        items[#items + 1] = { "Delete a preset...", function()
+        end },
+        { T("preset_delete", "Delete a preset..."), function()
             local sub = {}
             for _, name in ipairs(names) do
                 sub[#sub + 1] = { name, function()
-                    self:ask({ title = "Delete the preset " .. name .. "?", choices = { { "Delete", function()
+                    self:ask({ title = T("preset_delete_q", "Delete the preset %1?", name), choices = { { T("preset_delete_btn", "Delete"), function()
                         self.model.presets[name] = nil
                         self:savePresets()
                         self:say(name .. " deleted.")
@@ -2958,9 +3339,8 @@ function PZMMMods:presetMenu(mx, my)
                 end, danger = true }
             end
             self:menu(sub, mx, my)
-        end, danger = true }
-    end
-    self:menu(items, mx, my)
+        end, danger = true },
+    }
 end
 
 --- Load a preset: its installed mods on and the rest off, as the game's own Presets do. Undo takes it back.
@@ -3021,6 +3401,46 @@ function PZMMMods:moveMany(g)
     self:remember()
     self.picked = {}
     if self:writeLibrary(lines) then self:toApp("library\t" .. libBody(lines), #moving .. " mods moved.") end
+end
+
+--- The picked mods to the top or bottom as one block, as the app's bulk move: in the library list (their order
+--- there kept) and in the load order (theirs there kept), as one Undo step. Not while a search, filter or sort is on.
+function PZMMMods:blockMove(ids, top)
+    if self:filtering() then return self:say("Clear the search and filters, and sort by library order, to move mods: they move in the whole list.") end
+    local snap, n0, was = self:snapshot(), #self.undos, self.picked
+    self.picked = {}
+    for _, id in ipairs(ids) do self.picked[id] = true end
+    if self.lib or not self.app then self:moveMany(top and PZMMMods.MOVE_TOP or PZMMMods.MOVE_BOTTOM) end
+    self.picked = was
+    local on = false
+    for _, id in ipairs(ids) do if self.model.mods[id] and self.model.mods[id].isActive then on = true end end
+    if on then self:orderEnds(ids, top) end
+    -- one step back to before both
+    while #self.undos > n0 + 1 do table.remove(self.undos) end
+    if #self.undos == n0 + 1 then self.undos[n0 + 1] = snap end
+end
+
+--- Pick every mod the list shows (Ctrl+A, More > Select all).
+function PZMMMods:selectShown()
+    self.picked = {}
+    for _, e in ipairs(self.entries or {}) do if e.mod then self.picked[e.mod.modId] = true end end
+end
+
+--- Mods to the top or bottom of the load order (the enabled ones, keeping their order), as one Undo step.
+function PZMMMods:orderEnds(ids, top)
+    local set, moving, rest = {}, {}, {}
+    for _, id in ipairs(ids) do set[id] = true end
+    for _, id in ipairs(self:activeOrder()) do
+        if set[id] then moving[#moving + 1] = id else rest[#rest + 1] = id end
+    end
+    if #moving == 0 then return self:say("Only enabled mods are in the load order: enable it first.") end
+    local list = {}
+    for _, id in ipairs(top and moving or rest) do list[#list + 1] = id end
+    for _, id in ipairs(top and rest or moving) do list[#list + 1] = id end
+    local snap = self:snapshot()
+    local d = self.model.mods[moving[1]]
+    self:setOrder(list, (#moving == 1 and ((d and d.name or moving[1]) .. " loads ") or (#moving .. " mods load ")) .. (top and "first now." or "last now."))
+    self:rememberIfChanged(snap)
 end
 
 --- One mod to the top or bottom of the list (the whole list, in library order).
@@ -3557,6 +3977,7 @@ end
 --- `first`: mods to start with (their groups lead, as the app's bisectStart(first)).
 function PZMMMods:bisectStart(first)
     if self.bisect then return end
+    if self.app and self.app.bisect == "1" then return self:say("PZMM's own search for the broken mod is running: finish or stop it there first.") end
     if self:changes(true) > 0 then return self:say("Accept or discard your changes first: the search saves its test lists as it goes.") end
     local mods = self.model.mods
     -- every enabled mod, in load order, comes back after; mods this build can't load aren't suspects: they stay as
@@ -3623,25 +4044,10 @@ function PZMMMods:bisectFinish(found)
 end
 
 --- The panel at the top of Check setup: start the search, or where it stands, or what it found.
-function PZMMMods:drawBisect(x, y, w, mx, my)
+function PZMMMods:bisectBanner()
     local b = self.bisect
-    local function buttons(list)
-        local bx = x
-        for _, a in ipairs(list) do
-            local bw = width(a[1]) + 28
-            if bx > x and bx + bw > x + w then bx, y = x, y + BAR + 6 end
-            local _, _, over = flatButton(self, a[1], bx, y, mx, my, a[2])
-            if over and a[4] then tip(self, a[4]) end
-            self.hits[#self.hits + 1] = { kind = "fn", fn = a[3], x = bx, y = y, w = bw, h = BAR }
-            bx = bx + bw + 8
-        end
-        y = y + BAR + 14
-    end
-    if not b then
-        buttons({ { T("findings_find", "Find the broken mod"), nil, function() self:bisectStart() end,
-            "Find the broken mod\nTurns off half of your mods at a time, keeping mods that need each other together, and asks whether the problem still happens, until one mod or group is left. Your mod list is restored after." } })
-        return y
-    end
+    if not b then return nil end
+    local function done() self.bannerCache = nil end
     if b.result ~= nil then
         local together = b.result:sub(1, 1) == "~"
         local members = {}
@@ -3654,38 +4060,20 @@ function PZMMMods:drawBisect(x, y, w, mx, my)
             or #members == 1 and T("bisect_found", "Found it: %1 causes the problem. Your mod list is restored.", names[1])
             or #members > 1 and T("bisect_found_group", "It's in this group: %1. These mods need each other, so they were tested together: turn off the ones nothing else needs, one at a time, to find which. Your mod list is restored.", table.concat(names, ", "))
             or T("bisect_none", "The problem still happens with every suspect off, so it isn't one of these mods. Your mod list is restored.")
-        local y0 = y
-        for _, l in ipairs(wrap(msg, w - 12)) do
-            text(self, l, x + 12, y, C.text)
-            y = y + H_SMALL + 2
-        end
-        rect(self, x, y0, 2, y - y0, b.result ~= "" and C.danger or C.muted, 1)
-        y = y + 6
-        local acts = {}
-        if d then acts[#acts + 1] = { "Show it", "primary", function() self.selected, self.checkOpen = d, false end } end
-        acts[#acts + 1] = { "Dismiss", "quiet", function() self.bisect = nil; writeBisect(nil) end }
-        buttons(acts)
-        return y
+        local buttons = {}
+        if d then buttons[#buttons + 1] = { label = "Show it", primary = true, fn = function() self.selected, self.checkOpen = d, false; done() end } end
+        buttons[#buttons + 1] = { label = T("dismiss", "Dismiss"), fn = function() self.bisect = nil; writeBisect(nil); done() end }
+        return { tone = b.result ~= "" and nil or "accent", text = msg, buttons = buttons }
     end
-    local y0 = y
-    bold(self, "Finding the broken mod, round " .. b.round .. ":", x + 12, y, C.text)
-    y = y + H_SMALL + 4
     local n, t, nm = #b.suspects, #b.testing, 0
     for _, g in ipairs(b.suspects) do nm = nm + #g end
-    local msg = nm .. (nm == 1 and " suspect mod" or " suspect mods") .. " left in " .. n .. (n == 1 and " group" or " groups") .. ", " .. t .. (t == 1 and " group" or " groups")
-        .. " on for this test. Mods that need each other are tested together. Start the game, check whether the problem happens, then come back here."
-    for _, l in ipairs(wrap(msg, w - 12)) do
-        text(self, l, x + 12, y, C.text)
-        y = y + H_SMALL + 2
-    end
-    rect(self, x, y0, 2, y - y0, C.accentText, 1)
-    y = y + 6
-    buttons({
-        { "The problem still happens", "primary", function() self:bisectAnswer(true) end },
-        { "The problem is gone", nil, function() self:bisectAnswer(false) end },
-        { "Stop and restore my list", "quiet", function() self:bisectFinish(nil) end },
-    })
-    return y
+    local msg = "Finding the broken mod, round " .. b.round .. ": " .. nm .. (nm == 1 and " suspect mod" or " suspect mods") .. " left in " .. n .. (n == 1 and " group" or " groups") .. ", " .. t .. (t == 1 and " group" or " groups")
+        .. " on for this test. Start the game, check whether the problem happens, then come back here."
+    return { tone = "accent", text = msg, buttons = {
+        { label = "The problem still happens", primary = true, fn = function() self:bisectAnswer(true); done() end },
+        { label = "The problem is gone", fn = function() self:bisectAnswer(false); done() end },
+        { label = "Stop and restore my list", fn = function() self:bisectFinish(nil); done() end },
+    } }
 end
 
 --- Turn on what enabled mods need (and what that needs), when it's installed and loads on this build.
@@ -3888,6 +4276,36 @@ function PZMMMods:appUp()
                 self:takeAppMods()
             end
         end
+        -- PZMM changed the mod favourites: read them again (Accept would write the old ones back), keeping unsaved stars
+        if a and a.fav_rev then
+            if self.favRev and self.favRev ~= a.fav_rev then self:reloadFavs() end
+            self.favRev = a.fav_rev
+        end
+        -- PZMM changed the pins (sorting_rules.txt): read them again
+        if a and a.rules_rev then
+            if self.rulesRev and self.rulesRev ~= a.rules_rev then
+                self:loadRuleFile()
+                self.findings = nil
+                self:updateView()
+            end
+            self.rulesRev = a.rules_rev
+        end
+        -- What's new read in PZMM: its badge goes here too (feedseen.txt only moves forward)
+        local seen = K.readFeedSeen and K.readFeedSeen() or 0
+        if seen > (self.feedSeen or 0) then self.feedSeen = seen end
+        -- Compact rows, Show mod IDs and Favourites first changed in PZMM's Settings
+        if a then K.appTwins(self) end
+        -- PZMM (or Mod Manager) hid or showed mods: shown here too, what this screen changed kept
+        if self.hidden and K.openHidden then
+            local now0 = readHidden()
+            local moved = false
+            for id in pairs(now0) do if not K.openHidden[id] then self.hidden[id], moved = true, true end end
+            for id in pairs(K.openHidden) do if not now0[id] then self.hidden[id], moved = nil, true end end
+            if moved then
+                K.openHidden = now0
+                self:updateView()
+            end
+        end
         -- default.txt changed while this screen is open, and not by it (open() and its first seconds baseline it)
         if a and a.default_rev then
             -- while our own edits wait for PZMM's ack, and for a few seconds after it, default.txt changing is those edits
@@ -3916,6 +4334,22 @@ function PZMMMods:appUp()
         end
     end
     return self.app ~= nil and self.app.running
+end
+
+--- The game's mod favourites read again from its file (pz_modlist_settings.cfg); stars toggled here and not saved yet
+--- stay as they are.
+function PZMMMods:reloadFavs()
+    local mine = {}
+    for id, d in pairs(self.model.mods) do
+        if (d.favorite and true or false) ~= (d.defaultFav and true or false) then mine[id] = d.favorite or false end
+    end
+    if not pcall(function() self.model:loadModDataFromFile() end) then return end
+    for id, d in pairs(self.model.mods) do
+        d.defaultFav = self.model.favs[id]
+        if mine[id] ~= nil then self.model.favs[id] = mine[id] or nil end
+    end
+    self.model:refreshMods()
+    self:addLog("PZMM changed your favourites: they're here now.", "info", "sync")
 end
 
 --- Show the library's lines and keep them: with PZMM running the app writes library.txt (its request is on
@@ -3962,14 +4396,18 @@ function PZMMMods:afterAcks()
     local t = getTimestampMs()
     if self.ackAt and t - self.ackAt < 1000 then return end
     self.ackAt = t
-    -- a request or a job not acked in 3 minutes is given up, said as an error (never a silent wait)
+    -- a request or a job not acked in 3 minutes is given up, said as an error (never a silent wait); the clock
+    -- runs only while PZMM isn't running, as a running one may be asking you first (no time limit on an answer)
     self.sentAt = self.sentAt or {}
+    local up = self:appUp()
     local gone = {}
     for id, said in pairs(self.sent) do
+        if up then self.sentAt[id] = t end
         if t - (self.sentAt[id] or t) > 180000 then gone[#gone + 1] = { id, said, false } end
         self.sentAt[id] = self.sentAt[id] or t
     end
     for id, job in pairs(self.afterAck) do
+        if up and job[3] ~= math.huge then job[3] = t end
         job[3] = job[3] or t
         if t - job[3] > 180000 then gone[#gone + 1] = { id, job[2], true, job } end
     end
@@ -3990,15 +4428,17 @@ function PZMMMods:afterAcks()
         while line do
             local id, ok, said = line:match("^([^\t]+)\t(%a+)\t?(.*)$")
             if id and self.sent[id] then
+                local kind = self.kinds and self.kinds[id]
+                -- a hosted server's state chip reads hosted.txt again (a no leaves it as it was)
+                if kind == "server" then self.hostedAt = nil end
                 if ok ~= "ok" then
-                    self:say("PZMM didn't do it (" .. self.sent[id] .. "): " .. (said ~= "" and said or "no reason given."), "error")
-                else
-                    local kind = self.kinds and self.kinds[id]
-                    if kind == "install" then self:say("Installed: Rescan to see the new mods.")
-                    elseif kind == "restore" then self.saves = nil end
-                end
+                    -- (a job of its own says it, below)
+                    local what = self.sent[id]:gsub(": say yes in PZMM%.$", "")
+                    if not self.afterAck[id] then self:say("PZMM didn't do it (" .. what .. "): " .. (said ~= "" and said or "no reason given."), "error") end
+                elseif kind == "install" then self:say("Installed: Rescan to see the new mods.")
+                elseif kind == "restore" then self.saves = nil end
                 if self.kinds then self.kinds[id] = nil end
-                self.sent[id] = nil
+                self.sent[id], self.sentAt[id] = nil, nil
             end
             local job = id and self.afterAck[id]
             if job then
@@ -4047,7 +4487,10 @@ function PZMMMods:settle()
             local id, ok, said = line:match("^([^\t]+)\t(%a+)\t?(.*)$")
             if id and self.pending[id] then
                 self.pending[id] = nil
-                if ok ~= "ok" and said ~= "" then why = said end
+                -- ponytail: a refused pics request is asked again 5 s on at the earliest (a fixed wait, not backoff)
+                if K.PICS_FLY[id] then
+                    if ok ~= "ok" then K.PICS_ASKED[K.PICS_FLY[id]] = getTimestampMs() + 5000 end
+                elseif ok ~= "ok" and said ~= "" then why = said end
                 -- PZMM did our edit: what it did to default.txt is no change of its own
                 if ok == "ok" then self.rebaseUntil = getTimestampMs() + 6000 end
             end
@@ -4055,6 +4498,7 @@ function PZMMMods:settle()
         end
         r:close()
     end)
+    if #K.PICS_Q > 0 then K.sendPics(self) end
     if not self.overlay then return end -- (acks for edits with no overlay, like tags, are read above)
     local waiting = self:waiting()
     if waiting and self:appUp() then return end
@@ -4206,9 +4650,18 @@ function PZMMMods:drawRow(e, x, y, w, mx, my)
     if not self:filtering() then handle(self, x + 12, y + ROW / 2 - 6) end
     local bx, by = x + 32, y + (ROW - BOX) / 2
     checkbox(self, bx, by, d.isActive, not d.isAvailable)
+    -- the eye: hides it from the list (on or off stays); faint until the row is pointed at, always there once hidden
+    local hid = self.hidden and self.hidden[d.modId]
+    local eyeOver = mx >= x + 54 and mx < x + 80 and my >= y and my < y + ROW
+    local et = hid and TB.eye_off or TB.eye
+    if et then
+        local ec = lit and C.onSelected or eyeOver and C.text or C.muted
+        self:drawTextureScaled(et, x + 60, y + math.floor((ROW - 14) / 2), 14, 14, (hid or over) and 1 or 0.4, ec.r, ec.g, ec.b)
+    end
+    if eyeOver then tip(self, hid and T("unhide_tip", "Hidden. Click to show it in the list again.") or T("hide_tip", "Hide from the list. It stays on or off as it is. Use it for parts you don't need to see, like a mod's other presets. Find it again under Hidden.")) end
     local mid = y + (ROW - H_SMALL) / 2
     local n = d.isActive and self.place[d.modId]
-    if n then text(self, tostring(n), x + 84 - width(tostring(n)), mid, lit and C.onSelected or C.accentText) end
+    if n then text(self, tostring(n), x + 116 - width(tostring(n)), mid, lit and C.onSelected or C.accentText) end
 
     -- right: where it's from (click: its Workshop page), and an update waiting
     local right = x + w - 16
@@ -4247,59 +4700,44 @@ function PZMMMods:drawRow(e, x, y, w, mx, my)
         local hot = mx >= right - (width(lbl) + 30) and mx < right and my >= py and my < py + H_SMALL + 4
         right = pill(self, lbl, right, py, C.ok, true, lit, nil, nil, hot)
         local ws = wsOf(d)
-        if hot then tip(self, src == 4 and "Workshop page\nPZMM's copy of a Workshop item. Opens it in Steam." or "Workshop page\nOpens it in Steam.") end
+        if hot then
+            tip(self, src == 4 and "Workshop\nDownloaded from the Workshop by PZMM. Click: its page in Steam, where Subscribe has Steam keep it updated."
+                or "Subscribed\nSubscribed in Steam; Steam keeps it updated. Click: its page in Steam, where you can unsubscribe.")
+        end
         pillHit = { kind = "fn", fn = function() self:openWorkshop(ws) end, x = right, y = py, w = r0 - right, h = H_SMALL + 4 }
     elseif src == 2 then
         right = pill(self, "Local", right, py, C.muted, false, lit, nil, K.FOLDER)
     end
 
-    -- shared files with another mod: the layers mark, accent where its files win, muted where they lose, white when lit
+    self.srcSeen = math.max(self.srcSeen or 0, x + w - 16 - right)
+    local cols = K.cols(self, x, w)
+    -- Overwrites (enabled mods): the layers mark and how many mods it shares files with; accent where its files win,
+    -- muted where they lose, white when lit
     local ovl = d.isActive and self.ovOf and self.ovOf[d.modId]
-    local ox = right - 24
     if ovl and TB.overlap then
-        local wins = false
-        for _ in pairs(ovl.wins) do wins = true; break end
+        local wins, nov, both = false, 0, {}
+        for id in pairs(ovl.wins) do wins, both[id], nov = true, true, nov + 1 end
+        for id in pairs(ovl.loses) do if not both[id] then nov = nov + 1 end end
         local oc = lit and C.onSelected or (wins and C.accentText or C.muted)
-        self:drawTextureScaled(TB.overlap, ox + 4, y + math.floor((ROW - 16) / 2), 16, 16, 1, oc.r, oc.g, oc.b)
-        if mx >= ox and mx < ox + 24 and my >= y and my < y + ROW then
-            local function names(set)
-                local out = {}
-                for id in pairs(set) do out[#out + 1] = (self.model.mods[id] and self.model.mods[id].name) or id end
-                table.sort(out)
-                return table.concat(out, ", ")
-            end
-            local t = "Shared files"
-            local won = names(ovl.wins)
-            local lost = names(ovl.loses)
-            if won ~= "" then t = t .. "\nOverrides files from " .. won end
-            if lost ~= "" then t = t .. "\nSome files are overridden by " .. lost end
-            tip(self, t)
-        end
+        local nt = tostring(nov)
+        local ob = cols.ovl
+        local ox = ob[1] + math.floor((ob[2] - ob[1] - 19 - width(nt)) / 2)
+        self:drawTextureScaled(TB.overlap, ox, y + math.floor((ROW - 16) / 2), 16, 16, 1, oc.r, oc.g, oc.b)
+        text(self, nt, ox + 19, mid, oc)
+        if mx >= ob[1] and mx < ob[2] and my >= y and my < y + ROW then tip(self, self:overlapTip(ovl)) end
     end
-    if ovl or w >= 760 then right = ox - 8 end
-    -- wide enough: its size and last change (Steam's, for Workshop mods)
-    if w >= 760 then
-        local stw = self:steamOf(d)
-        local when = ""
-        if stw and (stw.updated or 0) > 0 then
-            local okd, ds = pcall(os.date, "%d %b %Y", K.LT(stw.updated))
-            if okd then when = ds end
-        end
-        local sz = ""
-        if stw and (stw.size or 0) > 0 then
-            sz = stw.size >= 1048576 and ((math.floor(stw.size / 104857.6) / 10) .. " MB") or (math.floor(stw.size / 1024) .. " KB")
-        end
+    -- wide enough: Size (Steam's, for Workshop mods), Installed and Last changed
+    if cols.size then
         local c1 = lit and C.onSelected or C.muted
-        right = right - 96
-        if when ~= "" then text(self, when, right, mid, c1) end
-        right = right - 76
-        if sz ~= "" then text(self, sz, right, mid, c1) end
-        if mx >= right and mx < right + 172 and my >= y and my < y + ROW and (sz ~= "" or when ~= "") then tip(self, "Size and last change\nSteam's numbers for this Workshop item.") end
-        right = right - 8
+        for _, v in ipairs({ { cols.size, K.fmtSize(st and st.size) }, { cols.installed, K.fmtDate(K.installedAt(self, d)) }, { cols.changed, K.fmtDate(st and st.updated) } }) do
+            if v[2] ~= "" then text(self, v[2], v[1][2] - width(v[2]), mid, c1) end
+        end
     end
+    right = cols.mod[2] + 8
     -- the star of a favourite, the name (bold), mod ID, then chips; cut short before the pills
-    local tx = x + 98
+    local tx = x + 124
     local c = lit and C.onSelected or d.isActive and C.text or C.muted
+    if hid and not lit then c = copy(c, 0.7) end
     local room = right - 16 - tx
     if d.favorite and K.STAR_ON then
         local sc = lit and C.onSelected or C.accentText
@@ -4365,6 +4803,7 @@ function PZMMMods:drawRow(e, x, y, w, mx, my)
     -- (hits are tried in order: the source pill's comes before the row's)
     self.hits[#self.hits + 1] = { kind = "drag", mod = d, x = x + 6, y = y, w = 20, h = ROW }
     self.hits[#self.hits + 1] = { kind = "box", mod = d, x = bx - 6, y = by - 6, w = BOX + 12, h = BOX + 12 }
+    self.hits[#self.hits + 1] = { kind = "fn", fn = function() self:toggleHidden(d) end, x = x + 54, y = y, w = 26, h = ROW }
     if pillHit then self.hits[#self.hits + 1] = pillHit end
     self.hits[#self.hits + 1] = { kind = "row", mod = d, x = x, y = y, w = w, h = ROW }
 end
@@ -4476,18 +4915,22 @@ function PZMMMods:drawSide()
     if self.selected or self.checkOpen then
         local what = self.checkOpen and "check" or self.selected
         if self.detailFor ~= what then self.detailFor, self.detailScroll = what, 0 end
-        self:setStencilRect(x, y, w, h)
+        -- Check setup's footer stays put under its list
+        local fh = self.checkOpen and self:checkFoot(x + 18, nil, w - 36) or 0
+        local ch = h - fh
+        self:setStencilRect(x, y, w, ch)
         local bottom
         if self.checkOpen then
-            bottom = self:drawCheck(x + 18, y + 16 - self.detailScroll, w - 36, y + h)
+            bottom = self:drawCheck(x + 18, y + 16 - self.detailScroll, w - 36, y + ch)
         else
-            bottom = self:drawDetails(self.selected, x + 18, y + 16 - self.detailScroll, w - 36, y + h)
+            bottom = self:drawDetails(self.selected, x + 18, y + 16 - self.detailScroll, w - 36, y + ch)
         end
         self:clearStencilRect()
         local full = bottom + self.detailScroll - y + 16
-        self.detailBox = { x = x, y = y, w = w, h = h, full = full }
-        self.detailScroll = math.max(0, math.min(self.detailScroll, full - h))
-        scrollbar(self, "detailScroll", x, y, w, h, full)
+        self.detailBox = { x = x, y = y, w = w, h = ch, full = full }
+        self.detailScroll = math.max(0, math.min(self.detailScroll, full - ch))
+        scrollbar(self, "detailScroll", x, y, w, ch, full)
+        if fh > 0 then self:checkFoot(x + 18, y + ch, w - 36) end
         return
     end
     self:drawOrder(x, y, w, h)
@@ -4613,7 +5056,8 @@ function PZMMMods:drawOrder(x, y, w, h)
             local prob = self.oprob and self.oprob[id]
             local c = (not d and C.danger) or (d.isAvailable == false and C.danger) or (over and C.onSelected) or C.text
             local ovm = d and d.isActive and self.ovOf and self.ovOf[id]
-            local room2 = w - 36 - nw - 12 - (prob and 24 or 0) - (ovm and 24 or 0)
+            local pinned = K.pinned(id)
+            local room2 = w - 36 - nw - 12 - (prob and 24 or 0) - (ovm and 24 or 0) - (pinned and 24 or 0)
             local shown = fit(name, room2)
             bold(self, shown, hx + nw + 12, mid, c)
             -- its ID after the name, muted, when there's room
@@ -4632,6 +5076,13 @@ function PZMMMods:drawOrder(x, y, w, h)
             end
             if prob and TB.alert then
                 self:drawTextureScaled(TB.alert, rx2, ry + math.floor((rh - 16) / 2), 16, 16, 1, C.danger.r, C.danger.g, C.danger.b)
+                rx2 = rx2 - 24
+            end
+            -- pinned: the app's lock
+            if pinned and TB.lock then
+                local lc = over and C.onSelected or C.muted
+                self:drawTextureScaled(TB.lock, rx2 + 2, ry + math.floor((rh - 12) / 2), 12, 12, 1, lc.r, lc.g, lc.b)
+                if over and mx >= rx2 - 4 and mx < rx2 + 20 then iconTip = "Pinned\nAutosort keeps it between its neighbours." end
             end
             if over then tip(self, iconTip or (name .. "\n" .. id .. (prob and ("\n" .. prob[1]) or ""))) end
             if od and od.moved and od.i == i then rect(self, x + 1, ry, w - 2, rh, C.panel, 0.6) end
@@ -4814,6 +5265,26 @@ function PZMMMods:setRule(id, key, value)
     return ok
 end
 
+--- Pinned: the rules file has it load after or before a mod (what the app's Pin writes; Autosort keeps it there).
+function K.pinned(id)
+    local f = FILE_RULES[id]
+    return f ~= nil and (#f.after > 0 or #f.before > 0)
+end
+--- Pin a mod between its neighbours in the load order (loadAfter the one above, loadBefore the one below, in
+--- sorting_rules.txt), as the app's; unpin clears both.
+function PZMMMods:pin(d, on)
+    local after, before = "", ""
+    if on then
+        local order, at = self:activeOrder(), nil
+        for i, id in ipairs(order) do if id == d.modId then at = i end end
+        if not at or #order < 2 then return self:say("Enable it first: a pin keeps it between its neighbours in the load order.") end
+        after, before = order[at - 1] or "", order[at + 1] or ""
+    end
+    if self:setRule(d.modId, "loadAfter", after) and self:setRule(d.modId, "loadBefore", before) then
+        self:say(on and (d.name .. " pinned: Autosort keeps it between its neighbours.") or (d.name .. " unpinned."))
+    end
+end
+
 --- The Load rules section of a mod's details: loadFirst / loadLast / category as select-like fields and the
 --- loadAfter / loadBefore / incompatible lists (add by prompt, remove with the x), from mod.info and Mod Load
 --- Order Sorter's rules file; Clear rules removes this mod's rules from the file.
@@ -4934,20 +5405,17 @@ end
 
 function PZMMMods:drawDetails(d, x, y, w, bottom)
     local info = d.modInfo
-    if d.poster == nil then
-        d.poster = false
-        pcall(function() if (info:getPosterCount() or 0) > 0 then d.poster = getTexture(info:getPoster(0)) or false end end)
-        -- none of its own: the Workshop picture PZMM saved for the game, if the game can load it from there
-        if not d.poster and self.app then
-            pcall(function()
-                local ws = wsOf(d)
-                if ws ~= "" then
-                    local sep = getFileSeparator()
-                    d.poster = getTexture(Core.getMyDocumentFolder() .. sep .. "Lua" .. sep .. "pzmm" .. sep .. "img" .. sep .. ws .. ".png") or false
-                end
-            end)
-        end
+    if d.posters == nil then
+        -- every poster its mod.info lists, as the app's Workshop panel has every screenshot
+        d.posters, d.pic = {}, 1
+        pcall(function() for i = 0, (info:getPosterCount() or 0) - 1 do d.posters[#d.posters + 1] = getTexture(info:getPoster(i)) end end)
     end
+    -- then the Workshop item's pictures PZMM saved (it saves the others once asked)
+    local pws = self.app and not d.ghost and wsOf(d) or ""
+    if pws ~= "" then K.askPics(self, pws) end
+    d.pics = K.picList(d.posters, pws)
+    if d.pic > #d.pics then d.pic = 1 end
+    d.poster = d.pics[d.pic] or false
     local top0 = y
     if d.poster then
         -- at most 220 high, cropped to fill the width (cover), cut to its own stencil as the hero's art is
@@ -4962,6 +5430,29 @@ function PZMMMods:drawDetails(d, x, y, w, bottom)
             local sc = math.max(w / pw0, ph / phh)
             local aw, ah = pw0 * sc, phh * sc
             self:drawTextureScaled(d.poster, x + (w - aw) / 2, y + (ph - ah) / 2, aw, ah, 1, 1, 1, 1)
+            local n = #d.pics
+            if n > 1 then
+                -- "2 / 5" in the bottom right; previous and next on hover, wrapping at the ends, as the app's
+                local mx, my = self:getMouseX(), self:getMouseY()
+                local s = d.pic .. " / " .. n
+                local sw = width(s) + 14
+                round(self, x + w - sw - 8, y + ph - H_SMALL - 14, sw, H_SMALL + 6, 6, C.black, 0.6)
+                text(self, s, x + w - sw + 7 - 8, y + ph - H_SMALL - 11, C.onAccent)
+                if mx >= x and mx < x + w and my >= math.max(y, c0) and my < math.min(y + ph, c1) then
+                    local ay = y + math.floor((ph - 28) / 2)
+                    for side = -1, 1, 2 do
+                        local ax = side < 0 and x + 8 or x + w - 36
+                        local over = mx >= ax and mx < ax + 28 and my >= ay and my < ay + 28
+                        round(self, ax, ay, 28, 28, 14, C.black, over and 0.8 or 0.55)
+                        local t = side < 0 and K.CHEV_LEFT or K.CHEV_RIGHT
+                        if t then self:drawTextureScaled(t, ax + 7, ay + 7, 14, 14, 1, 1, 1, 1) end
+                        if over then tip(self, side < 0 and T("previous", "Previous") or T("next", "Next")) end
+                        if ay >= c0 and ay + 28 <= c1 then
+                            self.hits[#self.hits + 1] = { kind = "fn", x = ax, y = ay, w = 28, h = 28, fn = function() d.pic = (d.pic - 1 + side) % n + 1 end }
+                        end
+                    end
+                end
+            end
             self:clearStencilRect()
             self:setStencilRect(bx0, by0, bw0, bh0)
         end
@@ -4998,7 +5489,7 @@ function PZMMMods:drawDetails(d, x, y, w, bottom)
         local ax = x
         for _, a in ipairs({
             { "Disable", nil, function() self:toggle(d) end, TB.x },
-            { "Find on the Workshop", nil, function() self:findOnWorkshop(d.modId) end, TB.steam },
+            self.app and { T("install_btn", "Install"), "primary", function() self:findMod(d.modId) end, TB.download } or { "Find on the Workshop", nil, function() self:findOnWorkshop(d.modId) end, TB.steam },
         }) do
             local aw = width(a[1]) + 28 + 20
             if ax > x and ax + aw > x + w then ax, y = x, y + BAR + 6 end
@@ -5013,6 +5504,13 @@ function PZMMMods:drawDetails(d, x, y, w, bottom)
     local acts = { { d.isActive and "Disable" or "Enable", not d.isActive and "primary" or nil, function() self:toggle(d) end, d.isActive and TB.x or TB.check } }
     acts[#acts + 1] = { "Show files", nil, function() pcall(function() showFolderInDesktop(d.modInfo:getDir()) end) end, TB.folder }
     if ws and ws ~= "" and ws ~= "0" then acts[#acts + 1] = { "Workshop page", nil, function() self:openWorkshop(ws) end, TB.steam } end
+    -- PZMM keeps the copy from before each update: it puts it back (it says if it has none)
+    local rk = self:removeKind(d)
+    if rk == "pzmm" and self.app then
+        acts[#acts + 1] = { T("details_restore", "Restore previous version"), nil, function() self:request("rollback\t" .. d.modId, d.name .. ": PZMM asks before it puts the previous version back.") end, TB.undo }
+    elseif rk == "steam" then
+        acts[#acts + 1] = { T("details_unsubscribe", "Unsubscribe on the Workshop page"), nil, function() self:removeMods({ d }) end, TB.steam }
+    end
     local ax = x
     for _, a in ipairs(acts) do
         local aw = width(a[1]) + 28 + (a[4] and 20 or 0)
@@ -5046,6 +5544,20 @@ function PZMMMods:drawDetails(d, x, y, w, bottom)
             if self.app and ws then self:request("install\t" .. ws, d.name .. " update asked for.") elseif ws then self:openWorkshop(ws) end
         end }
         y = y + bh + 8
+        -- what changed since your version: the change notes PZMM's feed has for it (none: nothing)
+        local notes = K.changesFor(self, ws)
+        if #notes > 0 then
+            y = K.heading(self, T("details_what_changed", "What changed since your version"), x, y + 6)
+            for _, n in ipairs(notes) do
+                bold(self, n[1], x, y, C.text)
+                y = y + H_SMALL + 4
+                for _, l in ipairs(wrap(n[2], w)) do
+                    text(self, l, x, y, C.desc)
+                    y = y + H_SMALL + 2
+                end
+                y = y + 8
+            end
+        end
     end
     pcall(function() field("Author", info:getAuthor()) end)
     pcall(function() field(T("details_mod_version", "Mod version"), info:getModVersion()) end)
@@ -5140,7 +5652,22 @@ function PZMMMods:drawDetails(d, x, y, w, bottom)
             if r and r.isActive then state, c = "on", C.muted elseif r then state = "off" end
             local label = r and r.name or id
             local over = r and mx >= x and mx < x + w and my >= y and my < y + H_SMALL + 6
-            text(self, fit(label, w - width(state) - 12), x, y, over and C.accentText or C.text)
+            local stR = self:steamOf(d)
+            local sw = width(state)
+            if not r and self.app and #(stR and stR.missing or {}) == 0 then
+                -- no Workshop item known for it: PZMM looks it up by its mod ID
+                local il = T("install_btn", "Install")
+                local iw = width(il)
+                local ix = x + w - sw - 12 - iw
+                local io = mx >= ix and mx < ix + iw and my >= y and my < y + H_SMALL + 6
+                text(self, il, ix, y, io and C.text or C.accentText)
+                rect(self, ix, y + H_SMALL, iw, 1, io and C.text or C.accentText, 1)
+                if io then tip(self, T("install_by_id", "Install by mod ID") .. "\nPZMM finds " .. id .. " on the Workshop and installs it once you say yes.") end
+                local idx = id
+                self.hits[#self.hits + 1] = { kind = "fn", fn = function() self:findMod(idx) end, x = ix, y = y, w = iw, h = H_SMALL + 6 }
+                sw = sw + 12 + iw
+            end
+            text(self, fit(label, w - sw - 12), x, y, over and C.accentText or C.text)
             text(self, state, x + w - width(state), y, c)
             if r then
                 if over then tip(self, label .. "\n" .. id .. "\nClick to see it.") end
@@ -5191,6 +5718,7 @@ function PZMMMods:drawDetails(d, x, y, w, bottom)
     end
     mods(T("details_needed_by", "Needed by"), users, nil, true)
     mods("Incompatible", clash, true)
+    y = self:drawRules(d, x, y + 6, w) + 8
     -- same-named Lua and script files: it replaces mods before it, and mods after it replace it
     if d.isActive then
         local of, done = self:overlaps()
@@ -5228,7 +5756,6 @@ function PZMMMods:drawDetails(d, x, y, w, bottom)
             y = y + H_SMALL + 6
         end
     end
-    y = self:drawRules(d, x, y + 6, w) + 8
     if not (d.descLines and d.descW == w) then
         local desc = ""
         pcall(function() desc = info:getDescription() or "" end)
@@ -5344,6 +5871,8 @@ local function readFeedSeen()
     return ok and t or 0
 end
 
+K.readFeedSeen = readFeedSeen
+
 local function readPlayed()
     local ok, t = pcall(function()
         local r = getFileReader("pzmm/played.txt", false)
@@ -5408,6 +5937,20 @@ local function date(t, long)
     local ok, out = pcall(function() return os.date(long and "%A %d %B %Y" or "%d %B %Y", K.LT(t)) end)
     return ok and out or ""
 end
+--- The change notes PZMM's feed has for Workshop item `ws`, newest first: { { day, text }, ... } (none: {}).
+function K.changesFor(ui, ws)
+    local out = {}
+    for _, e in ipairs(ui.feed and ui.feed.entries or {}) do
+        if e.item == ws then
+            for i, n in ipairs(e.notes) do
+                if i > K.SHOWN_NOTES then break end
+                local body = plain(n.text)
+                out[#out + 1] = { date(n.time), body ~= "" and body or "(no text)" }
+            end
+        end
+    end
+    return out
+end
 K.RISKS = { map = "It adds a map.", version = "A major version jump.", notes = "Its notes mention a new game or wiped saves." }
 local function riskTip(e)
     local why = {}
@@ -5455,59 +5998,6 @@ local function inkButton(ui, label, x, y, mx, my)
     return w, h
 end
 
-K.UH_OH = tex("uh_oh")
-K.SORRY = "Because of limits on what mods can do inside the game, What's new only works with the PZMM Mod Manager app installed. The app fetches your mods' change notes from Steam and brings them here."
-K.SORRY_LINKS = {
-    { icon = LINKS[1][1], url = K.RELEASES_URL, title = "Download on GitHub", sub = "Get the PZMM Mod Manager app" },
-    { icon = LINKS[2][1], url = LINKS[2][2], title = "Join the Discord", sub = "Help, ideas and the community" },
-}
-
---- What can't work here: the raccoon's sign, why (`body`, What's new's by default), and its `links` (the
---- app's GitHub and Discord by default), filling `w` by `h`. Returns its height.
-function PZMMMods:drawSorry(x, y, w, h, mx, my, body, links, title)
-    body, links, title = body or K.SORRY, links or K.SORRY_LINKS, title or "We're sorry"
-    local LARGE = UIFont.Large
-    local H_LARGE = TM:getFontHeight(LARGE)
-    -- whole pixels throughout: a fractional edge leaves a seam between round()'s strips
-    x, y, w, h = math.floor(x), math.floor(y), math.floor(w), math.floor(h)
-    local pad, gap = 40, 48
-    local img = math.floor(math.max(160, math.min(h - pad * 2, w * 0.4)))
-    local tw = math.min(600, w - pad * 2 - gap - img) -- a readable measure, the pair centred in the card
-    local gx = x + math.floor((w - img - gap - tw) / 2)
-    local tx = gx + img + gap
-    local lines = wrap(body, tw, MEDIUM)
-    local stacked = tw < 520 or #links > 2
-    local bw = stacked and tw or math.floor((tw - 16) / 2)
-    local bh = H_MEDIUM + H_SMALL + 30
-    local banners = stacked and #links * (bh + 16) - 16 or bh
-    local body = H_LARGE + 16 + #lines * (H_MEDIUM + 4) + 28 + banners
-    h = math.max(h, img + pad * 2, body + pad * 2)
-    round(self, x, y, w, h, 8, C.panel)
-    outline(self, x, y, w, h, 8, C.line, 1)
-    image(self, K.UH_OH, gx, y + math.floor((h - img) / 2), img, img)
-    local ty = y + math.floor((h - body) / 2)
-    bold(self, title, tx, ty, C.text, LARGE)
-    ty = ty + H_LARGE + 16
-    for _, l in ipairs(lines) do
-        text(self, l, tx, ty, C.muted, MEDIUM)
-        ty = ty + H_MEDIUM + 4
-    end
-    ty = ty + 28
-    for i, s in ipairs(links) do
-        local bx = stacked and tx or tx + (i - 1) * (bw + 16)
-        local by = stacked and ty + (i - 1) * (bh + 16) or ty
-        local over = mx >= bx and mx < bx + bw and my >= by and my < by + bh
-        if over then tip(self, s.title .. "\n" .. (s.url or s.sub)) end
-        round(self, bx, by, bw, bh, 10, over and C.hover or C.raised)
-        outline(self, bx, by, bw, bh, 10, over and C.accent or C.line, over and 0.9 or 1)
-        local lx = s.icon and bx + 66 or bx + 18
-        if s.icon then image(self, s.icon, bx + 18, by + (bh - 32) / 2, 32, 32) end
-        bold(self, s.title, lx, by + 13, C.text, MEDIUM)
-        text(self, s.sub, lx, by + 17 + H_MEDIUM, C.muted)
-        self.feedHits[#self.feedHits + 1] = { kind = s.fn and "fn" or "url", url = s.url, fn = s.fn, x = bx, y = by, w = bw, h = bh }
-    end
-    return h
-end
 
 function PZMMMods:drawScrap(e, x, y, w, h, k, mx, my)
     local on = self:entryOn(e)
@@ -5517,7 +6007,14 @@ function PZMMMods:drawScrap(e, x, y, w, h, k, mx, my)
     local px, pw = x + 20, w - 40
     local ty = y + 22
     local title = e.title ~= "" and e.title or e.item
-    for i, l in ipairs(wrap(title, pw, MARKER)) do
+    local pic = self.app and K.img(tostring(e.item))
+    local tw0 = pw
+    if pic then
+        local ps = math.floor(56 * k)
+        K.thumb(self, pic, px + pw - ps, ty, ps, ps)
+        tw0 = pw - ps - 10
+    end
+    for i, l in ipairs(wrap(title, tw0, MARKER)) do
         if i > 2 then break end
         text(self, l, px, ty, K.INK, MARKER)
         ty = ty + H_MARKER
@@ -5757,28 +6254,28 @@ function PZMMMods:drawFeed()
     if not self.feed then y = self:drawNotice(x0, y, cw, T("notice_feed", "change notes and their history, and loading the notes for more mods."), mx, my) end
     bold(self, T("tab_feed", "What's new"), x0, y, C.text, MEDIUM)
     local rx = x0 + cw
+    -- Refresh at the right: PZMM's feed read again, and Steam asked again which of your mods changed
+    do
+        local label = T("feed_refresh", "Refresh")
+        local bw = width(label) + 48
+        local bxr, byr = rx - bw, y + math.floor((H_MEDIUM - BAR) / 2)
+        local _, _, over = flatButton(self, label, bxr, byr, mx, my, "quiet", ACTIONS[3][2])
+        if over then tip(self, "Refresh\nReads the change notes again and asks Steam which of your Workshop mods changed.") end
+        self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function()
+            self.feed, self.liteFeedCache = readFeed(), nil
+            self:querySteam(true)
+        end, x = bxr, y = byr, w = bw, h = BAR }
+        rx = bxr - 16
+    end
     if f then
-        -- Enabled only, at the right of the heading
+        -- Enabled only, left of Refresh, as the app's
         local label = T("maps_enabled_only", "Enabled only")
-        local cx = x0 + cw - width(label) - BOX - 8
+        local cx = rx - width(label) - BOX - 8
         local cy = y + (H_MEDIUM - BOX) / 2
         checkbox(self, cx, cy, self.enabledOnly)
         text(self, label, cx + BOX + 8, y + (H_MEDIUM - H_SMALL) / 2, C.text)
         self.feedHits[#self.feedHits + 1] = { kind = "only", x = cx - 4, y = cy - 4, w = BOX + 16 + width(label), h = BOX + 8 }
         if mx >= cx - 4 and mx < cx + BOX + 12 + width(label) and my >= cy - 4 and my < cy + BOX + 4 then tip(self, "Enabled only\nHide updates to mods you have turned off.") end
-        rx = cx - 16
-    end
-    -- Refresh: PZMM's feed read again, and Steam asked again which of your mods changed
-    do
-        local label = T("feed_refresh", "Refresh")
-        local bw = width(label) + 48
-        local bxr, byr = rx - bw, y + math.floor((H_MEDIUM - BAR) / 2)
-        local _, _, over = flatButton(self, label, bxr, byr, mx, my, "quiet", ACTIONS[2][2])
-        if over then tip(self, "Refresh\nReads the change notes again and asks Steam which of your Workshop mods changed.") end
-        self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function()
-            self.feed, self.steam, self.steamState, self.liteFeedCache = readFeed(), nil, nil, nil
-            self:querySteam()
-        end, x = bxr, y = byr, w = bw, h = BAR }
     end
     y = y + H_MEDIUM + 4
     if not f then
@@ -5862,6 +6359,21 @@ function PZMMMods:drawFeed()
             y = self:drawEntry(e, ix, y, iw, mx, my, by, by + bh) + 8
         end
         y = cy0 + hh + 18
+        -- the updates PZMM hasn't loaded notes for yet: it loads the next ones
+        local rest = 0
+        if self.app and self.feed then
+            for _, e in ipairs(self.feed.entries) do if not e.loaded then rest = rest + 1 end end
+            -- the updates whose notes aren't loaded yet, as PZMM counts them (more=)
+            rest = tonumber(self.feed.more or "") or rest
+        end
+        if rest > 0 then
+            local label = rest == 1 and T("feed_more_one", "Load notes for 1 more mod") or T("feed_more", "Load notes for %1 more mods", rest)
+            local lbw = width(label) + 48
+            local _, _, lo = flatButton(self, label, x0, y, mx, my, nil, TB.download)
+            if lo then tip(self, label .. "\nPZMM loads their change notes from the Workshop.") end
+            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:feedLoadMore() end, x = x0, y = y, w = lbw, h = BAR }
+            y = y + BAR + 14
+        end
         for _, l in ipairs(wrap(K.FINE, cw)) do
             text(self, l, x0, y, C.muted)
             y = y + H_SMALL + 2
@@ -5871,6 +6383,12 @@ function PZMMMods:drawFeed()
     self.feedHeight = y + self.feedScroll - by + 24
     self.feedScroll = math.max(0, math.min(self.feedScroll, self.feedHeight - bh))
     scrollbar(self, "feedScroll", bx, by, bw, bh, self.feedHeight)
+end
+
+--- Ask PZMM (quietly) for the next updates' notes; feed.txt is read again once it says done.
+function PZMMMods:feedLoadMore()
+    local id = self:request("feed\tmore", "Loading more change notes in PZMM...", true)
+    if id then self.afterAck[id] = { function() self.feed = readFeed(); self:say("More change notes loaded.") end, "Loading more change notes" } end
 end
 
 function PZMMMods:feedClick(x, y)
@@ -5919,17 +6437,102 @@ end
 
 --- Switch PZMM's profile: its profiles to pick from (PZMM confirms, then the game's list follows).
 --- One item per PZMM profile (the current one ticked); nil when PZMM hasn't listed any.
+--- PZMM's snapshots of the active profile (Zomboid/Lua/pzmm/snapshots.txt, newest first: "<id>\t<time>\t<reason>\t<on>/<n>").
+function K.readSnapshots()
+    local out = {}
+    pcall(function()
+        local r = getFileReader("pzmm/snapshots.txt", false)
+        if not r then return end
+        local line = r:readLine()
+        while line do
+            local f = fields(line)
+            if f[1]:match("^%d+$") and tonumber(f[2]) then
+                local on, n = (f[4] or ""):match("^(%d+)/(%d+)$")
+                local t = tonumber(f[2])
+                out[#out + 1] = { id = f[1], time = t > 1e11 and math.floor(t / 1000) or t, reason = f[3] or "", on = tonumber(on), n = tonumber(n) }
+            end
+            line = r:readLine()
+        end
+        r:close()
+    end)
+    return out
+end
+--- A profile name typed in: one line, trimmed (nil when empty).
+function K.profileName(typed)
+    local n = tostring(typed or ""):gsub("[\t\r\n]", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    return n ~= "" and n or nil
+end
+--- The profile menu, as the app's: each game's profiles under its heading (server profiles under their own), then
+--- New profile, Rename, Duplicate, Delete and Snapshots (PZMM does them).
 function PZMMMods:profileItems()
     local pr = readProfiles()
     if not pr or #pr.list == 0 then return nil end
     local items = {}
-    for _, e in ipairs(pr.list) do
+    local function add(e)
         items[#items + 1] = { e.name, function()
             if e.name == pr.active then return end
             self:request("profile\t" .. e.name, "Switching to " .. e.name .. ": say yes in PZMM.")
         end, e.name == pr.active }
     end
+    local zomboid, viewpoint, servers = {}, {}, {}
+    for _, e in ipairs(pr.list) do
+        local l = e.kind == "viewpoint" and viewpoint or e.kind == "server" and servers or zomboid
+        l[#l + 1] = e
+    end
+    items[#items + 1] = { T("profile_zomboid", "Project Zomboid Profiles"), heading = true }
+    for _, e in ipairs(zomboid) do add(e) end
+    if #servers > 0 then
+        items[#items + 1] = { T("profile_servers", "Server Profiles"), heading = true }
+        for _, e in ipairs(servers) do add(e) end
+    end
+    if #viewpoint > 0 then
+        items[#items + 1] = { T("profile_viewpoint", "Project Viewpoint Profiles"), heading = true }
+        for _, e in ipairs(viewpoint) do add(e) end
+    end
+    local cur = pr.active or (self.lib and self.lib.profile) or ""
+    items[#items + 1] = false
+    items[#items + 1] = { T("profile_new", "New profile..."), function()
+        self:prompt(T("profile_new_title", "New profile: an empty list"), "", T("profile_create", "Create"), function(t)
+            local n = K.profileName(t)
+            if n then self:request("profile\tnew\t" .. n, "Making the profile " .. n .. ": say yes in PZMM.") end
+        end, nil, 60)
+    end, icon = TB.plus }
+    if cur ~= "" then
+        items[#items + 1] = { T("profile_rename", "Rename..."), function()
+            self:prompt(T("profile_rename_title", "Rename %1", cur), cur, T("profile_rename_btn", "Rename"), function(t)
+                local n = K.profileName(t)
+                if n and n ~= cur then self:request("profile\trename\t" .. cur .. "\t" .. n, "Renaming " .. cur .. " to " .. n .. ": say yes in PZMM.") end
+            end, nil, 60)
+        end, icon = TB.pencil }
+        items[#items + 1] = { T("profile_duplicate", "Duplicate..."), function()
+            self:prompt(T("profile_duplicate_title", "Duplicate %1", cur), cur .. " copy", T("profile_duplicate_btn", "Duplicate"), function(t)
+                local n = K.profileName(t)
+                if n and n ~= cur then self:request("profile\tduplicate\t" .. cur .. "\t" .. n, "Copying " .. cur .. " as " .. n .. ": say yes in PZMM.") end
+            end, nil, 60)
+        end, icon = TB.copy }
+        items[#items + 1] = { T("profile_delete", "Delete..."), function()
+            self:request("profile\tdelete\t" .. cur, "Deleting " .. cur .. ": say yes in PZMM.")
+        end, danger = true, disabled = #pr.list < 2 }
+    end
+    items[#items + 1] = { T("profile_snapshots", "Snapshots..."), function() self:snapshotMenu() end, icon = TB.undo }
     return items
+end
+--- The active profile's snapshots, newest first: pick one to restore it (asked here, then PZMM does it).
+function PZMMMods:snapshotMenu()
+    local list = K.readSnapshots()
+    local items = { { T("profile_snapshots_head", "Snapshots of %1", (self.lib and self.lib.profile) or ""), heading = true } }
+    if #list == 0 then items[#items + 1] = { T("profile_no_snapshots", "No snapshots yet."), disabled = true } end
+    for i, sn in ipairs(list) do
+        if i > 10 then break end
+        local when = date(sn.time) .. " " .. clock(sn.time)
+        local label = when .. (sn.reason ~= "" and (": " .. sn.reason) or "") .. (sn.n and ("  (" .. sn.on .. "/" .. sn.n .. ")") or "")
+        items[#items + 1] = { label, function()
+            self:ask({ title = T("profile_restore_q", "Restore the list from %1? PZMM keeps the one you have now as a snapshot too.", when), choices = {
+                { T("profile_restore", "Restore"), function() self:request("snapshot\t" .. sn.id, "Restoring the snapshot from " .. when .. ": say yes in PZMM.") end, TB.undo },
+            } })
+        end }
+    end
+    self:menu(items)
 end
 function PZMMMods:profileMenu()
     local items = self:profileItems()
@@ -5943,6 +6546,19 @@ function PZMMMods:onMouseDown(x, y)
         getSoundManager():playUISound("UISelectListItem")
         self.logOpen, self.logScroll = not self.logOpen, 0
         return true
+    end
+    if inside(self.logExpand, x, y) then
+        getSoundManager():playUISound("UISelectListItem")
+        local big = self.logOpen and self.logExpanded
+        self.logOpen, self.logExpanded, self.logScroll = true, not big, 0
+        return true
+    end
+    for _, h in ipairs(self.footHits or {}) do
+        if inside(h, x, y) then
+            getSoundManager():playUISound("UISelectListItem")
+            h.fn()
+            return true
+        end
     end
     if inside(self.logCopy, x, y) and #PZMMMods.log > 0 then
         local lines = {}
@@ -5980,6 +6596,18 @@ function PZMMMods:onMouseDown(x, y)
             return true
         end
     end
+    for _, a in ipairs(self.tabActs or {}) do
+        if inside(a, x, y) then
+            getSoundManager():playUISound("UISelectListItem")
+            a.fn()
+            return true
+        end
+    end
+    if inside(self.installHit, x, y) then
+        getSoundManager():playUISound("UISelectListItem")
+        self:installTyped()
+        return true
+    end
     for _, pg in ipairs(self.pageBoxes or {}) do
         if x >= pg[2] and x < pg[2] + pg[3] and y >= ROW1 and y < TOP then
             getSoundManager():playUISound("UISelectListItem")
@@ -6005,6 +6633,13 @@ function PZMMMods:onMouseDown(x, y)
             self.tab = t[1]
             self.scroll = 0
             self:updateView()
+            return true
+        end
+    end
+    for _, t in ipairs(self.colHits or {}) do
+        if x >= t[2] and x < t[2] + t[4] and y >= t[3] and y < t[3] + t[5] then
+            getSoundManager():playUISound("UISelectListItem")
+            K.colSort(self, t[1])
             return true
         end
     end
@@ -6170,6 +6805,23 @@ function PZMMMods:onRightMouseDown(x, y)
     end
     return true
 end
+--- Hide mod `d` from the list, or show it again (the row menu's and the eye's): on or off stays as it is.
+function PZMMMods:toggleHidden(d)
+    local hid = self.hidden[d.modId]
+    self.hidden[d.modId] = (not hid) or nil
+    writeHidden(self.hidden)
+    self:updateView()
+    self:say(hid and (d.name .. " shows again.") or (d.name .. " hidden: Hidden shows it."))
+end
+--- Whether every picked mod is hidden (the bulk bar's Hide is then Show again).
+function K.pickedHidden(ui)
+    local any = false
+    for mid in pairs(ui.picked or {}) do
+        if not ui.hidden[mid] then return false end
+        any = true
+    end
+    return any
+end
 --- Several picked mods' menu: what it does, it does to all of them.
 function PZMMMods:manyMenu(list)
     local n = #list
@@ -6178,50 +6830,154 @@ function PZMMMods:manyMenu(list)
         if not m.favorite then favs = false end
         if not self.hidden[m.modId] then hid = false end
     end
+    local ids = {}
+    for _, m in ipairs(list) do ids[#ids + 1] = m.modId end
     local items = {
         { "Enable " .. n .. " mods", function() self:onTool("bulkOn") end },
         { "Disable " .. n .. " mods", function() self:onTool("bulkOff") end },
-        { favs and "Unfavourite" or "Favourite", function()
+        { T("menu_to_top", "Move to the top of the load order"), function() self:blockMove(ids, true) end, disabled = self:filtering() },
+        { T("menu_to_bottom", "Move to the bottom of the load order"), function() self:blockMove(ids, false) end, disabled = self:filtering() },
+        false,
+        { favs and T("menu_unfavourite", "Remove from favourites") or T("menu_favourite", "Add to favourites"), function()
             for _, m in ipairs(list) do self.model:setFavorite(m.modId, not favs) end
             self.model:refreshMods()
         end },
-        false,
-        { "Copy mod IDs", function()
-            local ids = {}
-            for _, m in ipairs(list) do ids[#ids + 1] = m.modId end
-            Clipboard.setClipboard(table.concat(ids, ";"))
-            self:say(n .. " mod IDs copied.")
-        end },
-        { T("menu_top", "Move to top"), function() self:moveMany(PZMMMods.MOVE_TOP) end },
-        { T("menu_bottom", "Move to bottom"), function() self:moveMany(PZMMMods.MOVE_BOTTOM) end },
-        false,
-        { hid and "Show again" or "Hide", function()
+        { hid and T("menu_unhide", "Show in the list again") or T("menu_hide", "Hide from the list"), function()
             for _, m in ipairs(list) do self.hidden[m.modId] = (not hid) or nil end
             writeHidden(self.hidden)
             self.picked = {}
             self:updateView()
-            self:say(hid and "Shown again." or "Hidden: Filters > Hidden shows them.")
+            self:say(hid and "Shown again." or "Hidden: Hidden shows them.")
         end },
+        false,
+        { "Copy mod IDs", function()
+            Clipboard.setClipboard(table.concat(ids, ";"))
+            self:say(n .. " mod IDs copied.")
+        end },
+        { T("tool_group", "Group by category"), function() self:groupByCategory() end },
     }
+    if self.app then
+        items[#items + 1] = false
+        items[#items + 1] = { T("menu_remove", "Remove"), function() self:removeMods(list) end, danger = true }
+    end
     self:menu(items)
 end
 
 --- Maps, with this map mod picked in its list.
 function PZMMMods:showInMaps(d)
     self.page, self.feedScroll = "maps", 0
-    self.mapQuery, self.mapFilter, self.gridSel = nil, "all", nil
+    self.mapQuery, self.mapFilter, self.gridSel, self.mapTab, self.mapSideScroll = nil, "all", nil, "mods", 0
     self.cellVer = (self.cellVer or 0) + 1
     for _, m in ipairs(self:mapRows()) do
         if m.d == d then self.mapSel = m end
     end
 end
 
---- A mod's menu: Enable or Disable, favourite, its ID, where it goes in the list, its Workshop page, its files, Show in
---- Maps for a map. On a mod that's one of two or more picked, it acts on all of them.
+--- A picture PZMM saved for the game (Zomboid/Lua/pzmm/img/<name>.png), or nil. A miss is looked for again once
+--- a second while it may still come (`till`, after a pics request), else once a minute.
+K.PIC = {}
+function K.img(name)
+    local c, t = K.PIC[name], getTimestampMs()
+    if c and (c.tex or t - c.at < (t < c.till and 1000 or 60000)) then return c.tex end
+    local tx
+    pcall(function()
+        local sep = getFileSeparator()
+        tx = getTexture(Core.getMyDocumentFolder() .. sep .. "Lua" .. sep .. "pzmm" .. sep .. "img" .. sep .. name .. ".png")
+    end)
+    K.PIC[name] = { tex = tx, at = t, till = c and c.till or 0 }
+    return tx
+end
+--- Ask PZMM (quietly, once a session per installed Workshop item) to save item `ws`'s other pictures. PZMM takes 3
+--- at a time: the rest wait here (PICS_Q) and go as acks come back. A refused one may be asked again (PICS_ASKED
+--- holds when); a missing file is just no picture (PZMM prunes those of items no longer installed).
+K.PICS_ASKED, K.PICS_FLY, K.PICS_Q = {}, {}, {}
+function K.askPics(ui, ws)
+    local a = K.PICS_ASKED[ws]
+    if not ui.app or not tostring(ws):match("^%d+$") or a == true or (a and getTimestampMs() < a) then return end
+    K.PICS_ASKED[ws] = true
+    K.PICS_Q[#K.PICS_Q + 1] = ws
+    K.sendPics(ui)
+end
+--- Send queued pics requests while fewer than 3 wait for their ack (in flight: still in ui.pending); look for each
+--- item's pictures for 30 s from then.
+function K.sendPics(ui)
+    local n = 0
+    for id in pairs(K.PICS_FLY) do
+        if ui.pending[id] then n = n + 1 else K.PICS_FLY[id] = nil end
+    end
+    while n < 3 and #K.PICS_Q > 0 do
+        local ws = table.remove(K.PICS_Q, 1)
+        local id = ui:request("pics\t" .. ws, "", true)
+        if not id then return end
+        K.PICS_FLY[id], n = ws, n + 1
+        local till = getTimestampMs() + 30000
+        for i = 1, 8 do
+            local nm = i == 1 and ws or (ws .. "-" .. i)
+            local c = K.PIC[nm]
+            if c then c.till, c.at = till, -1e9 else K.PIC[nm] = { at = -1e9, till = till } end
+        end
+    end
+end
+--- A mod's pictures for its details: mod.info's posters, then the Workshop item's (img/<ws>.png, -2 .. -8), each once.
+function K.picList(posters, ws)
+    local out, seen = {}, {}
+    local function add(t) if t and not seen[t] then seen[t] = true; out[#out + 1] = t end end
+    for _, t in ipairs(posters or {}) do add(t) end
+    if ws and ws ~= "" then
+        add(K.img(ws))
+        for i = 2, 8 do add(K.img(ws .. "-" .. i)) end
+    end
+    return out
+end
+--- `t` fitted inside a w x h box (letterboxed on the raised colour), for a Workshop picture in a row.
+function K.thumb(ui, t, x, y, w, h)
+    round(ui, x, y, w, h, 6, C.raised)
+    local tw, th = math.max(1, t:getWidth()), math.max(1, t:getHeight())
+    local sc = math.min(w / tw, h / th)
+    ui:drawTextureScaled(t, x + (w - tw * sc) / 2, y + (h - th * sc) / 2, tw * sc, th * sc, 1, 1, 1, 1)
+end
+
+--- Who removes mod `d`: "pzmm" for PZMM's own copies (installed.txt), "steam" for a Steam subscription, else nil.
+function PZMMMods:removeKind(d)
+    if d.ghost then return nil end
+    if pzmmCopy(d) or (self.installed and self.installed[d.modId]) then return "pzmm" end
+    if source(d) == 1 then return "steam" end
+    return nil
+end
+--- Remove these mods: PZMM's copies through PZMM (it asks first), subscriptions by unsubscribing on their page.
+function PZMMMods:removeMods(list)
+    local ids, steam = {}, {}
+    for _, d in ipairs(list) do
+        local k = self:removeKind(d)
+        if k == "pzmm" then ids[#ids + 1] = d.modId elseif k == "steam" then steam[#steam + 1] = d end
+    end
+    if #ids > 0 then
+        if self.app then
+            self:request("remove\t" .. table.concat(ids, ","), (#ids == 1 and list[1] and #list == 1 and list[1].name or (#ids .. " mods")) .. ": PZMM asks before it removes.")
+        else
+            self:say("Removing PZMM's copies needs the PZMM app: Settings > About has the link.")
+        end
+    end
+    if #steam == 1 and #ids == 0 then
+        self:openWorkshop(wsOf(steam[1]))
+        self:say(steam[1].name .. ": unsubscribe on its Workshop page, and Steam removes it.")
+    elseif #steam > 0 then
+        self:say(#steam .. " of them are Steam subscriptions: unsubscribe on their Workshop pages (Workshop page in each one's menu).")
+    end
+    if #ids == 0 and #steam == 0 then self:say("Those are your own local mods: remove their folders from Zomboid/mods.") end
+end
+--- Install a mod that isn't installed by its mod ID: PZMM finds its Workshop item (and asks first).
+function PZMMMods:findMod(id)
+    if not self.app then return self:findOnWorkshop(id) end
+    self:request("find\t" .. id, id .. ": PZMM looks for it on the Workshop.")
+end
+
+--- A mod's menu (modMenuItems). On a mod that's one of two or more picked, it acts on all of them.
 function PZMMMods:modMenu(d)
     if d.ghost then
         return self:menu({
             { "Disable", function() self:toggle(d) end },
+            self.app and { T("install_by_id", "Install by mod ID"), function() self:findMod(d.modId) end, icon = TB.download } or false,
             false,
             { "Copy mod ID", function() Clipboard.setClipboard(d.modId); self:say(d.modId .. " copied.") end },
         })
@@ -6237,41 +6993,62 @@ function PZMMMods:modMenu(d)
         table.sort(list, byName)
         if #list > 1 then return self:manyMenu(list) end
     end
+    self:menu(self:modMenuItems(d))
+end
+--- A mod's menu items, in the app's order: on or off, its place in the load order (pin it there), favourite and
+--- hide, then its files, Workshop page, ID, Group by category and Show in Maps.
+function PZMMMods:modMenuItems(d)
     local ws = wsOf(d)
+    local inOrder = d.isActive and #self:activeOrder() > 0
     local items = {
-        { d.isActive and "Disable" or "Enable", function() self:toggle(d) end },
-        { d.favorite and "Unfavourite" or "Favourite", function()
-            self.model:setFavorite(d.modId, not d.favorite)
-            self.model:refreshMods()
-        end },
-        false,
-        { "Copy mod ID", function()
-            Clipboard.setClipboard(d.modId)
-            self:say(d.modId .. " copied.")
-        end },
-        { T("menu_top", "Move to top"), function() self:moveOne(d, PZMMMods.MOVE_TOP) end },
-        { T("menu_bottom", "Move to bottom"), function() self:moveOne(d, PZMMMods.MOVE_BOTTOM) end },
+        { d.isActive and T("menu_disable", "Disable") or T("menu_enable", "Enable"), function() self:toggle(d) end },
+        { T("menu_to_top", "Move to the top of the load order"), function() self:orderEnds({ d.modId }, true) end, disabled = not inOrder },
+        { T("menu_to_bottom", "Move to the bottom of the load order"), function() self:orderEnds({ d.modId }, false) end, disabled = not inOrder },
     }
-    if ws and ws ~= "" and ws ~= "0" then
-        items[#items + 1] = { "Workshop page", function() self:openWorkshop(ws) end }
+    if K.pinned(d.modId) then
+        items[#items + 1] = { T("menu_unpin", "Unpin its place in the load order"), function() self:pin(d, false) end }
+    elseif inOrder then
+        items[#items + 1] = { T("menu_pin", "Pin its place in the load order"), function() self:pin(d, true) end, disabled = #self:activeOrder() < 2 }
     end
-    items[#items + 1] = { "Show files", function() pcall(function() showFolderInDesktop(d.modInfo:getDir()) end) end }
-    local isMap = d.category == "map" or (self.mapScanState and self.mapScanState.modOf[d.modId])
-    if isMap then items[#items + 1] = { T("menu_maps", "Show in Maps"), function() self:showInMaps(d) end } end
     local hid = self.hidden[d.modId]
     items[#items + 1] = false
-    items[#items + 1] = { hid and "Show again" or "Hide", function()
-        self.hidden[d.modId] = (not hid) or nil
-        writeHidden(self.hidden)
-        self:updateView()
-        self:say(hid and (d.name .. " shows again.") or (d.name .. " hidden: Filters > Hidden shows it."))
+    items[#items + 1] = { d.favorite and T("menu_unfavourite", "Remove from favourites") or T("menu_favourite", "Add to favourites"), function()
+        self.model:setFavorite(d.modId, not d.favorite)
+        self.model:refreshMods()
     end }
-    self:menu(items)
+    items[#items + 1] = { hid and T("menu_unhide", "Show in the list again") or T("menu_hide", "Hide from the list"), function() self:toggleHidden(d) end }
+    items[#items + 1] = false
+    items[#items + 1] = { T("menu_show_files", "Show files"), function() pcall(function() showFolderInDesktop(d.modInfo:getDir()) end) end }
+    if ws and ws ~= "" and ws ~= "0" then
+        items[#items + 1] = { T("menu_workshop", "Workshop page"), function() self:openWorkshop(ws) end }
+    end
+    items[#items + 1] = { T("menu_copy_id", "Copy mod ID"), function()
+        Clipboard.setClipboard(d.modId)
+        self:say(d.modId .. " copied.")
+    end }
+    items[#items + 1] = { T("tool_group", "Group by category"), function() self:groupByCategory() end }
+    local isMap = d.category == "map" or (self.mapScanState and self.mapScanState.modOf[d.modId])
+    if isMap then items[#items + 1] = { T("menu_maps", "Show in Maps"), function() self:showInMaps(d) end } end
+    -- last, as the app's: Remove (PZMM's copy, with PZMM), or unsubscribe on its page
+    local rk = self:removeKind(d)
+    if rk == "pzmm" and self.app then
+        items[#items + 1] = false
+        items[#items + 1] = { T("menu_remove", "Remove"), function() self:removeMods({ d }) end, danger = true }
+    elseif rk == "steam" then
+        items[#items + 1] = false
+        items[#items + 1] = { T("menu_unsubscribe", "Unsubscribe on the Workshop page"), function() self:removeMods({ d }) end, icon = TB.steam }
+    end
+    return items
 end
 
 function PZMMMods:onMouseWheel(del)
     if self.logOpen and inside(self.logBox, self:getMouseX(), self:getMouseY()) then
         self.logScroll = math.max(0, math.min((self.logScroll or 0) - del * 48, (self.logFull or 0) - (self.logBox.view or self.logBox.h)))
+        return true
+    end
+    local sb = self.sidePane
+    if sb and sb.page == self.page and inside(sb, self:getMouseX(), self:getMouseY()) then
+        self[sb.key] = math.max(0, math.min((self[sb.key] or 0) + del * 48, sb.full - sb.h))
         return true
     end
     if self.page == "maps" then
@@ -6377,6 +7154,18 @@ function PZMMMods:takeAppMods()
         self:setOrder(list)
     end)
     self.model:refreshMods()
+    -- and its map order (maps.txt: its default.txt's Map= lines), saved with Accept as the game's Maps order is
+    pcall(function()
+        local r = getFileReader("pzmm/maps.txt", false)
+        if not r then return end
+        local maps, line = {}, r:readLine()
+        while line do
+            if line ~= "" then maps[#maps + 1] = line end
+            line = r:readLine()
+        end
+        r:close()
+        if #maps > 0 then self:setMapOrder(maps) end
+    end)
     for _, d in pairs(self.model.mods) do d.defaultActive = d.isActive end
     pcall(function()
         local o = ActiveMods.getById("pzmmUndo")
@@ -6439,7 +7228,9 @@ function PZMMMods:ask(q)
     PZMMOverlay.show({ ask = q })
 end
 --- A popup menu at the mouse, or at `x`, `y`: `items` = { { label, fn, ticked } or false (a line), ... }.
-K.MENU_ICONS = { { "enable", "check" }, { "disable", "x" }, { "unfavourite", "star" }, { "favourite", "star" }, { "remove favourite", "star" },
+K.MENU_ICONS = { { "move to the top", "chev_up" }, { "move to the bottom", "chev_down" }, { "pin", "lock" }, { "unpin", "lock" },
+    { "add to favourites", "star" }, { "remove from favourites", "star" }, { "hide from", "filter" }, { "show in the list", "eye" },
+    { "group by", "layers" }, { "select all", "check" }, { "new section", "plus" }, { "enable", "check" }, { "disable", "x" }, { "unfavourite", "star" }, { "favourite", "star" }, { "remove favourite", "star" },
     { "copy", "copy" }, { "workshop page", "steam" }, { "show files", "folder" }, { "open folder", "folder" }, { "show again", "eye" },
     { "hide", "filter" }, { "move to top", "chev_up" }, { "move to bottom", "chev_down" }, { "delete", "trash" }, { "remove", "trash" },
     { "rename", "pencil" }, { "show in maps", "layers" }, { "switch profile", "swap" }, { "new game", "plus" }, { "continue", "play" },
@@ -6772,35 +7563,85 @@ end
 
 --- Ask Steam about every item you're subscribed to (once per visit): title, update time, download state
 --- and the items it requires. Required items you aren't subscribed to are asked about next, for titles.
-function PZMMMods:querySteam()
-    self.steam = self.steam or {}
+-- Steam's answers about Workshop items outlive the screen (it opens again on every visit to the main menu), as the
+-- app's shared cache: an item is asked about again only after K.STEAM_TTL or on Refresh, never twice at once, and
+-- after a failed ask (Steam limiting requests, or offline) nothing is asked for a while, 30 s doubling to 5 min.
+K.STEAM = { items = {}, asking = {}, fails = 0, wait = 0, known = false }
+K.STEAM_TTL = 5 * 60 * 1000
+function K.steamCooling() return getTimestampMs() < K.STEAM.wait end
+function K.steamFailed()
+    local S = K.STEAM
+    S.fails = S.fails + 1
+    S.wait = getTimestampMs() + math.min(300000, 30000 * 2 ^ (S.fails - 1))
+end
+
+--- Ask Steam about the items in `batch` (Workshop IDs), unless it's cooling down; false when it didn't ask.
+function PZMMMods:steamAsk(batch)
+    if #batch == 0 or K.steamCooling() then return false end
+    local list = ArrayList.new()
+    for _, w in ipairs(batch) do
+        K.STEAM.asking[w] = true
+        list:add(w)
+    end
+    querySteamWorkshopItemDetails(list, function(_, status, info) self:onSteamDetails(status, info, batch) end, self)
+    return true
+end
+
+--- Your Workshop items' details from Steam: only the ones not known yet or older than K.STEAM_TTL (all of them with
+--- `force`, the Refresh button).
+function PZMMMods:querySteam(force)
+    local S = K.STEAM
+    self.steam = S.items
     -- "none": nothing subscribed (What's new is empty, not waiting); "asking" until Steam answers
     self.steamState = "none"
     pcall(function()
         local ids = getSteamWorkshopItemIDs()
-        local list, seen = ArrayList.new(), {}
+        local all, seen = {}, {}
         if ids then
             for i = 0, ids:size() - 1 do
                 local w = tostring(ids:get(i))
-                if not seen[w] then seen[w] = true; list:add(w) end
+                if not seen[w] then seen[w] = true; all[#all + 1] = w end
             end
         end
         -- items PZMM installed from (they aren't subscribed): asked too, for their updates
         for _, w in pairs(installedItem) do
-            if w ~= "" and not seen[w] then seen[w] = true; list:add(w) end
+            if w ~= "" and not seen[w] then seen[w] = true; all[#all + 1] = w end
         end
-        if not list:isEmpty() then
+        if #all == 0 then return end
+        local now, batch, busy = getTimestampMs(), {}, false
+        for _, w in ipairs(all) do
+            local e = S.items[w]
+            if S.asking[w] then
+                busy = true
+            elseif force or not (e and e.at) or now - e.at > K.STEAM_TTL then
+                batch[#batch + 1] = w
+            end
+        end
+        if self:steamAsk(batch) or busy then
             self.steamState = "asking"
-            querySteamWorkshopItemDetails(list, PZMMMods.onSteamDetails, self)
+        else
+            -- nothing to ask, or Steam is cooling down: what it said last time stands
+            self.steamState = (#batch == 0 or S.known) and "done" or "failed"
         end
     end)
 end
-function PZMMMods:onSteamDetails(status, info)
+function PZMMMods:onSteamDetails(status, info, batch)
+    local S = K.STEAM
+    for _, w in ipairs(batch or {}) do S.asking[w] = nil end
+    -- the screen may have been opened again since it asked
+    local uis = { self }
+    if PZMMMods.instance and PZMMMods.instance ~= self then uis[2] = PZMMMods.instance end
     if status ~= "Completed" then
-        if self.steamState == "asking" then self.steamState = "failed" end
+        K.steamFailed()
+        for _, ui in ipairs(uis) do
+            if ui.steamState == "asking" then ui.steamState = S.known and "done" or "failed" end
+        end
         return
     end
-    self.steamState = "done"
+    S.fails, S.known = 0, true
+    for _, ui in ipairs(uis) do ui.steamState = "done" end
+    self.steam = S.items
+    local now = getTimestampMs()
     local subscribed, wanted = {}, {}
     pcall(function()
         local ids = getSteamWorkshopItemIDs()
@@ -6810,7 +7651,7 @@ function PZMMMods:onSteamDetails(status, info)
         pcall(function()
             local det = info:get(i)
             local id = det:getIDString()
-            local e = { title = det:getTitle(), updated = tonumber(tostring(det:getTimeUpdated())) or 0, missing = {}, size = 0, created = 0 }
+            local e = { title = det:getTitle(), updated = tonumber(tostring(det:getTimeUpdated())) or 0, missing = {}, size = 0, created = 0, at = now }
             pcall(function() e.created = tonumber(tostring(det:getTimeCreated())) or 0 end)
             pcall(function() e.size = tonumber(tostring(det:getFileSize())) or 0 end)
             pcall(function() e.state = tostring(det:getState()) end)
@@ -6820,23 +7661,21 @@ function PZMMMods:onSteamDetails(status, info)
                     local c = tostring(det:getChildID(j))
                     if not subscribed[c] then
                         e.missing[#e.missing + 1] = c
-                        if not self.steam[c] then wanted[#wanted + 1] = c end
+                        if not self.steam[c] and not S.asking[c] then wanted[#wanted + 1] = c end
                     end
                 end
             end)
             self.steam[id] = e
         end)
     end
-    self.liteFeedCache = nil
-    if self.sortBy == "size" or self.sortBy == "changed" then self:updateView() end
+    for _, ui in ipairs(uis) do
+        ui.liteFeedCache = nil
+        if ui.sortBy == "size" or ui.sortBy == "changed" then ui:updateView() end
+    end
     if #wanted > 0 then
         pcall(function()
-            local list = ArrayList.new()
-            for _, c in ipairs(wanted) do
-                self.steam[c] = self.steam[c] or { title = nil, updated = 0, missing = {} }
-                list:add(c)
-            end
-            querySteamWorkshopItemDetails(list, PZMMMods.onSteamDetails, self)
+            for _, c in ipairs(wanted) do self.steam[c] = self.steam[c] or { title = nil, updated = 0, missing = {} } end
+            self:steamAsk(wanted)
         end)
     end
 end
@@ -6899,25 +7738,272 @@ local function jstr(s)
     return '"' .. table.concat(out) .. '"'
 end
 
---- The app's share code for the enabled mods: "PZMM1:" + base64 of { name, kind, list, order, workshop, maps }.
+--- The app's share code: "PZMM1:" + base64 of { name, kind, list, order, workshop, maps }. With a library (PZMM's
+--- profile), `list` is its lines as the app's code has them: its sections, and the mods that are off too.
 function PZMMMods:shareCode()
-    local order, list, ws, ids = self:activeOrder(), {}, {}, {}
-    for _, id in ipairs(order) do
-        list[#list + 1] = "+" .. id .. "\n"
-        ids[#ids + 1] = jstr(id)
+    local order, list, ws, ids, listed = self:activeOrder(), {}, {}, {}, {}
+    local function item(id)
         local d = self.model.mods[id]
         local w
         if d then w = wsOf(d) end
         if w and w ~= "" and w ~= "0" then ws[#ws + 1] = jstr(id) .. ":" .. jstr(w) end
+    end
+    for _, l in ipairs(self.lib and self.lib.lines or {}) do
+        local sign, id = l:match("^([+-])(.+)$")
+        if id then
+            if not listed[id] then
+                listed[id] = true
+                local d = self.model.mods[id]
+                list[#list + 1] = (d and (d.isActive and "+" or "-") or sign) .. id .. "\n"
+                item(id)
+            end
+        elseif not l:match("^# PZMM profile:") then
+            list[#list + 1] = l .. "\n"
+        end
+    end
+    for _, id in ipairs(order) do
+        ids[#ids + 1] = jstr(id)
+        if not listed[id] then
+            list[#list + 1] = "+" .. id .. "\n"
+            item(id)
+        end
     end
     local maps = {}
     pcall(function()
         local mo = self.model:getActiveMods():getMapOrder()
         for i = 0, mo:size() - 1 do maps[#maps + 1] = jstr(mo:get(i)) end
     end)
-    local json = '{"name":' .. jstr((self.lib and self.lib.profile) or "PZMM") .. ',"kind":"","list":' .. jstr(table.concat(list))
+    -- the profile's kind (zomboid, viewpoint, server), as profiles.txt has it, so an import keeps it
+    local kind, name = "", (self.lib and self.lib.profile) or ""
+    local pr = readProfiles()
+    for _, e in ipairs(pr and pr.list or {}) do if e.name == name then kind = e.kind end end
+    local json = '{"name":' .. jstr(name ~= "" and name or "PZMM") .. ',"kind":' .. jstr(kind) .. ',"list":' .. jstr(table.concat(list))
         .. ',"order":[' .. table.concat(ids, ",") .. '],"workshop":{' .. table.concat(ws, ",") .. '},"maps":[' .. table.concat(maps, ",") .. "]}"
     return "PZMM1:" .. base64(json), #order
+end
+
+--- Base64 (standard or URL-safe; padding and spaces ignored) to its bytes.
+function K.unb64(str)
+    if not K.UNB64 then
+        K.UNB64 = {}
+        for i = 1, #B64 do K.UNB64[B64:sub(i, i)] = i - 1 end
+        K.UNB64["-"], K.UNB64["_"] = 62, 63
+    end
+    local out, n, bits = {}, 0, 0
+    for c in tostring(str):gmatch("[%w%+/%-_]") do
+        n, bits = n * 64 + K.UNB64[c], bits + 6
+        if bits >= 8 then
+            bits = bits - 8
+            local p = 2 ^ bits
+            out[#out + 1] = string.char(math.floor(n / p))
+            n = n % p
+        end
+    end
+    return table.concat(out)
+end
+--- A JSON value (objects as tables, arrays as lists; a \u escape over 127 becomes "?"); nil for bad JSON.
+function K.json(str)
+    local i, bad = 1, false
+    local function sp() i = str:find("[^ \t\r\n]", i) or (#str + 1) end
+    local function at() return str:sub(i, i) end
+    local function stringAt()
+        if at() ~= '"' then bad = true; return "" end
+        i = i + 1
+        local out = {}
+        while true do
+            local j = str:find('["\\]', i)
+            if not j then bad = true; return "" end
+            out[#out + 1] = str:sub(i, j - 1)
+            if str:sub(j, j) == '"' then i = j + 1; return table.concat(out) end
+            local e = str:sub(j + 1, j + 1)
+            if e == "u" then
+                local cp = tonumber(str:sub(j + 2, j + 5), 16) or 63
+                out[#out + 1] = cp < 128 and string.char(cp) or "?"
+                i = j + 6
+            else
+                out[#out + 1] = ({ n = "\n", t = "\t", r = "\r", b = "", f = "" })[e] or e
+                i = j + 2
+            end
+        end
+    end
+    local value
+    local function list(close, item)
+        i = i + 1
+        sp()
+        if at() == close then i = i + 1; return end
+        while not bad do
+            item()
+            sp()
+            local c = at()
+            i = i + 1
+            if c == close then return end
+            if c ~= "," then bad = true end
+        end
+    end
+    value = function()
+        sp()
+        local c = at()
+        if c == "{" then
+            local o = {}
+            list("}", function()
+                sp()
+                local k = stringAt()
+                sp()
+                if at() ~= ":" then bad = true; return end
+                i = i + 1
+                o[k] = value()
+            end)
+            return o
+        elseif c == "[" then
+            local a = {}
+            list("]", function() a[#a + 1] = value() end)
+            return a
+        elseif c == '"' then
+            return stringAt()
+        end
+        local lit = str:sub(i):match("^[%w%.%+%-]+")
+        if not lit then bad = true; return nil end
+        i = i + #lit
+        if lit == "true" then return true elseif lit == "false" then return false elseif lit == "null" then return nil end
+        if not tonumber(lit) then bad = true end
+        return tonumber(lit)
+    end
+    local v = value()
+    if bad then return nil end
+    return v
+end
+--- What was pasted into Import: a PZMM share code (or its JSON) { kind = "share", name, ids (on, library order),
+--- order, workshop }, Workshop links or IDs { kind = "items", ids }, the game's preset text "Name:a;b;c"
+--- { kind = "preset", name, ids }, a share code that won't read { kind = "bad" }, or nil.
+function K.parseImport(text)
+    text = tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if text == "" then return nil end
+    if text:sub(1, 6) == "PZMM1:" or text:sub(1, 1) == "{" then
+        local ok, sh = pcall(function() return K.json(text:sub(1, 1) == "{" and text or K.unb64(text:sub(7))) end)
+        if not (ok and type(sh) == "table" and type(sh.name) == "string" and type(sh.list) == "string") then return { kind = "bad" } end
+        local ids = {}
+        for line in (sh.list .. "\n"):gmatch("([^\n]*)\n") do
+            local id = line:match("^%+(.-)%s*$")
+            if id and id ~= "" then ids[#ids + 1] = id end
+        end
+        local order = {}
+        for _, id in ipairs(type(sh.order) == "table" and sh.order or {}) do if type(id) == "string" then order[#order + 1] = id end end
+        return { kind = "share", name = sh.name, ids = ids, order = order, workshop = type(sh.workshop) == "table" and sh.workshop or {} }
+    end
+    local items = K.workshopIds(text)
+    if #items > 0 and (text:find("steamcommunity.com", 1, true) or text:match("^[%d%s,;]+$")) then return { kind = "items", ids = items } end
+    local name, rest = text:match("^([^:;/\r\n]+):(.*)$")
+    if name and name:find("%S") and not rest:match("^//") then
+        local ids = {}
+        for id in rest:gmatch("[^;\r\n]+") do
+            id = id:gsub("^%s+", ""):gsub("%s+$", "")
+            if id ~= "" then ids[#ids + 1] = id end
+        end
+        if #ids > 0 then return { kind = "preset", name = (name:gsub("^%s+", ""):gsub("%s+$", "")), ids = ids } end
+    end
+    return nil
+end
+--- Mods or ids as a line's names: the first 12, then how many more.
+function K.nameList(ui, list)
+    local out = {}
+    for i, m in ipairs(list) do
+        if i > 12 then
+            out[#out + 1] = "and " .. (#list - 12) .. " more"
+            break
+        end
+        local d = type(m) == "table" and m or ui.model.mods[m]
+        out[#out + 1] = d and d.name or tostring(m)
+    end
+    return table.concat(out, ", ")
+end
+--- What a list does to My mods, without PZMM: { on = mods to turn on, off = mods to turn off, missing = ids not
+--- installed, lines = for the question }.
+function K.importPlan(ui, ids)
+    local want, plan = {}, { on = {}, off = {}, missing = {}, lines = {} }
+    for _, id in ipairs(ids) do
+        want[id] = true
+        if not ui.model.mods[id] then plan.missing[#plan.missing + 1] = id end
+    end
+    for id, d in pairs(ui.model.mods) do
+        if want[id] and not d.isActive and d.isAvailable then plan.on[#plan.on + 1] = d
+        elseif not want[id] and d.isActive then plan.off[#plan.off + 1] = d end
+    end
+    table.sort(plan.on, byName)
+    table.sort(plan.off, byName)
+    table.sort(plan.missing)
+    if #plan.on > 0 then plan.lines[#plan.lines + 1] = T("import_on", "Turns on %1: %2", #plan.on, K.nameList(ui, plan.on)) end
+    if #plan.off > 0 then plan.lines[#plan.lines + 1] = T("import_off", "Turns off %1: %2", #plan.off, K.nameList(ui, plan.off)) end
+    if #plan.missing > 0 then plan.lines[#plan.lines + 1] = T("import_missing", "Not installed, %1: %2", #plan.missing, K.nameList(ui, plan.missing)) end
+    if #plan.lines == 0 then plan.lines[1] = T("import_same", "It has the mods you have on: only their load order changes.") end
+    return plan
+end
+--- The header's Import: paste a share code, collection or item links, or a preset; or load one of the game's presets.
+function PZMMMods:openImport()
+    local clip = ""
+    pcall(function() clip = tostring(Clipboard.getClipboard() or "") end)
+    local pre = (clip:sub(1, 6) == "PZMM1:" or clip:find("steamcommunity.com", 1, true)) and clip:gsub("[\r\n]+", " ") or ""
+    local choices = { { T("act_import", "Import"), function(typed) self:importText(typed) end, TB.download } }
+    local names = self:presetNames()
+    if #names > 0 then
+        choices[2] = { T("import_saved", "Or a list saved on this computer"), function()
+            local sub = { { T("import_saved_head", "The game's presets"), heading = true } }
+            for _, name in ipairs(names) do sub[#sub + 1] = { T("preset_load", "Load %1", name), function() self:loadPreset(name) end } end
+            self:menu(sub)
+        end }
+    end
+    PZMMOverlay.show({ ask = { title = T("import_intro", "Import a profile: paste a share code, Workshop collection or item links (several at once), or a preset shared from the game's mod menu."),
+        lines = { self.app and T("import_app", "PZMM makes a profile of it and installs the missing Workshop mods.") or T("import_noapp", "Without PZMM it becomes this list: you see what turns on and off first, and missing Workshop mods show in Browse Workshop to subscribe.") },
+        input = pre, max = 200000, choices = choices } })
+end
+--- Import what was pasted: PZMM makes a new profile of it; without PZMM a share code or preset becomes this list
+--- (asked first, with what turns on and off), and links show in Browse Workshop to subscribe.
+function PZMMMods:importText(typed)
+    local p = K.parseImport(typed)
+    if not p then return self:say("Nothing to import: paste a PZMM1: share code, Workshop links, or a preset (Name:ModA;ModB;).") end
+    if p.kind == "bad" then return self:say("That share code is cut short or mistyped: copy it again.") end
+    if self.app then
+        local line = tostring(typed):gsub("[\t\r\n]+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+        return self:request("import\t" .. line, "Importing: say yes in PZMM.")
+    end
+    if p.kind == "items" then
+        for i = #p.ids, 1, -1 do self:lookUp(p.ids[i]) end
+        self.page, self.feedScroll = "workshop", 0
+        if #p.ids == 1 then self:openWorkshop(p.ids[1]) end
+        return
+    end
+    local plan = K.importPlan(self, p.ids)
+    local choices = { { T("import_use", "Use this list"), function() self:applyImport(p, plan) end, TB.check } }
+    if p.kind == "preset" then
+        choices[2] = { T("import_keep_preset", "Save as a preset"), function()
+            self:addPreset(p.name, p.ids)
+            self:say(p.name .. " added to the game's presets: " .. #p.ids .. " mods.")
+        end }
+    end
+    self:ask({ title = T("import_title", "Make %1 your mod list?", p.name), lines = plan.lines, choices = choices })
+end
+--- Turn on and off as `plan` says, in the list's load order; its missing Workshop mods go to Browse Workshop.
+function PZMMMods:applyImport(p, plan)
+    local snap = self:snapshot()
+    local skipped = self:setMany(plan.on, plan.off)
+    if p.order and #p.order > 0 then
+        local on, list, seen = {}, {}, {}
+        for _, id in ipairs(self:activeOrder()) do on[id] = true end
+        for _, id in ipairs(p.order) do if on[id] and not seen[id] then seen[id] = true; list[#list + 1] = id end end
+        for _, id in ipairs(self:activeOrder()) do if not seen[id] then list[#list + 1] = id end end
+        self:setOrder(list)
+    end
+    self:rememberIfChanged(snap)
+    local items = {}
+    for _, id in ipairs(plan.missing) do
+        local w = p.workshop and p.workshop[id]
+        if type(w) == "string" and w:match("^%d+$") then items[#items + 1] = w end
+    end
+    self:say(p.name .. " is your list now." .. (#plan.missing > 0 and (" " .. #plan.missing .. " of its mods aren't installed.") or "") .. (skipped > 0 and (" " .. self:skipNote(skipped)) or ""))
+    if #items > 0 then
+        for i = #items, 1, -1 do self:lookUp(items[i]) end
+        self.page, self.feedScroll = "workshop", 0
+        self:say("Its missing Workshop mods are in Browse Workshop: Subscribe gets each.")
+    end
 end
 
 function PZMMMods:onAction(id)
@@ -6927,9 +8013,13 @@ function PZMMMods:onAction(id)
             { "Copy as a PZMM share code", function()
                 local code, n = self:shareCode()
                 pcall(function() Clipboard.setClipboard(code) end)
-                self:say(n .. " enabled mods copied as a share code: paste it into PZMM's Import profile.")
+                self:say(n .. " enabled mods copied as a share code: paste it into Import.")
             end },
+            false,
+            { T("preset_save_on", "Save what's on as a preset"), function() self:savePresetAs() end, icon = TB.plus },
         }, self:getMouseX(), self:getMouseY())
+    elseif id == "import" then
+        self:openImport()
     elseif id == "sharePreset" then
         -- the game's own preset text (its mod screen's Presets > Add takes it): name, then ids, ";" after each
         local ids = {}
@@ -6958,7 +8048,7 @@ function PZMMMods:onAction(id)
             if was[id] then d.defaultActive, d.defaultFav = was[id][1], was[id][2] end
         end
         self.model:refreshMods()
-        self.steam, self.steamState = nil, nil
+        self.liteFeedCache = nil
         self:querySteam()
         self:say("Mods rescanned.")
     elseif id == "check" then
@@ -7022,6 +8112,8 @@ function PZMMMods.open()
     s.afterAck = s.afterAck or {}
     s.sent = s.sent or {}
     s.hidden, s.picked, s.anchor, s.neededAll = readHidden(), {}, nil, nil
+    K.openHidden = {}
+    for id in pairs(s.hidden) do K.openHidden[id] = true end
     s.ignored, s.langDone, s.lang, s.homeAsked, s.lint, s.srvSel = nil, false, nil, nil, nil, nil
     s.hosted, s.recent, s.srvCache, s.pfAt, PZMMMods.pitchAt = nil, nil, nil, nil, nil
     s.looked, s.lookOrder = nil, nil
@@ -7037,7 +8129,7 @@ function PZMMMods.open()
     s.mapOrder, s.modsOrig, s.saves, s.java = nil, nil, nil, nil
     s.mapScanState, s.mapShow, s.mapSel, s.gridCache, s.mapRowsKey, s.legendKey, s.gv = nil, {}, nil, nil, nil, nil, nil
     s.mapClash, s.gridSel, s.cellVer, s.mapRowsList, s.legendList = nil, nil, (s.cellVer or 0) + 1, nil, nil
-    s.steam, s.steamState, s.liteFeedCache, s.lastPlayed, s.feedSeen = nil, nil, nil, readPlayed(), readFeedSeen()
+    s.liteFeedCache, s.lastPlayed, s.feedSeen = nil, readPlayed(), readFeedSeen()
     s:querySteam()
     s.page, s.feedScroll, s.launchAt, s.latest = s.page or "mods", 0, nil, nil
     -- a search for the broken mod that's still going (or has an answer): its panel is the first thing you see
@@ -7143,9 +8235,11 @@ function PZMMMods.onKey(key)
         -- a box being typed in lets go first
         local typing0 = false
         pcall(function() typing0 = (s.search:isFocused() or s.homeSearch:isFocused()) and true or false end)
+        pcall(function() typing0 = typing0 or s.installBox:isFocused() end)
         if typing0 then
             pcall(function() s.search:unfocus() end)
             pcall(function() s.homeSearch:unfocus() end)
+            pcall(function() s.installBox:unfocus() end)
             return
         end
         if s.drag or s.odrag then s.drag, s.odrag = nil, nil return end
@@ -7159,6 +8253,8 @@ function PZMMMods.onKey(key)
     if PZMMMods.overlayShut and getTimestampMs() - PZMMMods.overlayShut < 150 then return end
     local typing = false
     pcall(function() typing = s.search:isFocused() end)
+    -- (keys typed into the Install box are its own)
+    pcall(function() typing = typing or s.installBox:isFocused() end)
     if typing then return end
     local ctrl = false
     pcall(function() ctrl = isCtrlKeyDown() end)
@@ -7167,16 +8263,18 @@ function PZMMMods.onKey(key)
     pcall(function() shift = isShiftKeyDown() end)
     if ctrl and s.page == "mods" and key == Keyboard.KEY_Z then return s:undoRedo(not shift) end
     if ctrl and s.page == "mods" and key == Keyboard.KEY_Y then return s:undoRedo(false) end
-    if Keyboard.KEY_SLASH and key == Keyboard.KEY_SLASH and s.page == "mods" and not ctrl then
+    if ctrl and s.page == "maps" and key == Keyboard.KEY_Z then return s:mapUndo() end
+    if Keyboard.KEY_SLASH and key == Keyboard.KEY_SLASH and not ctrl and K.findSearch(s) then
         s.slashAt = getTimestampMs()
         pcall(function() s.search:focus() end)
         return
     end
     if ctrl and key == Keyboard.KEY_F then
-        s.page = "mods"
+        if not K.findSearch(s) then s.page = "mods" end
         pcall(function() s.search:focus() end)
         return
     end
+    if (key == Keyboard.KEY_PRIOR or key == Keyboard.KEY_NEXT) and not ctrl then return K.pageScroll(s, key == Keyboard.KEY_NEXT and 1 or -1) end
     if key == Keyboard.KEY_PRIOR or key == Keyboard.KEY_NEXT then
         local tabs, at = {}, 1
         for _, pg in ipairs(PAGES) do
@@ -7190,14 +8288,13 @@ function PZMMMods.onKey(key)
         return
     end
     if s.page ~= "mods" then return end
-    local alt = false
-    pcall(function() alt = Keyboard.isKeyDown(Keyboard.KEY_LMENU) or Keyboard.isKeyDown(Keyboard.KEY_RMENU) end)
-    if ctrl and key == Keyboard.KEY_A then
-        -- every mod the list shows
-        s.picked = {}
-        for _, e in ipairs(s.entries or {}) do if e.mod then s.picked[e.mod.modId] = true end end
+    if (Keyboard.KEY_APPS and key == Keyboard.KEY_APPS) or (shift and key == Keyboard.KEY_F10) then
+        if s.selected then return s:modMenu(s.selected) end
         return
     end
+    local alt = false
+    pcall(function() alt = Keyboard.isKeyDown(Keyboard.KEY_LMENU) or Keyboard.isKeyDown(Keyboard.KEY_RMENU) end)
+    if ctrl and key == Keyboard.KEY_A then return s:selectShown() end
     if alt and s.selected and (key == Keyboard.KEY_UP or key == Keyboard.KEY_DOWN) then return s:nudge(key == Keyboard.KEY_UP and -1 or 1) end
     if key == Keyboard.KEY_UP then return s:stepSelection(-1) end
     if key == Keyboard.KEY_DOWN then return s:stepSelection(1) end
@@ -7209,6 +8306,17 @@ function PZMMMods.onKey(key)
     if key == Keyboard.KEY_SPACE and s.selected then return s:toggle(s.selected) end
 end
 if Events.OnKeyPressed then Events.OnKeyPressed.Add(PZMMMods.onKey) end
+--- Page Up / Page Down: the list (or the page) a screenful up or down.
+function K.pageScroll(s, dir)
+    if s.page ~= "mods" then
+        local _, _, _, bh = s:feedBox()
+        if s.page == "home" then bh = s.height - BOTTOM - TOP end
+        s.feedScroll = math.max(0, math.min(s.feedScroll + dir * math.floor(bh * 0.9), (s.feedHeight or 0) - bh))
+        return
+    end
+    local _, _, _, lh = s:listBox()
+    s.scroll = math.max(0, math.min(s.scroll + dir * math.floor(lh * 0.9), (s.listHeight or 0) - lh))
+end
 
 -- the main menu's Mods button opens this screen
 MainScreen.onMenuItemMouseDownMainMenu = function(item, x, y)
@@ -7585,6 +8693,98 @@ function PZMMMods:launchNow()
     end
 end
 
+--- What the launch pre-flight asks about, as the app's: the problems (Broken and Risk, the game's own check and PZMM's
+--- last one) and the warnings (Check), neither hidden as "It's fine". nil: nothing to ask (warnings too, unless
+--- `warn`). { problems, warns, offs = mods turning them off fixes, ons, order, nfix = the safe fixes }.
+function K.preflightPlan(ui, list, pf, warn)
+    local ign = ui.ignored or {}
+    local probs, warns, live = {}, {}, {}
+    for _, f in ipairs(list) do
+        if not ign[f.key] then
+            live[#live + 1] = f
+            if f.level == "error" or f.level == "risk" then probs[#probs + 1] = f elseif f.level == "warn" and not (K.PFWARN or {})[K.pfwarnKey(ui, f)] then warns[#warns + 1] = f end
+        end
+    end
+    for _, f in ipairs(pf and pf.list or {}) do
+        if (f.level == "error" or f.level == "risk") and not ign[pfKey(f)] then probs[#probs + 1] = f end
+    end
+    if #probs == 0 and (#warns == 0 or not warn) then return nil end
+    local offs, seen = {}, {}
+    local function addOff(d) if d and d.isActive and not seen[d] then seen[d] = true; offs[#offs + 1] = d end end
+    for _, f in ipairs(probs) do
+        if f.mod then addOff(ui.model.mods[f.mod]) end
+        for _, fx in ipairs(f.fixes or {}) do
+            addOff(fx.off)
+            for _, d in ipairs(fx.offs or {}) do addOff(d) end
+        end
+    end
+    local ons, order, n = ui:safeFixes(live)
+    return { problems = probs, warns = warns, offs = offs, ons = ons, order = order, nfix = n }
+end
+--- A launch warning's key in client.txt, as the app's: per profile, by its kind and mod (not its words).
+function K.pfwarnKey(ui, f)
+    local function clean(v) return (tostring(v):gsub("[^%w_%-]", "_")) end
+    return "pfwarn." .. clean((ui.lib and ui.lib.profile) or (ui.app and ui.app.profile) or "") .. "." .. clean(f.level .. "." .. tostring(f.wid or f.key))
+end
+--- Settings' "Ask about launch warnings again": every warning not to ask about is asked about again.
+function PZMMMods:pfReset()
+    K.PFWARN = {}
+    SETTINGS.pfwarn = true
+    saveSettings("pfwarn")
+    self:say(T("set_pfreset_done", "Launch warnings are asked about again."))
+end
+--- Play, Continue and Join run Check setup first, as the app's launch does: no problems, straight on; else asked
+--- "N problems" with Fix and play (the safe fixes), Turn those mods off, Play anyway (or Join anyway) and Cancel;
+--- warnings only can be played past for good, each for this profile (client.txt pfwarn.<profile>.<warning>=1;
+--- pfwarn=0, the old switch, still asks about none).
+function PZMMMods:preflight(go, join)
+    self.ignored = self.ignored or self:loadIgnored()
+    if self.app then self.pfAt, self.pf = getTimestampMs(), readFindings() end
+    self.findings = self:checkSetup()
+    local p = K.preflightPlan(self, self.findings, self.app and self.pf, SETTINGS.pfwarn)
+    if not p then return go() end
+    local bad = #p.problems > 0
+    local shown = bad and p.problems or p.warns
+    local n = #shown
+    local title = bad and (n == 1 and T("pf_title_one", "1 problem in your mod list. The game may skip mods or fail to load.") or T("pf_title", "%1 problems in your mod list. The game may skip mods or fail to load.", n))
+        or (n == 1 and T("pf_warn_one", "1 thing to know before you play. The game still starts.") or T("pf_warn", "%1 things to know before you play. The game still starts.", n))
+    local lines = {}
+    for i, f in ipairs(shown) do
+        if i > 8 then
+            lines[#lines + 1] = "and " .. (n - 8) .. " more"
+            break
+        end
+        lines[#lines + 1] = f.text
+    end
+    local choices = {}
+    if p.nfix > 0 then
+        choices[#choices + 1] = { T("pf_fix", "Fix and play"), function() self:fixSafely(p.ons, p.order); go() end, TB.check }
+    end
+    if bad and #p.offs > 0 then
+        choices[#choices + 1] = { #p.offs == 1 and T("pf_off_one", "Turn that mod off") or T("pf_off", "Turn those %1 mods off", #p.offs), function()
+            local snap = self:snapshot()
+            self:setMany({}, p.offs)
+            self:rememberIfChanged(snap)
+            self.findings = nil
+            go()
+        end, TB.x }
+    end
+    choices[#choices + 1] = { join and T("pf_join_anyway", "Join anyway") or T("pf_anyway", "Launch anyway"), function() go() end, TB.play }
+    if not bad then
+        choices[#choices + 1] = { join and T("pf_join_stop", "Join, and don't ask about these again") or T("pf_stop", "Launch, and don't ask about these again"), function()
+            K.PFWARN = K.PFWARN or {}
+            for _, f in ipairs(p.warns) do K.PFWARN[K.pfwarnKey(self, f)] = true end
+            saveSettings()
+            go()
+        end }
+    end
+    self:ask({ title = title, lines = lines, choices = choices })
+end
+--- Play (or Continue) through the game's own screen, after the pre-flight.
+function PZMMMods:play(internal)
+    self:preflight(function() self:gameScreen(internal) end)
+end
+
 --- The main menu's own screens: this one closes, then the game opens its own (Load, Multiplayer, Workshop...).
 function PZMMMods:gameScreen(internal)
     self:leaveTo(function() menuClick({ internal = internal }, 0, 0) end)
@@ -7643,6 +8843,8 @@ function PZMMMods:banners()
     local c = self.bannerCache
     if c and t - c.at < 500 then return c.list end
     local list = {}
+    -- the search for the broken mod, first: over the list, as the app's strip
+    list[#list + 1] = self:bisectBanner()
     -- PZMM changed the mods while this screen was open: take them, or keep this list (Accept writes it)
     if self.defChanged then
         list[#list + 1] = { tone = "accent", text = T("app_changed", "PZMM changed your mods since you opened this screen."),
@@ -7901,8 +9103,8 @@ end
 
 K.LIB_TABS = { { "popular", T("home_popular", "Popular") }, { "favourites", T("home_favourites", "Favourites") }, { "recent", T("home_recent", "Recent") }, { "hosted", T("home_hosted", "Your servers") } }
 
---- What the library lists on a tab: { name, ip, port, host, key, sv, recent, hosted, inet }. Popular is the busiest of the
---- Internet list (once Steam has answered); Favourites the game's saved servers; Recent the ones you joined, as PZMM
+--- What the library lists on a tab: { name, ip, port, host, key, sv, recent, hosted, inet }. Popular is the busiest 30
+--- modded servers of the Internet list (once Steam has answered); Favourites the game's saved servers; Recent the ones you joined, as PZMM
 --- noted them; Your servers the ones you host. Kept until the page is left (and the Internet list grows).
 function PZMMMods:libraryList(tab)
     self.libLists = self.libLists or {}
@@ -7920,6 +9122,10 @@ function PZMMMods:libraryList(tab)
             e.key = e.ip .. ":" .. tostring(e.port)
             list[#list + 1] = e
         end
+        for _, f in ipairs(K.appFavs(self)) do
+            f.host = hostOf(f.ip)
+            list[#list + 1] = f
+        end
     elseif tab == "recent" then
         for _, r in ipairs(self:recentServers()) do
             local ip, port = r.addr:match("^(.*):(%d+)$")
@@ -7933,13 +9139,14 @@ function PZMMMods:libraryList(tab)
             list[#list + 1] = { name = name, hosted = st, key = "hosted:" .. name }
         end
     else
+        -- the Internet list's servers that run mods (a mod manager's Home has no use for vanilla ones), as the app's
         local rows = {}
         for _, sv in ipairs(PZMMMods.inet) do
             local e = { sv = sv, inet = true, name = "", ip = "", port = 16261, pl = 0 }
             pcall(function() e.name, e.ip, e.port, e.pl = sv:getName() or "", sv:getIp() or "", sv:getPort() or 16261, tonumber(sv:getPlayers()) or 0 end)
             e.host = e.ip
             e.key = e.ip .. ":" .. tostring(e.port)
-            rows[#rows + 1] = e
+            if #self:serverMods(sv) > 0 then rows[#rows + 1] = e end
         end
         table.sort(rows, function(a, b)
             if a.pl ~= b.pl then return a.pl > b.pl end
@@ -8202,7 +9409,9 @@ K.SHORTCUTS = {
     { "Alt+Up, Alt+Down", "Move the selected mod in the load order" },
     { "Space", "Enable or disable the selected mod" },
     { "Enter", "Open the first mod's details" },
-    { "Page Up, Page Down", "Switch tab" },
+    { "Page Up, Page Down", "Scroll the list a page" },
+    { "Ctrl+Page Up, Ctrl+Page Down", "Switch tab" },
+    { "Shift+F10", "Open the selected mod's menu" },
     { "Esc", "Step back: close a menu, let go of a pick, then leave" },
 }
 --- Open Zomboid/Logs in the file manager.
@@ -8300,14 +9509,19 @@ function PZMMMods:drawHomeUpdates(x, y, w, mx, my)
             self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:request("install\t" .. tostring(item), title .. " asked for.") end, x = right - uw, y = uy, w = uw, h = BAR }
             right = right - uw - 12
         end
-        -- the first-letter tile (the Workshop picture is the app's), then the name, its new version and when
+        -- its Workshop picture (PZMM saves it), else the first-letter tile, then the name, its new version and when
         local name = e.title or tostring(e.item)
         local ts = 32
         local ty0 = ry + math.floor((rh - ts) / 2)
-        round(self, x + 16, ty0, ts, ts, 6, C.raised)
-        outline(self, x + 16, ty0, ts, ts, 6, C.line, 1)
-        local letter = name:sub(1, 1):upper()
-        bold(self, letter, x + 16 + math.floor((ts - width(letter)) / 2), ty0 + math.floor((ts - H_SMALL) / 2), C.muted)
+        local pic = self.app and K.img(tostring(e.item))
+        if pic then
+            K.thumb(self, pic, x + 16, ty0, ts, ts)
+        else
+            round(self, x + 16, ty0, ts, ts, 6, C.raised)
+            outline(self, x + 16, ty0, ts, ts, 6, C.line, 1)
+            local letter = name:sub(1, 1):upper()
+            bold(self, letter, x + 16 + math.floor((ts - width(letter)) / 2), ty0 + math.floor((ts - H_SMALL) / 2), C.muted)
+        end
         local tx0 = x + 16 + ts + 12
         -- "May break saves" from the feed's risks
         if #(e.risks or {}) > 0 then
@@ -8333,22 +9547,104 @@ function PZMMMods:drawHomeUpdates(x, y, w, mx, my)
     return y + 24
 end
 
---- Home's community links.
-function PZMMMods:drawHomeCommunity(x, y, w, mx, my)
-    bold(self, T("home_community", "Community"), x, y, C.text, MEDIUM)
-    y = y + H_MEDIUM + 10
-    local rh = H_SMALL + 20
-    card(self, x, y, w, #K.COMMUNITY * rh)
-    for i, l in ipairs(K.COMMUNITY) do
-        local ry = y + (i - 1) * rh
-        local over = listRow(self, x, ry, w, rh, i == #K.COMMUNITY, mx, my)
-        text(self, l[1], x + 16, ry + 10, over and C.onSelected or C.text)
-        local host = l[2]:gsub("^https?://", ""):gsub("^www%.", ""):gsub("/$", "")
-        text(self, fit(host, w / 2 - 32), x + w - 16 - math.min(width(host), w / 2 - 32), ry + 10, C.muted)
-        if over then tip(self, l[1] .. "\n" .. l[2]) end
-        self.feedHits[#self.feedHits + 1] = { kind = "url", url = l[2], x = x, y = ry, w = w, h = rh }
+--- The Indie Stone's news PZMM saved for the game (Zomboid/Lua/pzmm/news.txt, newest first: "<n>\t<date secs>\t<build or
+--- empty>\t<title>\t<url>\t<excerpt>", its picture img/news_<n>.png): { n, date, build, title, url, excerpt }.
+function K.readNews()
+    local out, found = {}, false
+    pcall(function()
+        local r = getFileReader("pzmm/news.txt", false)
+        if not r then return end
+        found = true
+        local line = r:readLine()
+        while line do
+            local f = fields(line)
+            if f[1] ~= "" and (f[4] or "") ~= "" and (f[5] or ""):match("^https?://") then
+                out[#out + 1] = { n = f[1], date = tonumber(f[2]) or 0, build = f[3] or "", title = unflat(f[4]), url = f[5], excerpt = unflat(f[6] or "") }
+            end
+            line = r:readLine()
+        end
+        r:close()
+    end)
+    return out, found
+end
+--- Its tag, as the app's: a big update, a patch (a third number in the build) or other news.
+function K.newsTag(build)
+    if build == "" then return T("home_tag_news", "News") end
+    local _, dots = build:gsub("%.", "")
+    return dots > 1 and T("home_tag_patch", "Patch") or T("home_tag_major", "Major update")
+end
+--- Home's Featured (the latest post: picture, tag, date, title, excerpt) and News (the next 4) cards, from PZMM's
+--- news.txt (read again every 10 s; nothing without the app). A click opens the post.
+function PZMMMods:drawHomeNews(x, y, w, mx, my)
+    local t = getTimestampMs()
+    if not self.app then return y end
+    if not self.newsAt or t - self.newsAt > 10000 then
+        self.newsAt = t
+        self.news, self.newsFile = K.readNews()
     end
-    return y + #K.COMMUNITY * rh + 24
+    local posts = self.news or {}
+    local function heading(label)
+        bold(self, label, x, y, C.text, MEDIUM)
+        chip(self, T("home_official", "Official"), x + width(label, MEDIUM) + 10, y + math.floor((H_MEDIUM - H_SMALL - 2) / 2))
+        y = y + H_MEDIUM + 10
+    end
+    heading(T("home_featured", "Featured from The Indie Stone"))
+    if #posts == 0 then
+        -- no news.txt at all: a PZMM from before it saved the news
+        text(self, self.newsFile and T("home_no_news", "No news yet") or T("home_news_update", "Update PZMM to see the news here"), x, y, C.muted)
+        return y + H_SMALL + 24
+    end
+    local p = posts[1]
+    local ch = 132
+    card(self, x, y, w, ch)
+    local over = mx >= x and mx < x + w and my >= y and my < y + ch
+    if over then outline(self, x, y, w, ch, 8, C.accent, 0.7) end
+    local pic = K.img("news_" .. p.n)
+    local iw = math.floor(math.min(w * 0.4, 220))
+    if pic then K.thumb(self, pic, x + 8, y + 8, iw, ch - 16) else round(self, x + 8, y + 8, iw, ch - 16, 6, C.raised) end
+    local tx, tw = x + 8 + iw + 14, w - iw - 8 - 14 - 14
+    local ty = y + 12
+    local cx = chip(self, K.newsTag(p.build), tx, ty)
+    text(self, date(p.date), cx + 8, ty + 1, C.muted)
+    local played = self.lastPlayed
+    if p.build ~= "" and played and p.date > played then
+        local ml = T("home_may_affect", "May affect mods")
+        chip(self, ml, cx + 8 + width(date(p.date)) + 8, ty, C.warn)
+    end
+    ty = ty + H_SMALL + 10
+    for i, l in ipairs(wrap(p.title, tw)) do
+        if i > 2 then break end
+        bold(self, l, tx, ty, over and C.onSelected or C.text)
+        ty = ty + H_SMALL + 2
+    end
+    ty = ty + 4
+    for _, l in ipairs(wrap(p.excerpt, tw)) do
+        if ty + H_SMALL > y + ch - 10 then break end
+        text(self, l, tx, ty, C.muted)
+        ty = ty + H_SMALL + 2
+    end
+    if over then tip(self, p.title .. "\n" .. p.url) end
+    self.feedHits[#self.feedHits + 1] = { kind = "url", url = p.url, x = x, y = y, w = w, h = ch }
+    y = y + ch + 24
+    if #posts < 2 then return y end
+    heading(T("home_news", "News from The Indie Stone"))
+    local n = math.min(5, #posts) - 1
+    local rh = 48
+    card(self, x, y, w, n * rh)
+    for i = 1, n do
+        local q = posts[i + 1]
+        local ry = y + (i - 1) * rh
+        local ov = listRow(self, x, ry, w, rh, i == n, mx, my)
+        local qp = K.img("news_" .. q.n)
+        if qp then K.thumb(self, qp, x + 12, ry + 6, 36, 36) end
+        local when = date(q.date)
+        local qx = x + 12 + (qp and 48 or 4)
+        bold(self, fit(q.title, x + w - 16 - width(when) - 12 - qx), qx, ry + math.floor((rh - H_SMALL) / 2), ov and C.onSelected or C.text)
+        text(self, when, x + w - 16 - width(when), ry + math.floor((rh - H_SMALL) / 2), C.muted)
+        if ov then tip(self, q.title .. (q.excerpt ~= "" and ("\n" .. q.excerpt) or "")) end
+        self.feedHits[#self.feedHits + 1] = { kind = "url", url = q.url, x = x, y = ry, w = w, h = rh }
+    end
+    return y + n * rh + 24
 end
 
 --- Home's server library, as the app's: Popular / Favourites / Recent / Your servers with a search; picking a
@@ -8575,17 +9871,22 @@ function PZMMMods:drawHome(x, y, w, mx, my, top, fh)
     hh = math.min(hh, math.floor(self.height * 0.45))
     y = self:drawHero(0, y, self.width, hh, mx, my, top, fh)
     y = self:drawPlayBar(y, mx, my) + 24
-    y = self:drawNotice(x, y, w, T("notice_home", "Featured from The Indie Stone and its news, the Workshop picture on each update, starting a hosted server, and its Stopped, Starting and Crashed states."), mx, my)
-    local line = self.app and ("PZMM " .. tostring(self.app.version or "") .. (self:appUp() and " is running: what you change here reaches your profile." or " is installed: what you change here reaches your profile when it next starts."))
-        or "The PZMM app adds news from The Indie Stone, change notes and Workshop pictures. Settings > About has the link."
-    text(self, fit(line, w), x, y, C.muted)
-    y = y + H_SMALL + 24
     local two = w >= 900
     local gap = 24
     local lw = two and math.floor((w - gap) / 2) or w
     local rw = two and (w - gap - lw) or w
-    local ly = self:drawHomeUpdates(x, y, lw, mx, my)
-    ly = self:drawHomeCommunity(x, ly, lw, mx, my)
+    -- the app's left column: Featured and News (from PZMM), then your updates; the hero's note has the community links
+    local ly = self:drawHomeNews(x, y, lw, mx, my)
+    ly = self:drawHomeUpdates(x, ly, lw, mx, my)
+    -- what's only in the app (all of it the game shows once PZMM is installed), and how PZMM stands
+    if not self.app then ly = self:drawNotice(x, ly, lw, T("notice_home", "Featured from The Indie Stone and its news, the Workshop picture on each update, starting a hosted server, and its Stopped, Starting and Crashed states."), mx, my) end
+    local line = self.app and ("PZMM " .. tostring(self.app.version or "") .. (self:appUp() and " is running: what you change here reaches your profile." or " is installed: what you change here reaches your profile when it next starts."))
+        or "The PZMM app adds news from The Indie Stone, change notes and Workshop pictures. Settings > About has the link."
+    for _, l in ipairs(wrap(line, lw)) do
+        text(self, l, x, ly, C.muted)
+        ly = ly + H_SMALL + 2
+    end
+    ly = ly + 22
     local ry = self:drawHomeLibrary(two and (x + lw + gap) or x, two and y or ly, rw, mx, my, top, fh, two and (ly - 24) or nil)
     return math.max(two and ly or 0, ry)
 end
@@ -8619,14 +9920,18 @@ function PZMMMods:drawPlayBar(y, mx, my)
         sel.opts = sel.opts or self:hostedOptions(sel.hosted, { "DefaultPort", "PublicDescription" })
         local hport = tonumber(sel.opts.DefaultPort) or 16261
         self:askHomeInfo({ host = "127.0.0.1", port = hport })
-        if PZMMMods.srvInfo["127.0.0.1:" .. hport] then
+        local hs = K.readHosted(self)[tostring(sel.name):lower()]
+        if PZMMMods.srvInfo["127.0.0.1:" .. hport] or (hs and hs.state == "running") then
             label, icon = T("launcher_join", "Join"), TB.play
             hostedJoin = true
             fn = function() self:joinServer(sel.name, "127.0.0.1", tostring(hport), true) end
+        elseif hs and (hs.state == "stopped" or hs.state == "crashed") then
+            label, icon = T("hosted_start", "Start"), TB.play
+            fn = function() self:serverDo("start", sel.name) end
         end
     else
         label, icon = T("home_play", "Play"), TB.play
-        fn = function() self:gameScreen(has and "LATESTSAVE" or "SOLO") end
+        fn = function() self:play(has and "LATESTSAVE" or "SOLO") end
     end
     local bh = 46
     local bx, by = 32, y + (h - bh) / 2
@@ -8656,25 +9961,26 @@ function PZMMMods:drawPlayBar(y, mx, my)
         if server then
             local addr = tostring(server.ip) .. ":" .. tostring(server.port)
             local function link(label, url) return { label, function() openLink(url) end, icon = TB.external } end
-            items[#items + 1] = { T("launcher_join_as_is", "Join as-is"), function() self:joinEntry(server) end, icon = TB.play }
+            items[#items + 1] = { T("launcher_join_as_is", "Join as is"), function() self:joinEntry(server) end, icon = TB.play }
             items[#items + 1] = { T("home_details", "Details"), function()
                 self:selectServer({ name = server.name, ip = server.ip, port = server.port, sv = server.sv, join = function() self:joinEntry(server) end })
                 self.page = "servers"
             end, icon = TB.info }
+            items[#items + 1] = { T("home_favourite", "Favourite"), function() self:toggleFavourite(server); self.libLists = nil end, K.favKey(self, server) and true or false, icon = TB.star }
             items[#items + 1] = { T("home_copy_address", "Copy address"), function() Clipboard.setClipboard(addr) end }
             items[#items + 1] = link(T("launcher_battlemetrics", "BattleMetrics"), "https://www.battlemetrics.com/servers/zomboid?q=" .. urlEncode(tostring(server.ip)))
             if server.discord then items[#items + 1] = link(T("home_server_discord", "Server Discord"), server.discord) end
             if server.site then items[#items + 1] = link(T("home_server_site", "Server website"), server.site) end
             items[#items + 1] = { T("home_copy_link", "Copy join link"), function() Clipboard.setClipboard("pzmm://join/" .. addr) end, icon = TB.link }
             items[#items + 1] = false
-            items[#items + 1] = { T("home_favourite", "Favourite"), function() self:toggleFavourite(server); self.libLists = nil end, K.favKey(self, server) and true or false, icon = TB.star }
-            items[#items + 1] = false
         elseif sel then
             items[#items + 1] = { T("home_manage", "Manage"), manage, icon = TB.server }
             items[#items + 1] = false
         end
-        if has then items[#items + 1] = { T("home_continue_latest", "Continue latest save"), function() self:gameScreen("LATESTSAVE") end } end
-        items[#items + 1] = { T("home_new_game", "New game"), function() self:gameScreen("SOLO") end }
+        -- the game's own screens, under one heading
+        items[#items + 1] = { T("home_game", "Game"), heading = true }
+        if has then items[#items + 1] = { T("home_continue_latest", "Continue latest save"), function() self:play("LATESTSAVE") end } end
+        items[#items + 1] = { T("home_new_game", "New game"), function() self:play("SOLO") end }
         items[#items + 1] = { T("home_load_save", "Load a save"), function() self:gameScreen("LOAD") end }
         items[#items + 1] = { T("home_join_server", "Join a server"), function() self:gameScreen("MULTIPLAYER") end }
         items[#items + 1] = false
@@ -8753,7 +10059,7 @@ function PZMMMods:drawPlayBar(y, mx, my)
             end)
         else
             if has then
-                leftStat("LAST PLAYED", fit(T("home_continue", "Continue %1", latest[1]), 220), C.text, "Saves\nEvery save, with Play, Folder and Delete.", function() self.page, self.feedScroll = "saves", 0 end)
+                leftStat("LAST PLAYED", fit(T("home_continue", "Continue %1", latest[1]), 220), C.text, "Continue\nLoads " .. latest[1] .. " with its own mods, as Play does.", function() self:play("LATESTSAVE") end)
             else
                 -- nothing played yet: the way to a first server
                 local fl = T("home_find_server", "Find a server")
@@ -9374,6 +10680,44 @@ function PZMMMods:mapCopy(kind)
     self:say("Copied: " .. (kind == "all" and "the maps with their Workshop links and the Mods=, WorkshopItems= and Map= lines." or kind == "links" and (#links .. " maps with their Workshop links.") or (lines[kind]:match("^[^=]+") .. "=")) .. " Paste it where you need it.")
 end
 
+--- The servers PZMM runs (Zomboid/Lua/pzmm/hosted.txt: "<ini>\t<stopped|starting|running|crashed>\t<players>"), by ini
+--- name, lower case: { state, players }. Read at most every 2 s; empty without the app.
+function K.readHosted(ui)
+    local t = getTimestampMs()
+    if ui.hostedAt and t - ui.hostedAt < 2000 then return ui.hostedState end
+    local out = {}
+    if ui.app then
+        pcall(function()
+            local r = getFileReader("pzmm/hosted.txt", false)
+            if not r then return end
+            local line = r:readLine()
+            while line do
+                local f = fields(line)
+                local st = f[2]
+                if f[1] ~= "" and (st == "stopped" or st == "starting" or st == "running" or st == "crashed") then
+                    out[f[1]:lower()] = { state = st, players = tonumber(f[3]) or 0 }
+                end
+                line = r:readLine()
+            end
+            r:close()
+        end)
+    end
+    ui.hostedAt, ui.hostedState = t, out
+    return out
+end
+K.HOSTED_STATE = { stopped = T("hosted_stopped", "Stopped"), starting = T("hosted_starting", "Starting..."), running = T("hosted_running", "Running"), crashed = T("hosted_crashed", "Crashed") }
+--- A hosted server's state chip text: "Running, 3 players" and the like.
+function K.hostedLabel(h)
+    if h.state == "running" then return T("hosted_running_n", "Running, %1 players", h.players) end
+    return K.HOSTED_STATE[h.state]
+end
+--- Start, stop or restart a server PZMM runs.
+function PZMMMods:serverDo(op, name)
+    local said = { start = "Starting ", stop = "Stopping ", restart = "Restarting " }
+    self.hostedAt = nil
+    self:request("server\t" .. op .. "\t" .. name, said[op] .. name .. ": say yes in PZMM.")
+end
+
 --- Your hosted servers (Zomboid/Server/*.ini), read once per visit.
 function PZMMMods:hostedList()
     if not self.hosted then
@@ -9439,6 +10783,7 @@ function PZMMMods:compareMaps(st)
         order = { "Order differs. Server: " .. table.concat(a, ", "), "Order differs. You: " .. table.concat(b, ", ") }
     end
     self.compared = { name = name, onlyServer = onlyS, onlyYou = onlyY, order = order }
+    self.mapTab = "compare"
 end
 
 --- The Compare result: what only the server has (with Enable, Preview, Workshop page), what only you have, the order.
@@ -9463,7 +10808,7 @@ function PZMMMods:drawCompare(x, y, w, mx, my)
         ry = ry + 8
     end
     for _, r in ipairs(c.onlyServer) do
-        local room = self:drawRowActions(self:mapRowActions(r.d), x + w - 18, ry, rh, mx, my) - 10
+        local room = self:drawRowActions(self:mapRowActions(r.d), x + w - 18, ry, rh, mx, my, w < 600) - 10
         local ty = ry + math.floor((rh - H_SMALL) / 2)
         local hint = r.d and (r.d.name .. (r.d.isActive and " (installed, on)" or " (installed, off)")) or "not installed"
         bold(self, fit(r.folder, room - x - 18), x + 18, ty, C.text)
@@ -9884,12 +11229,18 @@ function PZMMMods:mapRowActions(d)
     return out
 end
 --- Draw those buttons right to left, the first at `right`, in a row at `y` of height `rh`; returns the left edge.
-function PZMMMods:drawRowActions(btns, right, y, rh, mx, my)
+--- `icons`: icon buttons (their label in the tip), for a narrow panel.
+function PZMMMods:drawRowActions(btns, right, y, rh, mx, my, icons)
     for _, b in ipairs(btns) do
-        local bw = width(b[1]) + 20 + 28
+        local bw = icons and BAR or (width(b[1]) + 20 + 28)
         right = right - bw
         local by = y + math.floor((rh - BAR) / 2)
-        local _, _, over = flatButton(self, b[1], right, by, mx, my, nil, b[4])
+        local over
+        if icons then
+            _, over = toolButton(self, b[4], nil, right, by, mx, my)
+        else
+            _, _, over = flatButton(self, b[1], right, by, mx, my, nil, b[4])
+        end
         if over then tip(self, b[2]) end
         self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = b[3], x = right, y = by, w = bw, h = BAR }
         right = right - 6
@@ -9995,7 +11346,7 @@ end
 
 --- The requirements of every shown map (enabled or previewed), as the app's Requirements: grouped by what needs them,
 --- with how many aren't installed. Folded when nothing is missing. Returns the y under it.
-function PZMMMods:drawMapReqsAll(x, y, w, mx, my)
+function PZMMMods:drawMapReqsAll(x, y, w, mx, my, always)
     local s = self:mapScan()
     local key = (self.modVer or 0) .. "|" .. (self.showVer or 0) .. "|" .. s.ver
     local c = self.reqAllCache
@@ -10039,6 +11390,8 @@ function PZMMMods:drawMapReqsAll(x, y, w, mx, my)
     if c.shown == 0 then return y end
     local open = self.reqAllOpen
     if open == nil then open = c.missing > 0 end
+    if always then open = true end
+    local icons = w < 600
     local rh = BAR + 4
     local lines, total = {}, 0
     for _, gid in ipairs({ "enabled", "preview" }) do
@@ -10057,14 +11410,14 @@ function PZMMMods:drawMapReqsAll(x, y, w, mx, my)
         h = hh + (#lines == 0 and (H_SMALL + 8) or 0) + #lines * rh + (total > 40 and (H_SMALL + 8) or 0)
     end
     card(self, x, y, w, h)
-    local chev = open and K.CHEV_DOWN or K.CHEV_RIGHT
+    local chev = (not always) and (open and K.CHEV_DOWN or K.CHEV_RIGHT)
     if chev then self:drawTextureScaled(chev, x + 16, y + 18 + math.floor((BAR - 14) / 2), 14, 14, 1, C.muted.r, C.muted.g, C.muted.b) end
     local title = T("maps_req_title", "Requirements")
     bold(self, title, x + 36, y + 18 + (BAR - H_SMALL) / 2, C.text)
     if c.missing > 0 then
         chip(self, T("maps_req_missing", "%1 missing", c.missing), x + 36 + width(title) + 12, y + 18 + math.floor((BAR - H_SMALL - 2) / 2), C.warn)
     end
-    self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self.reqAllOpen = not open end, x = x, y = y, w = w, h = hh }
+    if not always then self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self.reqAllOpen = not open end, x = x, y = y, w = w, h = hh } end
     if not open then return y + h + 16 end
     local ry = y + 18 + BAR + 6
     if #lines == 0 then text(self, T("maps_req_none", "The shown maps need nothing else."), x + 18, ry, C.muted) end
@@ -10073,9 +11426,9 @@ function PZMMMods:drawMapReqsAll(x, y, w, mx, my)
             bold(self, l.head, x + 18, ry + math.floor((rh - H_SMALL) / 2), C.muted)
         else
             local d = self.model.mods[l.id]
-            local room = self:drawRowActions(self:mapRowActions(d), x + w - 18, ry, rh, mx, my) - 10
+            local room = self:drawRowActions(self:mapRowActions(d), x + w - 18, ry, rh, mx, my, icons) - 10
             local lx = x + 18
-            local name = fit(d and d.name or l.id, room - lx - 120)
+            local name = fit(d and d.name or l.id, math.max(40, room - lx - (icons and 70 or 120)))
             local ty = ry + math.floor((rh - H_SMALL) / 2)
             bold(self, name, lx, ty, d and C.text or C.warn)
             lx = lx + width(name) + 10
@@ -10225,44 +11578,15 @@ function K.vanilla()
     return K.VAN or nil
 end
 
-function PZMMMods:drawGrid(x, y, w, mx, my)
+--- The cell grid at x, y, w, `gh` tall (default 420), with its legend of maps at the right.
+function PZMMMods:drawGrid(x, y, w, mx, my, gh)
     local s = self:mapScan()
     local g = self:gridCells()
-    local clashes = self:mapClashes()
-    local nclash = 0
-    for _, m in ipairs(s.mods) do
-        if m.d.isActive and clashes[m.d.modId] then
-            local any = false
-            for _ in pairs(clashes[m.d.modId].others) do any = true end
-            for _ in pairs(clashes[m.d.modId].extra) do any = true end
-            if any then nclash = nclash + 1 end
-        end
-    end
     local major = 42
     pcall(function() major = getCore():getGameVersion():getMajor() end)
     -- Knox County under the maps (its cells are Build 42's), unless hidden
     local V = major >= 42 and not self.hideVanilla and K.vanilla() or nil
-    bold(self, T("grid_title", "Cell grid"), x, y, C.text, MEDIUM)
-    local sub = g.shown .. (g.shown == 1 and " map" or " maps") .. " shown, " .. g.over .. " cells where they overlap, " .. nclash .. (nclash == 1 and " map" or " maps") .. " clashing"
-    if not s.finished then sub = sub .. "    scanning " .. math.min(s.qi - 1, #s.queue) .. " of " .. #s.queue .. "..." end
-    text(self, fit(sub, w - 640), x + width(T("grid_title", "Cell grid"), MEDIUM) + 16, y + (H_MEDIUM - H_SMALL) / 2, C.muted)
-    -- Fit view, Zoom in, Zoom out and Per-map colours, right-aligned
-    local by, right = y + (H_MEDIUM - BAR) / 2, x + w
-    for _, b in ipairs({
-        { T("maps_fit", "Fit"), "Fit\nZooms to every shown cell. The wheel zooms, dragging pans.", function() self.gvFit = true end },
-        { "Zoom in", "Zoom in\nCloser, about the middle of the grid. The wheel zooms about the mouse.", function() self:zoomGrid(1.25) end },
-        { "Zoom out", "Zoom out\nFarther away.", function() self:zoomGrid(0.8) end },
-        { "Per-map colours", "Per-map colours\nEach map in its own colour, instead of one colour for every map. Overlaps stay red.", function() self.mapColours = not self.mapColours end, self.mapColours },
-        { "Knox County", "Knox County\nThe game's own map in grey, a mod's cells over it in yellow. Click to hide or show it.", function() self.hideVanilla = not self.hideVanilla; self.gvFit = true end, major >= 42 and not self.hideVanilla },
-    }) do
-        local bw = width(b[1]) + 28
-        local _, _, o = flatButton(self, b[1], right - bw, by, mx, my, b[4] and "primary" or "quiet")
-        if o then tip(self, b[2]) end
-        self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = b[3], x = right - bw, y = by, w = bw, h = BAR }
-        right = right - bw - 6
-    end
-    y = y + H_MEDIUM + 10
-    local gh = 420
+    gh = gh or 420
     card(self, x, y, w, gh)
     local lgw = math.min(280, math.floor(w * 0.3))
     local ix, iy, iw, ih = x + 12, y + 12, w - 36 - lgw, gh - 24
@@ -10305,6 +11629,13 @@ function PZMMMods:drawGrid(x, y, w, mx, my)
         -- (clips nest: the page's comes off first, or one is left on and hides the footer)
         self:clearStencilRect()
         self:setStencilRect(ix, cy0, iw, cy1 - cy0)
+        -- over the world map, the cells only tint it, as the app's
+        local world = not self.hideWorld and self:drawWorld(V, s, ix, cy0, iw, cy1 - cy0, ox, oy, z, major >= 42 and 256 or 300)
+        local tint = world and 0.5 or 1
+        if world then
+            self:clearStencilRect()
+            self:setStencilRect(ix, cy0, iw, cy1 - cy0)
+        end
         local step = 1
         for _, st in ipairs({ 1, 2, 5, 10, 20, 50, 100 }) do
             step = st
@@ -10322,14 +11653,14 @@ function PZMMMods:drawGrid(x, y, w, mx, my)
         if V then
             for _, r in ipairs(V.runs) do
                 local px, py = math.floor(ox + r[2] * z), math.floor(oy + r[1] * z)
-                if py > topp and py < bottom then self:drawRect(px, py, (r[3] - r[2] + 1) * z, z, 0.22, C.muted.r, C.muted.g, C.muted.b) end
+                if py > topp and py < bottom then self:drawRect(px, py, (r[3] - r[2] + 1) * z, z, 0.22 * tint, C.muted.r, C.muted.g, C.muted.b) end
             end
         end
         for i = 1, g.n do
             local px, py = ox + xs[i] * z, oy + ys[i] * z
             if px > left and px < right and py > topp and py < bottom then
                 local c = cs[i] == 0 and C.danger or (V and V.set[(xs[i] + 500) * 10000 + (ys[i] + 500)] and C.warn) or (percol and K.MAP_COLORS[cs[i]] or K.MAP_CELL)
-                self:drawRect(math.floor(px), math.floor(py), cw, cw, cs[i] == 0 and 1 or 0.9, c.r, c.g, c.b)
+                self:drawRect(math.floor(px), math.floor(py), cw, cw, (cs[i] == 0 and 1 or 0.9) * tint, c.r, c.g, c.b)
             end
         end
         -- axis labels, on a faint strip along the top and the left edge
@@ -10368,7 +11699,7 @@ function PZMMMods:drawGrid(x, y, w, mx, my)
     self:clearStencilRect()
     self:setStencilRect(fx, fy, fw, fh)
     if g.n == 0 and not V then
-        local msg = s.finished and "Nothing to draw: enable a map mod, or click a map in the legend or the list below." or "Looking for map cells..."
+        local msg = s.finished and "Nothing to draw: enable a map mod, or click a map in the legend or in Map mods." or "Looking for map cells..."
         text(self, msg, ix + math.floor((iw - width(msg)) / 2), iy + math.floor(ih / 2), C.muted)
     end
     if not gd and cy1 > cy0 then self.feedHits[#self.feedHits + 1] = { kind = "griddrag", x = ix, y = cy0, w = iw, h = cy1 - cy0 } end
@@ -10436,6 +11767,113 @@ function PZMMMods:drawGrid(x, y, w, mx, my)
     return y + H_SMALL + 16
 end
 
+--- The world map under the cell grid, as the app's: water, roads and buildings from each shown map's worldmap.xml and the
+--- game's own (when Knox County is on), in the app's colours, drawn by the game's own map (UIWorldMap, as the spawn
+--- picker's) in place in the draw order, so the cells, labels and tips stay over it. The first map to fill a cell wins,
+--- as in the game, so the maps go top of the load order first. Only maps the game has loaded can be read (enabled ones).
+--- False when there's nothing to draw yet, or this build can't (the grid is drawn plain then, for good after an error).
+function PZMMMods:drawWorld(V, s, x, y, w, h, ox, oy, z, tiles)
+    if self.world == false then return false end
+    local ok, drawn = pcall(function()
+        local wm = self.world
+        if not wm then
+            wm = {}
+            wm.javaObject = UIWorldMap.new(wm)
+            wm.api = wm.javaObject:getAPIv3()
+            -- nothing that needs a game running (players, symbols, what you've visited: WorldMapVisited throws in the menus)
+            for k, v in pairs({ ClampBaseZoomToPoint5 = false, DebugInfo = false, ImagePyramid = false, InfiniteZoom = true, Isometric = false, Features = true,
+                HideUnvisited = false, Players = false, RemotePlayers = false, PlayerNames = false, Symbols = false, MiniMapSymbols = false, Animals = false,
+                CellGrid = false, TileGrid = false, WorldBounds = false, ShowStreetNames = false, PlaceNames = false, TerrainImage = false }) do wm.api:setBoolean(k, v) end
+            self.world = wm
+        end
+        -- the maps to read: worked out again only when the scan, the shown maps or the order change
+        local token = tostring(s.ver) .. "|" .. tostring(self.showVer) .. "|" .. tostring(V ~= nil) .. "|" .. tostring(self.mapOrder)
+        local want = wm.want
+        if wm.token ~= token then
+            wm.token = token
+            local shown = {}
+            want = {}
+            for _, e in ipairs(s.entries) do if e.folder ~= K.BASE_MAP and self:mapShown(e) then shown[e.folder] = true end end
+            for _, f in ipairs(self:maps()) do
+                if shown[f] then
+                    want[#want + 1] = f
+                    shown[f] = nil
+                end
+            end
+            local rest = {}
+            for f in pairs(shown) do rest[#rest + 1] = f end
+            table.sort(rest)
+            for _, f in ipairs(rest) do want[#want + 1] = f end
+            if V then want[#want + 1] = K.BASE_MAP end
+            wm.want = want
+        end
+        local key = table.concat(want, "|")
+        if wm.key ~= key then
+            wm.key, wm.styled, wm.bounded = key, nil, nil
+            wm.api:clearData()
+            for _, f in ipairs(want) do MapUtils.initDirectoryMapData(wm, "media/maps/" .. f) end
+        end
+        if #want == 0 or wm.api:getDataCount() == 0 then return false end
+        -- the data loads while the map draws (as the spawn picker's), so it draws from the start
+        local loaded = wm.styled ~= nil or wm.api:isDataLoaded()
+        if loaded and not wm.bounded then
+            wm.bounded = true
+            wm.api:setBoundsFromData()
+        end
+        if loaded and wm.styled ~= THEME.rev then
+            wm.styled = THEME.rev
+            local st = wm.javaObject:getAPIv1():getStyleAPI()
+            st:clear()
+            -- buildings only from zoom 12.5 (fading in by 13), as the game's own map: thousands of them, every frame, are what's slow
+            -- ponytail: zoomed right out the county is ~11.3; draw buildings there too if a cached picture of the map ever replaces this
+            for _, l in ipairs({ { "water", "water", C.mapWater, 0 }, { "roads", "highway", C.mapRoad, 0 }, { "railway", "railway", C.mapRoad, 0 }, { "buildings", "building", C.mapBuilding, 12.5 } }) do
+                local layer = st:newPolygonLayer(l[1])
+                layer:setMinZoom(l[4])
+                layer:setFilter(l[2], "*")
+                local r, g, b = math.floor(l[3].r * 255), math.floor(l[3].g * 255), math.floor(l[3].b * 255)
+                if l[4] > 0 then layer:addFill(l[4], r, g, b, 0) end
+                layer:addFill(l[4] > 0 and l[4] + 0.5 or 0, r, g, b, 255)
+                layer:addFill(24, r, g, b, 255)
+            end
+            wm.api:setBackgroundRGBA(C.bg.r, C.bg.g, C.bg.b, 1)
+        end
+        local j = wm.javaObject
+        j:setX(self:getAbsoluteX() + x)
+        j:setY(self:getAbsoluteY() + y)
+        j:setWidth(w)
+        j:setHeight(h)
+        -- the grid's scale (z pixels a cell, `tiles` squares a cell) and its middle, in squares
+        -- set again only when the grid's view moves (and until the data's in, as it can't zoom before that)
+        local per = z / tiles
+        local cx, cy = (x + w / 2 - ox) / z * tiles, (y + h / 2 - oy) / z * tiles
+        local view = per .. "|" .. cx .. "|" .. cy .. "|" .. w .. "|" .. h
+        if wm.view ~= view or not loaded then
+            wm.view = view
+            for _ = 1, 4 do
+                local sc = wm.api:getWorldScale()
+                if not sc or sc <= 0 or math.abs(sc / per - 1) < 0.002 then break end
+                wm.api:setZoom(wm.api:getZoomF() + math.log(per / sc) / math.log(2))
+            end
+            wm.api:centerOn(cx, cy)
+        end
+        if not loaded then pcall(function() j:update() end) end
+        j:render()
+        -- once per change, for console.txt: how far it got
+        local st = key .. " data=" .. wm.api:getDataCount() .. " loaded=" .. tostring(loaded) .. " styled=" .. tostring(wm.styled ~= nil)
+        if st ~= wm.said then
+            wm.said = st
+            print("PZMM world map: " .. st .. " scale=" .. tostring(wm.api:getWorldScale()) .. " want=" .. per .. " zoom=" .. tostring(wm.api:getZoomF()))
+        end
+        return wm.styled ~= nil
+    end)
+    if not ok then
+        print("PZMM: no world map under the grid: " .. tostring(drawn))
+        self.world = false
+        return false
+    end
+    return drawn
+end
+
 --- The list of every installed map mod, with its search, filter and sort.
 function PZMMMods:drawMapMods(x, y, w, mx, my, top, bh)
     local RH = math.max(34, BAR + 4) -- the app's 34 px rows
@@ -10453,7 +11891,8 @@ function PZMMMods:drawMapMods(x, y, w, mx, my, top, bh)
         self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() fn(px, py + BAR + 4) end, x = px, y = py, w = tw, h = BAR }
         bx = bx + tw + 8
     end
-    bx = bx + K.searchSpot(self, bx, y, 200, top, bh) + 8
+    K.searchSpot(self, x, y, w, top, bh)
+    y = y + BAR + 8
     local fnames = { all = "All maps", on = T("filter_enabled", "Enabled"), installed = T("filter_installed", "Installed"), clash = T("maps_filter_conflict", "Conflicting") }
     local fcur = self.mapFilter or "all"
     tool(TB.filter, fnames[fcur], "Filter\nAll maps, the enabled ones, the installed ones (all of these are), or only those that clash: two maps with the same cells, or the game's own map conflicts. Hide spawn-point mods leaves out mods with no cells.", function(mxp, myp)
@@ -10482,6 +11921,8 @@ function PZMMMods:drawMapMods(x, y, w, mx, my, top, bh)
             names[#names + 1] = (math.floor(k / 10000) - 500) .. "," .. (k % 10000 - 500)
         end
         local more = #self.gridSel.keys - #names
+        local clabel = "Cells " .. table.concat(names, "; ") .. (more > 0 and (" +" .. more) or "")
+        if bx > x and bx + width(clabel) + 15 > x + w then bx, y = x, y + BAR + 6 end
         local cx, cy = bx + 4, y + math.floor((BAR - H_SMALL - 2) / 2)
         local cr = chip(self, "Cells " .. table.concat(names, "; ") .. (more > 0 and (" +" .. more) or ""), cx, cy, C.accentText)
         if mx >= cx and mx < cr and my >= cy and my < cy + H_SMALL + 2 then tip(self, "Cells on the grid\nThe list shows the maps at these cells. Click to clear. Shift-click the grid adds cells.") end
@@ -10491,6 +11932,7 @@ function PZMMMods:drawMapMods(x, y, w, mx, my, top, bh)
         end, x = cx, y = cy, w = cr - cx, h = H_SMALL + 2 }
     end
     y = y + BAR + 12
+    y = self:drawMapBulk(x, y, w, mx, my)
     if #rows == 0 then
         local none = s.found and #s.mods == 0
         text(self, none and T("maps_none_build", "No installed mod adds maps for Build %1.", K.myBuild():match("^(%d+)") or "42")
@@ -10555,7 +11997,7 @@ function PZMMMods:drawMapMods(x, y, w, mx, my, top, bh)
                 right = right - 16
             end
             local tx = x + 68
-            local name = fit(d.name, right - tx - 120)
+            local name = fit(d.name, math.max(40, right - tx - (w < 600 and 8 or 120)))
             bold(self, name, tx, mid, over and C.onSelected or (self.hidden[d.modId] and C.muted or C.text))
             tx = tx + width(name) + 10
             local folders = {}
@@ -10601,56 +12043,108 @@ K.MAP_HELP = {
     { "Preview or enable", "Enabled maps are always shown. The tick enables a map; to preview it instead, press Preview (or click its swatch). Click its row for its details. A preview is drawn and checked for conflicts, but nothing changes in your mod list until you enable it. Click cells to list the maps there; Shift+click adds more cells." },
     { "Workshop maps", "With the PZMM app, Workshop maps lists every Map-tagged Workshop item for this build, including ones you haven't installed, read from Steam's file lists (no download, nothing installed). Paste a collection in Check a Workshop map to preview all its maps. Preview them like installed maps, then Install the ones you want." },
 }
+--- Maps, as the app's: the grid's toolbar (title, legend, Hide vanilla, Per-map colours, World map, Zoom in, Zoom out,
+--- Fit, Undo, Help), then the grid filling the page; the tools are down the right (drawMapTools).
 function PZMMMods:drawMaps(x, y, w, mx, my, top, bh)
-    y = self:drawNotice(x, y, w, T("notice_maps", "the world picture and hiding the game's map, installing a map's missing requirements, a mod ID in two items, a background picture, the Workshop maps source in the list (Map-tagged items you haven't installed, with its scan and Stop, an Install on those rows and in Compare), searching maps by tag, checking Workshop maps you haven't installed and subscriber counts (Steam's details don't give them)."), mx, my)
-    local maps = self:maps()
     local s = self:mapScan()
-    text(self, fit("Your enabled maps, in load order: where two maps cover the same cells, the higher one wins. Accept saves it.", w), x, y, C.muted)
-    y = y + H_SMALL + 10
+    local g = self:gridCells()
+    local major = 42
+    pcall(function() major = getCore():getGameVersion():getMajor() end)
+    local V = major >= 42 and not self.hideVanilla and K.vanilla() or nil
     local bx = x
-    local function tool(icon, label, tipText, fn, off)
-        local px, py = bx, y
-        local tw, over = toolButton(self, icon, label, px, py, mx, my, nil, off)
-        if over then tip(self, tipText) end
-        if not off then self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() fn(px, py + BAR + 4) end, x = px, y = py, w = tw, h = BAR } end
-        bx = bx + tw + 8
+    -- (a control that doesn't fit goes on the next line)
+    local function place(cw)
+        if bx > x and bx + cw > x + w then bx, y = x, y + BAR + 6 end
+        return bx
     end
-    if #maps > 1 then
-        tool(TB.layers, "Autosort maps", "Autosort maps\nA map that builds on another (lots= in its map.info) goes before it; the rest keep their order; Muldraugh, KY last.", function() self:autosortMaps() end)
-    end
-    tool(TB.copy, T("maps_copy", "Copy"), "Copy\nYour enabled maps for a friend or a server: their Workshop links, or the Mods=, WorkshopItems= and Map= lines.", function(mxp, myp)
-        self:menu({
-            { "Maps with Workshop links", function() self:mapCopy("links") end },
-            { "Mods= line", function() self:mapCopy("mods") end },
-            { "WorkshopItems= line", function() self:mapCopy("items") end },
-            { "Map= line", function() self:mapCopy("map") end },
-            false,
-            { "Everything", function() self:mapCopy("all") end },
-        }, mxp, myp)
-    end)
-    tool(TB.layers, T("maps_compare", "Compare with a server"), "Compare with a server\nA hosted server's Map= against your map order: what's missing, what's extra, and the order.", function(mxp, myp)
-        local hosted = self:hostedList()
-        if #hosted == 0 then return self:say("No hosted servers in Zomboid/Server yet: host one first.") end
-        local items = {}
-        for _, st in ipairs(hosted) do
-            local name = ""
-            pcall(function() name = st:getName() end)
-            items[#items + 1] = { name, function() self:compareMaps(st) end }
+    -- the title, with what's shown, overlapping and clashing as its tip
+    local title = T("world", "World map")
+    bold(self, title, bx, y + math.floor((BAR - H_MEDIUM) / 2), C.text, MEDIUM)
+    if mx >= bx and mx < bx + width(title, MEDIUM) and my >= y and my < y + BAR then
+        local nclash = 0
+        local clashes = self:mapClashes()
+        for _, m in ipairs(s.mods) do
+            local cl = m.d.isActive and clashes[m.d.modId]
+            if cl then
+                local any = false
+                for _ in pairs(cl.others) do any = true end
+                for _ in pairs(cl.extra) do any = true end
+                if any then nclash = nclash + 1 end
+            end
         end
-        self:menu(items, mxp, myp)
-    end)
-    tool(TB.layers, T("maps_presets", "Presets"), "Presets\nSave the maps shown on the grid under a name, and show them again later.", function(mxp, myp) self:mapPresetMenu(mxp, myp) end)
-    tool(TB.layers, T("maps_quick", "Most maps that fit"), "Most maps that fit\nPreview the most listed maps that share no cell with each other or the enabled ones.", function() self:mapQuickFit() end)
-    local anyOff = false
-    for _, m in ipairs(self:mapRows()) do
-        if not m.d.isActive then
-            for _, e in ipairs(m.entries) do if not self:mapShown(e) then anyOff = true end end
-        end
+        tip(self, title .. "\n" .. g.shown .. (g.shown == 1 and " map" or " maps") .. " shown, " .. g.over .. " cells where they overlap, " .. nclash .. (nclash == 1 and " map" or " maps") .. " clashing.")
     end
-    tool(TB.filter, anyOff and T("maps_preview_listed", "Preview listed") or T("maps_unpreview_listed", "Unpreview listed"), "Preview listed\nShow every listed map you haven't enabled on the grid, or take them off it again. Nothing changes in your mod list.", function() self:mapPreviewListed(anyOff) end)
-    tool(TB.undo, T("maps_undo", "Undo"), "Undo\nUndo the last preview change, quick select, preset, order change or enable/disable on this page.", function() self:mapUndo() end, not (self.mapUndos and #self.mapUndos > 0))
-    tool(TB.info, T("maps_help", "Help"), "Help\nHow to read the grid, preview or enable a map, and what Workshop maps do.", function() self.mapHelp = not self.mapHelp end)
+    bx = bx + width(title, MEDIUM) + 20
+    -- the legend: what each colour is (with Per-map colours, the shown maps' own)
+    if V and g.overV == nil then
+        local n = 0
+        for j = 1, g.n do
+            if g.cs[j] ~= 0 and V.set[(g.xs[j] + 500) * 10000 + (g.ys[j] + 500)] then n = n + 1 end
+        end
+        g.overV = n
+    end
+    local keys = {}
+    if self.mapColours then
+        local list = self.legendList or {}
+        for j = 1, math.min(12, #list) do keys[#keys + 1] = { mapColor(self, list[j]), j == math.min(12, #list) and (#list > 12 and T("maps_legend_more", "+%1 more", #list - 12) or "") or "", self:mapInfo(list[j].folder).title } end
+    else
+        keys[#keys + 1] = { K.MAP_CELL, T("maps_legend_map", "A map") }
+    end
+    if V then keys[#keys + 1] = { C.warn, T("maps_legend_over", "Over vanilla (%1)", g.overV or 0) } end
+    keys[#keys + 1] = { C.danger, T("maps_legend_conflict", "Conflict (%1)", g.over) }
+    if V then keys[#keys + 1] = { C.muted, T("maps_legend_vanilla", "Vanilla"), nil, 0.5 } end
+    for _, k in ipairs(keys) do
+        local kw = 12 + (k[2] ~= "" and (6 + width(k[2])) or 0)
+        local kx = place(kw)
+        rect(self, kx, y + math.floor((BAR - 10) / 2), 10, 10, k[1], k[4] or 1)
+        if k[2] ~= "" then text(self, k[2], kx + 16, y + (BAR - H_SMALL) / 2, C.muted) end
+        if k[3] and mx >= kx and mx < kx + 12 and my >= y and my < y + BAR then tip(self, k[3]) end
+        bx = kx + kw + 12
+    end
+    if not s.finished then
+        local sl = "scanning " .. math.min(s.qi - 1, #s.queue) .. " of " .. #s.queue .. "..."
+        local sx = place(width(sl))
+        text(self, sl, sx, y + (BAR - H_SMALL) / 2, C.muted)
+        bx = sx + width(sl) + 12
+    end
+    bx = bx + 8
+    -- Hide vanilla, Per-map colours, World map: checkboxes
+    for _, c in ipairs({
+        { T("maps_hide_vanilla", "Hide vanilla"), major < 42 or self.hideVanilla, "Hide vanilla\nThe game's own map (Knox County) is grey, a mod's cells over it yellow: tick to leave it off the grid." .. (major < 42 and " It isn't drawn on this build." or ""),
+            function() self.hideVanilla = not self.hideVanilla; self.gvFit = true end },
+        { T("maps_per_map", "Per-map colours"), self.mapColours, "Per-map colours\nEach map in its own colour, instead of one colour for every map. Overlaps stay red.", function() self.mapColours = not self.mapColours end },
+        { T("world", "World map"), not self.hideWorld, T("world", "World map") .. "\n" .. T("world_tip", "Draw water, roads and buildings from each map's own world map under the grid (maps that ship none stay plain)"), function() self.hideWorld = not self.hideWorld end },
+    }) do
+        local cw = BOX + 8 + width(c[1])
+        local cx = place(cw)
+        checkbox(self, cx, y + math.floor((BAR - BOX) / 2), c[2])
+        text(self, c[1], cx + BOX + 8, y + (BAR - H_SMALL) / 2, C.text)
+        if mx >= cx and mx < cx + cw and my >= y and my < y + BAR then tip(self, c[3]) end
+        self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = c[4], x = cx, y = y, w = cw, h = BAR }
+        bx = cx + cw + 16
+    end
+    -- Zoom in, Zoom out, Fit, then Undo and Help
+    for _, b in ipairs({
+        { T("maps_zoom_in", "Zoom in"), "Zoom in\nCloser, about the middle of the grid. The wheel zooms about the mouse.", function() self:zoomGrid(1.25) end },
+        { T("maps_zoom_out", "Zoom out"), "Zoom out\nFarther away.", function() self:zoomGrid(0.8) end },
+        { T("maps_fit", "Fit"), "Fit\nZooms to every shown cell. The wheel zooms, dragging pans.", function() self.gvFit = true end },
+        { T("maps_undo", "Undo"), "Undo\nUndo the last preview change, quick select, preset, order change or enable/disable on this page (Ctrl+Z).", function() self:mapUndo() end, TB.undo, not (self.mapUndos and #self.mapUndos > 0) },
+        { T("maps_help", "Help"), "Help\nHow to read the grid, preview or enable a map, and what Workshop maps do.", function() self.mapHelp = not self.mapHelp end, TB.info },
+    }) do
+        local bw = b[4] and (width(b[1]) + 46) or (width(b[1]) + 28)
+        local px = place(bw)
+        local over
+        if b[4] then
+            _, over = toolButton(self, b[4], b[1], px, y, mx, my, b[1] == T("maps_help", "Help") and self.mapHelp, b[5])
+        else
+            _, _, over = flatButton(self, b[1], px, y, mx, my, "quiet")
+        end
+        if over then tip(self, b[2]) end
+        if not b[5] then self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = b[3], x = px, y = y, w = bw, h = BAR } end
+        bx = px + bw + 6
+    end
     y = y + BAR + 12
+    y = self:drawNotice(x, y, w, T("notice_maps", "installing a map's missing requirements, a mod ID in two items, a background picture, the Workshop maps source in the list (Map-tagged items you haven't installed, with its scan and Stop, an Install on those rows and in Compare), searching maps by tag, checking Workshop maps you haven't installed and subscriber counts (Steam's details don't give them)."), mx, my)
     if self.mapHelp then
         local iw = w - 40
         local hc = self.mapHelpC
@@ -10669,70 +12163,196 @@ function PZMMMods:drawMaps(x, y, w, mx, my, top, bh)
             if r[2] then bold(self, r[1], x + 20, py, C.text) else text(self, r[1], x + 20, py, C.muted) end
             py = py + H_SMALL + 3
         end
-        local cw2, _, co = flatButton(self, "Close", x + 20, py + 8, mx, my, "quiet", TB.x)
+        local cw2 = flatButton(self, "Close", x + 20, py + 8, mx, my, "quiet", TB.x)
         self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self.mapHelp = nil end, x = x + 20, y = py + 8, w = cw2, h = BAR }
         y = y + ph + 12
     end
-    -- bulk: what's previewed turned on, what's listed and on turned off, previews cleared, hidden maps back
-    do
-        local rows, previewOff, listedOn, hiddenN = self:mapRows(), {}, {}, 0
-        for _, m in ipairs(rows) do
-            if m.d.isActive then
-                listedOn[#listedOn + 1] = m.d
-            else
-                for _, e in ipairs(m.entries) do
-                    if self:mapShown(e) then previewOff[#previewOff + 1] = m.d; break end
-                end
-            end
-        end
-        for _, m in ipairs(s.mods) do if self.hidden[m.d.modId] then hiddenN = hiddenN + 1 end end
-        local anyPreview = false
-        for _, m in ipairs(s.mods) do
-            if not m.d.isActive then
-                for _, e in ipairs(m.entries) do if self.mapShow[e.key] then anyPreview = true end end
-            end
-        end
-        bx = x
-        local bulk = {}
-        if anyPreview then bulk[#bulk + 1] = { T("maps_enabled_only", "Enabled only"), "Enabled only\nTake every preview off the grid: only the enabled maps stay.", function()
-            self:mapRemember()
-            for _, m in ipairs(s.mods) do
-                if not m.d.isActive then for _, e in ipairs(m.entries) do self.mapShow[e.key] = nil end end
-            end
-            self.showVer = (self.showVer or 0) + 1
-        end } end
-        if #previewOff > 0 then bulk[#bulk + 1] = { "Enable " .. #previewOff .. " previewed", "Enable previewed\nTurns on the listed maps you are previewing.", function()
-            self:mapRemember()
-            self:setMany(previewOff, {})
-        end, TB.check } end
-        if #listedOn > 0 then bulk[#bulk + 1] = { "Disable " .. #listedOn .. " listed", "Disable listed\nTurns off the enabled maps in the list.", function()
-            self:mapRemember()
-            self:setMany({}, listedOn)
-        end, TB.x } end
-        if hiddenN > 0 then bulk[#bulk + 1] = { "Unhide " .. hiddenN, "Unhide\nPuts the maps you hid back in the list.", function()
-            for _, m in ipairs(s.mods) do self.hidden[m.d.modId] = nil end
-            writeHidden(self.hidden)
-            self:updateView()
-        end } end
-        if #bulk > 0 then
-            for _, b in ipairs(bulk) do
-                local bw, bh2, over = flatButton(self, b[1], bx, y, mx, my, nil, b[4])
-                if over then tip(self, b[2]) end
-                self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = b[3], x = bx, y = y, w = bw, h = bh2 }
-                bx = bx + bw + 8
-            end
-            y = y + BAR + 12
-        end
-    end
-    if self.compared then y = self:drawCompare(x, y, w, mx, my) end
-    y = self:drawMapOrder(x, y, w, mx, my) + 20
-    y = self:drawGrid(x, y, w, mx, my)
-    y = self:drawMapReqsAll(x, y, w, mx, my)
+    -- the picked map's strip and what it needs, over the grid
     if self.mapSel and s.modOf[self.mapSel.d.modId] then
         y = self:drawMapStrip(x, y, w, mx, my)
         y = self:drawMapReqs(x, y, w, mx, my)
     else
         self.mapSel = nil
+    end
+    -- the grid fills the rest of the page (no less than 300 px)
+    return self:drawGrid(x, y, w, mx, my, math.max(300, top + bh - (y + self.feedScroll) - (H_SMALL + 48)))
+end
+
+--- Map mods' bulk row, as the app's: Most maps that fit, Preview or Unpreview listed, Enabled only, Enable the
+--- previewed ones, Disable the listed ones, Unhide. Returns the y under it.
+function PZMMMods:drawMapBulk(x, y, w, mx, my)
+    local s = self:mapScan()
+    local rows, previewOff, listedOn, hiddenN = self:mapRows(), {}, {}, 0
+    local anyOff, anyPreview = false, false
+    for _, m in ipairs(rows) do
+        if m.d.isActive then
+            listedOn[#listedOn + 1] = m.d
+        else
+            for _, e in ipairs(m.entries) do
+                if not self:mapShown(e) then anyOff = true end
+            end
+            for _, e in ipairs(m.entries) do
+                if self:mapShown(e) then previewOff[#previewOff + 1] = m.d; break end
+            end
+        end
+    end
+    for _, m in ipairs(s.mods) do
+        if self.hidden[m.d.modId] then hiddenN = hiddenN + 1 end
+        if not m.d.isActive then
+            for _, e in ipairs(m.entries) do if self.mapShow[e.key] then anyPreview = true end end
+        end
+    end
+    local bulk = {
+        { T("maps_quick", "Most maps that fit"), "Most maps that fit\nPreview the most listed maps that share no cell with each other or the enabled ones.", function() self:mapQuickFit() end, TB.layers },
+        { anyOff and T("maps_preview_listed", "Preview listed") or T("maps_unpreview_listed", "Unpreview listed"), "Preview listed\nShow every listed map you haven't enabled on the grid, or take them off it again. Nothing changes in your mod list.", function() self:mapPreviewListed(anyOff) end, TB.filter },
+    }
+    if anyPreview then bulk[#bulk + 1] = { T("maps_enabled_only", "Enabled only"), "Enabled only\nTake every preview off the grid: only the enabled maps stay.", function()
+        self:mapRemember()
+        for _, m in ipairs(s.mods) do
+            if not m.d.isActive then for _, e in ipairs(m.entries) do self.mapShow[e.key] = nil end end
+        end
+        self.showVer = (self.showVer or 0) + 1
+    end } end
+    if #previewOff > 0 then bulk[#bulk + 1] = { "Enable " .. #previewOff .. " previewed", "Enable previewed\nTurns on the listed maps you are previewing.", function()
+        self:mapRemember()
+        self:setMany(previewOff, {})
+    end, TB.check } end
+    if #listedOn > 0 then bulk[#bulk + 1] = { "Disable " .. #listedOn .. " listed", "Disable listed\nTurns off the enabled maps in the list.", function()
+        self:mapRemember()
+        self:setMany({}, listedOn)
+    end, TB.x } end
+    if hiddenN > 0 then bulk[#bulk + 1] = { "Unhide " .. hiddenN, "Unhide\nPuts the maps you hid back in the list.", function()
+        for _, m in ipairs(s.mods) do self.hidden[m.d.modId] = nil end
+        writeHidden(self.hidden)
+        self:updateView()
+    end } end
+    local bx = x
+    for _, b in ipairs(bulk) do
+        local bw = width(b[1]) + 28 + (b[4] and 20 or 0)
+        if bx > x and bx + bw > x + w then bx, y = x, y + BAR + 6 end
+        local _, bh2, over = flatButton(self, b[1], bx, y, mx, my, nil, b[4])
+        if over then tip(self, b[2]) end
+        self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = b[3], x = bx, y = y, w = bw, h = bh2 }
+        bx = bx + bw + 8
+    end
+    return y + BAR + 12
+end
+
+-- the tool panel's tabs, as the app's icon rail
+K.MAP_TABS = {
+    { "mods", T("mapmods_title", "Map mods"), TB.layers },
+    { "reqs", T("maps_req_title", "Requirements"), TB.alert },
+    { "order", T("maps_tab_order", "Order & export"), TB.swap },
+    { "compare", T("maps_tab_compare", "Compare"), TB.server },
+}
+K.MAPRAIL = 52
+K.MAPSIDE = SIDE + K.MAPRAIL
+--- Maps' tools down the right, as the app's tool panel: the icon rail (with counts) and the picked tab's pane,
+--- which scrolls on its own.
+function PZMMMods:drawMapTools(x, y, w, h)
+    local rw = K.MAPRAIL
+    rect(self, x, y, rw, h, C.panel, 1)
+    rect(self, x, y, 1, h, C.line, 1)
+    rect(self, x + rw - 1, y, 1, h, C.line, 1)
+    local mx, my = self:getMouseX(), self:getMouseY()
+    local tab = self.mapTab or "mods"
+    local counts = { mods = #self:mapRows(), reqs = self.reqAllCache and self.reqAllCache.missing or 0 }
+    local ty = y + 16
+    for _, t in ipairs(K.MAP_TABS) do
+        local tx = x + math.floor((rw - 36) / 2)
+        local on = tab == t[1]
+        local over = mx >= tx and mx < tx + 36 and my >= ty and my < ty + 36
+        if on or over then round(self, tx, ty, 36, 36, 8, C.accent, on and 0.32 or 0.2) end
+        if on then rect(self, x + 1, ty + 6, 2, 24, C.onSelected, 1) end
+        local c = (on or over) and C.onSelected or C.text
+        if t[3] then self:drawTextureScaled(t[3], tx + 10, ty + 10, 16, 16, 1, c.r, c.g, c.b) end
+        local n = counts[t[1]] or 0
+        if n > 0 then
+            local label = tostring(n)
+            local nw = width(label) + 8
+            local nx, ny = tx + 36 - nw + 6, ty - 4
+            round(self, nx, ny, nw, H_SMALL, capR(H_SMALL), C.panel, 1)
+            outline(self, nx, ny, nw, H_SMALL, capR(H_SMALL), t[1] == "reqs" and C.warn or C.line, 1)
+            text(self, label, nx + 4, ny, t[1] == "reqs" and C.warn or C.muted)
+        end
+        if over then tip(self, t[2] .. (n > 0 and (t[1] == "reqs" and ("\n" .. T("maps_req_missing", "%1 missing", n)) or ("\n" .. n)) or "")) end
+        local id = t[1]
+        self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self.mapTab, self.mapSideScroll = id, 0 end, x = tx, y = ty, w = 36, h = 36 }
+        ty = ty + 48
+    end
+    self:drawScrollSide("mapSideScroll", x + rw, y, w - rw, h, function(px, py, pw, mx2, my2) return self:drawMapPane(tab, px, py, pw, mx2, my2, y, h) end)
+end
+--- One tab of Maps' tools at x, y, w: Map mods, Requirements, Order & export (the map order, Autosort maps, Copy,
+--- Presets) or Compare (with a hosted server). `top`, `bh`: the panel's box. Returns the y under it.
+function PZMMMods:drawMapPane(tab, x, y, w, mx, my, top, bh)
+    local function title(str)
+        bold(self, str, x, y, C.text, MEDIUM)
+        y = y + H_MEDIUM + 10
+    end
+    local function para(str)
+        for _, l in ipairs(wrap(str, w)) do
+            text(self, l, x, y, C.muted)
+            y = y + H_SMALL + 2
+        end
+        y = y + 10
+    end
+    if tab == "reqs" then
+        local y2 = self:drawMapReqsAll(x, y, w, mx, my, true)
+        if y2 ~= y then return y2 end
+        title(T("maps_req_title", "Requirements"))
+        para(T("maps_req_show_one", "Show or enable a map to see what it needs."))
+        return y
+    elseif tab == "order" then
+        title(T("maps_export_title", "Map order and export"))
+        para("Your enabled maps, in load order: where two maps cover the same cells, the higher one wins. Accept saves it.")
+        y = self:drawMapOrder(x, y, w, mx, my) + 16
+        local maps = self:maps()
+        local bx = x
+        local function tool(icon, label, tipText, fn, kind)
+            local tw = width(label) + 28 + (icon and 20 or 0)
+            if bx > x and bx + tw > x + w then bx, y = x, y + BAR + 6 end
+            local px, py = bx, y
+            local _, _, over = flatButton(self, label, px, py, mx, my, kind, icon)
+            if over then tip(self, tipText) end
+            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() fn(px, py + BAR + 4) end, x = px, y = py, w = tw, h = BAR }
+            bx = bx + tw + 8
+        end
+        local nm = #maps
+        tool(TB.copy, nm == 1 and T("maps_copy_one", "Copy 1 map to the clipboard") or T("maps_copy_n", "Copy %1 maps to the clipboard", nm), "Copy\nYour enabled maps for a friend or a server: their Workshop links, or the Mods=, WorkshopItems= and Map= lines.", function(mxp, myp)
+            self:menu({
+                { "Maps with Workshop links", function() self:mapCopy("links") end },
+                { "Mods= line", function() self:mapCopy("mods") end },
+                { "WorkshopItems= line", function() self:mapCopy("items") end },
+                { "Map= line", function() self:mapCopy("map") end },
+                false,
+                { "Everything", function() self:mapCopy("all") end },
+            }, mxp, myp)
+        end, "primary")
+        if nm > 1 then
+            tool(TB.layers, "Autosort maps", "Autosort maps\nA map that builds on another (lots= in its map.info) goes before it; the rest keep their order; Muldraugh, KY last.", function() self:autosortMaps() end)
+        end
+        tool(TB.layers, T("maps_presets", "Presets"), "Presets\nSave the maps shown on the grid under a name, and show them again later.", function(mxp, myp) self:mapPresetMenu(mxp, myp) end)
+        return y + BAR
+    elseif tab == "compare" then
+        title(T("maps_compare", "Compare with a server"))
+        para("A hosted server's Map= against your map order: what's missing, what's extra, and the order.")
+        local hosted = self:hostedList()
+        if #hosted == 0 then para(T("maps_compare_none", "No server configs in Zomboid/Server yet.")) end
+        for _, st in ipairs(hosted) do
+            local name = ""
+            pcall(function() name = st:getName() end)
+            local cl = T("maps_compare_do", "Compare")
+            local cw = width(cl) + 28
+            text(self, fit(name .. ".ini", w - cw - 12), x, y + (BAR - H_SMALL) / 2, C.text)
+            local _, _, over = flatButton(self, cl, x + w - cw, y, mx, my, (self.compared and self.compared.name == name) and "primary" or nil)
+            if over then tip(self, "Compare\nIts Map= against your map order.") end
+            local stx = st
+            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:compareMaps(stx) end, x = x + w - cw, y = y, w = cw, h = BAR }
+            y = y + BAR + 6
+        end
+        y = y + 10
+        if self.compared then y = self:drawCompare(x, y, w, mx, my) end
+        return y
     end
     return self:drawMapMods(x, y, w, mx, my, top, bh)
 end
@@ -10767,15 +12387,17 @@ function PZMMMods:drawMapOrder(x, y, w, mx, my)
             self.feedHits[#self.feedHits + 1] = { kind = "mapdrag", i = i, x = x, y = ry, w = 48, h = RH }
         end
         -- its title, then its folder (what Map= lists)
-        local title = self:mapInfo(m).title
-        bold(self, title, x + 52, mid, C.text)
-        if title ~= m then text(self, m, x + 52 + width(title) + 12, mid, copy(C.muted, 0.75)) end
-        local nameW = width(title) + (title ~= m and width(m) + 12 or 0)
         local clash = {}
         pcall(function()
             local c = self.model:getMapConflicts(m)
             for j = 0, c:size() - 1 do clash[#clash + 1] = c:get(j) end
         end)
+        local room = w - 52 - 170 - (#clash > 0 and (width("Clashes with " .. #clash) + 25) or 0)
+        local title = fit(self:mapInfo(m).title, room)
+        bold(self, title, x + 52, mid, C.text)
+        local folderShown = title ~= m and width(title) + 12 + width(m) <= room
+        if folderShown then text(self, m, x + 52 + width(title) + 12, mid, copy(C.muted, 0.75)) end
+        local nameW = width(title) + (folderShown and width(m) + 12 or 0)
         if #clash > 0 then
             local cx = x + 52 + nameW + 14
             local cy = ry + (RH - H_SMALL - 2) / 2
@@ -10873,67 +12495,6 @@ K.RESETS = {
     { "animals", "Animals", "The animals are built again from the map. Any animal, tamed ones too, may be lost.", { "DeleteAPopXYBin" } },
 }
 
---- A save's More menu: Characters, Rename, Recovery, Give it my mods, Folder, Back up in PZMM, Delete.
-function PZMMMods:saveMenu(s)
-    local items = {
-        { "Characters...", function() self:characterMenu(s) end },
-        { "Rename...", function() self:renameSave(s) end },
-        { "Recovery...", function()
-            local sub = {}
-            for _, r in ipairs(K.RESETS) do sub[#sub + 1] = { "Reset " .. r[2]:lower(), function() self:resetSave(s, r) end } end
-            self:menu(sub)
-        end },
-        false,
-        { "Give it my mods", function() self:giveMods(s) end },
-        { "Folder", function() pcall(function() showFolderInDesktop(getAbsoluteSaveFolderName(s.folder)) end) end },
-    }
-    if self.app then
-        items[#items + 1] = { "Back up in PZMM", function() self:request("backup\t" .. s.folder:gsub("\\", "/"), "Backup of " .. s.name .. " asked for.") end }
-        local backups = readBackups()[s.folder:gsub("\\", "/")] or {}
-        if #backups > 0 then
-            items[#items + 1] = { "Restore a backup...", function()
-                local sub = {}
-                for i, b in ipairs(backups) do
-                    if i > 12 then break end
-                    local days = math.floor((now() - b.at) / 86400)
-                    local when = days <= 0 and "today" or days == 1 and "yesterday" or (days .. " days ago")
-                    sub[#sub + 1] = { (b.slot ~= "" and (b.slot .. ", ") or "") .. when, function()
-                        self:request("restore\t" .. s.folder:gsub("\\", "/") .. "\t" .. b.file, "Restoring " .. s.name .. ": say yes in PZMM.")
-                    end }
-                end
-                self:menu(sub)
-            end }
-        end
-    end
-    items[#items + 1] = false
-    items[#items + 1] = { "Delete", function() self:deleteSave(s) end, danger = true }
-    self:menu(items)
-end
-
---- Who the save loads as: one of its living characters, or a new one (the game's own Load screen's choice).
-function PZMMMods:characterMenu(s)
-    local items = {}
-    for _, pl in ipairs(s.info and s.info.players or {}) do
-        if not pl.isDead then
-            items[#items + 1] = { "Play as " .. tostring(pl.name), function()
-                pcall(function() setSavefilePlayer1(s.mode, s.name, pl.sqlID) end)
-                self.saves = nil
-                self:say(s.name .. " loads as " .. tostring(pl.name) .. " now.")
-            end, pl.sqlID == 1 }
-        end
-    end
-    if s.mode ~= "A Really CD DA" then
-        if #items > 0 then items[#items + 1] = false end
-        items[#items + 1] = { "New character", function()
-            pcall(function() setSavefilePlayer1(s.mode, s.name, -1) end)
-            self.saves = nil
-            self:say(s.name .. ": Play makes a new character.")
-        end }
-    end
-    if #items == 0 then return self:say(s.name .. " has no living characters.") end
-    self:menu(items)
-end
-
 --- Rename a save, as the game's Load screen: a name the game accepts, not taken.
 function PZMMMods:renameSave(s)
     self:prompt("Rename " .. s.name, s.name, "Rename", function(name)
@@ -11003,9 +12564,43 @@ function PZMMMods:useSaveMods(s)
     self:say("My mods now has " .. s.name .. "'s mods. Accept keeps them.")
 end
 
+--- What Give it my mods changes in save `s`: the enabled mods it gains and the ones it loses, by ID, sorted.
+function K.giveDiff(ui, s)
+    local had, on, adds, drops = {}, {}, {}, {}
+    for _, id in ipairs(s.mods or {}) do had[id] = true end
+    for _, id in ipairs(ui:activeOrder()) do
+        on[id] = true
+        if not had[id] then adds[#adds + 1] = id end
+    end
+    for _, id in ipairs(s.mods or {}) do if not on[id] then drops[#drops + 1] = id end end
+    table.sort(adds)
+    table.sort(drops)
+    return adds, drops
+end
+--- The same as lines for the question, by name (the first 12 of each, then how many more).
+function K.giveLines(ui, s)
+    local adds, drops = K.giveDiff(ui, s)
+    local function names(ids)
+        local out = {}
+        for i, id in ipairs(ids) do
+            if i > 12 then
+                out[#out + 1] = "and " .. (#ids - 12) .. " more"
+                break
+            end
+            local d = ui.model.mods[id]
+            out[#out + 1] = d and d.name or id
+        end
+        return table.concat(out, ", ")
+    end
+    local lines = {}
+    if #adds > 0 then lines[#lines + 1] = "Adds " .. #adds .. ": " .. names(adds) end
+    if #drops > 0 then lines[#lines + 1] = "Removes " .. #drops .. ": " .. names(drops) end
+    if #lines == 0 then lines[1] = "It has the same mods: only their load order is written." end
+    return lines
+end
 --- The save's mod list becomes My mods as they are now (the game's own way, as its Load screen does).
 function PZMMMods:giveMods(s)
-    self:ask({ title = "Give " .. s.name .. " your mods as they are in My mods now? It loads with them from then on.", choices = {
+    self:ask({ title = "Give " .. s.name .. " your mods as they are in My mods now? It loads with them from then on.", lines = K.giveLines(self, s), choices = {
         { "Give it my mods", function()
             pcall(function()
                 ActiveMods.getById("currentGame"):copyFrom(self.model:getActiveMods())
@@ -11060,12 +12655,12 @@ function PZMMMods:drawSaves(x, y, w, mx, my)
     local h = head + #saves * rh
     card(self, x, y, w, h)
     bold(self, "Saves", x + 16, y + 16, C.text, MEDIUM)
-    text(self, "Every save, with Play, Use its mods and More.", x + 16, y + 16 + H_MEDIUM + 4, C.muted)
+    text(self, "Every save, with Play, Use its mods and Tools.", x + 16, y + 16 + H_MEDIUM + 4, C.muted)
     rect(self, x, y + head - 1, w, 1, C.line, 0.6)
     y = y + head
     for i, s in ipairs(saves) do
         local ry = y + (i - 1) * rh
-        listRow(self, x, ry, w, rh, i == #saves, mx, my)
+        listRow(self, x, ry, w, rh, i == #saves, mx, my, self.saveTool == s.folder)
         if s.thumb == nil then
             s.thumb = false
             pcall(function() s.thumb = getTextureFromSaveDir("thumb.png", s.folder) or false end)
@@ -11079,7 +12674,9 @@ function PZMMMods:drawSaves(x, y, w, mx, my)
         local ty = ry + 14
         -- Play and Use its mods; the rest in More
         local buttons = {
-            { "More", "quiet", "More\nCharacters, Rename, Recovery, Give it my mods, Folder" .. (self.app and ", Back up in PZMM" or "") .. " and Delete.", function() self:saveMenu(s) end },
+            { T("saves_tools", "Tools"), "quiet", T("saves_tools", "Tools") .. "\nBackups, Give it my mods, characters and recovery, with Rename, Folder and Delete.", function()
+                self.saveTool = self.saveTool ~= s.folder and s.folder or nil
+            end },
             { "Use its mods", nil, "Use its mods\nTurns on exactly this save's mods in My mods. Accept keeps them.", function() self:useSaveMods(s) end },
             { "Play", "primary", self:cantPlay(s) or "Play\nLoad this save with its own mods.", function()
                 local why = self:cantPlay(s)
@@ -11129,7 +12726,148 @@ function PZMMMods:drawSaves(x, y, w, mx, my)
             bx = bx - 8
         end
     end
-    return y + #saves * rh
+    y = y + #saves * rh + 16
+    -- the app's hint: its automatic backups are set in its Settings
+    local hint, link = T("saves_auto_hint", "Backups when the game starts or closes:"), T("saves_auto_settings", "set them in Settings")
+    text(self, hint, x, y, C.muted)
+    local lx = x + width(hint) + 6
+    local lw = width(link)
+    local lo = mx >= lx and mx < lx + lw and my >= y and my < y + H_SMALL
+    text(self, link, lx, y, lo and C.text or C.accentText)
+    rect(self, lx, y + H_SMALL - 2, lw, 1, lo and C.text or C.accentText, 1)
+    self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self.page, self.feedScroll, self.setSection = "settings", 0, "backups" end, x = lx, y = y, w = lw, h = H_SMALL }
+    return y + H_SMALL
+end
+
+K.SAVE_TABS = { { "backups", T("saves_tab_backups", "Backups") }, { "mods", T("saves_tab_mods", "Mods") }, { "players", T("saves_tab_players", "Characters") }, { "recovery", T("saves_tab_recovery", "Recovery") } }
+--- The save `s`'s Tools panel at the right, as the app's: its name with Rename, Folder and Delete, then the sub-tabs
+--- Backups (PZMM's, Back up now and Restore), Mods (Give it my mods), Characters (Play as) and Recovery (the resets).
+function PZMMMods:drawSaveTools(s, x, y, w, h, mx, my)
+    rect(self, x, y, w, h, C.panel, 1)
+    rect(self, x, y, 1, h, C.line, 1)
+    self:setStencilRect(x, y, w, h)
+    local px, pw = x + 18, w - 36
+    local hits = self.feedHits
+    local function btn(label, bx, by, kind, icon, tipText, fn)
+        local bw = width(label) + 28 + (icon and 20 or 0)
+        local _, _, over = flatButton(self, label, bx, by, mx, my, kind, icon)
+        if over and tipText then tip(self, tipText) end
+        hits[#hits + 1] = { kind = "fn", fn = fn, x = bx, y = by, w = bw, h = BAR }
+        return bw
+    end
+    local py = y + 16
+    -- the close X, then the name and its header buttons
+    local cx0 = px + pw - 32
+    local cover = mx >= cx0 and mx < cx0 + 32 and my >= py and my < py + 32
+    round(self, cx0, py, 32, 32, 8, cover and C.hover or C.panel)
+    outline(self, cx0, py, 32, 32, 8, cover and C.accent or C.line, cover and 0.7 or 1)
+    if TB.x then self:drawTextureScaled(TB.x, cx0 + 8, py + 8, 16, 16, 1, C.text.r, C.text.g, C.text.b) end
+    if cover then tip(self, "Close") end
+    hits[#hits + 1] = { kind = "fn", fn = function() self.saveTool = nil end, x = cx0, y = py, w = 32, h = 32 }
+    bold(self, fit(s.name, pw - 44, MEDIUM), px, py + math.floor((32 - H_MEDIUM) / 2), C.text, MEDIUM)
+    py = py + 32 + 10
+    local bx = px
+    bx = bx + btn(T("saves_rename", "Rename..."), bx, py, "quiet", TB.pencil, nil, function() self:renameSave(s) end) + 6
+    bx = bx + btn(T("saves_folder", "Open folder"), bx, py, "quiet", TB.folder, nil, function() pcall(function() showFolderInDesktop(getAbsoluteSaveFolderName(s.folder)) end) end) + 6
+    btn(T("saves_delete", "Delete"), bx, py, "quiet", TB.trash, nil, function() self.saveTool = nil; self:deleteSave(s) end)
+    py = py + BAR + 14
+    -- the sub-tabs
+    local tab = self.saveTab or "backups"
+    local tx = px
+    for _, t in ipairs(K.SAVE_TABS) do
+        local tw = width(t[2]) + 20
+        local on = tab == t[1]
+        local over = mx >= tx and mx < tx + tw and my >= py and my < py + BAR
+        if on then rect(self, tx, py + BAR - 2, tw, 2, C.onSelected, 1) end
+        text(self, t[2], tx + 10, py + (BAR - H_SMALL) / 2, (on or over) and C.text or C.muted)
+        local id = t[1]
+        hits[#hits + 1] = { kind = "fn", fn = function() self.saveTab = id end, x = tx, y = py, w = tw, h = BAR }
+        tx = tx + tw + 4
+    end
+    py = py + BAR + 4
+    rect(self, px, py, pw, 1, C.line, 1)
+    py = py + 14
+    local function para(str, c)
+        for _, l in ipairs(wrap(str, pw)) do
+            text(self, l, px, py, c or C.muted)
+            py = py + H_SMALL + 2
+        end
+        py = py + 8
+    end
+    local key = s.folder:gsub("\\", "/")
+    if tab == "backups" then
+        if not self.app then
+            para(T("saves_backups_noapp", "Backups are PZMM's: install the app to back up and restore saves."))
+        else
+            btn(T("saves_back_up_now", "Back up now"), px, py, "primary", TB.download, nil, function() self:request("backup\t" .. key, "Backup of " .. s.name .. " asked for.") end)
+            py = py + BAR + 14
+            local backups = readBackups()[key] or {}
+            if #backups == 0 then para(T("saves_no_backups", "No backups of this save yet.")) end
+            for i, b in ipairs(backups) do
+                if i > 12 then break end
+                local rl = T("saves_restore", "Restore")
+                local rw = width(rl) + 28
+                local label = (b.slot ~= "" and (b.slot .. ", ") or "") .. date(b.at) .. " " .. clock(b.at)
+                text(self, fit(label, pw - rw - 12), px, py + (BAR - H_SMALL) / 2, C.text)
+                local bb = b
+                btn(rl, px + pw - rw, py, nil, nil, nil, function()
+                    self:request("restore\t" .. key .. "\t" .. bb.file, "Restoring " .. s.name .. ": say yes in PZMM.")
+                end)
+                py = py + BAR + 6
+            end
+        end
+    elseif tab == "mods" then
+        para(T("saves_mods_hint", "Give this save the mods of %1. You see what changes before anything is written.", (self.lib and self.lib.profile) or T("tab_mods", "My mods")))
+        local gw = btn(T("saves_give_mods", "Give it my mods"), px, py, "primary", TB.swap, nil, function() self:giveMods(s) end)
+        btn(T("banner_use_mods", "Use this save's mods"), px + gw + 8, py, nil, TB.check, nil, function() self:useSaveMods(s) end)
+        py = py + BAR + 14
+    elseif tab == "players" then
+        local any = false
+        for _, pl in ipairs(s.info and s.info.players or {}) do
+            any = true
+            local name = tostring(pl.name)
+            local state = pl.isDead and T("saves_dead", "Dead") or (pl.sqlID == 1 and T("saves_plays_as", "Plays as this one") or "")
+            text(self, fit(name, pw / 2), px, py + (BAR - H_SMALL) / 2, pl.isDead and C.muted or C.text)
+            if pl.isDead or pl.sqlID == 1 then
+                text(self, state, px + pw - width(state), py + (BAR - H_SMALL) / 2, C.muted)
+            else
+                local lb = T("saves_play_as", "Play as")
+                local plx = pl
+                btn(lb, px + pw - width(lb) - 28, py, nil, nil, nil, function()
+                    pcall(function() setSavefilePlayer1(s.mode, s.name, plx.sqlID) end)
+                    self.saves = nil
+                    self:say(s.name .. " loads as " .. name .. " now.")
+                end)
+            end
+            py = py + BAR + 6
+        end
+        if not any then para(T("saves_no_players", "No characters in this save yet.")) end
+        if s.mode ~= "A Really CD DA" then
+            btn(T("saves_new_character", "New character"), px, py, "quiet", TB.plus, nil, function()
+                pcall(function() setSavefilePlayer1(s.mode, s.name, -1) end)
+                self.saves = nil
+                self:say(s.name .. ": Play makes a new character.")
+            end)
+            py = py + BAR + 14
+        end
+    else
+        para(self.app and T("saves_reset_hint", "Fix a world that's gone wrong: PZMM backs the save up, then the game builds these files again the next time you load it.")
+            or T("saves_reset_noapp", "Fix a world that's gone wrong: the game builds these files again the next time you load it. Without PZMM there's no backup first: you're asked before anything goes."), self.app and C.muted or C.warn)
+        for _, r in ipairs(K.RESETS) do
+            local rl = T("saves_reset", "Reset")
+            local rw = width(rl) + 28
+            bold(self, r[2], px, py + (BAR - H_SMALL) / 2, C.text)
+            local rr = r
+            btn(rl, px + pw - rw, py, nil, nil, r[2] .. "\n" .. r[3], function() self:resetSave(s, rr) end)
+            py = py + BAR + 4
+            for _, l in ipairs(wrap(r[3], pw)) do
+                text(self, l, px, py, C.muted)
+                py = py + H_SMALL + 2
+            end
+            py = py + 12
+        end
+    end
+    self:clearStencilRect()
 end
 
 -- Servers ---------------------------------------------------------------------------------------------
@@ -11384,9 +13122,11 @@ end
 --- Connect from this screen: with changes to your mods not accepted it asks first, as leaving does (the game's
 --- connect screen hides this one and comes back to `prev`: a stand-in that opens it again when this one closed).
 function PZMMMods:beforeJoin(go)
-    if self:changes(true) == 0 then return go(self) end
-    local back = { setVisible = function(_, v) if v then PZMMMods.open() end end }
-    self:leaveTo(function() go(back) end)
+    self:preflight(function()
+        if self:changes(true) == 0 then return go(self) end
+        local back = { setVisible = function(_, v) if v then PZMMMods.open() end end }
+        self:leaveTo(function() go(back) end)
+    end, true)
 end
 
 --- The servers you joined lately, as PZMM noted them (Zomboid/Lua/pzmm/servers.txt: name, ip:port, when).
@@ -11398,9 +13138,16 @@ function PZMMMods:recentServers()
             local r = getFileReader("pzmm/servers.txt", false)
             if not r then return end
             local line = r:readLine()
+            local favs = {}
+            self.appFavs = favs
             while line do
-                local name, addr, at = line:match("^([^\t]*)\t([^\t]+)\t(%d+)")
-                if addr then recent[#recent + 1] = { name = name, addr = addr, at = tonumber(at) } end
+                local f = fields(line)
+                local name, addr, at = f[1], f[2] or "", tonumber(f[3] or "") or 0
+                if addr ~= "" then
+                    -- a favourite PZMM has without a join of it: a row of its own, at 0
+                    if at > 0 then recent[#recent + 1] = { name = name, addr = addr, at = at } end
+                    if f[4] == "1" then favs[#favs + 1] = { name = name, addr = addr } end
+                end
                 line = r:readLine()
             end
             r:close()
@@ -11437,7 +13184,7 @@ end
 function PZMMMods:selectServer(sel)
     sel.key = sel.key or ((sel.ip or "") .. ":" .. tostring(sel.port or ""))
     self.srvSel = sel
-    self.feedScroll = 0
+    self.srvSideScroll = 0
     if sel.ip and not sel.hosted then self:askRules(sel) end
     -- no server object (an address typed): players and ping come from Steam's own query
     if sel.ip and not sel.hosted and not sel.sv then
@@ -11471,6 +13218,22 @@ function K.mb(b)
     return b >= 1048576 and ((math.floor(b / 104857.6) / 10) .. " MB") or (math.floor(b / 1024) .. " KB")
 end
 --- The game's saved servers (favourites) by "ip:port", read twice a second.
+--- PZMM's favourite servers the game hasn't saved (servers.txt's 4th column 1, by host:port): { name, ip, port, key }.
+function K.appFavs(ui)
+    ui:recentServers()
+    local game = K.favs(ui)
+    local out, seen = {}, {}
+    for _, f in ipairs(ui.appFavs or {}) do
+        local ip, port = f.addr:match("^(.*):(%d+)$")
+        if not ip then ip, port = f.addr, "16261" end
+        local key = ip .. ":" .. port
+        if not game[key] and not seen[key] then
+            seen[key] = true
+            out[#out + 1] = { name = f.name, ip = ip, port = tonumber(port) or 16261, key = key, appFav = true }
+        end
+    end
+    return out
+end
 function K.favs(ui)
     local t = getTimestampMs()
     local c = ui.favCache
@@ -11486,22 +13249,55 @@ function K.favs(ui)
 end
 --- The saved server that is this one (nil: not a favourite).
 function K.favKey(ui, sel) return K.favs(ui)[tostring(sel.ip) .. ":" .. tostring(sel.port or 16261)] end
---- Add a server to the game's saved servers, or take it out (as its server browser's star does).
+--- Add a server to the game's saved servers, or take it out (as its server browser's star does); PZMM's favourites
+--- follow (serverfav), and one only PZMM has is taken out there.
 function PZMMMods:toggleFavourite(sel)
     local saved = K.favKey(self, sel)
+    local key = tostring(sel.ip) .. ":" .. tostring(sel.port or 16261)
+    local name = (sel.name and sel.name ~= "") and sel.name or tostring(sel.ip)
+    if not saved then
+        for _, f in ipairs(K.appFavs(self)) do
+            if f.key == key then
+                K.serverFav(self, key, false)
+                return self:say(name .. " is no longer a favourite.")
+            end
+        end
+    end
     if saved then
         pcall(function() deleteServerToAccountList(saved) end)
-        self:say((sel.name ~= "" and sel.name or tostring(sel.ip)) .. " is no longer a favourite.")
+        self:say(name .. " is no longer a favourite.")
+        K.serverFav(self, key, false)
     else
         local sv = sel.sv
         local pw = false
         if sv then pcall(function() pw = sv:isPasswordProtected() end) end
+        -- the game can't save it (no server object, or a password it asks for): PZMM can
+        if (not sv or pw) and self.app then
+            K.serverFav(self, key, true, sel.name)
+            return self:say(name .. " is a favourite in PZMM now.")
+        end
         if not sv then return self:say("Find it in the Internet list to favourite it, or add it in the game's server browser.") end
         if pw then return self:say("It has a password: add it in the game's server browser, which asks for it.") end
         pcall(function() addServerToAccountList(sv) end)
-        self:say((sel.name ~= "" and sel.name or tostring(sel.ip)) .. " is a favourite now.")
+        self:say(name .. " is a favourite now.")
+        K.serverFav(self, key, true, sel.name)
     end
     self.favCache = nil
+end
+--- Tell PZMM a server ("host:port") is a favourite or not (quiet; its servers.txt follows), shown here at once.
+function K.serverFav(ui, key, on, name)
+    if not ui.app then return end
+    local id = ui:request("serverfav\t" .. key .. "\t" .. (on and "1" or "0"), nil, true)
+    local function reread() ui.recent, ui.srvCache, ui.favCache = nil, nil, nil end
+    -- (no time limit: a closed PZMM takes it when it starts)
+    if id then ui.afterAck[id] = { reread, "Favourite server", math.huge, nil, nil, reread } end
+    ui:recentServers()
+    local favs = {}
+    for _, f in ipairs(ui.appFavs or {}) do
+        if (f.addr:find(":%d+$") and f.addr or (f.addr .. ":16261")) ~= key then favs[#favs + 1] = f end
+    end
+    if on then favs[#favs + 1] = { name = (name and name ~= "") and name or key, addr = key } end
+    ui.appFavs = favs
 end
 --- The server's installed mods that Steam says changed after you last joined it (PZMM's servers.txt has when).
 function PZMMMods:modsMovedOn(sel, ids)
@@ -11536,15 +13332,16 @@ function PZMMMods:downloadSize(sel, r)
                 bytes = bytes + st.size
             else
                 known = false
-                ask = ask or ArrayList.new()
-                ask:add(item)
+                ask = ask or {}
+                ask[#ask + 1] = item
             end
         end
     end
     if ask and not sel.sized then
-        sel.sized = true
-        self.steam = self.steam or {}
-        pcall(function() querySteamWorkshopItemDetails(ask, PZMMMods.onSteamDetails, self) end)
+        self.steam = K.STEAM.items
+        local fresh = {}
+        for _, w in ipairs(ask) do if not K.STEAM.asking[w] then fresh[#fresh + 1] = w end end
+        pcall(function() sel.sized = #fresh == 0 or self:steamAsk(fresh) end)
     end
     return count, known and bytes or nil
 end
@@ -11590,6 +13387,23 @@ function PZMMMods:useMods(ids, name)
         .. (skipped > 0 and (" " .. self:skipNote(skipped)) or "") .. " Undo takes it back.")
 end
 
+--- Set up and join with PZMM: it makes (or refreshes) the server's own profile with exactly `ids` and switches to it;
+--- once it says done, the game takes that profile's mods and joins.
+function PZMMMods:serverProfileJoin(sel, ids)
+    local addr = tostring(sel.ip) .. ":" .. tostring(sel.port or 16261)
+    local name = sel.name ~= "" and sel.name or addr
+    local id = self:request("serverprofile\t" .. addr .. "\t" .. table.concat(ids, ","), "Setting up " .. name .. "'s profile to join: say yes in PZMM.")
+    if not id then return end
+    local join = sel.join
+    self.afterAck[id] = { function()
+        pcall(function() self.model:reloadMods() end)
+        self:takeAppMods()
+        self.defRev, self.defChanged = self.app and self.app.default_rev, nil
+        self:say(name .. "'s profile is on: joining.")
+        join()
+    end, name .. "'s profile, not joining" }
+end
+
 --- Open the game's server settings screen on a hosted server (Back returns here); else the host screen.
 function PZMMMods:editServerSettings(name)
     -- leaving asks about unaccepted changes first (leaveTo closes this screen)
@@ -11618,9 +13432,12 @@ function PZMMMods:editServerSettingsNow(name)
 end
 
 --- The picked server's details: what it says about itself, its mods against yours, and what to do with it.
+--- The picked server's details at x, y, w (the side panel's inside), as the app's: name and close, its header
+--- buttons, warnings, facts and description, the Mods | Rules | Players | Your joins tabs, then what to do.
+--- Returns the y under it.
 function PZMMMods:drawServerPanel(x, y, w, mx, my)
     local sel = self.srvSel
-    local ix, iw = x + 18, w - 36
+    local ix, iw = x, w
     local sv = sel.sv
     local function g(fn)
         local ok, v = pcall(fn)
@@ -11628,7 +13445,7 @@ function PZMMMods:drawServerPanel(x, y, w, mx, my)
         return nil
     end
     local r = (not sel.hosted) and self:rulesFor(sel) or nil
-    local facts, desc, modStr = {}, "", ""
+    local facts, desc, modStr, plNow = {}, "", "", nil
     local function fact(label, v)
         if v ~= nil and tostring(v) ~= "" then facts[#facts + 1] = { label, tostring(v) } end
     end
@@ -11655,7 +13472,8 @@ function PZMMMods:drawServerPanel(x, y, w, mx, my)
             local si = PZMMMods.srvInfo[tostring(sel.host or sel.ip) .. ":" .. tostring(sel.port or "")]
             if si then pl, mx2, ping, known = si.players, si.max, si.ping, true end
         end
-        fact("Players", (pl and (known or pl > 0)) and (pl .. "/" .. tostring(mx2 or "?")) or nil)
+        plNow = (pl and (known or pl > 0)) and (pl .. "/" .. tostring(mx2 or "?")) or nil
+        fact("Players", plNow)
         fact("Ping", (ping and ping > 0) and (ping .. " ms") or nil)
         fact("Version", (r and r.version) or (sv and g(function() return sv:getVersion() end)))
         fact("Map", sv and g(function() return sv:getMapName() end))
@@ -11694,44 +13512,52 @@ function PZMMMods:drawServerPanel(x, y, w, mx, my)
             if rr.addr == addr and (rr.at or 0) > 0 then hist = rr; break end
         end
     end
-    if tab == "history" and not hist then tab = "mods" end
-    -- what to do: Set up and join (the ticked mods on, then join), Join as-is, Use its mods, Favourite...
-    local buttons = {}
-    local function button(label, kind, tipText, fn, icon) buttons[#buttons + 1] = { label, kind, tipText, fn, icon } end
+    -- the header's buttons (Favourite, Refresh, BattleMetrics) and the footer's (Set up and join, Join as is or
+    -- Join, Use its mods, Forget the saved password; a hosted one's Give it my mods and Edit settings)
+    local head, foot = {}, {}
+    local function button(list, label, kind, tipText, fn, icon) list[#list + 1] = { label, kind, tipText, fn, icon } end
     local function ticked()
         local out = {}
         for _, id in ipairs(ids) do if miss[id] or not sel.skip[id] then out[#out + 1] = id end end
         return out
     end
+    if not sel.hosted then
+        local fav = K.favKey(self, sel)
+        if sel.ip and sel.ip ~= "" then
+            button(head, fav and T("launcher_unfavourite", "Remove favourite") or T("launcher_favourite", "Favourite"), nil, "Favourite\nAdds it to the game's saved servers (a server with a password is added in the game's server browser), or takes it out.", function() self:toggleFavourite(sel) end, TB.star)
+        end
+        button(head, T("srv_refresh", "Refresh"), nil, "Refresh\nAsks Steam for its description, version and mods again.", function() self:askRules(sel) end, TB.update)
+        if sel.ip and sel.ip ~= "" then
+            button(head, T("launcher_battlemetrics", "BattleMetrics"), nil, "BattleMetrics\nLook the server up on BattleMetrics: its player history, uptime and rank.", function() openLink("https://www.battlemetrics.com/servers/zomboid?q=" .. urlEncode(tostring(sel.ip))) end, TB.external)
+        end
+    end
     if sel.join and #ids > 0 and not sel.hosted then
-        button(T("launcher_set_up_join", "Set up and join"), "primary", "Set up and join\nTurns on the ticked mods you have (the rest off), then joins. The game downloads any Workshop mods it needs as it connects.", function()
+        button(foot, T("launcher_set_up_join", "Set up and join"), "primary", self.app and "Set up and join\nPZMM makes the server a profile of its own with exactly its ticked mods and switches to it, then you join. The game downloads any Workshop mods it needs as it connects."
+            or "Set up and join\nTurns on the ticked mods you have (the rest off), then joins. The game downloads any Workshop mods it needs as it connects.", function()
+            if self.app then return self:serverProfileJoin(sel, ticked()) end
             self:useMods(ticked(), sel.name ~= "" and sel.name or tostring(sel.ip))
             sel.join()
         end, TB.play)
-        button(T("launcher_join_as_is", "Join as-is"), nil, "Join as-is\nJoins with your mods as they are, turning nothing on.", sel.join, TB.play)
+        button(foot, T("launcher_join_as_is", "Join as is"), nil, "Join as is\nJoins with your mods as they are, turning nothing on.", sel.join, TB.play)
     elseif sel.join then
-        button("Join", "primary", "Join\nThe game downloads any Workshop mods it needs as it connects.", sel.join, TB.play)
+        button(foot, T("launcher_join", "Join"), "primary", "Join\nThe game downloads any Workshop mods it needs as it connects.", sel.join, TB.play)
     end
     if #ids > 0 then
         local nt = #ticked() - #missing
-        button(T("srv_use_mods", "Use its mods"), nil, "Use its mods\nTurns on exactly the " .. nt .. " ticked of its " .. #ids .. " mods you have installed, and the rest off." .. (#missing > 0 and (" " .. #missing .. (#missing == 1 and " isn't" or " aren't") .. " installed: joining downloads Workshop ones.") or "") .. " Undo takes it back.", function()
+        button(foot, T("srv_use_mods", "Use its mods"), nil, "Use its mods\nTurns on exactly the " .. nt .. " ticked of its " .. #ids .. " mods you have installed, and the rest off." .. (#missing > 0 and (" " .. #missing .. (#missing == 1 and " isn't" or " aren't") .. " installed: joining downloads Workshop ones.") or "") .. " Undo takes it back.", function()
             self:useMods(ticked(), sel.name ~= "" and sel.name or tostring(sel.ip))
         end, TB.check)
     end
     if sel.hosted then
         local stx = sel.hosted
-        button("Give it my mods", nil, "Give it my mods\nIts Mods, WorkshopItems and Map settings become the mods on in My mods now.", function() self:giveServerMods(stx) end)
-        button(T("srv_edit", "Edit settings"), nil, "Edit settings\nThe game's own server settings screen for it. Back brings you here.", function() self:editServerSettings(sel.name) end)
+        button(foot, "Give it my mods", nil, "Give it my mods\nIts Mods, WorkshopItems and Map settings become the mods on in My mods now.", function() self:giveServerMods(stx) end)
+        button(foot, T("srv_edit", "Edit settings"), nil, "Edit settings\nThe game's own server settings screen for it. Back brings you here.", function() self:editServerSettings(sel.name) end)
     else
         local fav = K.favKey(self, sel)
-        if sel.ip and sel.ip ~= "" then
-            button(fav and T("launcher_unfavourite", "Remove favourite") or T("launcher_favourite", "Favourite"), nil, "Favourite\nAdds it to the game's saved servers (a server with a password is added in the game's server browser), or takes it out.", function() self:toggleFavourite(sel) end, TB.star)
-            button(T("launcher_battlemetrics", "BattleMetrics"), nil, "BattleMetrics\nIts history and player counts.", function() openLink("https://www.battlemetrics.com/servers/zomboid?q=" .. urlEncode(tostring(sel.ip))) end, TB.external)
-        end
         local hasPw = false
         if fav then pcall(function() hasPw = tostring(fav:getServerPassword() or "") ~= "" end) end
         if hasPw then
-            button(T("srv_forget_pw", "Forget saved password"), nil, "Forget saved password\nTakes the server's password out of the game's saved server: joining asks for it again. PZMM keeps no password of its own.", function()
+            button(foot, T("srv_forget_pw", "Forget the saved password"), nil, "Forget the saved password\nTakes the server's password out of the game's saved server: joining asks for it again. PZMM keeps no password of its own.", function()
                 self:ask({ title = "Forget the saved password of " .. (sel.name ~= "" and sel.name or tostring(sel.ip)) .. "?", lines = { "The game's saved server keeps its address and accounts. Joining asks for the password each time." }, choices = {
                     { "Forget it", function()
                         local ok = pcall(function()
@@ -11744,13 +13570,6 @@ function PZMMMods:drawServerPanel(x, y, w, mx, my)
                 } })
             end, TB.lock)
         end
-        button("Ask Steam again", "quiet", "Ask Steam again\nAsks for its description, version and mods again.", function() self:askRules(sel) end, TB.alert)
-    end
-    local brows, bx0 = 1, 0
-    for _, bt in ipairs(buttons) do
-        local bw = width(bt[1]) + 28 + (bt[5] and 20 or 0)
-        if bx0 > 0 and bx0 + bw > iw then brows, bx0 = brows + 1, 0 end
-        bx0 = bx0 + bw + 8
     end
     -- warnings: this build isn't the server's, a mod moved on since you last joined
     local warns = {}
@@ -11815,49 +13634,41 @@ function PZMMMods:drawServerPanel(x, y, w, mx, my)
         local known = r ~= nil or sel.hosted or (sv and g(function() return sv:isResponded() end))
         mline(known and T("srv_no_mods", "No mods: it runs vanilla Project Zomboid.") or T("srv_mods_unknown", "Its mods show once it answers."), C.muted)
     end
-    local hlines = (tab == "history" and hist) and wrap(T("srv_history_hint", "Your last join of this server, from PZMM's list. Restoring a past join's setup, and who is online, are in the PZMM app: the game can't ask a server for either."), iw) or {}
     local labelW = 0
     for _, f in ipairs(facts) do labelW = math.max(labelW, width(f[1])) end
     for _, f in ipairs(rules) do labelW = math.max(labelW, width(f[1])) end
     labelW = labelW + 14
-    local colW = 260
+    local colW = iw < 520 and iw or 260
     local cols = math.max(1, math.floor(iw / colW))
     local cap = cols * 12
     local nshow = math.min(#ids, cap)
     local rows = math.ceil(nshow / cols)
     local rowH = BOX + 4
-    local tabsH = sel.hosted and 0 or (BAR + 12)
-    local body = 0
-    if tab == "history" then
-        body = (H_SMALL + 6) + #hlines * (H_SMALL + 2) + 8
-    elseif tab == "rules" then
-        body = #rules * (H_SMALL + 4) + (wipeHint and (#wipeHint * (H_SMALL + 2) + 6) or 0) + 8
-    elseif tab == "mods" then
-        body = (#ids > 0 and (H_SMALL + 8 + rows * rowH + (#ids > cap and (H_SMALL + 4) or 0)) or 0) + #mlines * (H_SMALL + 2) + 8
+    local py = y
+    -- (a row of buttons, wrapped to the width)
+    local function buttonRow(list)
+        if #list == 0 then return end
+        local bx = ix
+        for _, bt in ipairs(list) do
+            local bw = width(bt[1]) + 28 + (bt[5] and 20 or 0)
+            if bx > ix and bx + bw > ix + iw then bx, py = ix, py + BAR + 8 end
+            local _, _, over = flatButton(self, bt[1], bx, py, mx, my, bt[2], bt[5])
+            if over then tip(self, bt[3]) end
+            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = bt[4], x = bx, y = py, w = bw, h = BAR }
+            bx = bx + bw + 8
+        end
+        py = py + BAR + 14
     end
-    local h = 18 + H_MEDIUM + 4 + H_SMALL + 14 + brows * (BAR + 8) + 6 + (#wlines > 0 and (#wlines * (H_SMALL + 2) + 10) or 0)
-        + #facts * (H_SMALL + 4) + (nd > 0 and (nd * (H_SMALL + 2) + 12) or 0) + tabsH + body + (#plines > 0 and (#plines * (H_SMALL + 2) + 8) or 0) + 12
-    card(self, x, y, w, h)
-    local py = y + 18
-    local shownTitle = fit(sel.name ~= "" and sel.name or tostring(sel.ip), iw - 100)
+    local shownTitle = fit(sel.name ~= "" and sel.name or tostring(sel.ip), iw - BAR - 12, MEDIUM)
     bold(self, shownTitle, ix, py, C.text, MEDIUM)
-    if r and r.pvp and width(shownTitle, MEDIUM) + 80 < iw - 100 then tagChip(self, "PvP", ix + width(shownTitle, MEDIUM) + 12, py + math.floor((H_MEDIUM - H_SMALL - 2) / 2), false) end
+    if r and r.pvp and width(shownTitle, MEDIUM) + 60 < iw - BAR - 12 then tagChip(self, "PvP", ix + width(shownTitle, MEDIUM) + 12, py + math.floor((H_MEDIUM - H_SMALL - 2) / 2), false) end
     local _, co = toolButton(self, TB.x, nil, ix + iw - BAR, py - 4, mx, my)
     if co then tip(self, "Close\nHides these details.") end
     self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self.srvSel = nil end, x = ix + iw - BAR, y = py - 4, w = BAR, h = BAR }
     py = py + H_MEDIUM + 4
     text(self, sel.hosted and "Your hosted server" or "Server", ix, py, C.muted)
     py = py + H_SMALL + 14
-    local bx = ix
-    for _, bt in ipairs(buttons) do
-        local bw = width(bt[1]) + 28 + (bt[5] and 20 or 0)
-        if bx > ix and bx + bw > ix + iw then bx, py = ix, py + BAR + 8 end
-        local _, _, over = flatButton(self, bt[1], bx, py, mx, my, bt[2], bt[5])
-        if over then tip(self, bt[3]) end
-        self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = bt[4], x = bx, y = py, w = bw, h = BAR }
-        bx = bx + bw + 8
-    end
-    py = py + BAR + 14
+    buttonRow(head)
     for _, l in ipairs(wlines) do
         if TB.alert and l == wlines[1] then self:drawTextureScaled(TB.alert, ix, py + math.floor((H_SMALL - 14) / 2), 14, 14, 1, C.warn.r, C.warn.g, C.warn.b) end
         text(self, l, ix + 20, py, C.warn)
@@ -11879,20 +13690,22 @@ function PZMMMods:drawServerPanel(x, y, w, mx, my)
         end
         py = py + 8
     end
-    -- Mods | Rules
+    -- Mods | Rules | Players | Your joins
     if not sel.hosted then
-        local tabs = { { "mods", T("srv_tab_mods", "Mods") }, { "rules", T("srv_tab_rules", "Rules") } }
-        if hist then tabs[#tabs + 1] = { "history", T("srv_tab_history", "History") } end
+        local tabs = { { "mods", T("srv_tab_mods", "Mods") }, { "rules", T("srv_tab_rules", "Rules") }, { "players", T("srv_players", "Players") }, { "history", T("srv_tab_history", "Your joins") } }
         local sw = 0
-        for _, t in ipairs(tabs) do sw = sw + width(t[2]) + 24 end
+        for _, t in ipairs(tabs) do sw = sw + width(t[2]) + 20 end
+        local pad = sw > iw and 6 or 10
+        sw = 0
+        for _, t in ipairs(tabs) do sw = sw + width(t[2]) + pad * 2 end
         local tx = ix
         for i, t in ipairs(tabs) do
-            local tw = width(t[2]) + 24
+            local tw = width(t[2]) + pad * 2
             local on = tab == t[1]
             if on then roundEnds(self, tx, py, tw, BAR, 6, C.accent, 0.32, i == 1, i == #tabs) end
             local over = mx >= tx and mx < tx + tw and my >= py and my < py + BAR
             local f = on and bold or text
-            f(self, t[2], tx + 12, py + (BAR - H_SMALL) / 2, on and C.onSelected or over and C.text or C.muted)
+            f(self, t[2], tx + pad, py + (BAR - H_SMALL) / 2, on and C.onSelected or over and C.text or C.muted)
             local id = t[1]
             self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() sel.tab = id end, x = tx, y = py, w = tw, h = BAR }
             tx = tx + tw
@@ -11900,14 +13713,26 @@ function PZMMMods:drawServerPanel(x, y, w, mx, my)
         outline(self, ix, py, sw, BAR, 6, C.line)
         py = py + BAR + 12
     end
-    if tab == "history" then
-        local okd, ds = pcall(os.date, "%d %b %Y, %H:%M", K.LT(hist.at))
-        text(self, (okd and ds or "") .. "  " .. K.ago(hist.at), ix, py, C.text)
-        py = py + H_SMALL + 6
-        for _, l in ipairs(hlines) do
-            text(self, l, ix, py, C.muted)
+    local function para(str, c)
+        for _, l in ipairs(wrap(str, iw)) do
+            text(self, l, ix, py, c or C.muted)
             py = py + H_SMALL + 2
         end
+    end
+    if tab == "history" then
+        if hist then
+            local okd, ds = pcall(os.date, "%d %b %Y, %H:%M", K.LT(hist.at))
+            text(self, (okd and ds or "") .. "  " .. K.ago(hist.at), ix, py, C.text)
+            py = py + H_SMALL + 6
+            para(T("srv_history_hint", "Your last join of this server, from PZMM's list. Restoring a past join's setup, and who is online, are in the PZMM app: the game can't ask a server for either."))
+        else
+            para(T("srv_no_history", "Servers you join show up here."))
+        end
+    elseif tab == "players" then
+        text(self, T("srv_players", "Players"), ix, py, C.muted)
+        text(self, plNow or "unknown", ix + labelW, py, C.text)
+        py = py + H_SMALL + 8
+        para(T("srv_players_hint", "Who is on shows in the PZMM app: the game can't ask a server for its player list."))
     elseif tab == "rules" then
         for _, f in ipairs(rules) do
             text(self, f[1], ix, py, C.muted)
@@ -11949,14 +13774,15 @@ function PZMMMods:drawServerPanel(x, y, w, mx, my)
                 if mx >= cx - 4 and mx < cx + BOX + 4 and my >= ry - 2 and my < ry - 2 + rowH then tip(self, "Use " .. label2 .. "\nTicked: Set up and join turns it on. Unticked: it's turned off.") end
                 lx = cx + BOX + 8
             end
-            local shownName = fit(label2, colW - 24 - chipW - 12 - (lx - cx))
+            local cr = cx + colW - (cols > 1 and 24 or 0)
+            local shownName = fit(label2, cr - chipW - 12 - lx)
             text(self, shownName, lx, ry + math.floor((rowH - H_SMALL) / 2), miss[id] and C.warn or C.text)
             local side = c.so[id] and T("srv_server_only", "Server only") or c.op[id] and T("srv_optional", "Optional") or nil
             if side then
                 local sx = lx + width(shownName) + 8
-                if sx + width(side) + 12 < cx + colW - 24 - chipW - 8 then chip(self, side, sx, ry + math.floor((rowH - H_SMALL - 2) / 2), nil, nil, C.line) end
+                if sx + width(side) + 12 < cr - chipW - 8 then chip(self, side, sx, ry + math.floor((rowH - H_SMALL - 2) / 2), nil, nil, C.line) end
             end
-            chip(self, st, cx + colW - 24 - chipW, ry + math.floor((rowH - H_SMALL - 2) / 2), stc, nil, C.line)
+            chip(self, st, cr - chipW, ry + math.floor((rowH - H_SMALL - 2) / 2), stc, nil, C.line)
         end
         py = py + rows * rowH
         if #ids > cap then text(self, "+" .. (#ids - cap) .. " more", ix, py, C.muted) end
@@ -11971,13 +13797,44 @@ function PZMMMods:drawServerPanel(x, y, w, mx, my)
         text(self, l, ix, py, #missing > 0 and C.warn or C.muted)
         py = py + H_SMALL + 2
     end
-    return y + h + 20
+    -- the footer: what to do with it
+    if #foot > 0 then
+        py = py + 12
+        rect(self, ix, py, iw, 1, C.line, 1)
+        py = py + 14
+        buttonRow(foot)
+    end
+    return py
 end
 
 
+--- A server typed or pasted, as the app's: ip:port, an address alone (port 16261), or a pzmm://join/host:port link
+--- (with ?password=... the server's password). Returns ip, port and that password (nil: none), or nil.
+function K.parseServer(typed)
+    local s = (tostring(typed or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+    local pw
+    local link = s:match("^[Pp][Zz][Mm][Mm]://[Jj][Oo][Ii][Nn]/(.+)$")
+    local function dec(v) return (v:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)) end
+    if link then
+        local addr, q = link:match("^([^?#]*)%??([^#]*)")
+        s = (dec(addr):gsub("/$", ""))
+        for k, v in q:gmatch("([^&=]+)=?([^&]*)") do
+            if k:lower() == "password" then pw = dec((v:gsub("%+", " "))) end
+        end
+    elseif s:find("^%a+://") then
+        return nil
+    end
+    local ip, port = s:match("^([^%s:/?#]+):?(%d*)$")
+    if not ip then return nil end
+    port = port ~= "" and port or "16261"
+    local pn = tonumber(port)
+    if not pn or pn < 1 or pn > 65535 then return nil end
+    return ip, port, pw
+end
+
 --- Join a server straight away, through the game's own connecting screen: the account you type (a new name
---- makes a new account), and the server's password if it has one.
-function PZMMMods:joinServer(name, ip, port, protected, user, pass)
+--- makes a new account), and the server's password if it has one (`spw0`: from a link, shown filled in).
+function PZMMMods:joinServer(name, ip, port, protected, user, pass, spw0)
     local function go(u, pw, spw)
         self.lastUser = u
         self:beforeJoin(function(prev)
@@ -11990,18 +13847,21 @@ function PZMMMods:joinServer(name, ip, port, protected, user, pass)
         if u == "" then return end
         self:prompt("Account password (blank for a new account)", "", protected and "Next" or "Join", function(pw)
             if not protected then return go(u, pw, "") end
+            if spw0 then
+                return self:prompt("The server's password. " .. T("srv_pw_from_link", "Filled in from the link: check it before joining."), spw0, "Join", function(spw) go(u, pw, spw) end)
+            end
             self:prompt("The server's password", "", "Join", function(spw) go(u, pw, spw) end, true)
         end, true)
     end)
 end
 
---- The Internet list's filters and sort, as the app's: players, password, PvP (when Steam's rules say), build, mods,
---- not full, not empty. Each is a menu or a toggle; they work over the rows already asked for. Returns the y under them.
-function PZMMMods:drawServerFilters(x, y, w, mx, my)
+--- The server lists' filters and sort, as the app's, in its order: Search, Build, Mods (Any, Only mods I have,
+--- Missing some, At most N to download), Map, Players (Any, Not empty, Not full, 5+, 10+, 20+), Password, PvP,
+--- Sort (not on History), Refresh. Each is a menu or a toggle over the rows already asked for. Returns the y under them.
+function PZMMMods:drawServerFilters(x, y, w, mx, my, top, bh, page)
     local f = self.sf
     if not f then f = {}; self.sf = f end
-    local function set(k, v)
-        f[k] = v
+    local function changed()
         self.sfVer = (self.sfVer or 0) + 1
         self.srvCache = nil
     end
@@ -12022,64 +13882,86 @@ function PZMMMods:drawServerFilters(x, y, w, mx, my)
         b = { n = #PZMMMods.inet, k = PZMMMods.srvN, list = list }
         self.srvBuilds = b
     end
-    local function menu(key, title, opts)
+    -- a menu over one or more keys: each choice sets its key and clears the others (nil key: Any)
+    local function menu(keys, title, opts)
         local cur
-        for _, o in ipairs(opts) do if f[key] == o[2] then cur = o[1] end end
-        local on = f[key] ~= nil
-        return { title = on and (title .. ": " .. tostring(cur)) or title, on = on, tip = title .. "\nFilter the list.", fn = function(mx2, my2)
+        for _, o in ipairs(opts) do if o[2] and f[o[2]] == o[3] then cur = o[1] end end
+        return { title = cur and (title .. ": " .. tostring(cur)) or title, on = cur ~= nil, tip = title .. "\nFilter the list.", fn = function(mx2, my2)
             local items = {}
             for _, o in ipairs(opts) do
-                local v = o[2]
-                items[#items + 1] = { o[1], function() set(key, v) end, f[key] == v }
+                items[#items + 1] = { o[1], function()
+                    for _, k in ipairs(keys) do f[k] = nil end
+                    if o[2] then f[o[2]] = o[3] end
+                    changed()
+                end, (o[2] == nil and cur == nil) or (o[2] ~= nil and f[o[2]] == o[3]) }
             end
             self:menu(items, mx2, my2)
         end }
     end
-    local builds = { { T("srv_any_build", "Any build"), nil } }
-    for _, v in ipairs(b.list) do builds[#builds + 1] = { v, v } end
+    local builds = { { T("srv_any_build", "Any build") } }
+    for _, v in ipairs(b.list) do builds[#builds + 1] = { v, "build", v } end
+    local mods = { { T("srv_any_mods", "Any mods") }, { T("srv_only_mine", "Only mods I have"), "mods", "have" }, { "Missing some", "mods", "missing" } }
+    for _, n in ipairs({ 1, 3, 5, 10 }) do mods[#mods + 1] = { T("srv_at_most", "At most %1 to download", n), "maxdl", n } end
+    local players = { { T("srv_any_players", "Any players") }, { T("srv_not_empty", "Not empty"), "players", 1 }, { T("srv_not_full", "Not full"), "notFull", true } }
+    for _, n in ipairs({ 5, 10, 20 }) do players[#players + 1] = { n .. " or more", "players", n } end
     local sorts = { { "players", T("srv_by_players", "Most players") }, { "ping", T("srv_by_ping", "Lowest ping") }, { "name", T("srv_by_name", "Name") } }
     local sortName = sorts[1][2]
     for _, s in ipairs(sorts) do if s[1] == (self.srvSort or "players") then sortName = s[2] end end
     local ctl = {
-        menu("players", T("srv_players", "Players"), { { T("srv_any_players", "Any players"), nil }, { "1 or more", 1 }, { "5 or more", 5 }, { "10 or more", 10 }, { "20 or more", 20 } }),
-        menu("pw", T("srv_password", "Password"), { { T("srv_any_password", "Password or not"), nil }, { T("srv_no_password", "No password"), "no" }, { T("srv_with_password", "With a password"), "yes" } }),
-        menu("pvp", "PvP", { { T("srv_any_pvp", "PvP or PvE"), nil }, { "PvP", true }, { "PvE", false } }),
-        menu("build", T("srv_build", "Build"), builds),
-        menu("mods", T("srv_mods", "Mods"), { { T("srv_any_mods", "Any mods"), nil }, { T("srv_only_mine", "Only mods I have"), "have" }, { "Missing some", "missing" } }),
-        menu("maxdl", T("srv_max_download", "To download"), { { T("srv_any_download", "Any number to download"), nil }, { "At most 0 to download", 0 }, { "At most 1 to download", 1 }, { "At most 3 to download", 3 }, { "At most 5 to download", 5 }, { "At most 10 to download", 10 } }),
+        { search = true },
+        menu({ "build" }, T("srv_build", "Build"), builds),
+        menu({ "mods", "maxdl" }, T("srv_mods", "Mods"), mods),
         { title = f.map and ("Map: " .. f.map) or T("srv_map", "Map"), on = f.map ~= nil, tip = "Map\nOnly servers whose map name has these letters. Click again to change or clear it.", fn = function()
             self:prompt("Part of a map name (empty: any)", f.map or "", "Filter", function(t)
                 t = tostring(t or ""):gsub("^%s+", ""):gsub("%s+$", "")
-                set("map", t ~= "" and t:lower() or nil)
+                f.map = t ~= "" and t:lower() or nil
+                changed()
             end)
         end },
-        { title = T("srv_not_full", "Not full"), on = f.notFull == true, tip = "Not full\nHides servers with no free slot.", fn = function() set("notFull", not f.notFull or nil) end },
-        { title = T("srv_not_empty", "Not empty"), on = f.notEmpty == true, tip = "Not empty\nHides servers nobody is on.", fn = function() set("notEmpty", not f.notEmpty or nil) end },
-        { title = sortName, icon = TB.sort, tip = "Sort\nHow the list is ordered.", fn = function(mx2, my2)
+        menu({ "players", "notFull", "notEmpty" }, T("srv_players", "Players"), players),
+        menu({ "pw" }, T("srv_password", "Password"), { { T("srv_any_password", "Password or not") }, { T("srv_no_password", "No password"), "pw", "no" }, { T("srv_with_password", "With a password"), "pw", "yes" } }),
+        menu({ "pvp" }, "PvP", { { T("srv_any_pvp", "PvP or PvE") }, { "PvP", "pvp", true }, { "PvE", "pvp", false } }),
+    }
+    if page ~= "history" then
+        ctl[#ctl + 1] = { title = sortName, icon = TB.sort, tip = "Sort\nHow the list is ordered.", fn = function(mx2, my2)
             local items = {}
             for _, s in ipairs(sorts) do
-                items[#items + 1] = { s[2], function() self.srvSort = s[1]; self.sfVer = (self.sfVer or 0) + 1; self.srvCache = nil end, (self.srvSort or "players") == s[1] }
+                items[#items + 1] = { s[2], function() self.srvSort = s[1]; changed() end, (self.srvSort or "players") == s[1] }
             end
             self:menu(items, mx2, my2)
-        end },
-    }
+        end }
+    end
+    local steam = false
+    pcall(function() steam = getSteamModeActive() end)
+    if steam then
+        ctl[#ctl + 1] = { title = T("srv_refresh", "Refresh"), icon = TB.update, tip = "Refresh\nAsks Steam for the Internet list again. Each server's mods are checked against yours.", fn = function()
+            PZMMMods.inet = {}
+            PZMMMods.inetAt = getTimestampMs()
+            self.recent, self.srvCache = nil, nil
+            listen()
+            PZMMMods.askInet()
+        end }
+    end
     local any = false
     for _, v in pairs(f) do if v ~= nil then any = true end end
     if any then
         ctl[#ctl + 1] = { title = T("tool_clear", "Clear filters"), icon = TB.x, tip = "Clear filters\nShow every server again.", fn = function()
             self.sf = {}
-            self.sfVer = (self.sfVer or 0) + 1
-            self.srvCache = nil
+            changed()
         end }
     end
     local bx = x
     for _, c in ipairs(ctl) do
-        local bw = width(c.title) + 46
+        local bw = c.search and 220 or (width(c.title) + 46)
         if bx + bw > x + w and bx > x then bx, y = x, y + BAR + 6 end
-        local _, over = toolButton(self, c.icon, c.title, bx, y, mx, my, c.on)
-        if over then tip(self, c.tip) end
-        local fn = c.fn
-        self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() fn(mx, my) end, x = bx, y = y, w = bw, h = BAR }
+        if c.search then
+            K.searchSpot(self, bx, y, bw, top, bh)
+        else
+            local _, over = toolButton(self, c.icon, c.title, bx, y, mx, my, c.on)
+            if over then tip(self, c.tip) end
+            local fn = c.fn
+            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() fn(mx, my) end, x = bx, y = y, w = bw, h = BAR }
+        end
         bx = bx + bw + 6
     end
     y = y + BAR
@@ -12091,17 +13973,112 @@ function PZMMMods:drawServerFilters(x, y, w, mx, my)
     return y + 16
 end
 
---- Servers: find servers on the Internet with each one's mods checked against yours, join by address, your
---- saved servers, the ones you joined lately (from PZMM), and your hosted servers, which take your mods.
-function PZMMMods:drawServers(x, y, w, mx, my, top, bh)
-    y = self:drawNotice(x, y, w, T("notice_servers", "running a dedicated server (setup, start, stop, console, players, backups and files), hosting beyond start and stop (restart, a warned restart with abort, updating, adopting or finding an existing server, checking the Workshop for external servers, copying diagnostics), hosting tabs (automation with crash and scheduled restarts, warnings, backups every N and the Discord bot and relay; world tools to copy a world, reset chunks or migrate; a mods editor that adds from a collection, profile or preset, autosorts and checks conflicts; the ini settings editor with presets), remote servers (RCON, FTP and the Files tab), the public join address and opening pzmm:// links, a profile per server, the country filter and its setting, listing servers without Steam (a Steam Web API key), your Steam friends' servers, a server's player list, restoring a past join's setup and, in the join dialog, map overlap and maps-not-in-mods warnings, per-mod size and updated date, server keywords, a caution for a very recent update and Remember password (the game can't ask a server who is online)."), mx, my)
-    local bx = x
-    local function button(label, kind, tipText, fn, icon)
-        local bw, _, over = flatButton(self, label, bx, y, mx, my, kind, icon)
-        if over then tip(self, tipText) end
-        self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = fn, x = bx, y = y, w = bw, h = BAR }
-        bx = bx + bw + 8
+--- The page Servers shows: the one picked in its rail, else Overview when you host servers, else Browse servers.
+function PZMMMods:srvPageNow()
+    return self.srvPage or (#self:hostedList() > 0 and "overview" or "browse")
+end
+--- Direct connect's Look up: the address typed (ip:port, or a pzmm://join link) opens its details at the right.
+function PZMMMods:directLookUp()
+    local ip, port, pw = K.parseServer(self.directText or "")
+    if not ip then
+        self.directErr = T("srv_bad_address", "Not a server address: type IP:port (or a host name), or paste a pzmm://join link.")
+        return
     end
+    self.directErr = nil
+    self:selectServer({ name = "", ip = ip, port = port, join = function() self:joinServer("", ip, port, true, nil, nil, pw) end })
+    if pw then self:say("The link has the server's password: Join fills it in.") end
+end
+--- The server lists' columns for a list at x, w, as the app's: each one's left edge (Map and Build are left out
+--- when it's narrow), Join's, and the star's at the right.
+function K.srvCols(x, w)
+    local c = { star = x + w - 16 - 16 }
+    c.join = c.star - 12 - (width(T("launcher_join", "Join")) + 48)
+    local r = c.join - 16
+    c.mods = r - 120
+    r = c.mods - 8
+    if w >= 900 then
+        c.build = r - 72
+        r = c.build - 8
+    end
+    c.ping = r - 64
+    r = c.ping - 8
+    c.players = r - 72
+    r = c.players - 8
+    if w >= 900 then
+        c.map = r - 150
+        r = c.map - 8
+    end
+    c.server = x + 16
+    c.serverW = r - 8 - c.server
+    return c
+end
+--- The columns' names over a list. Returns the y under them.
+function PZMMMods:srvHead(c, y)
+    for _, h in ipairs({ { c.server, T("srv_col_server", "Server") }, { c.map, T("srv_map", "Map") }, { c.players, T("srv_players", "Players") },
+        { c.ping, T("srv_col_ping", "Ping") }, { c.build, T("srv_build", "Build") }, { c.mods, T("srv_mods", "Mods") } }) do
+        if h[1] then text(self, h[2], h[1], y, C.muted) end
+    end
+    return y + H_SMALL + 8
+end
+--- One server in a list, in those columns: Server (its name, a lock with a password, the PvP tag; `o.sub` under it),
+--- Map, Players, Ping, Build, Mods (Vanilla, N to get, all here), then Join and the favourite star at the right.
+--- `o`: name, pw, pvp, sub, info { players, max, ping, map, mapFull, ver }, mods { ids, missing }, fav, key,
+--- join, joinTip, primary, star, pick.
+function PZMMMods:srvRow(o, c, x, ry, w, rh, last, mx, my)
+    listRow(self, x, ry, w, rh, last, mx, my, self.srvSel and self.srvSel.key == o.key)
+    local hits = self.feedHits
+    local mid = ry + math.floor((rh - H_SMALL) / 2)
+    local star = o.fav and K.STAR_ON or K.STAR_OFF
+    local sc = o.fav and C.accentText or C.muted
+    if star then self:drawTextureScaled(star, c.star, mid + math.floor((H_SMALL - 14) / 2), 14, 14, 1, sc.r, sc.g, sc.b) end
+    if mx >= c.star - 5 and mx < c.star + 19 and my >= ry and my < ry + rh then tip(self, o.fav and "Favourite\nClick to take it out of your saved servers." or "Favourite\nClick to add it to your saved servers.") end
+    hits[#hits + 1] = { kind = "fn", fn = o.star, x = c.star - 5, y = ry, w = 24, h = rh }
+    local jl = T("launcher_join", "Join")
+    local jw = width(jl) + 48
+    local jy = ry + math.floor((rh - BAR) / 2)
+    local _, _, jo = flatButton(self, jl, c.join, jy, mx, my, o.primary and "primary" or nil, TB.play)
+    if jo then tip(self, o.joinTip) end
+    hits[#hits + 1] = { kind = "fn", fn = o.join, x = c.join, y = jy, w = jw, h = BAR }
+    -- (the star's and Join's hits come before the row's: the first hit wins)
+    hits[#hits + 1] = { kind = "fn", fn = o.pick, x = x, y = ry, w = w, h = rh }
+    local ny = o.sub and (ry + 12) or mid
+    local nm = fit(o.name, c.serverW - (o.pw and 20 or 0))
+    bold(self, nm, c.server, ny, C.text)
+    local tx = c.server + width(nm) + 8
+    if o.pw and TB.lock then
+        self:drawTextureScaled(TB.lock, tx, ny + math.floor((H_SMALL - 12) / 2), 12, 12, 1, C.muted.r, C.muted.g, C.muted.b)
+        tx = tx + 20
+    end
+    if o.pvp and tx + width("PvP") + 17 < c.server + c.serverW then tagChip(self, "PvP", tx, ny - 1, false) end
+    if o.sub then text(self, fit(o.sub, c.serverW), c.server, ry + 16 + H_SMALL, C.muted) end
+    local i = o.info or {}
+    if c.map and (i.map or "") ~= "" then
+        text(self, fit(i.map, c.players - 8 - c.map), c.map, mid, C.text)
+        if mx >= c.map and mx < c.players - 8 and my >= ry and my < ry + rh then tip(self, "Map\n" .. tostring(i.mapFull or i.map)) end
+    end
+    if i.players then text(self, i.players .. "/" .. tostring(i.max or "?"), c.players, mid, C.text) end
+    if (i.ping or 0) > 0 then text(self, i.ping .. " ms", c.ping, mid, C.text) end
+    if c.build and (i.ver or "") ~= "" then text(self, fit(tostring(i.ver), c.mods - 8 - c.build), c.build, mid, C.text) end
+    if o.mods then
+        local ids, miss = o.mods[1], o.mods[2]
+        if #ids == 0 then
+            text(self, T("srv_vanilla", "Vanilla"), c.mods, mid, C.muted)
+        else
+            local label = #miss == 0 and T("srv_all_here", "all here") or T("srv_to_get", "%1 to get", #miss)
+            local cy = ry + math.floor((rh - H_SMALL - 2) / 2)
+            local right = chip(self, label, c.mods, cy, #miss == 0 and C.ok or C.warn)
+            if mx >= c.mods and mx < right and my >= cy and my < cy + H_SMALL + 2 then
+                tip(self, #miss == 0 and ("Its mods\nYou have all " .. #ids .. " of them.") or ("Mods you don't have\n" .. table.concat(miss, ", ") .. "\nJoining downloads Workshop ones."))
+            end
+        end
+    end
+end
+
+--- Servers, as the app's: a rail of pages (Play: Browse servers, Favourites, History, Direct connect; Dedicated
+--- server: Overview, each hosted server, New server...), the page at its right, and the picked server's details
+--- down the right of the screen (drawServerPanel).
+function PZMMMods:drawServers(x, y, w, mx, my, top, bh)
+    y = self:drawNotice(x, y, w, T("notice_servers2", "running a dedicated server (setup, console, players, backups and files), hosting beyond start, stop and restart (a warned restart with abort, updating, adopting or finding an existing server, checking the Workshop for external servers, copying diagnostics), hosting tabs (automation with crash and scheduled restarts, warnings, backups every N and the Discord bot and relay; world tools to copy a world, reset chunks or migrate; a mods editor that adds from a collection, profile or preset, autosorts and checks conflicts; the ini settings editor with presets), remote servers (RCON, FTP and the Files tab), the public join address, the country filter and its setting, listing servers without Steam (a Steam Web API key), your Steam friends' servers, a server's player list, restoring a past join's setup and, in the join dialog, map overlap and maps-not-in-mods warnings, per-mod size and updated date, server keywords, a caution for a very recent update and Remember password (the game can't ask a server who is online)."), mx, my)
     -- drawing runs every frame: the rows, their mod ids and servers.txt are worked out once per visit (a
     -- gap in drawing means the page was left), and again when the list or the filter changes
     local t = getTimestampMs()
@@ -12109,31 +14086,58 @@ function PZMMMods:drawServers(x, y, w, mx, my, top, bh)
     self.srvAt = t
     local steam = false
     pcall(function() steam = getSteamModeActive() end)
-    if steam then
-        button(#PZMMMods.inet > 0 and "Find again" or "Find servers", "primary", "Find servers\nAsks Steam for the Internet list. Each server's mods are checked against yours.", function()
-            PZMMMods.inet = {}
-            PZMMMods.inetAt = getTimestampMs()
-            self.recent, self.srvCache = nil, nil
-            listen()
-            PZMMMods.askInet()
-        end, TB.search)
+    local hostedAll = self:hostedList()
+    local cur = self:srvPageNow()
+    -- the rail
+    local items = { { head = T("srv_play", "Play") }, { "browse", T("srv_browse", "Browse servers") }, { "favs", T("srv_favourites", "Favourites") },
+        { "history", T("srv_history", "History") }, { "direct", T("srv_direct", "Direct connect") }, { head = T("srv_dedicated", "Dedicated server") },
+        { "overview", T("srv_overview", "Overview") } }
+    for _, st in ipairs(hostedAll) do
+        local nm = ""
+        pcall(function() nm = st:getName() end)
+        items[#items + 1] = { "host:" .. nm, nm, st = st }
     end
-    button("Look up a server", nil, "Look up a server\nA server's address and port, as ip:port: its rules and mods show first, then you can join.", function()
-        self:prompt("Server address (ip:port)", "", "Next", function(addr)
-            local ip, port = tostring(addr or ""):match("^%s*([^%s:]+):?(%d*)%s*$")
-            if not ip then return self:say("Type the server's address, like 203.0.113.5:16261.") end
-            port = port ~= "" and port or "16261"
-            -- looked up first: its rules, mods and players show here, and Join is a button on them
-            self:selectServer({ name = "", ip = ip, port = port, join = function() self:joinServer("", ip, port, true) end })
-        end)
-    end)
-    bx = bx + K.searchSpot(self, bx, y, 200, top, bh) + 8
-    button(T("srv_host", "Host"), "quiet", "Host\nThe game's own host screen: start a server on this PC and play on it.", function() self:gameScreen("COOP") end)
-    button("Game's server browser", "quiet", "Game's server browser\nThe game's own screen: favourites, accounts and the Internet list.", function() self:gameScreen("MULTIPLAYER") end)
-    y = y + BAR + 20
-    y = self:drawServerFilters(x, y, w, mx, my)
-    if self.srvSel then y = self:drawServerPanel(x, y, w, mx, my) end
+    items[#items + 1] = { "new", T("srv_new", "New server..."), tip = "New server...\nThe game's own host screen: start a server on this PC and play on it." }
+    local rw, ry = 200, y
+    local hs = K.readHosted(self)
+    for _, it in ipairs(items) do
+        if it.head then
+            if ry > y then ry = ry + 10 end
+            ry = K.heading(self, it.head, x + 14, ry + 4) + 2
+        else
+            local on = it[1] == cur
+            local over = mx >= x and mx < x + rw and my >= ry and my < ry + BAR
+            if on or over then
+                round(self, x, ry, rw, BAR, 6, C.accent, on and 0.32 or 0.2)
+                if on then rect(self, x, ry + 4, 2, BAR - 8, C.onSelected, 1) end
+            end
+            local lx = x + 14
+            local h = it.st and hs[it[2]:lower()]
+            if it.st then
+                -- its state: a dot (running, starting, crashed; hollow when PZMM doesn't know it)
+                local dc = h and (h.state == "running" and C.ok or h.state == "crashed" and C.danger or h.state == "starting" and C.warn or C.muted) or C.muted
+                if h then round(self, lx, ry + math.floor((BAR - 8) / 2), 8, 8, 4, dc, 1) else outline(self, lx, ry + math.floor((BAR - 8) / 2), 8, 8, 4, dc, 1) end
+                lx = lx + 16
+            end
+            local extra = (h and h.state == "running") and (" " .. h.players) or ""
+            text(self, fit(it[2], x + rw - 10 - lx - width(extra)) .. extra, lx, ry + (BAR - H_SMALL) / 2, (on or over) and C.onSelected or C.text)
+            if over and it.tip then tip(self, it.tip) end
+            local id, stx, nmx = it[1], it.st, it[2]
+            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function()
+                if id == "new" then return self:gameScreen("COOP") end
+                self.srvPage, self.feedScroll = id, 0
+                if stx then self:selectServer({ name = nmx, hosted = stx, key = "hosted:" .. nmx }) end
+            end, x = x, y = ry, w = rw, h = BAR }
+            ry = ry + BAR + 4
+        end
+    end
+    x, w = x + rw + 24, w - rw - 24
+    local rh = H_SMALL * 2 + 28
+    local favs = K.favs(self)
+    if cur == "browse" or cur == "favs" or cur == "history" then y = self:drawServerFilters(x, y, w, mx, my, top, bh, cur) end
+    local cols = K.srvCols(x, w)
 
+    if cur == "browse" then
     -- the Internet list: most players first, each with how many of its mods you have
     if #PZMMMods.inet > 0 then
         local c = self.srvCache
@@ -12193,79 +14197,43 @@ function PZMMMods:drawServers(x, y, w, mx, my, top, bh)
             self.srvCache = c
         end
         local rows = c.rows
-        local picked = self.srvSel and self.srvSel.key
-        bold(self, "Internet: " .. #rows .. " servers", x, y, C.text)
+        text(self, T("srv_shown", "%1 of %2 servers", #rows, #PZMMMods.inet), x, y, C.muted)
         y = y + H_SMALL + 10
         local n = math.min(200, #rows)
         if n == 0 then
             text(self, T("srv_no_match", "No server matches these filters."), x, y, C.muted)
             y = y + H_SMALL + 4
+        else
+            y = self:srvHead(cols, y)
+            card(self, x, y, w, n * rh)
         end
-        local rh = H_SMALL * 2 + 28
-        if n > 0 then card(self, x, y, w, n * rh) end
         for i = 1, n do
             local sv = rows[i]
-            local ry = y + (i - 1) * rh
+            local ry2 = y + (i - 1) * rh
             -- only the rows in view are drawn (the list can run to 200)
-            if ry + rh >= top and ry <= top + bh then
-            local name, ip, port, pl, max, ping, protected = "", "", 0, 0, 0, 0, false
-            pcall(function()
-                name, ip, port = sv:getName() or "", sv:getIp() or "", sv:getPort() or 16261
-                pl, max, ping = tonumber(sv:getPlayers()) or 0, tonumber(sv:getMaxPlayers()) or 0, tonumber(sv:getPing()) or 0
-                protected = sv:isPasswordProtected()
-            end)
-            listRow(self, x, ry, w, rh, i == n, mx, my, picked == ip .. ":" .. tostring(port))
-            local jw = width("Join") + 48
-            local jx, jy = x + w - 16 - jw, ry + (rh - BAR) / 2
-            local _, _, o = flatButton(self, "Join", jx, jy, mx, my, "primary", TB.play)
-            if o then tip(self, "Join\nThe game downloads any Workshop mods it needs as it connects.") end
-            local nm, ipx, px, pr = name, ip, port, protected
-            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:joinServer(nm, ipx, px, pr) end, x = jx, y = jy, w = jw, h = BAR }
-            local svx = sv
-            local tx = x + 16
-            -- the star: a favourite (a saved server of the game's), click to add or remove
-            local isFav = K.favs(self)[tostring(ip) .. ":" .. tostring(port)] ~= nil
-            local star = isFav and K.STAR_ON or K.STAR_OFF
-            local sc = isFav and C.accentText or C.muted
-            if star then self:drawTextureScaled(star, tx, ry + 12 + math.floor((H_SMALL - 14) / 2), 14, 14, 1, sc.r, sc.g, sc.b) end
-            if mx >= tx - 4 and mx < tx + 20 and my >= ry and my < ry + 32 then tip(self, isFav and "Favourite\nClick to take it out of your saved servers." or "Favourite\nClick to add it to your saved servers.") end
-            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:toggleFavourite({ sv = svx, name = nm, ip = ipx, port = px }) end, x = tx - 4, y = ry, w = 24, h = 32 }
-            -- (the star's hit comes before the row's: the first hit wins)
-            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function()
-                self:selectServer({ name = nm, ip = ipx, port = px, sv = svx, join = function() self:joinServer(nm, ipx, px, pr) end })
-            end, x = x, y = ry, w = w, h = rh }
-            tx = tx + 22
-            local shownName = fit(name ~= "" and name or ip, jx - 24 - tx - (protected and 20 or 0))
-
-            bold(self, shownName, tx, ry + 12, C.text)
-            if protected and TB.lock then
-                self:drawTextureScaled(TB.lock, tx + width(shownName) + 8, ry + 12 + math.floor((H_SMALL - 12) / 2), 12, 12, 1, C.muted.r, C.muted.g, C.muted.b)
-            end
-            -- the PvP tag, when Steam's rules for it say so
-            local rr = PZMMMods.rulesBy[tostring(ip) .. ":" .. tostring(port)]
-            if rr and rr.pvp then
-                local px0 = tx + width(shownName) + (protected and 28 or 10)
-                if px0 + width("PvP") + 17 < jx - 24 then tagChip(self, "PvP", px0, ry + 11, false) end
-            end
-            local si = c.info[sv] or {}
-            local meta = tostring(pl) .. "/" .. tostring(max) .. " players    " .. tostring(ping) .. " ms    " .. ((si.map or "") ~= "" and (si.map .. "    ") or "") .. ((si.ver or "") ~= "" and ("build " .. si.ver .. "    ") or "") .. ip .. ":" .. tostring(port)
-            text(self, fit(meta, jx - 24 - tx - 220), tx, ry + 16 + H_SMALL, C.muted)
-            local sm = c.mods[sv]
-            if not sm then
-                local a, b = self:serverMods(sv)
-                sm = { a, b }
-                c.mods[sv] = sm
-            end
-            local ids, missing = sm[1], sm[2]
-            local cx = tx + math.min(width(meta), jx - 24 - tx - 220) + 14
-            local cy = ry + 16 + H_SMALL - 1
-            if #ids > 0 then
-                local label = #missing == 0 and ("All " .. #ids .. " mods installed") or (#missing .. " of " .. #ids .. " mods missing")
-                local right = chip(self, label, cx, cy, #missing == 0 and C.ok or C.warn)
-                if mx >= cx and mx < right and my >= cy and my < cy + H_SMALL + 2 then
-                    tip(self, #missing == 0 and "Its mods\nYou have all of them." or ("Mods you don't have\n" .. table.concat(missing, ", ") .. "\nJoining downloads Workshop ones."))
+            if ry2 + rh >= top and ry2 <= top + bh then
+                local name, ip, port, protected = "", "", 0, false
+                pcall(function()
+                    name, ip, port = sv:getName() or "", sv:getIp() or "", sv:getPort() or 16261
+                    protected = sv:isPasswordProtected()
+                end)
+                local si = c.info[sv] or {}
+                local sm = c.mods[sv]
+                if not sm then
+                    local a, b = self:serverMods(sv)
+                    sm = { a, b }
+                    c.mods[sv] = sm
                 end
-            end
+                local rr = PZMMMods.rulesBy[tostring(ip) .. ":" .. tostring(port)]
+                local nm, ipx, px, pr, svx = name, ip, port, protected, sv
+                self:srvRow({ name = name ~= "" and name or ip, pw = protected, pvp = rr and rr.pvp, sub = ip .. ":" .. tostring(port), key = ip .. ":" .. tostring(port),
+                    info = { players = si.pl, max = si.max, ping = si.ping, map = si.map, mapFull = si.mapFull, ver = si.ver }, mods = sm,
+                    fav = favs[tostring(ip) .. ":" .. tostring(port)] ~= nil, primary = true,
+                    joinTip = "Join\nThe game downloads any Workshop mods it needs as it connects.",
+                    join = function() self:joinServer(nm, ipx, px, pr) end,
+                    star = function() self:toggleFavourite({ sv = svx, name = nm, ip = ipx, port = px }) end,
+                    pick = function() self:selectServer({ name = nm, ip = ipx, port = px, sv = svx, join = function() self:joinServer(nm, ipx, px, pr) end }) end,
+                }, cols, x, ry2, w, rh, i == n, mx, my)
             end
         end
         y = y + n * rh + 20
@@ -12279,19 +14247,19 @@ function PZMMMods:drawServers(x, y, w, mx, my, top, bh)
         if not steam then
             msg = T("srv_start_steam", "Start Steam and refresh: the Internet list comes from it.")
         elseif PZMMMods.inetAt and t - PZMMMods.inetAt > 20000 then
-            msg = T("srv_listed_none", "Steam listed no servers. Try Find again.")
+            msg = T("srv_listed_none", "Steam listed no servers. Try Refresh.")
         elseif PZMMMods.inetAt then
             msg = T("srv_getting_list", "Getting the server list from Steam...")
+        else
+            msg = "Refresh asks Steam for the Internet list."
         end
-        if msg then
-            text(self, fit(msg, w), x, y, C.muted)
-            y = y + H_SMALL + 20
-        end
+        text(self, fit(msg, w), x, y, C.muted)
+        y = y + H_SMALL + 20
+    end
     end
 
+    if cur == "favs" then
     -- your saved servers (the game's favourites): Join uses the account saved with it
-    bold(self, T("srv_favourites", "Favourites"), x, y, C.text)
-    y = y + H_SMALL + 10
     local servers = {}
     pcall(function() servers = getServerList() or {} end)
     local nSaved = #servers
@@ -12304,96 +14272,149 @@ function PZMMMods:drawServers(x, y, w, mx, my, top, bh)
         end
         servers = keep
     end
-    if #servers == 0 then
-        text(self, nSaved > 0 and T("srv_no_match", "No server matches these filters.") or "No saved servers yet: add one in the game's server browser.", x, y, C.muted)
+    -- the favourites PZMM has that the game hasn't saved: Join asks for your name there
+    local appFavs = K.appFavs(self)
+    local extra = {}
+    for _, f in ipairs(appFavs) do
+        if self:rowPasses(f.name ~= "" and f.name or f.key, f.ip, f.port, nil) then extra[#extra + 1] = f end
+    end
+    local gl = "Game's server browser"
+    local gw = width(gl) + 28
+    local _, _, go = flatButton(self, gl, x + w - gw, y - 4, mx, my, "quiet")
+    if go then tip(self, "Game's server browser\nThe game's own screen: favourites, accounts and the Internet list.") end
+    self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:gameScreen("MULTIPLAYER") end, x = x + w - gw, y = y - 4, w = gw, h = BAR }
+    bold(self, T("srv_favourites", "Favourites"), x, y + (BAR - 4 - H_SMALL) / 2, C.text)
+    y = y + BAR + 6
+    local n = #servers + #extra
+    if n == 0 then
+        text(self, (nSaved + #appFavs) > 0 and T("srv_no_match", "No server matches these filters.") or T("srv_no_favs", "No favourites yet: star a server to keep it here."), x, y, C.muted)
         y = y + H_SMALL + 20
     else
-        local rh = H_SMALL * 2 + 28
-        card(self, x, y, w, #servers * rh)
+        y = self:srvHead(cols, y)
+        card(self, x, y, w, n * rh)
         for i, sv in ipairs(servers) do
-            local ry = y + (i - 1) * rh
-            local name, ip, port, accounts = "", "", 16261, {}
+            local ry2 = y + (i - 1) * rh
+            local name, ip, port, accounts, modStr, pw = "", "", 16261, {}, "", false
             pcall(function()
                 name, ip, port = sv:getName() or "", sv:getIp() or "", sv:getPort() or 16261
                 local a = sv:getAccounts()
                 for j = 0, a:size() - 1 do accounts[#accounts + 1] = a:get(j) end
             end)
-            listRow(self, x, ry, w, rh, i == #servers, mx, my, self.srvSel and self.srvSel.key == ip .. ":" .. tostring(port))
-            if K.STAR_ON then self:drawTextureScaled(K.STAR_ON, x + 16, ry + 12 + math.floor((H_SMALL - 14) / 2), 14, 14, 1, C.accentText.r, C.accentText.g, C.accentText.b) end
-            local starHit = { kind = "fn", fn = function() self:toggleFavourite({ sv = sv, name = name, ip = ip, port = port }) end, x = x + 12, y = ry, w = 24, h = 32 }
-            if mx >= x + 12 and mx < x + 36 and my >= ry and my < ry + 32 then tip(self, "Favourite\nClick to take it out of your saved servers.") end
-            bold(self, name ~= "" and name or (ip .. ":" .. tostring(port)), x + 38, ry + 12, C.text)
-            local meta2 = ip .. ":" .. tostring(port) .. "    " .. #accounts .. (#accounts == 1 and " account" or " accounts")
-            text(self, meta2, x + 38, ry + 16 + H_SMALL, C.muted)
-            do
-                local modStr = ""
-                pcall(function() modStr = sv:getMods() or "" end)
-                local a, b = self:modIds(modStr)
-                self:srvChips(self:srvInfoFor(ip, port), self:rulesFor({ ip = ip, port = port, host = hostOf(ip) }), { a, b },
-                    x + 38 + width(meta2) + 14, ry + 16 + H_SMALL - 1, x + w - 16 - (width("Join") + 48) - 12, mx, my)
-            end
-            self.feedHits[#self.feedHits + 1] = starHit
-            local jw = width("Join") + 48
-            local jx, jy = x + w - 16 - jw, ry + (rh - BAR) / 2
-            local _, _, o = flatButton(self, "Join", jx, jy, mx, my, nil, TB.play)
-            if o then tip(self, #accounts == 1 and "Join\nWith its saved account." or "Join\nPick the account in the game's server browser.") end
+            pcall(function() modStr = sv:getMods() or "" end)
+            pcall(function() pw = sv:isPasswordProtected() and true or false end)
+            local rr = self:rulesFor({ ip = ip, port = port, host = hostOf(ip) })
+            local a, b = self:modIds((rr and rr.mods) or modStr)
             local nm, ipx, px, svx = name, ip, port, sv
-            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:joinSaved(svx) end, x = jx, y = jy, w = jw, h = BAR }
-            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function()
-                self:selectServer({ name = nm, ip = ipx, port = px, sv = svx, join = function() self:joinSaved(svx) end })
-            end, x = x, y = ry, w = w, h = rh }
+            self:srvRow({ name = name ~= "" and name or (ip .. ":" .. tostring(port)), pw = pw, pvp = rr and rr.pvp, key = ip .. ":" .. tostring(port),
+                sub = ip .. ":" .. tostring(port) .. "    " .. #accounts .. (#accounts == 1 and " account" or " accounts"),
+                info = self:srvInfoFor(ip, port), mods = (#a > 0 or rr) and { a, b } or nil, fav = true,
+                joinTip = #accounts == 1 and "Join\nWith its saved account." or "Join\nPick the account in the game's server browser.",
+                join = function() self:joinSaved(svx) end,
+                star = function() self:toggleFavourite({ sv = svx, name = nm, ip = ipx, port = px }) end,
+                pick = function() self:selectServer({ name = nm, ip = ipx, port = px, sv = svx, join = function() self:joinSaved(svx) end }) end,
+            }, cols, x, ry2, w, rh, i == n, mx, my)
         end
-        y = y + #servers * rh + 20
+        for j, f in ipairs(extra) do
+            local i = #servers + j
+            local ry2 = y + (i - 1) * rh
+            local fx = f
+            local rr = self:rulesFor({ ip = f.ip, port = f.port, host = hostOf(f.ip) })
+            local mods2
+            if rr and rr.mods then
+                local a, b = self:modIds(rr.mods)
+                mods2 = { a, b }
+            end
+            self:srvRow({ name = f.name ~= "" and f.name or f.key, pvp = rr and rr.pvp, key = f.key, sub = f.key .. "    " .. T("srv_pzmm_fav", "a favourite in PZMM"),
+                info = self:srvInfoFor(f.ip, f.port), mods = mods2, fav = true,
+                joinTip = "Join\nAsks your name on it, then joins.",
+                join = function() self:joinServer(fx.name, fx.ip, tostring(fx.port), true) end,
+                star = function() self:toggleFavourite({ name = fx.name, ip = fx.ip, port = fx.port }) end,
+                pick = function() self:selectServer({ name = fx.name, ip = fx.ip, port = fx.port, join = function() self:joinServer(fx.name, fx.ip, tostring(fx.port), true) end }) end,
+            }, cols, x, ry2, w, rh, i == n, mx, my)
+        end
+        y = y + n * rh + 20
+    end
     end
 
+    if cur == "history" then
     -- lately joined, as PZMM noted them
+    local all = self:recentServers()
     local recent = {}
-    for _, e in ipairs(self:recentServers()) do
+    for _, e in ipairs(all) do
         local ip, port = e.addr:match("^(.*):(%d+)$")
         if not ip then ip, port = e.addr, "16261" end
         if self:rowPasses(e.name ~= "" and e.name or e.addr, ip, port, nil) then recent[#recent + 1] = e end
     end
-    if #recent > 0 then
-        bold(self, "Joined lately", x, y, C.text)
-        y = y + H_SMALL + 10
-        local rh = H_SMALL * 2 + 28
+    bold(self, T("srv_history", "History"), x, y, C.text)
+    y = y + H_SMALL + 10
+    if #recent == 0 then
+        text(self, #all > 0 and T("srv_no_match", "No server matches these filters.") or T("srv_no_history", "Servers you join show up here."), x, y, C.muted)
+        y = y + H_SMALL + 20
+    else
+        y = self:srvHead(cols, y)
         card(self, x, y, w, #recent * rh)
         for i, e in ipairs(recent) do
-            local ry = y + (i - 1) * rh
+            local ry2 = y + (i - 1) * rh
             -- host and port split at the LAST ':' followed by digits; no port is 16261
             local ip, port = e.addr:match("^(.*):(%d+)$")
             if not ip then ip, port = e.addr, "" end
-            listRow(self, x, ry, w, rh, i == #recent, mx, my, self.srvSel and self.srvSel.key == ip .. ":" .. (port ~= "" and port or "16261"))
-            bold(self, e.name ~= "" and e.name or e.addr, x + 16, ry + 12, C.text)
+            local pt = port ~= "" and port or "16261"
             local days = math.floor((now() - e.at) / 86400)
-            local meta2 = e.addr .. "    " .. (days <= 0 and "today" or days == 1 and "yesterday" or (days .. " days ago"))
-            text(self, meta2, x + 16, ry + 16 + H_SMALL, C.muted)
-            do
-                local pt = port ~= "" and port or "16261"
-                local rr = self:rulesFor({ ip = ip, port = pt, host = hostOf(ip) })
-                local mods2
-                if rr and rr.mods then
-                    local a, b = self:modIds(rr.mods)
-                    mods2 = { a, b }
-                end
-                self:srvChips(self:srvInfoFor(ip, pt), rr, mods2, x + 16 + width(meta2) + 14, ry + 16 + H_SMALL - 1, x + w - 16 - (width("Join") + 48) - 12, mx, my)
+            local rr = self:rulesFor({ ip = ip, port = pt, host = hostOf(ip) })
+            local mods2
+            if rr and rr.mods then
+                local a, b = self:modIds(rr.mods)
+                mods2 = { a, b }
             end
-            local jw = width("Join") + 48
-            local jx, jy = x + w - 16 - jw, ry + (rh - BAR) / 2
-            flatButton(self, "Join", jx, jy, mx, my, nil, TB.play)
             local nm = e.name
-            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:joinServer(nm, ip, port ~= "" and port or "16261", true) end, x = jx, y = jy, w = jw, h = BAR }
-            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function()
-                self:selectServer({ name = nm, ip = ip, port = port ~= "" and port or "16261", join = function() self:joinServer(nm, ip, port ~= "" and port or "16261", true) end })
-            end, x = x, y = ry, w = w, h = rh }
+            self:srvRow({ name = e.name ~= "" and e.name or e.addr, pvp = rr and rr.pvp, key = ip .. ":" .. pt,
+                sub = e.addr .. "    " .. (days <= 0 and "today" or days == 1 and "yesterday" or (days .. " days ago")),
+                info = self:srvInfoFor(ip, pt), mods = mods2, fav = favs[ip .. ":" .. pt] ~= nil,
+                joinTip = "Join\nAsks your name on it, then joins.",
+                join = function() self:joinServer(nm, ip, pt, true) end,
+                star = function() self:toggleFavourite({ name = nm, ip = ip, port = pt }) end,
+                pick = function() self:selectServer({ name = nm, ip = ip, port = pt, join = function() self:joinServer(nm, ip, pt, true) end }) end,
+            }, cols, x, ry2, w, rh, i == #recent, mx, my)
         end
         y = y + #recent * rh + 20
     end
+    end
 
-    -- your hosted servers (Zomboid/Server/*.ini): give one your mods and maps
+    if cur == "direct" then
+        -- Direct connect, as the app's: an address or a pzmm://join link, looked up first (its details open at the right)
+        bold(self, T("srv_join_title", "Join a server"), x, y, C.text, MEDIUM)
+        y = y + H_MEDIUM + 6
+        for _, l in ipairs(wrap(T("srv_lede", "Find a modded server, get exactly its mods in a profile of its own, and join. Your other profiles stay as they are."), math.min(w, 760))) do
+            text(self, l, x, y, C.muted)
+            y = y + H_SMALL + 2
+        end
+        y = y + 14
+        bold(self, T("srv_direct", "Direct connect"), x, y, C.text)
+        y = y + H_SMALL + 8
+        local bw = math.min(420, w - 140)
+        K.searchSpot(self, x, y, bw, top, bh)
+        local ll = T("srv_look_up", "Look up")
+        local lw = width(ll) + 48
+        local _, _, lo = flatButton(self, ll, x + bw + 8, y, mx, my, "primary", TB.search)
+        if lo then tip(self, "Look up\nIts rules and mods show first, then you can join.") end
+        self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:directLookUp() end, x = x + bw + 8, y = y, w = lw, h = BAR }
+        y = y + BAR + 8
+        text(self, T("srv_direct_hint", "IP:port, or paste a pzmm://join link"), x, y, C.muted)
+        y = y + H_SMALL + 6
+        if self.directErr then
+            for _, l in ipairs(wrap(self.directErr, math.min(w, 760))) do
+                text(self, l, x, y, C.danger)
+                y = y + H_SMALL + 2
+            end
+        end
+        y = y + 20
+    end
+
+    -- your hosted servers (Zomboid/Server/*.ini): Overview has them all, a server's own page that one
+    if cur == "overview" or cur:sub(1, 5) == "host:" then
     local hosted = {}
     self.hostedRow = self.hostedRow or {}
-    for _, st in ipairs(self:hostedList()) do
+    for _, st in ipairs(hostedAll) do
         local nm = ""
         pcall(function() nm = st:getName() end)
         local o = self.hostedRow[nm]
@@ -12401,11 +14422,19 @@ function PZMMMods:drawServers(x, y, w, mx, my, top, bh)
             o = self:hostedOptions(st, { "DefaultPort", "Mods" })
             self.hostedRow[nm] = o
         end
-        if self:rowPasses(nm, "127.0.0.1", tonumber(o.DefaultPort) or 16261, nil, o.Mods) then hosted[#hosted + 1] = st end
+        if cur == "overview" or cur == "host:" .. nm then hosted[#hosted + 1] = st end
+    end
+    if #hosted == 0 and cur ~= "overview" then
+        self.srvPage, cur = "overview", "overview"
+        hosted = hostedAll
+    end
+    bold(self, cur == "overview" and T("srv_your_servers", "Your servers") or cur:sub(6), x, y, C.text, MEDIUM)
+    y = y + H_MEDIUM + 10
+    if #hosted == 0 then
+        text(self, fit(T("srv_hosted_none", "No servers yet: New server... opens the game's host screen to start one."), w), x, y, C.muted)
+        y = y + H_SMALL + 20
     end
     if #hosted > 0 then
-        bold(self, "Your hosted servers", x, y, C.text)
-        y = y + H_SMALL + 10
         local rh = ROW
         card(self, x, y, w, #hosted * rh)
         for i, st in ipairs(hosted) do
@@ -12417,11 +14446,35 @@ function PZMMMods:drawServers(x, y, w, mx, my, top, bh)
             local label = "Give it my mods"
             local gw = width(label) + 28
             local gx, gy = x + w - 16 - gw, ry + (rh - BAR) / 2
-            do
-                local ho = self.hostedRow[name] or {}
-                local hp = tonumber(ho.DefaultPort) or 16261
-                self:srvChips(self:srvInfoFor("127.0.0.1", hp), nil, nil, x + 16 + width(name) + 14, ry + math.floor((rh - H_SMALL - 2) / 2),
-                    gx - 8 - (width(T("srv_edit", "Edit settings")) + 28) - 12, mx, my)
+            -- PZMM's state for it, and its Start / Stop / Restart / Join (left of Edit settings)
+            local hs = K.readHosted(self)[name:lower()]
+            local ho = self.hostedRow[name] or {}
+            local hp = tonumber(ho.DefaultPort) or 16261
+            local sx = gx - 8 - (width(T("srv_edit", "Edit settings")) + 28) - 8
+            if hs then
+                local acts = {}
+                if hs.state == "running" then
+                    acts = { { T("launcher_join", "Join"), "primary", function() self:joinServer(name, "127.0.0.1", tostring(hp), true) end, TB.play },
+                        { T("hosted_restart", "Restart"), nil, function() self:serverDo("restart", name) end, TB.update },
+                        { T("hosted_stop", "Stop"), nil, function() self:serverDo("stop", name) end, TB.x } }
+                elseif hs.state == "starting" then
+                    acts = { { T("hosted_stop", "Stop"), nil, function() self:serverDo("stop", name) end, TB.x } }
+                else
+                    acts = { { T("hosted_start", "Start"), "primary", function() self:serverDo("start", name) end, TB.play } }
+                end
+                for _, a in ipairs(acts) do
+                    local aw = width(a[1]) + 48
+                    sx = sx - aw
+                    local _, _, ao = flatButton(self, a[1], sx, gy, mx, my, a[2], a[4])
+                    if ao then tip(self, a[1] .. "\n" .. (a[1] == T("launcher_join", "Join") and "It's running: join it on this PC." or "PZMM runs it.")) end
+                    self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = a[3], x = sx, y = gy, w = aw, h = BAR }
+                    sx = sx - 8
+                end
+                local cl = K.hostedLabel(hs)
+                local cc = hs.state == "crashed" and C.danger or hs.state == "running" and C.accentText or C.muted
+                chip(self, cl, x + 16 + width(name) + 14, ry + math.floor((rh - H_SMALL - 2) / 2), cc)
+            else
+                self:srvChips(self:srvInfoFor("127.0.0.1", hp), nil, nil, x + 16 + width(name) + 14, ry + math.floor((rh - H_SMALL - 2) / 2), sx - 4, mx, my)
             end
             local _, _, o = flatButton(self, label, gx, gy, mx, my)
             if o then tip(self, "Give it my mods\nIts Mods, WorkshopItems and Map settings become the mods on in My mods now, in load order, and your map order.") end
@@ -12440,13 +14493,16 @@ function PZMMMods:drawServers(x, y, w, mx, my, top, bh)
         end
         y = y + #hosted * rh
     end
-    return y
+    end
+    return math.max(ry, y)
 end
 
 --- A hosted server's Mods=, WorkshopItems= and Map= become what's on in My mods (asks first).
 --- This server's leave-out list: the app's (leaveout.txt) when the app is installed, else the game's own copy.
 function PZMMMods:leaveOutFor(name)
     local key = tostring(name):lower()
+    -- sent and not acked yet (PZMM may be closed: its file hasn't got it): as sent
+    if self.leavePending and self.leavePending[key] then return self.leavePending[key] end
     local e = self.app and K.readLeaveOut("pzmm/leaveout.txt")[key] or K.readLeaveOut("pzmm/leaveout_game.txt")[key]
     return e and e.ids or {}
 end
@@ -12458,7 +14514,7 @@ function PZMMMods:saveLeaveOut(name, left)
     table.sort(ids)
     local all = K.readLeaveOut("pzmm/leaveout_game.txt")
     if self.app then
-        self:request("leaveout\t" .. name .. "\t" .. table.concat(ids, ";"), nil, true)
+        K.leaveSend(self, name, left)
         all[name:lower()] = nil
     else
         all[name:lower()] = #ids > 0 and { name = name, ids = left } or nil
@@ -12474,6 +14530,20 @@ function PZMMMods:saveLeaveOut(name, left)
         w:close()
     end)
 end
+--- Send a server's leave-out list to PZMM (quiet): shown as sent until PZMM acks it (no time limit: a closed PZMM
+--- does it when it next starts).
+function K.leaveSend(ui, name, left)
+    local ids = {}
+    for id in pairs(left) do ids[#ids + 1] = id end
+    table.sort(ids)
+    local id = ui:request("leaveout\t" .. name .. "\t" .. table.concat(ids, ";"), nil, true)
+    if not id then return end
+    local key = tostring(name):lower()
+    ui.leavePending = ui.leavePending or {}
+    ui.leavePending[key] = left
+    local function done() if ui.leavePending[key] == left then ui.leavePending[key] = nil end end
+    ui.afterAck[id] = { done, T("leaveout_title", "Mods this server gets"), math.huge, nil, nil, done }
+end
 --- Lists the game kept while the app wasn't there go to the app once it is (as sections do), then the copy goes.
 function PZMMMods:sendLeaveOuts()
     if not self.app then return end
@@ -12481,10 +14551,7 @@ function PZMMMods:sendLeaveOuts()
     local any = false
     for _, e in pairs(all) do
         any = true
-        local list = {}
-        for id in pairs(e.ids) do list[#list + 1] = id end
-        table.sort(list)
-        self:request("leaveout\t" .. e.name .. "\t" .. table.concat(list, ";"), nil, true)
+        K.leaveSend(self, e.name, e.ids)
     end
     if any then pcall(function() local w = getFileWriter("pzmm/leaveout_game.txt", true, false); w:close() end) end
 end
@@ -12691,14 +14758,16 @@ function PZMMMods:drawJava(x, y, w, mx, my)
     end
     local lines = wrap(status, w - 32)
     local rowH = 30
-    local h = 14 + H_SMALL + 10 + 3 * rowH + #lines * (H_SMALL + 2) + 14
+    -- installed but off: turned on as the list does (what it needs comes on with it)
+    local enableHere = zb ~= nil and not zb.isActive
+    local h = 14 + H_SMALL + 10 + 3 * rowH + #lines * (H_SMALL + 2) + 14 + (enableHere and BAR + 12 or 0)
     card(self, x, y, w, h)
     bold(self, "ZombieBuddy", x + 16, y + 14, C.text)
     -- what makes it work, one after the other: installed, turned on, running
     local steps = {
-        { T("java_installed", "Installed"), zb ~= nil },
-        { T("java_on", "Turned on"), zb ~= nil and zb.isActive == true },
-        { version and (T("java_running", "Running") .. ", v" .. tostring(version)) or T("java_running", "Running"), version ~= nil },
+        { T("java_check_mod", "ZombieBuddy mod downloaded"), zb ~= nil },
+        { T("java_check_on", "Enabled in this list"), zb ~= nil and zb.isActive == true },
+        { T("java_check_running", "Running (agent and launch flag set up)") .. (version and (", v" .. tostring(version)) or ""), version ~= nil },
     }
     local sy = y + 14 + H_SMALL + 10
     for i, st in ipairs(steps) do
@@ -12713,6 +14782,12 @@ function PZMMMods:drawJava(x, y, w, mx, my)
     for _, l in ipairs(lines) do
         text(self, l, x + 16, sty, c)
         sty = sty + H_SMALL + 2
+    end
+    if enableHere then
+        local label = T("java_enable_here", "Enable in this profile")
+        local bw, _, over = flatButton(self, label, x + 16, sty + 10, mx, my, "primary", TB.check)
+        if over then tip(self, "Enable in this profile\nTurns ZombieBuddy on in this list, as its checkbox in My mods does.") end
+        self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:toggle(zb) end, x = x + 16, y = sty + 10, w = bw, h = BAR }
     end
     y = y + h + 12
     -- their Workshop pages (the Java loader, and Project Viewpoint that rides on it)
@@ -12787,16 +14862,136 @@ end
 
 -- Settings --------------------------------------------------------------------------------------------
 
-K.SETTING_ROWS = {
-    { "logo", "Hide the Project Zomboid logo on the main menu" },
-    { "watermark", "Hide ZombieBuddy's watermark on the main menu", "Its \"loaded\" line and Java mods list over the top of the screen." },
-    { "news", "PZMM patch notes box on the main menu", "The box at the top right, with a red ! for a new patch." },
-    { "tips", "Tooltips", "What a button, tab or chip does, when you hover it." },
-    { "large", "Larger text", "One font size up on this screen." },
-    { "ids", T("set_ids", "Show mod IDs beside names"), "In My mods' rows." },
-    { "favfirst", T("set_favfirst", "Favourites at the top of sorted and filtered lists") },
-    { "compact", T("set_compact", "Compact rows"), "Shorter rows in My mods." },
+-- Settings, as the app's: a rail of sections, each a few cards of rows. A row is { kind, key, label, hint, ... }:
+-- "client" a client.txt toggle (`set`: the same setting of PZMM's, kept in step), "bool" one of PZMM's on/off settings,
+-- "choice" one of its settings from a list ({ value, label } pairs), "number" a number it takes (min, max, unit),
+-- "inapp" one of its settings it doesn't share with the game (only its label, and "Change this in the app").
+function K.opt(v, l) return { v, l } end
+K.SET_SECTIONS = {
+    { "folders", T("set_folders", "Folders") },
+    { "downloads", T("set_downloads", "Downloads and updates"), app = true, desc = T("set_downloads_desc", "When PZMM looks for updates, how the Workshop opens, and repairs."), cards = {
+        { T("set_updates", "Updates"), T("set_updates_hint", "How often PZMM looks for new versions of your mods and of itself."), {
+            { "choice", "update_check", T("set_check", "Check mods for updates"), nil, { K.opt("off", T("set_check_off", "Never (use Check for updates)")), K.opt("start", T("set_check_start", "When PZMM starts")), K.opt("1h", T("set_check_1h", "On start, then every hour")), K.opt("3h", T("set_check_3h", "On start, then every 3 hours")) } },
+            { "inapp", "update_action", T("set_when_found", "When updates are found") },
+            { "bool", "app_updates", T("set_app_updates", "Check for new versions of PZMM when it starts") } } },
+        { T("set_workshop", "Workshop"), T("set_workshop_hint", "Where Workshop pages open and how the Workshop tab starts."), {
+            { "choice", "workshop_links", T("set_open_in", "Open Workshop pages in"), nil, { K.opt("steam", T("set_in_steam", "Steam (when it's running)")), K.opt("browser", T("set_in_browser", "The browser")) } } } } } },
+    { "backups", T("set_backups", "Removing and backups"), app = true, desc = T("set_backups_desc", "What happens to mods you remove, and the backups kept of mods and saves."), cards = {
+        { T("set_removing", "Removing mods"), T("set_removing_hint", "Where removed mods go, and what happens to the mods they needed."), {
+            { "inapp", "recycle", T("set_removed", "Removed mods") },
+            { "inapp", "remove_requirements", T("set_remove_reqs", "Also remove required mods nothing else uses") } } },
+        { T("set_mod_backups", "Mod backups"), T("set_mod_backups_hint", "An update keeps the mod's previous version as a backup (Restore previous version in its details)."), {
+            { "inapp", "backup_cap_mb", T("set_backup_cap", "Backups may use up to") } } },
+        { T("set_save_backups", "Save backups"), T("set_save_backups_hint", "PZMM sees the game, and a crash, only when it started the game. After a crash the saves you played are backed up and kept like slots."), {
+            { "bool", "save_backup_launch", T("set_backup_launch", "Back up the last played save when PZMM starts the game") },
+            { "bool", "save_backup_exit", T("set_backup_exit", "Back up the saves you played when the game closes") },
+            { "inapp", "save_backup_keep", T("set_backup_keep", "Automatic backups kept per save") },
+            { "number", "save_backup_every", T("set_backup_every", "Back up while playing, every (minutes)"), T("set_backup_every_hint", "0 is off. Only saves that changed since the last time are backed up."), 0, 240 } } } } },
+    { "appearance", T("set_appearance", "Appearance"), desc = T("set_appearance_desc", "Language, theme and what the mod lists show."), cards = {
+        { T("set_look", "Theme and language"), T("set_look_hint", "How PZMM looks. The game's language is the one it uses here."), {
+            { "choice", "theme", T("set_theme", "Theme"), nil, { K.opt("system", T("set_theme_system", "Match system")), K.opt("dark", T("set_dark", "Dark")), K.opt("light", T("set_light", "Light")) }, app = true },
+            { "accent", "accent", T("set_accent", "Accent"), T("set_accent_hint", "A colour as #rrggbb."), app = true },
+            { "client", "compact", T("set_compact", "Compact rows"), "Shorter rows in My mods.", set = "compact" },
+            { "client", "large", T("set_large", "Larger text in the in-game manager"), "One font size up on this screen." },
+            { "client", "tips", T("set_tips", "Tooltips in the in-game manager"), "What a button, tab or chip does, when you hover it." } } },
+        { T("set_lists", "Mod lists"), T("set_lists_hint", "The game build mods are checked against, and what the lists show."), {
+            { "choice", "build", T("set_build", "Game build"), nil, { K.opt("auto", T("set_build_detect", "Detect from default.txt")), K.opt("42", T("set_build_42", "Build 42")), K.opt("41", T("set_build_41", "Build 41")) }, app = true },
+            { "client", "ids", T("set_ids", "Show mod IDs beside names"), "In My mods' rows.", set = "show_ids" },
+            { "client", "favfirst", T("set_favfirst", "Favourites at the top of sorted and filtered lists"), nil, set = "fav_first" } } },
+        { T("set_ingame", "In-game mod manager"), T("set_lede", "This screen's options. PZMM's Settings write the same file."), {
+            { "client", "logo", T("set_logo", "Hide the Project Zomboid logo on the main menu") },
+            { "client", "watermark", T("set_watermark", "Hide ZombieBuddy's watermark on the main menu"), "Its \"loaded\" line and Java mods list over the top of the screen." },
+            { "client", "news", T("set_news", "PZMM patch notes box on the main menu"), "The box at the top right, with a red ! for a new patch." },
+            { "client", "pfwarn", T("set_pfwarn", "Ask about warnings before playing"), T("set_pfwarn_hint", "Play, Continue and Join check your mods first; problems are always asked about.") },
+            { "action", "pfreset", T("set_pfreset", "Warnings you said not to ask about"), T("set_pfreset_hint", "Kept per profile, each warning on its own."), T("set_pfreset_do", "Ask about launch warnings again"), "pfReset" } } } } },
+    { "launch", T("set_launch", "Launch and notifications"), app = true, desc = T("set_launch_desc", "How the game starts, the tray, and what PZMM tells you about."), cards = {
+        { T("set_profiles", "Profiles"), T("set_profiles_hint", "What PZMM does when you make or switch to a profile."), {
+            { "bool", "autosort_new", T("set_autosort", "Group a new profile's mods by category the first time it's used") },
+            { "bool", "keep_marks", T("set_keep_marks", "Keep favourites on and hidden mods off in every profile you make or switch to") } } },
+        { T("set_tray", "Tray and start-up"), T("set_tray_hint", "Server schedules, update checks and crash watch go on with the window closed. Quit from the tray icon."), {
+            { "choice", "on_close", T("set_on_close", "When I close the window"), nil, { K.opt("ask", T("set_close_ask", "Ask each time")), K.opt("tray", T("set_close_tray", "Minimise to tray")), K.opt("quit", T("set_close_quit", "Quit")) } },
+            { "inapp", "autostart", T("set_autostart", "Start PZMM in the tray when I sign in to my computer") } } },
+        { T("set_notifications", "Notifications"), T("set_notify_when", "While PZMM's window isn't in front, tell me when"), {
+            { "bool", "notify_crash", T("set_notify_crash", "a server crashes") },
+            { "bool", "notify_restart", T("set_notify_restart", "a server's mods update and it needs a restart") },
+            { "bool", "notify_downloads", T("set_notify_downloads", "installs and updates finish") },
+            { "bool", "notify_favourites", T("set_notify_favourites", "a favourite server comes online with room (checked every two minutes)") } } } } },
+    { "about", T("set_about", "About"), desc = T("set_about_desc", "Your version of PZMM, help and diagnostics.") },
 }
+--- PZMM's own settings for the game (Zomboid/Lua/pzmm/settings_app.txt, key=value), read at most every 2 s.
+function K.readAppSettings(ui)
+    local t = getTimestampMs()
+    if ui.appSetAt and t < ui.appSetAt then return ui.appSet end
+    local out = {}
+    pcall(function()
+        local r = getFileReader("pzmm/settings_app.txt", false)
+        if not r then return end
+        local line = r:readLine()
+        while line do
+            local k, v = line:match("^([%w_]+)=(.*)$")
+            if k then out[k] = v end
+            line = r:readLine()
+        end
+        r:close()
+    end)
+    ui.appSet, ui.appSetAt = out, t + 2000
+    return out
+end
+--- Change one of PZMM's settings (quiet); shown at once, and PZMM's refusal said if it won't take it.
+function PZMMMods:setApp(key, value)
+    value = tostring(value)
+    K.readAppSettings(self)[key] = value
+    self.appSetAt = getTimestampMs() + 5000
+    local id = self:request("set\t" .. key .. "\t" .. value, "", true)
+    if id then self.afterAck[id] = { function() end, T("set_refused", "Settings"), nil, nil, nil, function() self.appSetAt = nil; if K.twinWait then K.twinWait[key] = nil end end } end
+end
+--- The options both have (this one's key = PZMM's): a change in PZMM's Settings (settings_app.txt) shows here,
+--- not sent back. Only a change seen in its file is taken, so a toggle here PZMM hasn't taken yet (twinWait) stays.
+K.TWINS = { compact = "compact", ids = "show_ids", favfirst = "fav_first" }
+function K.appTwins(ui)
+    local set = K.readAppSettings(ui)
+    K.twinSeen, K.twinWait = K.twinSeen or {}, K.twinWait or {}
+    for key, twin in pairs(K.TWINS) do
+        local v = set[twin]
+        if v == "1" or v == "0" then
+            local was = K.twinSeen[twin]
+            K.twinSeen[twin] = v
+            if K.twinWait[twin] then
+                if K.twinWait[twin] == v then K.twinWait[twin] = nil end
+            elseif ((was and was ~= v) or (not was and ui.app and ui.app.running)) and SETTINGS[key] ~= (v == "1") then
+                ui:toggleClient(key)
+            end
+        end
+    end
+end
+--- Toggle one of this screen's options (client.txt); its PZMM twin, if it has one, follows.
+function PZMMMods:toggleClient(key, twin)
+    SETTINGS[key] = not SETTINGS[key]
+    saveSettings(key)
+    if twin and self.app then
+        K.twinWait = K.twinWait or {}
+        K.twinWait[twin] = SETTINGS[key] and "1" or "0"
+        self:setApp(twin, SETTINGS[key] and "1" or "0")
+    end
+    if key == "favfirst" then self:updateView() end
+    -- Larger text and Compact rows: the screen is built again at the new size, on this page
+    if key == "large" or key == "compact" then
+        local page, section = self.page, self.setSection
+        local keep = { defs = {}, favs = {}, orig = self.modsOrig }
+        for id, d in pairs(self.model.mods) do keep.defs[id] = { d.defaultActive, d.defaultFav } end
+        for id, v in pairs(self.model.favs or {}) do keep.favs[id] = v end
+        pcall(function()
+            keep.cur = ActiveMods.getById("pzmmCarry")
+            keep.cur:copyFrom(self.model:getActiveMods())
+        end)
+        keep.bridge = { pending = self.pending, sent = self.sent, sentAt = self.sentAt, kinds = self.kinds, afterAck = self.afterAck,
+            overlay = self.overlay, defRev = self.defRev, defChanged = self.defChanged }
+        PZMMMods.carry = keep
+        self:close()
+        PZMMMods.open()
+        PZMMMods.instance.page, PZMMMods.instance.setSection = page, section
+    end
+end
 
 --- Whether the app pitch under Settings > About was dismissed (Zomboid/Lua/pzmm/pitch.txt).
 local function pitchDismissed()
@@ -12815,61 +15010,144 @@ local function pitchDismissed()
 end
 
 function PZMMMods:drawSettings(x, y, w, mx, my)
-    y = self:drawNotice(x, y, w, T("notice_settings", "language, the game build override, notifications and the tray, folders, downloads and updates, accounts and keys, removal and backup options, theme and accent, launch options, Performance (memory, JVM arguments, PZOpt, the largest mods), the Workshop links open in Steam or the browser setting, the server-country setting, the app's update check, autosorting new mods, autostart, which page the Workshop opens on, results per page, re-downloading the mods PZMM installed, keeping favourites on and hidden mods off in every profile, and a profile's own game folder (its saves, options and logs kept apart)."), mx, my)
-    local rh = H_SMALL * 2 + 22
-    -- its heading and description are in the card (22 above, 26 at the sides)
-    local head = 22 + H_MEDIUM + 4 + H_SMALL + 14
-    local h = head + #K.SETTING_ROWS * rh
-    card(self, x, y, w, h)
-    bold(self, "In-game mod manager", x + 26, y + 22, C.text, MEDIUM)
-    text(self, T("set_lede", "This screen's options. PZMM's Settings write the same file."), x + 26, y + 22 + H_MEDIUM + 4, C.muted)
-    rect(self, x, y + head - 1, w, 1, C.line, 1)
-    for i, s in ipairs(K.SETTING_ROWS) do
-        local ry = y + head + (i - 1) * rh
-        -- label on the left, the checkbox on the right, a line between rows; no hover tint
-        if i < #K.SETTING_ROWS then rect(self, x, ry + rh - 1, w, 1, C.line, 1) end
-        checkbox(self, x + w - 26 - BOX, ry + (rh - BOX) / 2, SETTINGS[s[1]])
-        local tx = x + 26
-        if s[3] then
-            text(self, s[2], tx, ry + 10, C.text)
-            text(self, s[3], tx, ry + 12 + H_SMALL, C.muted)
-        else
-            text(self, s[2], tx, ry + (rh - H_SMALL) / 2, C.text)
+    y = self:drawNotice(x, y, w, T("notice_settings2", "folders (editing), accounts and keys, Performance (memory, JVM arguments, PZOpt, the largest mods), language (the game's is used), launch options and a profile's own game folder, the server-country setting, which page the Workshop opens on and results per page, and re-downloading the mods PZMM installed."), mx, my)
+    -- the rail: the sections, PZMM's own only with PZMM
+    local sections = {}
+    for _, sec in ipairs(K.SET_SECTIONS) do if not sec.app or self.app then sections[#sections + 1] = sec end end
+    local cur = sections[1]
+    for _, sec in ipairs(sections) do if sec[1] == (self.setSection or "appearance") then cur = sec end end
+    local rw = 220
+    local ry = y
+    for _, sec in ipairs(sections) do
+        local on = sec == cur
+        local over = mx >= x and mx < x + rw and my >= ry and my < ry + BAR
+        if on or over then
+            round(self, x, ry, rw, BAR, 6, C.accent, on and 0.32 or 0.2)
+            if on then rect(self, x, ry + 4, 2, BAR - 8, C.onSelected, 1) end
         end
-        local key = s[1]
-        self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function()
-            SETTINGS[key] = not SETTINGS[key]
-            saveSettings(key)
-            -- Larger text: the screen is built again at the new size, on this page
-            if key == "favfirst" then self:updateView() end
-            if key == "large" or key == "compact" then
-                local page = self.page
-                local keep = { defs = {}, favs = {}, orig = self.modsOrig }
-                for id, d in pairs(self.model.mods) do keep.defs[id] = { d.defaultActive, d.defaultFav } end
-                for id, v in pairs(self.model.favs or {}) do keep.favs[id] = v end
-                pcall(function()
-                    keep.cur = ActiveMods.getById("pzmmCarry")
-                    keep.cur:copyFrom(self.model:getActiveMods())
-                end)
-                keep.bridge = { pending = self.pending, sent = self.sent, sentAt = self.sentAt, kinds = self.kinds, afterAck = self.afterAck,
-                    overlay = self.overlay, defRev = self.defRev, defChanged = self.defChanged }
-                PZMMMods.carry = keep
-                self:close()
-                PZMMMods.open()
-                PZMMMods.instance.page = page
-            end
-        end, x = x, y = ry, w = w, h = rh }
+        text(self, sec[2], x + 14, ry + (BAR - H_SMALL) / 2, (on or over) and C.onSelected or C.text)
+        local id = sec[1]
+        self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self.setSection, self.feedScroll = id, 0 end, x = x, y = ry, w = rw, h = BAR }
+        ry = ry + BAR + 4
     end
-    y = y + h + 20
-    -- Make a mod, as far as the game goes: your own Workshop items
-    local label = T("make_items", "Your Workshop items")
-    local bw = width(label) + 46
-    local tw, over = toolButton(self, TB.layers, label, x, y, mx, my)
-    if over then tip(self, "Your Workshop items\nMods you made: open their files, and upload an update from the game's Workshop screen.") end
-    self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self.page, self.feedScroll = "make", 0 end, x = x, y = y, w = tw, h = BAR }
-    y = y + BAR + 20
-    bold(self, "About", x, y, C.text)
-    y = y + H_SMALL + 10
+    local cx, cw = x + rw + 24, w - rw - 24
+    local cy = y
+    bold(self, cur[2], cx, cy, C.text, MEDIUM)
+    cy = cy + H_MEDIUM + 4
+    if cur.desc then
+        text(self, fit(cur.desc, cw), cx, cy, C.muted)
+        cy = cy + H_SMALL
+    end
+    cy = cy + 16
+    if cur[1] == "folders" then
+        cy = self:drawSetFolders(cx, cy, cw, mx, my)
+    elseif cur[1] == "about" then
+        cy = self:drawSetAbout(cx, cy, cw, mx, my)
+    else
+        local appSet = self.app and K.readAppSettings(self) or {}
+        for _, c in ipairs(cur.cards) do
+            local rows = {}
+            for _, r in ipairs(c[3]) do if not r.app or self.app then rows[#rows + 1] = r end end
+            if #rows > 0 then cy = self:drawSetCard(c, rows, appSet, cx, cy, cw, mx, my) + 20 end
+        end
+    end
+    return math.max(ry, cy)
+end
+--- One settings card: its title and hint, then its rows (label at the left, the control at the right).
+function PZMMMods:drawSetCard(c, rows, appSet, x, y, w, mx, my)
+    local rh = H_SMALL * 2 + 22
+    local hint = c[2] and wrap(c[2], w - 52) or {}
+    local head = 22 + H_SMALL + 4 + #hint * (H_SMALL + 2) + 12
+    local h = head + #rows * rh
+    card(self, x, y, w, h)
+    bold(self, c[1], x + 26, y + 22, C.text)
+    for i, l in ipairs(hint) do text(self, l, x + 26, y + 22 + H_SMALL + 4 + (i - 1) * (H_SMALL + 2), C.muted) end
+    rect(self, x, y + head - 1, w, 1, C.line, 1)
+    for i, r in ipairs(rows) do
+        local ry = y + head + (i - 1) * rh
+        if i < #rows then rect(self, x, ry + rh - 1, w, 1, C.line, 1) end
+        local kind, key = r[1], r[2]
+        local fn
+        local right = x + w - 26
+        if kind == "client" or kind == "bool" then
+            local on = kind == "client" and SETTINGS[key] or (appSet[key] == "1")
+            checkbox(self, right - BOX, ry + (rh - BOX) / 2, on)
+            right = right - BOX - 12
+            if kind == "client" then fn = function() self:toggleClient(key, r.set) end
+            else fn = function() self:setApp(key, on and "0" or "1") end end
+        elseif kind == "action" then
+            local label = r[5]
+            local bw = math.min(width(label) + 28, math.floor(w * 0.45))
+            local bx, by = right - bw, ry + (rh - BAR) / 2
+            flatButton(self, fit(label, bw - 28), bx, by, mx, my)
+            right = bx - 12
+            fn = function() self[r[6]](self) end
+        elseif kind == "inapp" then
+            local label = T("set_in_app", "Change this in the app")
+            right = right - width(label)
+            text(self, label, right, ry + (rh - H_SMALL) / 2, C.muted)
+            right = right - 12
+        else
+            -- the value as a button: a menu of the choices, or a box to type a number or colour in
+            local v = appSet[key] or ""
+            local shown = v
+            if kind == "choice" then for _, o in ipairs(r[5]) do if o[1] == v then shown = o[2] end end end
+            if kind == "number" and r[7] then shown = v .. " " .. r[7] end
+            if shown == "" then shown = "-" end
+            local bw = math.min(width(shown) + 28 + 20, math.floor(w * 0.45))
+            local bx, by = right - bw, ry + (rh - BAR) / 2
+            flatButton(self, fit(shown, bw - 48), bx, by, mx, my, nil, kind == "choice" and TB.chev_down or TB.pencil)
+            right = bx - 12
+            if kind == "choice" then
+                fn = function()
+                    local items = {}
+                    for _, o in ipairs(r[5]) do items[#items + 1] = { o[2], function() self:setApp(key, o[1]) end, o[1] == v } end
+                    self:menu(items)
+                end
+            else
+                fn = function()
+                    self:prompt(r[3], v, T("set_set", "Set"), function(typed)
+                        typed = tostring(typed or ""):gsub("%s", "")
+                        if kind == "accent" then
+                            if not typed:match("^#%x%x%x%x%x%x$") then return self:say("A colour is # and six hex digits, like #a1b2c3.") end
+                        else
+                            local n = tonumber(typed)
+                            if not n or n ~= math.floor(n) or n < r[5] or n > r[6] then return self:say(r[3] .. ": a whole number from " .. r[5] .. " to " .. r[6] .. ".") end
+                        end
+                        self:setApp(key, typed)
+                    end, nil, 12)
+                end
+            end
+        end
+        local tx = x + 26
+        if r[4] then
+            text(self, fit(r[3], right - tx), tx, ry + 10, C.text)
+            text(self, fit(r[4], right - tx), tx, ry + 12 + H_SMALL, C.muted)
+        else
+            text(self, fit(r[3], right - tx), tx, ry + (rh - H_SMALL) / 2, C.text)
+        end
+        if fn then self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = fn, x = x, y = ry, w = w, h = rh } end
+    end
+    return y + h
+end
+--- Settings > Folders: the mods folder, opened in the file manager.
+function PZMMMods:drawSetFolders(x, y, w, mx, my)
+    local rh = BAR + 16
+    card(self, x, y, w, rh)
+    local label = T("set_mods_folder", "Mods folder")
+    text(self, label, x + 16, y + (rh - H_SMALL) / 2, C.text)
+    local open = T("set_open", "Open")
+    local ow = width(open) + 48
+    local ox, oy = x + w - 16 - ow, y + 8
+    local path = "Zomboid" .. getFileSeparator() .. "mods"
+    text(self, fit(path, ox - 16 - (x + 180)), x + 180, y + (rh - H_SMALL) / 2, C.muted)
+    local _, _, over = flatButton(self, open, ox, oy, mx, my, nil, TB.folder)
+    if over then tip(self, "Open mods folder\nZomboid/mods, where mods you made or downloaded by hand go.") end
+    self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:onAction("folder") end, x = ox, y = oy, w = ow, h = BAR }
+    return y + rh
+end
+--- Settings > About: the versions, the app pitch (once), the Logs folder and diagnostics, the links and the shortcuts.
+function PZMMMods:drawSetAbout(x, y, w, mx, my)
     -- the PZMM app, once: what it adds, Get the app, and Don't show this again
     if not self.app and not pitchDismissed() then
         local lines = wrap("The PZMM Mod Manager app adds the rest: news and change notes, Workshop pictures, installs without Steam, backups and restore, profiles and server tools. With both, everything here syncs with it.", w - 32)
@@ -12916,6 +15194,15 @@ function PZMMMods:drawSettings(x, y, w, mx, my)
         self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = b[3], x = bx, y = y, w = bw, h = bh2 }
         bx = bx + bw + 8
     end
+    y = y + BAR + 14
+    -- the app's links: GitHub, Discord, Ko-fi
+    bx = x
+    for _, l in ipairs(LINKS) do
+        local bw, bh2, o = flatButton(self, l[3], bx, y, mx, my, "quiet", TB.external)
+        if o then tip(self, l[4]) end
+        self.feedHits[#self.feedHits + 1] = { kind = "url", url = l[2], x = bx, y = y, w = bw, h = bh2 }
+        bx = bx + bw + 8
+    end
     y = y + BAR + 20
     -- the shortcuts this screen answers to
     bold(self, T("about_keys", "Keyboard shortcuts"), x, y, C.text)
@@ -12956,6 +15243,7 @@ end
 
 --- Ask Steam for these IDs' details; the ones it can't answer end up marked failed.
 function PZMMMods:askSteam(ids)
+    if K.steamCooling() then return self:lookFailed(ids) end
     local ok = pcall(function()
         local a = ArrayList.new()
         for _, id in ipairs(ids) do a:add(id) end
@@ -12971,7 +15259,10 @@ function PZMMMods:lookFailed(ids)
 end
 function PZMMMods:onLookedUp(status, info, ids)
     if status ~= "Completed" or not info then
-        if not info and ids and tostring(status):lower():find("fail") then self:lookFailed(ids) end
+        if not info and ids and tostring(status):lower():find("fail") then
+            K.steamFailed()
+            self:lookFailed(ids)
+        end
         return
     end
     for i = 0, info:size() - 1 do
@@ -13014,6 +15305,30 @@ local function workshopId(typed)
     local id = typed:match("[?&]id=(%d+)") or typed:match("^%s*(%d+)%s*$")
     return id and #id <= 20 and id or nil
 end
+--- Every Workshop ID in what was pasted (IDs or links, apart by spaces, commas or new lines), each once.
+function K.workshopIds(typed)
+    local out, seen = {}, {}
+    for tok in tostring(typed or ""):gmatch("[^%s,;]+") do
+        local id = workshopId(tok)
+        if id and not seen[id] then
+            seen[id] = true
+            out[#out + 1] = id
+        end
+    end
+    return out
+end
+--- The header's Install box: PZMM installs what was pasted; without it, each shows in Browse Workshop (Subscribe
+--- opens it in Steam), and one item opens in the Steam overlay straight away.
+function PZMMMods:installTyped()
+    local ids = K.workshopIds(self.installBox and self.installBox:getText())
+    if #ids == 0 then return self:say("That isn't a Workshop ID or link: it's the number after id= in the page's address.") end
+    self.installBox:setText("")
+    pcall(function() self.installBox:unfocus() end)
+    if self.app then return self:request("install\t" .. table.concat(ids, ","), (#ids == 1 and ids[1] or (#ids .. " Workshop items")) .. " asked for.") end
+    for i = #ids, 1, -1 do self:lookUp(ids[i]) end
+    self.page, self.feedScroll = "workshop", 0
+    if #ids == 1 then self:openWorkshop(ids[1]) end
+end
 
 local function megabytes(bytes)
     if not bytes or bytes <= 0 then return nil end
@@ -13024,40 +15339,128 @@ end
 --- Browse Workshop, as far as the game lets a mod go: search the Workshop in Steam, and look up any item or
 --- collection by its ID or link (its size, when it was updated, whether you have it, a collection's items),
 --- with Subscribe (Steam) or Install with PZMM.
+-- Steam's Workshop tags for Project Zomboid, and their names as the app shows them
+K.WS_TAGS = { { "Animals", T("ws_tag_animals", "Animals") }, { "Audio", T("ws_tag_audio", "Audio") }, { "Balance", T("ws_tag_balance", "Balance") },
+    { "Building", T("ws_tag_building", "Building") }, { "Clothing/Armor", T("ws_tag_clothing", "Clothing") }, { "Farming", T("ws_tag_farming", "Farming") },
+    { "Food", T("ws_tag_food", "Food") }, { "Framework", T("ws_tag_framework", "Framework") }, { "Hardmode", T("ws_tag_hardmode", "Hardmode") },
+    { "Interface", T("ws_tag_interface", "Interface") }, { "Items", T("ws_tag_items", "Items") }, { "Language/Translation", T("ws_tag_translations", "Translations") },
+    { "Literature", T("ws_tag_literature", "Literature") }, { "Map", T("ws_tag_map", "Map") }, { "Military", T("ws_tag_military", "Military") },
+    { "Misc", T("ws_tag_misc", "Misc") }, { "Models", T("ws_tag_models", "Models") }, { "Multiplayer", T("ws_tag_multiplayer", "Multiplayer") },
+    { "Pop Culture", T("ws_tag_pop", "Pop culture") }, { "QoL", T("ws_tag_qol", "QoL") }, { "Realistic", T("ws_tag_realistic", "Realistic") },
+    { "Silly/Fun", T("ws_tag_silly", "Silly & fun") }, { "Skills", T("ws_tag_skills", "Skills") }, { "Textures", T("ws_tag_textures", "Textures") },
+    { "Traits", T("ws_tag_traits", "Traits") }, { "Vehicles", T("ws_tag_vehicles", "Vehicles") }, { "Weapons", T("ws_tag_weapons", "Weapons") }, { "WIP", T("ws_tag_wip", "WIP") } }
+--- Steam's Workshop search page for Project Zomboid: the words, and the tags picked (each one required).
+function K.wsSearchUrl(q, tags)
+    local url = "https://steamcommunity.com/workshop/browse/?appid=108600&searchtext=" .. urlEncode(q or "")
+    for _, t in ipairs(K.WS_TAGS) do
+        if tags and tags[t[1]] then url = url .. "&requiredtags%5B%5D=" .. urlEncode(t[1]) end
+    end
+    return url
+end
+--- Search the Workshop with the box's words and the picked tags, in the Steam overlay (else the browser).
+function PZMMMods:wsSearchGo(q)
+    q = q or (self.wsSearch and self.wsSearch:getText()) or ""
+    q = tostring(q):gsub("^%s+", ""):gsub("%s+$", "")
+    local url = K.wsSearchUrl(q, self.wsTags)
+    local overlay = false
+    pcall(function() overlay = isSteamOverlayEnabled() end)
+    if overlay then pcall(function() activateSteamOverlayToWebPage(url) end) else openLink(url) end
+    self.wsLastUrl = url
+end
+--- Browse Workshop's options column, as the app's: Search the Workshop (box + Search, with the tags picked below),
+--- Hide installed, and the Viewpoint group. Returns the y under it.
+function PZMMMods:drawWsOptions(x, y, w, mx, my, top, bh)
+    local hits = self.feedHits
+    local pad = 16
+    local px, pw = x + pad, w - pad * 2
+    -- its height first (the card is drawn under it)
+    local cy = y + pad
+    local sh = H_SMALL + 8 + BAR + 8 + BAR + 18
+    local th = H_SMALL + 10
+    local chipH = H_SMALL + 8
+    local rows, rx = 1, 0
+    for _, t in ipairs(K.WS_TAGS) do
+        local cw = width(t[2]) + 20
+        if rx > 0 and rx + cw > pw then rows, rx = rows + 1, 0 end
+        rx = rx + cw + 6
+    end
+    local tagsH = th + rows * (chipH + 6) + 12
+    local vp = self.model.mods["Viewpoint"] ~= nil
+    local h = pad + sh + tagsH + BAR + 12 + (vp and (H_SMALL + 10 + 2 * (BAR + 6)) or 0) + BAR + pad
+    card(self, x, y, w, h)
+    bold(self, T("ws_search_placeholder", "Search the Workshop"), px, cy, C.text)
+    cy = cy + H_SMALL + 8
+    -- the box
+    round(self, px, cy, pw, BAR, 6, C.raised)
+    local focused = false
+    pcall(function() focused = self.wsSearch:isFocused() end)
+    outline(self, px, cy, pw, BAR, 6, focused and C.focus or C.line)
+    if self.wsSearch then
+        local inFrame = cy >= top and cy + BAR <= top + bh
+        self.wsSearch:setVisible(inFrame)
+        self.wsSearch:setX(px + 8)
+        self.wsSearch:setY(cy + 4)
+        self.wsSearch:setWidth(pw - 16)
+    end
+    cy = cy + BAR + 8
+    local sl = T("ws_search", "Search")
+    local sw, _, so = flatButton(self, sl, px, cy, mx, my, "primary", TB.search)
+    if so then tip(self, sl .. "\nOpens Steam's Workshop search for Project Zomboid with these words and the tags picked below.") end
+    hits[#hits + 1] = { kind = "fn", fn = function() self:wsSearchGo() end, x = px, y = cy, w = sw, h = BAR }
+    local ol = T("ws_open", "Open the Workshop")
+    local ow, _, oo = flatButton(self, ol, px + sw + 8, cy, mx, my, "quiet", TB.steam)
+    if oo then tip(self, ol .. "\nProject Zomboid's Workshop in Steam.") end
+    hits[#hits + 1] = { kind = "fn", fn = function() openLink("https://steamcommunity.com/app/108600/workshop/") end, x = px + sw + 8, y = cy, w = ow, h = BAR }
+    cy = cy + BAR + 18
+    -- the tags: each picked one is required in the search
+    self.wsTags = self.wsTags or {}
+    local np = 0
+    for _ in pairs(self.wsTags) do np = np + 1 end
+    bold(self, np > 0 and T("ws_tags_n", "Tags (%1)", np) or T("ws_tags", "Tags"), px, cy, C.text)
+    cy = cy + th
+    local tx = px
+    for _, t in ipairs(K.WS_TAGS) do
+        local cw = width(t[2]) + 20
+        if tx > px and tx + cw > px + pw then tx, cy = px, cy + chipH + 6 end
+        local on = self.wsTags[t[1]]
+        local over = mx >= tx and mx < tx + cw and my >= cy and my < cy + chipH
+        round(self, tx, cy, cw, chipH, 6, on and C.accent or C.raised, on and 0.32 or 1)
+        outline(self, tx, cy, cw, chipH, 6, (on or over) and C.accent or C.line, (on or over) and 0.7 or 1)
+        text(self, t[2], tx + 10, cy + 4, on and C.onSelected or C.text)
+        local tag = t[1]
+        hits[#hits + 1] = { kind = "fn", fn = function() self.wsTags[tag] = (not self.wsTags[tag]) or nil end, x = tx, y = cy, w = cw, h = chipH }
+        tx = tx + cw + 6
+    end
+    cy = cy + chipH + 6 + 12
+    -- Hide installed
+    local hl = T("ws_hide_installed", "Hide installed")
+    checkbox(self, px, cy + (BAR - BOX) / 2, self.wsHide)
+    text(self, hl, px + BOX + 8, cy + (BAR - H_SMALL) / 2, C.text)
+    if mx >= px and mx < px + BOX + 8 + width(hl) and my >= cy and my < cy + BAR then tip(self, hl .. "\n" .. T("ws_hide_installed_tip", "Leave out mods you already have (installed or subscribed)")) end
+    hits[#hits + 1] = { kind = "fn", fn = function() self.wsHide = not self.wsHide end, x = px, y = cy, w = BOX + 8 + width(hl), h = BAR }
+    cy = cy + BAR + 12
+    if vp then
+        bold(self, "Project Viewpoint", px, cy, C.text)
+        cy = cy + H_SMALL + 10
+        for _, b in ipairs({
+            { T("ws_viewpoint_addons", "Viewpoint add-ons"), "Viewpoint add-ons\nSearches the Workshop for Project Viewpoint's add-ons.", function() self:wsSearchGo("Project Viewpoint") end, TB.layers },
+            { T("ws_viewpoint_discord", "Viewpoint Discord"), "Viewpoint Discord\nThe Project Viewpoint community.", function() openLink("https://discord.gg/g83XvPhEgQ") end, TB.external },
+        }) do
+            local bw, _, bo = flatButton(self, b[1], px, cy, mx, my, "quiet", b[4])
+            if bo then tip(self, b[2]) end
+            hits[#hits + 1] = { kind = "fn", fn = b[3], x = px, y = cy, w = bw, h = BAR }
+            cy = cy + BAR + 6
+        end
+    end
+    return y + h
+end
+
 function PZMMMods:drawWorkshop(x, y, w, mx, my, top, bh)
-    y = self:drawNotice(x, y, w, T("notice_workshop", "browsing the Workshop with filters, tags, sorting and pages, an item's stars, comments and pictures, making a profile from a collection, the mods-by-this-author and mods-that-need drill-downs, the item's change-notes tab, Collections with this item (that needs Workshop queries), its description, subscriber, visitor and favourite counts and tags, the Workshop's Home view (popular this week, most subscribed, newest, recently updated, most required), and removing an installed item."), mx, my)
-    local bx = x
-    local function button(label, kind, tipText, fn, icon)
-        local bw, _, over = flatButton(self, label, bx, y, mx, my, kind, icon)
-        if over then tip(self, tipText) end
-        self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = fn, x = bx, y = y, w = bw, h = BAR }
-        bx = bx + bw + 8
-    end
-    local function search(q)
-        local url = "https://steamcommunity.com/workshop/browse/?appid=108600&searchtext=" .. urlEncode(q)
-        local overlay = false
-        pcall(function() overlay = isSteamOverlayEnabled() end)
-        if overlay then pcall(function() activateSteamOverlayToWebPage(url) end) else openLink(url) end
-    end
-    button("Search the Workshop", "primary", "Search the Workshop\nOpens Steam's Workshop search for Project Zomboid with what you type.", function()
-        self:prompt("Search the Workshop", "", "Search", function(q)
-            search((tostring(q or ""):gsub("^%s+", ""):gsub("%s+$", "")))
-        end)
-    end)
-    button("Look up an ID or link", nil, "Look up an ID or link\nA Workshop item or collection: paste its link or type its ID.", function()
-        self:prompt("Look up a Workshop item or collection", "", "Look up", function(typed)
-            local id = workshopId(typed)
-            if not id then return self:say("That isn't a Workshop ID or link: it's the number after id= in the page's address.") end
-            self:lookUp(id)
-        end)
-    end)
-    button("Open the Workshop", "quiet", "Open the Workshop\nProject Zomboid's Workshop in Steam.", function() openLink("https://steamcommunity.com/app/108600/workshop/") end)
-    button(T("ws_hide_installed", "Hide installed"), "quiet", "Hide installed\nLeaves out the looked-up items you already have.", function() self.wsHide = not self.wsHide end, self.wsHide and TB.check or nil)
-    if self.model.mods["Viewpoint"] then
-        button(T("ws_viewpoint_addons", "Viewpoint add-ons"), "quiet", "Viewpoint add-ons\nSearches the Workshop for Project Viewpoint's add-ons.", function() search("Project Viewpoint") end, TB.layers)
-        button(T("ws_viewpoint_discord", "Viewpoint Discord"), "quiet", "Viewpoint Discord\nThe Project Viewpoint community.", function() openLink("https://discord.gg/g83XvPhEgQ") end, TB.external)
-    end
-    y = y + BAR + 20
+    y = self:drawNotice(x, y, w, T("notice_workshop2", "browsing the Workshop with filters, tags, sorting and pages, an item's stars, comments and pictures, making a profile from a collection, the mods-by-this-author and mods-that-need drill-downs, the item's change-notes tab, Collections with this item (that needs Workshop queries), its description, subscriber, visitor and favourite counts and tags, and the Workshop's Home view (popular this week, most subscribed, newest, recently updated, most required)."), mx, my)
+    -- the options at the left, the items at the right
+    local ow = 300
+    local optBottom = self:drawWsOptions(x, y, ow, mx, my, top, bh)
+    x, w = x + ow + 24, w - ow - 24
     local list = {}
     local t = getTimestampMs()
     for _, id in ipairs(self.lookOrder or {}) do
@@ -13073,8 +15476,11 @@ function PZMMMods:drawWorkshop(x, y, w, mx, my, top, bh)
         end
     end
     if #list == 0 then
-        text(self, "Look up an item or a collection and it shows here, with what you need to get it.", x, y, C.muted)
-        return y + H_SMALL
+        for _, l in ipairs(wrap("Paste an item or a collection in the Install box at the top: it shows here, with what you need to get it.", w)) do
+            text(self, l, x, y, C.muted)
+            y = y + H_SMALL + 2
+        end
+        return math.max(y, optBottom)
     end
     -- what you have: subscribed items (Steam's word), and installed mods' Workshop IDs
     local have = {}
@@ -13102,26 +15508,42 @@ function PZMMMods:drawWorkshop(x, y, w, mx, my, top, bh)
             if over then tip(self, "Retry\nAsk Steam about " .. e.id .. " again.") end
             self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:lookUp(e.id) end, x = right, y = ry + (ROW - BAR) / 2, w = bw, h = BAR }
             right = right - 12
-        elseif not e.asking and not isColl(e) then
-            local label = owned and "Subscribed" or (self.app and "Install with PZMM" or "Subscribe")
-            local kind = owned and "quiet" or "primary"
-            local icon = (not owned) and TB.download or nil
-            local bw = width(label) + 28 + (icon and 20 or 0)
+        elseif not e.asking and not isColl(e) and owned then
+            -- the app's installed state: Installed, and Uninstall (PZMM's copy through PZMM, a subscription on its page)
+            local ul = T("ws_uninstall", "Uninstall")
+            local bw = width(ul) + 28
             right = right - bw
-            local _, _, over = flatButton(self, label, right, ry + (ROW - BAR) / 2, mx, my, kind, icon)
-            if over then tip(self, owned and "Subscribed\nOpens it in Steam." or self.app and (label .. "\nOpens PZMM, which installs it once you say yes.") or "Subscribe\nOpens it in Steam: subscribe there and it downloads.") end
-            local act = (not owned and self.app) and function() self:request("install\t" .. e.id, title .. " asked for.") end or function() self:openWorkshop(e.id) end
+            local _, _, over = flatButton(self, ul, right, ry + (ROW - BAR) / 2, mx, my, "quiet")
+            if over then tip(self, ul .. "\n" .. T("ws_uninstall_tip", "Remove PZMM's copy, or unsubscribe in Steam")) end
+            local item = e.id
+            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function()
+                local list2 = {}
+                for _, d in pairs(self.model.mods) do if wsOf(d) == item then list2[#list2 + 1] = d end end
+                if #list2 == 0 then return self:openWorkshop(item) end
+                table.sort(list2, byName)
+                self:removeMods(list2)
+            end, x = right, y = ry + (ROW - BAR) / 2, w = bw, h = BAR }
+            right = right - 12
+            local hl = T("ws_add_hosted", "Add to a hosted server")
+            local hw = width(hl) + 28
+            right = right - hw
+            local _, _, hover = flatButton(self, hl, right, ry + (ROW - BAR) / 2, mx, my, "quiet")
+            if hover then tip(self, "Add to a hosted server\nIts installed mods, and what they need, join a server's Mods= and WorkshopItems=.") end
+            self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:addToHosted({ e.id }, title) end, x = right, y = ry + (ROW - BAR) / 2, w = hw, h = BAR }
+            right = right - 12
+            local il = T("ws_installed", "Installed")
+            right = right - width(il) - 11
+            chip(self, il, right, ry + math.floor((ROW - H_SMALL - 2) / 2), C.accentText)
+            right = right - 12
+        elseif not e.asking and not isColl(e) then
+            local label = T("install_btn", "Install")
+            local bw = width(label) + 48
+            right = right - bw
+            local _, _, over = flatButton(self, label, right, ry + (ROW - BAR) / 2, mx, my, "primary", TB.download)
+            if over then tip(self, self.app and (label .. "\nOpens PZMM, which installs it once you say yes.") or (label .. "\nOpens it in Steam: subscribe there, and Steam downloads it.")) end
+            local act = self.app and function() self:request("install\t" .. e.id, title .. " asked for.") end or function() self:openWorkshop(e.id) end
             self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = act, x = right, y = ry + (ROW - BAR) / 2, w = bw, h = BAR }
             right = right - 12
-            if owned then
-                local hl = T("ws_add_hosted", "Add to a hosted server")
-                local hw = width(hl) + 28
-                right = right - hw
-                local _, _, hover = flatButton(self, hl, right, ry + (ROW - BAR) / 2, mx, my, "quiet")
-                if hover then tip(self, "Add to a hosted server\nIts installed mods, and what they need, join a server's Mods= and WorkshopItems=.") end
-                self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:addToHosted({ e.id }, title) end, x = right, y = ry + (ROW - BAR) / 2, w = hw, h = BAR }
-                right = right - 12
-            end
         end
         local facts = {}
         if megabytes(e.size) then facts[#facts + 1] = megabytes(e.size) end
@@ -13144,7 +15566,7 @@ function PZMMMods:drawWorkshop(x, y, w, mx, my, top, bh)
     end
     if #shownList == 0 then
         text(self, "Everything you looked up is installed: Hide installed is on.", x, y, C.muted)
-        return y + H_SMALL
+        return math.max(y + H_SMALL, optBottom)
     end
     for _, e in ipairs(shownList) do
         local kids = e.children or {}
@@ -13182,7 +15604,7 @@ function PZMMMods:drawWorkshop(x, y, w, mx, my, top, bh)
         end
         y = y + h + 12
     end
-    return y
+    return math.max(y, optBottom)
 end
 
 -- the game's upload check (SteamWorkshopItem:validateContents) answers with a code
@@ -13347,11 +15769,44 @@ function PZMMMods:drawMake(x, y, w, mx, my, top, bh)
     return y
 end
 
+--- A panel down the right of the page at x, y, w, h that scrolls on its own (`key` holds how far): `fn(px, py, pw,
+--- mx, my)` draws its content from px, py (pw wide) and returns the y under it. Its hits are cut to the panel, as
+--- its drawing is, so a row scrolled out of it can't be clicked.
+function PZMMMods:drawScrollSide(key, x, y, w, h, fn)
+    rect(self, x, y, w, h, C.panel, 1)
+    rect(self, x, y, 1, h, C.line, 1)
+    local mx, my = self:getMouseX(), self:getMouseY()
+    if mx < x or my < y or my >= y + h then my = -1e9 end
+    local hits = self.feedHits
+    local n0 = #hits
+    local sc = self[key] or 0
+    local top = y + 16 - sc
+    self:clearStencilRect()
+    self:setStencilRect(x, y, w, h)
+    local full = fn(x + 18, top, w - 36, mx, my) - top + 32
+    self:clearStencilRect()
+    local keep = {}
+    for i = n0 + 1, #hits do
+        local hb = hits[i]
+        local y0, y1 = math.max(hb.y, y), math.min(hb.y + hb.h, y + h)
+        if y1 > y0 then
+            hb.y, hb.h = y0, y1 - y0
+            keep[#keep + 1] = hb
+        end
+        hits[i] = nil
+    end
+    for _, hb in ipairs(keep) do hits[#hits + 1] = hb end
+    self[key] = math.max(0, math.min(sc, full - h))
+    scrollbar(self, key, x, y, w, h, full)
+    self.sidePane = { x = x, y = y, w = w, h = h, key = key, full = full, page = self.page }
+    return full
+end
+
 --- The frame every other tab draws in: What's new's (heading, scrolling, scroll bar).
 function PZMMMods:drawPage()
     local bx, by, bw, bh = self:feedBox()
-    -- each page's column: Settings and Saves are narrower than the rest
-    local cw = math.min(bw, ({ settings = 860, saves = 1180 })[self.page] or 1240)
+    -- each page's column: Settings and Saves are narrower than the rest, Maps and Servers take the whole width
+    local cw = math.min(bw, ({ settings = 1120, saves = 1180, maps = bw, servers = bw })[self.page] or 1240)
     local x0 = math.floor(bx + (bw - cw) / 2)
     local mx, my = self:getMouseX(), self:getMouseY()
     self.feedHits = {}
@@ -13367,17 +15822,38 @@ function PZMMMods:drawPage()
     else
         self:setStencilRect(bx, by, bw, bh)
         y = math.floor(by + 8 - self.feedScroll)
-        -- (Saves has its heading in its card)
-        if self.page ~= "saves" then
+        -- (Saves has its heading in its card, Maps its grid's title)
+        if self.page ~= "saves" and self.page ~= "maps" then
             bold(self, pg[2], x0, y, C.text, MEDIUM)
             y = y + H_MEDIUM + 12
         end
     end
+    -- Saves' Tools panel at the right: the list keeps out of its way
+    local tool
+    if self.page == "saves" and self.saveTool then
+        for _, s in ipairs(self:savesList()) do if s.folder == self.saveTool then tool = s end end
+        if not tool then self.saveTool = nil end
+    end
+    -- Maps' tools, a server's details: down the right too
+    local sideW = (tool and SIDE) or (self.page == "maps" and K.MAPSIDE) or (self.page == "servers" and self.srvSel and SIDE) or nil
+    if sideW then
+        cw = math.min(cw, bw - sideW - 24)
+        x0 = math.floor(bx + (bw - sideW - cw) / 2)
+        if mx >= self.width - sideW then my = -1e9 end
+    end
+    self.sidePane = nil
     y = self[pg[4]](self, x0, y, cw, mx, my, by, bh)
     self:clearStencilRect()
+    if tool then
+        self:drawSaveTools(tool, self.width - SIDE, by - 12, SIDE, bh + 12, self:getMouseX(), self:getMouseY())
+    elseif self.page == "maps" then
+        self:drawMapTools(self.width - sideW, by - 12, sideW, bh + 12)
+    elseif sideW then
+        self:drawScrollSide("srvSideScroll", self.width - sideW, by - 12, sideW, bh + 12, function(px, py, pw, mx2, my2) return self:drawServerPanel(px, py, pw, mx2, my2) end)
+    end
     self.feedHeight = y + self.feedScroll - by + 24
     self.feedScroll = math.max(0, math.min(self.feedScroll, self.feedHeight - bh))
-    scrollbar(self, "feedScroll", bx, by, bw, bh, self.feedHeight)
+    scrollbar(self, "feedScroll", bx, by, bw - (sideW and (sideW - PAD) or 0), bh, self.feedHeight)
 end
 
 -- the menu built before this file loaded holds the old function: point its Mods item here too

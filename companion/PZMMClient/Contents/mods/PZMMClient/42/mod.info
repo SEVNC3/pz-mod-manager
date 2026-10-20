@@ -4,5 +4,5 @@ description=Connects the game to PZMM, the free mod manager, server browser and 
 poster=poster.png
 icon=icon.png
 author=SEVNC3
-modversion=0.2.1
+modversion=0.2.2
 url=https://github.com/SEVNC3/pz-mod-manager
