@@ -3614,7 +3614,7 @@
     "settingsHint": "You can change this later in Settings."
   },
   "whatsNew": {
-    "notes": "Far fewer Steam requests, so \"Steam is limiting requests\" is rare\nMy mods has columns: Size, Installed, Last changed, Overwrites\nAn eye hides a mod from the list without turning it off\nWorkshop pictures with arrows, and new Added and Updated filters\nJoin on server rows, Rename and Delete for saves\nThe in-game manager can hand jobs to the app",
+    "notes": "Thanks to Lyven Ka Vinsxy, GhostyAshes, newbee, Gentle_Hilt and Yagoyuki for recent ideas and bug reports.\nFar fewer Steam requests, so \"Steam is limiting requests\" is rare\nMy mods has columns: Size, Installed, Last changed, Overwrites\nAn eye hides a mod from the list without turning it off\nWorkshop pictures with arrows, and new Added and Updated filters\nJoin on server rows, Rename and Delete for saves\nThe in-game manager can hand jobs to the app",
     "title": "What's new in {version}",
     "enjoying": "Enjoying PZMM?",
     "upvote": "If you're enjoying this app please upvote it on Steam!",

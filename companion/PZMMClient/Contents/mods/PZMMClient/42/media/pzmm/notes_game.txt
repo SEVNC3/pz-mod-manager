@@ -1,4 +1,5 @@
 # 0.2.2
+- Thanks to Lyven Ka Vinsxy, GhostyAshes, newbee, Gentle_Hilt and Yagoyuki for recent ideas and bug reports.
 - This screen is laid out like the app now. Tabs, buttons and panels sit where they do in PZMM, so if you know one you know the other.
 - My mods has an eye next to each tickbox. Click it to hide mods you don't want to see, like the versions of a texture pack you don't use. Hidden lists them. Hiding never turns a mod off.
 - Size, Installed, Last changed and Overwrites have their own columns. Click a header to sort by it.
