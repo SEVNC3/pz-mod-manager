@@ -1,3 +1,12 @@
+# 0.2.3
+- Thanks to Lyven Ka Vinsxy, GhostyAshes, newbee, Gentle_Hilt and Yagoyuki for recent ideas and bug reports.
+- Hold updates on a mod: click the lock next to the eye and PZMM keeps the version you have. yustin asked how to stop a save's mods updating on the Workshop page. This is the answer.
+- Held mods skip every update. When the Workshop has a newer one, a Held chip says so, and Update anyway in the mod's details takes it if you want it.
+- A Subscribed mod can be held too. PZMM asks first, keeps its own copy of your version and unsubscribes it, because Steam would update it otherwise.
+- Hold this save's mods on a save does the lot in one go.
+- Give it my mods on a hosted server now says Save mods to server. Mittens The Feared couldn't find it on Discord, and fair enough.
+- Holding updates needs PZMM 1.4.0.
+
 # 0.2.2
 - Thanks to Lyven Ka Vinsxy, GhostyAshes, newbee, Gentle_Hilt and Yagoyuki for recent ideas and bug reports.
 - This screen is laid out like the app now. Tabs, buttons and panels sit where they do in PZMM, so if you know one you know the other.
