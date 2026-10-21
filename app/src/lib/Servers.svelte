@@ -18,9 +18,15 @@
   let launcher = $state<LauncherView | null>(null);
   /** The open server's section has changes not saved yet (Mods, Settings, Automation); here so Home's links ask too. */
   let dirty = $state(false);
-  /** Before the open section goes: changes not saved are dropped only when the player says so. */
+  /** The open section's save (true only when saved), for Save and leave. */
+  let saveOpen = $state<(() => Promise<boolean>) | undefined>();
+  /** Before the open section goes: changes not saved are saved first or dropped, as the player says. */
   async function leave() {
-    if (sel === "server" && dirty && (await askNow(t("hosting.leaveTitle"), [t("hosting.leaveLine")], [{ label: t("hosting.leave"), icon: "undo" }])) !== 0) return false;
+    if (sel === "server" && dirty) {
+      const i = await askNow(t("hosting.leaveTitle"), [t("hosting.leaveLine")], [{ label: t("hosting.leaveSave"), icon: "check" }, { label: t("hosting.leave"), icon: "undo" }]);
+      // a save that fails, or whose preview is cancelled, stays
+      if (i < 0 || (i === 0 && !(await saveOpen?.()))) return false;
+    }
     dirty = false;
     return true;
   }
@@ -594,15 +600,15 @@
             {:else if shown === "files"}
               <ServerFiles server={card} onChanged={refresh} />
             {:else if shown === "mods"}
-              <ServerMods server={card} {profiles} {profile} {rows} {ask} bind:dirty />
+              <ServerMods server={card} {profiles} {profile} {rows} {ask} bind:dirty bind:saveAll={saveOpen} />
             {:else if shown === "settings"}
-              <ServerSettings server={card} bind:dirty />
+              <ServerSettings server={card} bind:dirty bind:saveAll={saveOpen} />
             {:else if shown === "backups"}
               <ServerBackups server={card} {ask} />
             {:else if shown === "world"}
               <ServerWorld server={card} {ask} onChanged={(name) => { if (name) [selected, notice] = [name, t("hosting.world.copied", { name })]; refresh(); }} />
             {:else}
-              <ServerAuto server={card} onSaved={refresh} bind:dirty />
+              <ServerAuto server={card} onSaved={refresh} bind:dirty bind:saveAll={saveOpen} />
             {/if}
           {/key}
         </div>

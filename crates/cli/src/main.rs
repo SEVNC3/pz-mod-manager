@@ -268,7 +268,8 @@ fn run(cli: Cli) -> Result<()> {
         }
         Cmd::Update => {
             // Workshop items that changed; GitHub and local sources can't be asked, so they all come again
-            let outdated = sources::check_updates(&paths)?;
+            // (held mods are left out: sources::fetch skips them)
+            let outdated = sources::check_updates(&paths)?.outdated;
             let mut seen = std::collections::HashSet::new();
             let all: Vec<Source> = store::load(&paths)?
                 .into_iter()
@@ -435,14 +436,15 @@ fn run(cli: Cli) -> Result<()> {
             }
         }
         Cmd::Outdated => {
-            let ids = sources::check_updates(&paths)?;
+            let found = sources::check_updates(&paths)?;
             if json {
-                return print_json(serde_json::to_value(&ids)?);
+                return print_json(serde_json::to_value(&found.outdated)?); // the list it always was
             }
-            if ids.is_empty() {
+            if found.outdated.is_empty() && found.held.is_empty() {
                 println!("everything PZMM installed is up to date");
             }
-            ids.iter().for_each(|i| println!("{i}: update available (pzmm update)"));
+            found.outdated.iter().for_each(|i| println!("{i}: update available (pzmm update)"));
+            found.held.keys().for_each(|i| println!("{i}: update available, but its updates are held"));
         }
         Cmd::Server { action, name, command, build, dir, data, port, memory } => match action.as_str() {
             "export" | "import" => server(&paths, &p, &action, &name)?,

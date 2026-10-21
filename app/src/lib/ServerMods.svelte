@@ -10,10 +10,12 @@
   import LeaveOut from "./LeaveOut.svelte";
   import { autosort, orderOf, sortLoadOrder } from "./order";
 
-  let { server, profiles, profile, rows, ask, dirty = $bindable(false) }: {
+  let { server, profiles, profile, rows, ask, dirty = $bindable(false), saveAll = $bindable() }: {
     server: ServerCard;
     /** The lines differ from the ini's (out). */
     dirty?: boolean;
+    /** Save what's changed (out, for the leave box's Save and leave): true only when it was saved. */
+    saveAll?: () => Promise<boolean>;
     profiles: string[];
     profile: string;
     /** The library: installed mods with their load rules, for Autosort and names. */
@@ -252,10 +254,11 @@
     done = t("hosting.mods.sorted");
   }
 
+  /** Check, preview, then write the lines: true only when they were written (not on a problem or a cancelled preview). */
   async function write() {
     error = done = "";
     const found = await check();
-    if (!found || found.some((p) => p.error)) return;
+    if (!found || found.some((p) => p.error)) return false;
     try {
       const p = await api.hostPreview(server.name, lines);
       const changes = [
@@ -265,16 +268,20 @@
         ...(p.maps_from.join(";") !== p.maps_to.join(";") ? [t("preview.map", { from: p.maps_from.join("; ") || "—", to: p.maps_to.join("; ") })] : []),
         ...found.map(say),
       ];
-      if ((await ask(t("hosting.mods.writeTitle", { name: server.name }), changes, [{ label: t("preview.write"), icon: "upload" }])) !== 0) return;
+      if ((await ask(t("hosting.mods.writeTitle", { name: server.name }), changes, [{ label: t("hosting.mods.saveConfirm"), icon: "upload" }])) !== 0) return false;
       await api.hostWrite(server.name, lines);
       saved = JSON.stringify(lines);
       done = server.status === "running" ? t("hosting.mods.writtenRestart") : t("hosting.mods.written");
       fit(server.managed && tagOn);
-      if (p.maps_from.join(";") !== p.maps_to.join(";")) offerSpawns();
+      // asked before this returns: Save and leave leaves after it, so the next section reads the regions it adds
+      if (p.maps_from.join(";") !== p.maps_to.join(";")) await offerSpawns();
+      return true;
     } catch (e) {
       error = t(...keyedError(e));
+      return false;
     }
   }
+  saveAll = write;
 
   /** New map mods with spawn points: offer to add their regions to the spawn list. */
   async function offerSpawns() {
@@ -460,7 +467,7 @@
   {/if}
   {#if server.managed}
     <div class="row">
-      <button class="primary" onclick={write} disabled={checking}><Icon name="upload" size={14} />{t("hosting.mods.write")}</button>
+      {#if !dirty}<button class="primary" onclick={write} disabled={checking}><Icon name="upload" size={14} />{t("hosting.mods.write")}</button>{/if}
       <button onclick={check} disabled={checking}><Icon name="search" size={14} />{checking ? t("hosting.mods.checking") : t("hosting.mods.check")}</button>
       <button class="quiet" onclick={load}><Icon name="rollback" size={14} />{t("hosting.mods.reload")}</button>
       <button class="quiet" onclick={savePreset} title={t("hosting.mods.savePresetTip")}><Icon name="upload" size={14} />{t("hosting.mods.savePreset")}</button>
@@ -488,6 +495,13 @@
   </section>
   {#if done}<p class="hint" role="status">{done}</p>{/if}
   {#if error}<p class="error">{error}</p>{/if}
+  {#if server.managed && dirty}
+    <div class="row bar">
+      <button class="primary" onclick={write} disabled={checking}><Icon name="upload" size={14} />{t("hosting.mods.write")}</button>
+      <button onclick={load} disabled={checking}><Icon name="undo" size={14} />{t("hosting.settings.discard")}</button>
+      <span class="hint">{t("hosting.mods.unsavedHint")}</span>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -501,6 +515,13 @@
   }
   .row label {
     color: var(--muted);
+  }
+  /* unsaved changes: Save stays in reach at the bottom, as Settings' bar does */
+  .bar {
+    position: sticky;
+    bottom: 0;
+    padding: 8px 0;
+    background: var(--bg);
   }
   .grow {
     flex: 1;

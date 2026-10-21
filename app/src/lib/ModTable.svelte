@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { describeSource, type ModRow, type Overlap, type Row, type Stats } from "./api";
+  import { describeSource, holdable, type ModRow, type Overlap, type Row, type Stats } from "./api";
   import { fmtDate, fmtNum, fmtSize } from "./format";
   import { t } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
@@ -20,6 +20,8 @@
     overlaps,
     problems,
     updates,
+    held,
+    heldNewer,
     favourites,
     fresh,
     hidden,
@@ -44,6 +46,7 @@
     sortBy,
     onSort,
     onHide,
+    onHold,
   }: {
     rows: Row[];
     /** The load order (enabled mod ids): the number column shows each mod's place in it. */
@@ -59,6 +62,9 @@
     overlaps: Record<string, Overlap>;
     problems: Map<string, Problem>;
     updates: Set<string>;
+    /** Mods whose updates are held, and the held ones the Workshop has a newer version of (when it came out). */
+    held: Set<string>;
+    heldNewer: Record<string, number>;
     /** Mods starred or hidden in the game's mod menu or a Workshop mod manager (see Lists). */
     favourites: Set<string>;
     /** Mods new to this profile (this session): a New pill. */
@@ -95,7 +101,11 @@
     onSort: (by: string) => void;
     /** The eye: hide the mod from the list, or show it again. */
     onHide: (id: string) => void;
+    /** The lock: hold the mod's updates, or allow them again. */
+    onHold: (id: string) => void;
   } = $props();
+  const holdTip = (id: string) =>
+    held.has(id) && heldNewer[id] ? t("modTable.heldNewerTip", { date: fmtDate(heldNewer[id], "long") }) : t(held.has(id) ? "modTable.heldTip" : "modTable.holdTip");
 
   /** The headers that sort, and the sort each one picks. */
   const HEADS: [string, string, string][] = [
@@ -158,7 +168,7 @@
 <table>
   <thead>
     <tr>
-      <th><span class="visually-hidden">{t("modTable.col.move")}</span></th><th><span class="visually-hidden">{t("common.enabled")}</span></th><th><span class="visually-hidden">{t("modTable.col.hide")}</span></th>
+      <th><span class="visually-hidden">{t("modTable.col.move")}</span></th><th><span class="visually-hidden">{t("common.enabled")}</span></th><th><span class="visually-hidden">{t("modTable.col.hide")}</span></th><th><span class="visually-hidden">{t("modTable.col.hold")}</span></th>
       {#each HEADS as [cls, by, key]}
         <th class={cls} aria-sort={sortBy === by && by !== "order" ? "descending" : undefined}>
           <!-- i18n-ignore: "#" is the load order number -->
@@ -173,7 +183,7 @@
       <!-- each section is a card: a separator starts one, the row before the next separator ends it -->
       {@const start = k === 0 || r.kind === "sep" || loose(k) || loose(k - 1)}
       {@const end = k === visible.length - 1 || visible[k + 1].r.kind === "sep" || loose(k) || loose(k + 1)}
-      {#if start && k > 0}<tr class="gap" aria-hidden="true"><td colspan="10"></td></tr>{/if}
+      {#if start && k > 0}<tr class="gap" aria-hidden="true"><td colspan="11"></td></tr>{/if}
       {#if r.kind === "sep"}
         <tr class="sep" class:start class:end class:drop={dropShown === i} class:dragging={dragFrom === i} data-index={i} tabindex="0" draggable={!filtering && editingSep !== i}
           ondragstart={() => (dragFrom = i)} ondragend={() => { dragFrom = dropAt = null; }}
@@ -181,7 +191,7 @@
           ondrop={(e) => { e.preventDefault(); drop(i); }}
           ondblclick={() => !busy && (editingSep = i)} oncontextmenu={(e) => { if (editingSep === i) return; e.preventDefault(); onSepMenu(i, e.clientX, e.clientY); }} onkeydown={(e) => editingSep !== i && onRowKey(e, i, r)}>
           <td class="grip" aria-hidden="true"><Icon name="grip" size={14} fill /></td>
-          <td colspan="9">
+          <td colspan="10">
             {#if editingSep === i}
               <!-- svelte-ignore a11y_autofocus -->
               <input class="tape-edit" type="text" value={r.name} autofocus aria-label={t("modTable.sepNameLabel")}
@@ -219,6 +229,12 @@
             <button class="quiet icon" class:on={hidden.has(r.id)} disabled={busy} title={t(hidden.has(r.id) ? "modTable.unhideTip" : "modTable.hideTip")}
               aria-label={t(hidden.has(r.id) ? "modTable.unhideTip" : "modTable.hideTip")} aria-pressed={hidden.has(r.id)}
               onclick={(e) => { e.stopPropagation(); onHide(r.id); }} onkeydown={(e) => e.stopPropagation()}><Icon name={hidden.has(r.id) ? "eye-off" : "eye"} size={14} /></button>
+          </td>
+          <td class="eye hold">
+            {#if holdable(r)}
+              <button class="quiet icon" class:on={held.has(r.id)} disabled={busy} title={holdTip(r.id)} aria-label={holdTip(r.id)} aria-pressed={held.has(r.id)}
+                onclick={(e) => { e.stopPropagation(); onHold(r.id); }} onkeydown={(e) => e.stopPropagation()}><Icon name={held.has(r.id) ? "lock" : "unlock"} size={14} /></button>
+            {/if}
           </td>
           <td class="num mono">{place.get(r.id) ?? ""}</td>
           <td class="name">
@@ -259,6 +275,8 @@
               <span class="missing" title={t(p.key, { id: p.id })}><Icon name="alert" size={12} />{t(p.key, { id: p.id })}</span>
             {:else if updates.has(r.id)}
               <span class="update"><Icon name="update" size={12} />{t("modTable.updateAvailable")}</span>
+            {:else if held.has(r.id) && heldNewer[r.id]}
+              <span class="update held" title={t("modTable.heldChipTip", { date: fmtDate(heldNewer[r.id], "long") })}><Icon name="lock" size={12} />{t("modTable.held")}</span>
             {:else}
               {@const kind = r.source.split(":")[0]}
               {@const hint = t(SOURCE_HINTS[kind] ?? "modTable.sourceHint.manual")}
@@ -277,7 +295,7 @@
       <tr class="tail" class:drop={dropShown === rows.length} aria-hidden="true"
         ondragover={(e) => { e.preventDefault(); dropAt = rows.length; }}
         ondrop={(e) => { e.preventDefault(); drop(rows.length); }}>
-        <td colspan="10"></td>
+        <td colspan="11"></td>
       </tr>
     {/if}
   </tbody>
@@ -452,6 +470,10 @@
     padding: 2px;
     color: var(--muted);
     opacity: 0.4;
+  }
+  /* a held mod's lock: full text colour (white in the dark theme, as in the game), always there */
+  .hold button.on {
+    color: var(--text);
   }
   .eye button.on,
   tr.mod:hover .eye button,
@@ -634,6 +656,12 @@
     color: var(--warn);
     font-weight: 700;
     font-size: 12px;
+  }
+  /* held with a newer version: the update is there, muted, as nothing waits on it */
+  .update.held {
+    border-color: var(--line);
+    color: var(--muted);
+    font-weight: 600;
   }
   .missing {
     display: inline-block;

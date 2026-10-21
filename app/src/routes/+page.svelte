@@ -4,7 +4,7 @@
   import { getVersion } from "@tauri-apps/api/app";
   import { check, type Update } from "@tauri-apps/plugin-updater";
   import { relaunch } from "@tauri-apps/plugin-process";
-  import { decodeShare, describeSource, encodeShare, isOurs, removable, WINDOWS, type HistoryRecord, type ModDetails, type Snapshot } from "$lib/api";
+  import { decodeShare, describeSource, encodeShare, holdable, isOurs, removable, WINDOWS, type HistoryRecord, type ModDetails, type Snapshot } from "$lib/api";
   import { arrowPick, isTyping, trap } from "$lib/ui";
   import { api, modeOf, VIEWPOINT, zbReady, type Mode, type ModRow, type NotifyKind, type Row, type View, type ZbStatus } from "$lib/api";
   import Details from "$lib/Details.svelte";
@@ -79,7 +79,10 @@
     if (busy) setTimeout(gameAsked, 2000);
     else fromGame();
   }
-  let updates = $state<Set<string>>(new Set());
+  /** What the last update check found to update (`updates` is what waits now). */
+  let outdated = $state<Set<string>>(new Set());
+  /** Held mods the Workshop has a newer version of, as the last check found them: when it came out. */
+  let heldNewer = $state<Record<string, number>>({});
   /** settings.json, folders and the rest of the Settings tab (null until read). */
   let cfg = $state<SettingsView | null>(null);
   $effect(applyPrefs);
@@ -191,6 +194,10 @@
   const refreshZb = () => api.zbStatus().then((s) => (zb = s)).catch(() => {});
 
   let view = $state<View | null>(null);
+  /** Mods whose updates are held. */
+  const held = $derived(new Set(view?.held ?? []));
+  /** Mods with an update waiting: those found, and held ones allowed again since; none held now. */
+  const updates = $derived(new Set([...outdated, ...Object.keys(heldNewer)].filter((id) => !held.has(id))));
   /** The library (left list): its order and sections are the player's organisation only. */
   let rows = $state<Row[]>([]);
   /** The load order: enabled mod ids, as the game loads them (the side panel's list). */
@@ -240,8 +247,8 @@
   let activityView = $state<"" | "expand" | "history">("");
   // search, filters and sort start as they were left (kept in prefs)
   let search = $state(prefs.modsSearch);
-  type Filter = "all" | "on" | "off" | "fav" | "hidden" | "problems" | "updates";
-  let filter = $state<Filter>((["all", "on", "off", "fav", "hidden", "problems", "updates"].includes(prefs.modsFilter) ? prefs.modsFilter : "all") as Filter);
+  type Filter = "all" | "on" | "off" | "fav" | "hidden" | "problems" | "updates" | "held";
+  let filter = $state<Filter>((["all", "on", "off", "fav", "hidden", "problems", "updates", "held"].includes(prefs.modsFilter) ? prefs.modsFilter : "all") as Filter);
   /** Only mods of this kind (framework, patch, map, ui, translation; "" any). */
   let kind = $state(prefs.modsKind);
   /** Only mods with this tag of the player's ("" any). */
@@ -340,6 +347,7 @@
         if (filter === "problems" && !problems.has(r.id) && !r.missing) return false;
         if (filter === "fav" && !favourites.has(r.id)) return false;
         if (filter === "updates" && !updates.has(r.id)) return false;
+        if (filter === "held" && !held.has(r.id)) return false;
         if (addedDays && (stats[r.id]?.first_seen ?? 0) < Date.now() / 1000 - addedDays * 86400) return false;
         if (changedDays && (stats[r.id]?.modified ?? 0) < Date.now() / 1000 - changedDays * 86400) return false;
         // hidden mods only show under Hidden, or when searched for
@@ -413,7 +421,7 @@
     }
     const isSorting = (r: GameRequest) => r.action === "place" || r.action === "section" || r.action === "library" || r.action === "tags";
     // the game doesn't wait on these (bridge.rs `quiet`)
-    const waitless = (r: GameRequest) => ["tags", "leaveout", "feed", "cancel", "set", "pics", "serverfav", "hide", "unhide"].includes(r.action);
+    const waitless = (r: GameRequest) => ["tags", "leaveout", "feed", "cancel", "set", "pics", "serverfav", "hide", "unhide"].includes(r.action) || (r.action === "hold" && r.on);
     // an Accept in the game's mod menu since the last look: taken in first, or the first edit is refused as "reloaded"
     if (reqs.some(isSorting)) await reloadList();
     // sorting edits first: a question about another request (or a long job it starts) mustn't keep them waiting
@@ -471,6 +479,8 @@
       // i18n-ignore: the game's words, in English as the game is
       else if (r.action === "cancel") longJobs ? api.installStop().catch(() => {}) : (why = "PZMM isn't downloading anything.");
       else if (r.action === "rollback") why = await rollbackFromGame(r.mod);
+      else if (r.action === "hold") why = await holdFromGame(r.ids, r.on);
+      else if (r.action === "updateheld") why = await updateHeldFromGame(r.mod);
       else if (r.action === "set") why = await setFromGame(r.key, r.value);
       else if (r.action === "hide") why = await hideFromGame(r.key);
       else if (r.action === "unhide") why = await unhideFromGame(r.key);
@@ -480,7 +490,11 @@
       else if (r.action === "install") {
         // titles, not bare IDs: any mod can write the request, so show what's being installed
         const titles = new Map((await api.workshopItems(r.ids).catch(() => [])).map((i) => [i.id, i.title]));
-        if (await askGame(t("game.installAsk"), { label: t("game.install"), icon: "download" }, r.ids.map((id) => (titles.has(id) ? `${titles.get(id)} (${id})` : id)))) {
+        // a held item isn't updated by an install either (the core leaves it out): say so rather than ask
+        const heldItems = r.ids.filter((item) => [...mods.values()].some((m) => m.source === `workshop:${item}` && held.has(m.id)));
+        // i18n-ignore: the game's words, in English as the game is
+        if (heldItems.length === r.ids.length) why = "Its updates are held in PZMM: use Update anyway there.";
+        else if (await askGame(t("game.installAsk"), { label: t("game.install"), icon: "download" }, r.ids.map((id) => (titles.has(id) ? `${titles.get(id)} (${id})` : id)))) {
           // i18n-ignore: the game's words, in English as the game is
           if (!(await installAndSettle(r.ids.length === 1 ? t("busy.installingOne", { name: r.ids[0] }) : t("busy.installingMany", { count: r.ids.length }), () => api.install(r.ids), r.ids.length > 1))) why = "PZMM couldn't install them: see its activity log.";
         }
@@ -706,6 +720,37 @@
     if (!(await askGame(t("game.rollbackAsk", { name: m.name || id }), { label: t("details.restore"), icon: "rollback" }))) return "Not rolled back: you said no in PZMM.";
     // i18n-ignore: the game's words, in English as the game is
     return (await rollback(id)) ? "" : "PZMM couldn't put the previous version back: see its activity log.";
+  }
+
+  /** The game's lock on its mods: hold or allow their updates (a Subscribed one asks first). Returns why it wasn't done. */
+  async function holdFromGame(ids: string[], on: boolean) {
+    const ok = ids.filter((id) => mods.get(id) && holdable(mods.get(id)!));
+    // i18n-ignore: the game's words, in English as the game is
+    if (!ok.length) return "Only mods from the Workshop or GitHub update, so only those can be held.";
+    const q = holdQuestion(ok, on);
+    // a quiet request that needs an answer: PZMM comes to the front for it, as for a loud one
+    if (q) api.appFront().catch(() => {});
+    // i18n-ignore: the game's words, in English as the game is
+    if (q && !(await askGame(q[0], hold(), q[1]))) return "Not held: you said no in PZMM.";
+    // allowing updates again is asked (a loud request, so PZMM is in front): any mod can write the request
+    const lifting = on ? [] : ok.filter((id) => held.has(id));
+    if (lifting.length && !(await askGame(t("confirm.allowHeld", { count: lifting.length }), { label: t("menu.allowUpdates"), icon: "unlock" }, lifting.map((id) => mods.get(id)?.name || id))))
+      // i18n-ignore: the game's words, in English as the game is
+      return "Updates stay held: you said no in PZMM.";
+    const why = await holdNow(ok, on);
+    // i18n-ignore: the game's words, in English as the game is
+    return why ? `PZMM couldn't change that: ${why}` : "";
+  }
+
+  /** The game's Update anyway on a held mod, once you say yes: it stays held. Returns why it wasn't done. */
+  async function updateHeldFromGame(id: string) {
+    const m = mods.get(id);
+    // i18n-ignore: the game's words, in English as the game is
+    if (!m || !held.has(id) || !isOurs(m)) return `${id}'s updates aren't held in PZMM.`;
+    // i18n-ignore: the game's words, in English as the game is
+    if (!(await askGame(t("confirm.updateAnyway", { name: m.name || id }), { label: t("details.updateAnyway"), icon: "refresh" }))) return "Not updated: you said no in PZMM.";
+    // i18n-ignore: the game's words, in English as the game is
+    return (await updateMods([id], false, true)) ? "" : "PZMM couldn't update it: see its activity log.";
   }
 
   /** A snapshot of the profile's list the game asks to put back, once you say yes. Returns why it wasn't done. */
@@ -1099,10 +1144,12 @@
     commitList(sortLoadOrder(list, loadable));
   }
 
-  async function checkUpdates() {
+  /** `quiet`: after a hold changed, only the marks follow (nothing said). */
+  async function checkUpdates(quiet = false) {
     try {
-      updates = new Set(await api.checkUpdates());
-      if (updates.size) say("log.updatesFound", { count: updates.size });
+      const found = await api.checkUpdates();
+      [outdated, heldNewer] = [new Set(found.outdated), found.held];
+      if (updates.size && !quiet) say("log.updatesFound", { count: updates.size });
     } catch (e) {
       say("log.updatesCheckFailed", { error: t(...keyedError(e)) });
     }
@@ -1128,20 +1175,25 @@
     checking = true;
     await checkUpdates();
     checking = false;
-    if (!updates.size) say("log.upToDate");
+    const heldCount = Object.keys(heldNewer).filter((id) => held.has(id)).length;
+    if (!updates.size) heldCount ? say("log.upToDateHeld", { count: heldCount }) : say("log.upToDate");
   }
 
   /** Re-download everything PZMM installed (repairs damaged copies); asks first, like an update. */
   async function redownloadAll() {
-    const ours = [...mods.values()].filter(isOurs).map((m) => m.id);
+    // not held ones: they're never updated (Update anyway is one at a time)
+    const ours = [...mods.values()].filter((m) => isOurs(m) && !held.has(m.id)).map((m) => m.id);
     if (!ours.length) return say("log.nothingToRedownload");
     if (!(await confirmed(t("confirm.redownload", { count: ours.length }), { label: t("settings.repair.redownload"), icon: "download" }))) return;
     await updateMods(ours);
   }
 
-  /** `background`: the scheduled check's install (its question doesn't take focus). */
+  /** `background`: the scheduled check's install (its question doesn't take focus); `anyway`: held mods too (Update anyway). */
   /** Whether it updated them. */
-  async function updateMods(ids: string[], background = false) {
+  async function updateMods(ids: string[], background = false, anyway = false) {
+    // held mods stay as they are (the core skips them too): nothing to do isn't a failure
+    if (!anyway) ids = ids.filter((id) => !held.has(id));
+    if (!ids.length) return true;
     await refreshSave();
     const inSave = latestSave ? ids.filter((i) => latestSave!.mods.includes(i)) : [];
     if (
@@ -1154,14 +1206,15 @@
     // only the ids that did install count (failures are in the log); an id's case may have changed
     let installed = new Set<string>();
     const ran = await run(ids.length === 1 ? t("busy.updatingOne", { name: ids[0] }) : t("busy.updatingMany", { count: ids.length }), async () => {
-      const [v, got] = await api.updateMods(ids);
+      const [v, got] = await api.updateMods(ids, anyway);
       installed = new Set(got.map((i) => i.toLowerCase()));
       return v;
     }, { showLog: true });
     const done = ids.filter((id) => installed.has(id.toLowerCase()));
     const ok = ran && (!ids.length || done.length > 0);
     if (ok) {
-      updates = new Set([...updates].filter((u) => !done.includes(u)));
+      outdated = new Set([...outdated].filter((u) => !done.includes(u)));
+      heldNewer = Object.fromEntries(Object.entries(heldNewer).filter(([u]) => !done.includes(u)));
       (forgetFeed(), forgetGlance()); // What's new marks which updates wait: read afresh
       // what changed: each updated Workshop mod links to its change notes
       for (const id of had.filter((id) => done.includes(id))) {
@@ -1171,6 +1224,42 @@
     }
     return ok;
   }
+
+  const hold = (): Choice => ({ label: t("menu.holdUpdates"), icon: "lock" });
+  /** The question before holding `ids` (none needed: null). Steam updates subscriptions itself, so a Subscribed one is
+   * unsubscribed and kept as PZMM's own copy; `save`: a save's mods, which always asks. */
+  function holdQuestion(ids: string[], on: boolean, save = ""): [string, string[]] | null {
+    const steam = on ? ids.filter((id) => mods.get(id)?.source.startsWith("steam:")) : [];
+    const names = steam.map((id) => mods.get(id)?.name || id);
+    if (save) return [t("confirm.holdSave", { count: ids.length, save }), steam.length ? [t("confirm.holdSaveSteam", { count: steam.length }), ...names] : []];
+    return steam.length ? [t("confirm.holdSteam", { count: steam.length }), names] : null;
+  }
+  /** Hold (`on`) or allow mods' updates, asking first when a Subscribed one is converted (see `holdQuestion`). */
+  async function holdMods(ids: string[], on: boolean, save = "") {
+    const q = holdQuestion(ids, on, save);
+    if (q && !(await confirmed(q[0], hold(), q[1]))) return false;
+    return !(await holdNow(ids, on));
+  }
+  /** Returns why it wasn't done ("" when it was). */
+  async function holdNow(ids: string[], on: boolean) {
+    const steam = on && ids.some((id) => mods.get(id)?.source.startsWith("steam:"));
+    let why = "";
+    const ok = await run(t("busy.saving"), () => api.holdSet(ids, on).catch((e) => ((why = String(e).replace(/^Error:\s*/, "")), Promise.reject(e))), { keepHistory: !steam, showLog: steam });
+    (forgetFeed(), forgetGlance()); // What's new marks which updates wait: read afresh
+    // the marks follow `held` at once; a just-held mod with an update gets its Held time from a quiet check
+    if (on && [...outdated].some((id) => held.has(id))) checkUpdates(true);
+    // i18n-ignore: the game's words, in English as the game is
+    return ok ? "" : why || "see PZMM's activity log";
+  }
+  /** A held mod's Update anyway in its details: asks, then updates it, still held. */
+  async function updateAnyway(id: string) {
+    if (await confirmed(t("confirm.updateAnyway", { name: mods.get(id)?.name || id }), { label: t("details.updateAnyway"), icon: "refresh" })) await updateMods([id], false, true);
+  }
+  /** A save's Hold this save's mods: those that can update. */
+  const holdSave = (s: Save) => {
+    const ids = s.mods.filter((id) => mods.get(id) && !mods.get(id)!.missing && holdable(mods.get(id)!) && !held.has(id));
+    return ids.length ? holdMods(ids, true, s.name) : (say("log.saveHeld", { save: s.name }), false);
+  };
 
   /**
    * Every install: run it with the log open, then place what it enabled (the backend appends it) like
@@ -1198,7 +1287,7 @@
   const installWorkshop = (id: string) => installAndSettle(t("busy.installingWorkshop", { id }), () => api.install([id]));
   /** Put back a Workshop item from the activity or the download history: installed as PZMM's copy, or subscribed in Steam again. */
   const reinstall = async (item: string, steam: boolean) =>
-    editBusy ? false : steam ? run(t("busy.subscribing", { name: item }), () => api.workshopSubscribe(item, true), { showLog: true }).then((ok) => (ok && reloadSoon(), ok)) : installWorkshop(item);
+    editBusy || (steam && !(await resubscribeHeld(item))) ? false : steam ? run(t("busy.subscribing", { name: item }), () => api.workshopSubscribe(item, true), { showLog: true }).then((ok) => (ok && reloadSoon(), ok)) : installWorkshop(item);
   /** The download history's Remove: PZMM's copy removed (asking first), or the Steam subscription ended. */
   async function removeRecord(r: HistoryRecord) {
     if (editBusy) return;
@@ -1913,6 +2002,7 @@
   const extraFilters = $derived([
     ...(filter === "fav" ? [{ key: "fav", label: t("mods.filterFavourites"), clear: () => (filter = "all") }] : []),
     ...(filter === "updates" ? [{ key: "updates", label: t("mods.filterUpdates"), clear: () => (filter = "all") }] : []),
+    ...(filter === "held" ? [{ key: "held", label: t("mods.filterHeld"), clear: () => (filter = "all") }] : []),
     ...(addedDays ? [{ key: "added", label: t("mods.addedChip", { when: t(WITHIN[addedDays]) }), clear: () => (addedDays = 0) }] : []),
     ...(changedDays ? [{ key: "changed", label: t("mods.changedChip", { when: t(WITHIN[changedDays]) }), clear: () => (changedDays = 0) }] : []),
     ...(kind ? [{ key: "kind", label: t(`kinds.${kind}`), clear: () => pickKind("") }] : []),
@@ -1923,6 +2013,7 @@
     { heading: t("mods.showLabel") },
     { label: t("mods.filterFavourites"), checked: filter === "fav", keep: true, run: () => (filter = filter === "fav" ? "all" : "fav") },
     { label: updates.size ? t("mods.filterUpdatesN", { count: updates.size }) : t("mods.filterUpdates"), checked: filter === "updates", keep: true, run: () => (filter = filter === "updates" ? "all" : "updates") },
+    { label: t("mods.filterHeld"), checked: filter === "held", keep: true, run: () => (filter = filter === "held" ? "all" : "held") },
     ...(language ? [{ label: t("mods.inLanguage", { language }), checked: inLanguage, keep: true, run: () => (inLanguage = !inLanguage) }] : []),
     { heading: t("mods.addedHeading") },
     ...DAYS.map((d) => ({ label: t(WITHIN[d]), checked: addedDays === d, keep: true, run: () => (addedDays = addedDays === d ? 0 : d) })),
@@ -2001,12 +2092,19 @@
     return commit(rows.map((r) => (r.kind === "mod" && ids.includes(r.id) ? { ...r, on } : r)), on ? placeAll([id]) : order);
   }
 
+  /** Subscribing to an item PZMM holds a copy of: Steam's copy takes over and the hold ends, so ask first. False when cancelled. */
+  async function resubscribeHeld(item: string) {
+    const m = [...mods.values()].find((x) => x.source === `workshop:${item}` && held.has(x.id));
+    if (!m) return true;
+    return confirmed(t("confirm.resubscribeHeld", { name: m.name || m.id }), { label: t("confirm.resubscribe"), icon: "steam" }, [t("confirm.resubscribeHeldLine")]);
+  }
   /** Subscribe to a mod's Workshop item in Steam (Steam keeps it updated), or unsubscribe (Steam deletes its files).
    * Without the Steam client, its Workshop page opens instead. */
   async function subscribe(id: string, on: boolean) {
     const m = mods.get(id);
     const item = m?.source.split(":")[1];
     if (!m || !item || editBusy) return false;
+    if (on && !(await resubscribeHeld(item))) return false;
     if (!on && (await ask(t("confirm.unsubscribeTitle", { name: m.name || id }), [t("confirm.unsubscribeLine")], [{ label: t("confirm.unsubscribe"), icon: "x" }])) !== 0) return false;
     if (!(await run(t(on ? "busy.subscribing" : "busy.unsubscribing", { name: m.name || id }), () => api.workshopSubscribe(item, on, m.id, m.name), { showLog: true }))) return api.openUrl(workshopUrl(item)), false;
     // Steam downloads (or deletes) it in the background: look again once it has had a moment
@@ -2221,6 +2319,7 @@
       null,
       { label: t(favourites.has(id) ? "menu.unfavourite" : "menu.favourite"), icon: "star", run: () => markAll(ids, "favourite", !favourites.has(id)) },
       { label: t(hidden.has(id) ? "menu.unhide" : "menu.hide"), icon: hidden.has(id) ? "eye" : "eye-off", run: () => markAll(ids, "hidden", !hidden.has(id)) },
+      ...(holdable(m) ? [{ label: t(held.has(id) ? "menu.allowUpdates" : "menu.holdUpdates"), icon: (held.has(id) ? "unlock" : "lock") as IconName, run: () => holdMods(ids.filter((x) => mods.get(x) && holdable(mods.get(x)!)), !held.has(id)), disabled: editBusy }] : []),
       null,
       { label: t("details.showFiles"), icon: "folder", run: () => d && api.openPath(d.dir), disabled: !d },
       ...(src.url ? [{ label: t(github ? "details.githubPage" : "details.workshopPage"), icon: (github ? "external" : "steam") as IconName, run: () => api.openUrl(src.url!) }] : []),
@@ -2281,6 +2380,9 @@
 
   /** Every picked mod is hidden: the bulk bar offers Show again, else Hide. */
   const pickedHidden = $derived([...picked].every((id) => hidden.has(id)));
+  /** The picked mods that can be held, and whether they all are. */
+  const pickedHoldable = $derived([...picked].filter((id) => mods.get(id) && holdable(mods.get(id)!)));
+  const pickedHeld = $derived(pickedHoldable.length > 0 && pickedHoldable.every((id) => held.has(id)));
   /** Bulk Enable / Disable leave favourites as they are. */
   let skipFavourites = $state(false);
 
@@ -2788,7 +2890,7 @@
     {/key}
   {:else if tab === "saves"}
     {#key view?.profile}
-      <Saves {busy} lock={profileLock} profile={view?.profile ?? ""} enabledIds={order} installedIds={[...mods.values()].filter((m) => !m.missing).map((m) => m.id)} onUseSave={useSave} onSettings={() => (tab = "settings")} {ask} />
+      <Saves {busy} lock={profileLock} profile={view?.profile ?? ""} enabledIds={order} installedIds={[...mods.values()].filter((m) => !m.missing).map((m) => m.id)} onUseSave={useSave} onHoldSave={holdSave} onSettings={() => (tab = "settings")} {ask} />
     {/key}
   {:else if tab === "zb"}
     <ZombieBuddy status={zb} {view} {updates} {busy} lock={profileLock}
@@ -2863,6 +2965,9 @@
           <option value="bottom">{t("mods.moveBottom")}</option>
         </select>
         <button onclick={() => markAll([...picked], "hidden", !pickedHidden)}><Icon name={pickedHidden ? "eye" : "eye-off"} size={14} />{t(pickedHidden ? "mods.showAgain" : "mods.hide")}</button>
+        {#if pickedHoldable.length}
+          <button onclick={() => holdMods(pickedHoldable, !pickedHeld)} disabled={editBusy} title={t(pickedHeld ? "mods.bulkAllowTip" : "mods.bulkHoldTip")}><Icon name={pickedHeld ? "unlock" : "lock"} size={14} />{t(pickedHeld ? "menu.allowUpdates" : "menu.holdUpdates")}</button>
+        {/if}
         <button class="danger" onclick={bulkRemove} disabled={editBusy}><Icon name="trash" size={14} />{t("common.remove")}</button>
         <button class="quiet" onclick={() => (picked = new Set())}><Icon name="x" size={14} />{t("common.clear")}</button>
       </span>
@@ -2896,15 +3001,16 @@
           <p>{t("mods.emptyHint")}</p>
         </div>
       {:else}
-        <ModTable {rows} {order} {visible} {sectionOf} {filtering} busy={editBusy} build={view?.build ?? null} {stats} {overlaps} {problems} {updates} {favourites} fresh={freshHere} {hidden} kinds={cats?.kinds ?? {}} neededBy={needed} tags={marks.tags}
+        <ModTable {rows} {order} {visible} {sectionOf} {filtering} busy={editBusy} build={view?.build ?? null} {stats} {overlaps} {problems} {updates} {held} {heldNewer} {favourites} fresh={freshHere} {hidden} kinds={cats?.kinds ?? {}} neededBy={needed} tags={marks.tags}
           {collapsed} {picked} {selected} bind:dragFrom bind:editingSep onRowClick={rowClick} onRowKey={rowKey} onToggle={toggleRow} onSubscribe={subscribe} onMenu={openMenu}
           onToggleSection={toggleSection} onDrop={dropOn} onRename={renameSep} onRemoveSep={removeSep} onSepMenu={(i, x, y) => (sepMenu = { i, x, y })}
-          {sortBy} onSort={(by) => (sortBy = by === sortBy ? "order" : (by as typeof sortBy))} onHide={(id) => markAll([id], "hidden", !hidden.has(id))} />
+          {sortBy} onSort={(by) => (sortBy = by === sortBy ? "order" : (by as typeof sortBy))} onHide={(id) => markAll([id], "hidden", !hidden.has(id))}
+          onHold={(id) => holdMods([id], !held.has(id))} />
       {/if}
     </div>
 
     {#if selected}
-      <Details id={selected} {mods} {busy} firstSeen={stats[selected]?.first_seen ?? 0} size={stats[selected]?.size ?? 0} updated={stats[selected]?.modified ?? 0} category={cats?.of[selected] ?? ""} lock={!!profileLock} hasUpdate={updates.has(selected)} neededBy={needed.get(selected) ?? []} tags={marks.tags[selected] ?? []} {allTags}
+      <Details id={selected} {mods} {busy} firstSeen={stats[selected]?.first_seen ?? 0} size={stats[selected]?.size ?? 0} updated={stats[selected]?.modified ?? 0} category={cats?.of[selected] ?? ""} lock={!!profileLock} hasUpdate={updates.has(selected)} held={held.has(selected)} heldNewer={heldNewer[selected] ?? 0} onHold={(id) => holdMods([id], !held.has(id))} onUpdateAnyway={updateAnyway} neededBy={needed.get(selected) ?? []} tags={marks.tags[selected] ?? []} {allTags}
         onTags={setTags} onRule={(id, rule) => run(t("busy.saving"), () => api.modRuleSet(id, rule), { keepHistory: true })} onUpdate={(id) => updateMods([id])} onInstallWorkshop={installWorkshop}
         onToggle={toggle} onSelect={(id) => (selected = id)}
         onRemove={remove} onRollback={rollback} onClose={() => (selected = null)} />

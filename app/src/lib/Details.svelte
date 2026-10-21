@@ -12,6 +12,10 @@
     busy,
     lock = false,
     hasUpdate,
+    held = false,
+    heldNewer = 0,
+    onHold,
+    onUpdateAnyway,
     neededBy,
     tags,
     allTags,
@@ -41,6 +45,13 @@
     /** A search for a broken mod owns the lists: installs, Enable/Disable and Remove wait. */
     lock?: boolean;
     hasUpdate: boolean;
+    /** Its updates are held, and when the Workshop's newer version came out (0: none). */
+    held?: boolean;
+    heldNewer?: number;
+    /** Hold its updates, or allow them again. */
+    onHold: (id: string) => void;
+    /** Update a held mod (asks first; it stays held). */
+    onUpdateAnyway: (id: string) => void;
     /** Enabled mods that require this one. */
     neededBy: string[];
     /** The player's own tags on this mod, and every tag in use (suggestions). */
@@ -229,6 +240,17 @@
         <dt>{k}</dt>
         <dd>{v}</dd>
       {/each}
+      {#if /^(workshop|github|steam):/.test(d.source)}
+        <dt>{t("details.updates")}</dt>
+        <dd class="hold">
+          {t(held ? "details.updatesHeld" : "details.updatesAllowed")}
+          {#if held && heldNewer}<span class="hint">{t("details.heldNewer", { date: fmtDate(heldNewer, "long") })}</span>{/if}
+          <span class="hold-acts">
+            <button class="quiet" onclick={() => onHold(id)} disabled={busy}><Icon name={held ? "unlock" : "lock"} size={14} />{t(held ? "menu.allowUpdates" : "menu.holdUpdates")}</button>
+            {#if held && d.ours}<button onclick={() => onUpdateAnyway(id)} disabled={busy}><Icon name="refresh" size={14} />{t("details.updateAnyway")}</button>{/if}
+          </span>
+        </dd>
+      {/if}
       {#if firstSeen}
         <dt>{t("details.firstSeen")}</dt>
         <dd title={t("details.firstSeenTip")}>{fmtDate(firstSeen, "long")}</dd>
@@ -560,6 +582,13 @@
   .rules {
     margin: 0;
     align-items: center;
+  }
+  .hold,
+  .hold-acts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
   }
   .chips {
     display: flex;

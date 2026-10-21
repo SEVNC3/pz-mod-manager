@@ -1,19 +1,21 @@
 <script lang="ts">
   import { track } from "./activity.svelte";
   import { onMount } from "svelte";
-  import { confirmed } from "./ask.svelte";
+  import { ask } from "./ask.svelte";
   import { api, type ConfigView, type ServerCard, type Setting, type SpawnRegion } from "./api";
   import { fmtNum } from "./format";
   import { keyedError, t } from "./i18n.svelte";
   import { arrowPick } from "./ui";
   import Icon from "./Icon.svelte";
 
-  let { server = null, save = null, dirty = $bindable(false) }: {
+  let { server = null, save = null, dirty = $bindable(false), saveAll = $bindable() }: {
     server?: ServerCard | null;
     /** A save's sandbox settings (map_sand.bin) instead of a server's files. */
     save?: { mode: string; name: string } | null;
     /** Edits not saved yet, in any part (out). */
     dirty?: boolean;
+    /** Save every part with edits (out, for the leave box's Save and leave): true only when all were saved. */
+    saveAll?: () => Promise<boolean>;
   } = $props();
 
   const PARTS = ["ini", "sandbox", "spawn", "files"] as const;
@@ -71,13 +73,26 @@
       error = t(...keyedError(e));
     }
   }
-  /** Open another file in the text editor: what was typed is dropped only when the player says so. */
+  /** Open another file in the text editor: what was typed is saved first or dropped, as the player says. */
   async function pickText(e: Event & { currentTarget: HTMLSelectElement }) {
     const el = e.currentTarget;
-    if (text !== null && text !== textSaved && !(await confirmed(t("hosting.leaveTitle"), { label: t("hosting.leave"), icon: "undo" }, [t("hosting.leaveLine")]))) return void (el.value = file);
-    file = el.value;
+    const to = el.value;
+    if (text !== null && text !== textSaved) {
+      el.value = file; // until it's decided
+      const i = await ask(t("hosting.leaveTitle"), [t("hosting.leaveLine")], [{ label: t("hosting.leaveSave"), icon: "check" }, { label: t("hosting.leave"), icon: "undo" }]);
+      if (i < 0) return;
+      // saving the text would drop the form's edits to the same file (the save reloads that form)
+      if (i === 0 && editedTwice()) return void (error = t("hosting.settings.editedTwice", { file: `${server?.name ?? ""}${file}` }));
+      if (i === 0 && !(await saveText())) return;
+    }
+    file = to;
     loadText();
   }
+  const saveText = () =>
+    run(async () => {
+      await api.hostTextWrite(server?.name ?? "", file, text ?? "");
+      textSaved = text ?? "";
+    }, saved(), FORM_OF[file] ? [FORM_OF[file]] : []);
 
   const FORM_OF: Record<string, Form> = { ".ini": "ini", "_SandboxVars.lua": "sandbox", "_spawnregions.lua": "spawn" };
   const restorePrev = (suffix: string) =>
@@ -98,6 +113,7 @@
   }
   const sectionLabel = (file: "ini" | "sandbox", id: string) => (file === "ini" ? t(`hosting.settings.section.${id}`) : id || t("hosting.settings.general"));
 
+  /** Whether it was done. */
   async function run(f: () => Promise<unknown>, ok: string, fresh: Form[] = []) {
     error = done = "";
     working = true;
@@ -105,8 +121,10 @@
       await f();
       done = ok;
       await load(fresh);
+      return true;
     } catch (e) {
       error = t(...keyedError(e));
+      return false;
     } finally {
       working = false;
     }
@@ -174,6 +192,24 @@
     newRegion = { name: "", file: "" };
   }
   const regionsChanged = $derived(JSON.stringify(regions) !== JSON.stringify(view?.regions ?? []));
+  const saveRegions = () => run(() => api.hostSpawnWrite(server?.name ?? "", regions), saved(), ["spawn"]);
+  /** The text editor's file also has form edits: saving one would drop the other (a save reloads that form). */
+  const editedTwice = () => {
+    const form = FORM_OF[file];
+    return text !== null && text !== textSaved && !!form && (form === "spawn" ? regionsChanged : !!changed(form));
+  };
+  saveAll = async () => {
+    if (editedTwice()) {
+      error = t("hosting.settings.editedTwice", { file: `${server?.name ?? ""}${file}` });
+      return false;
+    }
+    return (
+      (text === null || text === textSaved || (await saveText())) &&
+      (!changed("ini") || (await write("ini"))) &&
+      (!changed("sandbox") || (await write("sandbox"))) &&
+      (!regionsChanged || (await saveRegions()))
+    );
+  };
   $effect(() => {
     dirty = !!(changed("ini") || changed("sandbox") || regionsChanged || (text !== null && text !== textSaved));
   });
@@ -308,7 +344,7 @@
             <button type="submit" disabled={!newRegion.name.trim() || !newRegion.file.trim()}><Icon name="plus" size={14} />{t("hosting.settings.addRegion")}</button>
           </form>
           <div class="row bar">
-            <button class="primary" onclick={() => run(() => api.hostSpawnWrite(server?.name ?? "", regions), saved(), ["spawn"])} disabled={working || !regionsChanged}><Icon name="check" size={14} />{t("hosting.settings.saveRegions")}</button>
+            <button class="primary" onclick={saveRegions} disabled={working || !regionsChanged}><Icon name="check" size={14} />{t("hosting.settings.saveRegions")}</button>
             {#if view.prev.includes("_spawnregions.lua") && !regionsChanged}
               <button onclick={() => restorePrev("_spawnregions.lua")} disabled={working} title={t("hosting.settings.restoreTip")}><Icon name="rollback" size={14} />{t("hosting.settings.restore")}</button>
             {/if}
@@ -325,7 +361,7 @@
         {#if text !== null}
           <textarea class="mono text" bind:value={text} spellcheck="false" aria-label={t("hosting.settings.file")}></textarea>
           <div class="row bar">
-            <button class="primary" onclick={() => run(async () => { await api.hostTextWrite(server?.name ?? "", file, text ?? ""); textSaved = text ?? ""; }, saved(), FORM_OF[file] ? [FORM_OF[file]] : [])} disabled={working || text === textSaved}><Icon name="check" size={14} />{t("hosting.settings.saveText")}</button>
+            <button class="primary" onclick={saveText} disabled={working || text === textSaved}><Icon name="check" size={14} />{t("hosting.settings.saveText")}</button>
             {#if text !== textSaved}<button onclick={() => (text = textSaved)} disabled={working}><Icon name="undo" size={14} />{t("hosting.settings.discard")}</button>{/if}
             {#if view.prev.includes(file)}
               <button onclick={() => restorePrev(file)} disabled={working || text !== textSaved} title={t("hosting.settings.restoreTip")}><Icon name="rollback" size={14} />{t("hosting.settings.restore")}</button>

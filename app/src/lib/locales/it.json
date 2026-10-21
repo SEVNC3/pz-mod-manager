@@ -300,7 +300,10 @@
     },
     "newSectionTip": "Aggiungi una sezione sopra la mod selezionata (clic destro su una sezione per altro)",
     "hide": "Nascondi",
-    "showAgain": "Mostra di nuovo"
+    "showAgain": "Mostra di nuovo",
+    "filterHeld": "Bloccate",
+    "bulkHoldTip": "Blocca gli aggiornamenti delle mod scelte: PZMM tiene queste versioni.",
+    "bulkAllowTip": "Consenti di nuovo gli aggiornamenti delle mod scelte."
   },
   "busy": {
     "loading": "Caricamento",
@@ -405,7 +408,12 @@
     "playFailed": "Impossibile avviare il gioco: {error}",
     "appUpdateFound": "PZMM {version} è disponibile: «Aggiorna e riavvia» è sopra le schede.",
     "bisectSaveFailed": "Impossibile salvare la prossima lista di prova, quindi la ricerca non è andata avanti. In Istantanee c'è la tua lista di prima della ricerca.",
-    "bisectRestoreFailed": "Impossibile riportare la lista di mod com'era prima della ricerca: ripristinala da Istantanee (Prima di cercare la mod difettosa)."
+    "bisectRestoreFailed": "Impossibile riportare la lista di mod com'era prima della ricerca: ripristinala da Istantanee (Prima di cercare la mod difettosa).",
+    "saveHeld": "Le mod di {save} sono già bloccate, oppure nessuna può aggiornarsi.",
+    "upToDateHeld": {
+      "one": "Tutto il resto è aggiornato: {count} mod bloccata ha una versione più recente.",
+      "other": "Tutto il resto è aggiornato: {count} mod bloccate hanno versioni più recenti."
+    }
   },
   "confirm": {
     "group": "Raggruppa per categoria sostituisce le tue sezioni ({sections}) con sezioni per categoria. Ctrl+Z lo annulla. Raggruppare ora?",
@@ -481,7 +489,27 @@
     "unsubscribeTitle": "Annullare l'iscrizione a {name}?",
     "unsubscribeLine": "Steam elimina i suoi file, quindi i profili che lo usano lo perdono.",
     "unsubscribe": "Annulla iscrizione",
-    "deletePreset": "Eliminare la lista salvata «{name}»? Sparisce dal menu mod del gioco o dal Mod Manager che l'ha salvata."
+    "deletePreset": "Eliminare la lista salvata «{name}»? Sparisce dal menu mod del gioco o dal Mod Manager che l'ha salvata.",
+    "holdSteam": {
+      "one": "Steam tiene aggiornate le mod iscritte. Per bloccare questa, PZMM annulla l'iscrizione e tiene una propria copia della versione che hai ora.",
+      "other": "Steam tiene aggiornate le mod iscritte. Per bloccare queste {count}, PZMM annulla le iscrizioni e tiene proprie copie delle versioni che hai ora."
+    },
+    "holdSave": {
+      "one": "Bloccare gli aggiornamenti della mod usata da {save}?",
+      "other": "Bloccare gli aggiornamenti delle {count} mod usate da {save}?"
+    },
+    "holdSaveSteam": {
+      "one": "Questa è iscritta su Steam, che la tiene aggiornata: PZMM annulla l'iscrizione e tiene una propria copia della versione che hai ora.",
+      "other": "Queste {count} sono iscritte su Steam, che le tiene aggiornate: PZMM annulla le iscrizioni e tiene proprie copie delle versioni che hai ora."
+    },
+    "updateAnyway": "Aggiornare comunque {name}? I suoi aggiornamenti restano bloccati dopo.",
+    "resubscribeHeld": "Iscriverti di nuovo a {name} su Steam?",
+    "resubscribeHeldLine": "I suoi aggiornamenti sono bloccati. La copia di Steam subentra e la tiene aggiornata; la copia bloccata di PZMM se ne va quando Steam l'ha scaricata.",
+    "resubscribe": "Iscriviti di nuovo",
+    "allowHeld": {
+      "one": "Consentire di nuovo gli aggiornamenti per {count} mod?",
+      "other": "Consentire di nuovo gli aggiornamenti per {count} mod?"
+    }
   },
   "common": {
     "imageFailed": "Impossibile caricare l’immagine",
@@ -894,7 +922,8 @@
       "source": "Origine",
       "installed": "Installata",
       "overwrites": "Sovrascrive",
-      "hide": "Nascondi"
+      "hide": "Nascondi",
+      "hold": "Blocca"
     },
     "sepNameLabel": "Nome del separatore (vuoto lo rimuove)",
     "expandLabel": "Espandi {name}",
@@ -932,7 +961,12 @@
     "newSectionBelow": "Nuova sezione sotto",
     "hideTip": "Nascondi dalla lista. Resta attiva o disattivata com'è. Utile per le parti che non ti serve vedere, come le altre varianti di una mod. La ritrovi in Nascoste.",
     "unhideTip": "Nascosta. Clicca per mostrarla di nuovo nella lista.",
-    "sortByTip": "Ordina per questa colonna (clicca di nuovo per l'ordine della libreria)"
+    "sortByTip": "Ordina per questa colonna (clicca di nuovo per l'ordine della libreria)",
+    "holdTip": "Blocca gli aggiornamenti: tieni questa versione. PZMM non la aggiornerà finché non fai di nuovo clic.",
+    "heldTip": "Aggiornamenti bloccati: questa versione resta. Fai clic per consentire di nuovo gli aggiornamenti.",
+    "heldNewerTip": "Aggiornamenti bloccati. Il Workshop ha una versione più recente del {date}. Fai clic per consentire di nuovo gli aggiornamenti.",
+    "held": "Bloccata",
+    "heldChipTip": "Aggiornamenti bloccati. Il Workshop ha una versione più recente del {date}."
   },
   "details": {
     "firstSeen": "Vista per la prima volta",
@@ -1010,7 +1044,12 @@
     "workshopId": "ID Workshop",
     "updated": "Aggiornata",
     "languages": "Ha testi in",
-    "incompatibleOn": "Incompatibile con mod attive: {names}"
+    "incompatibleOn": "Incompatibile con mod attive: {names}",
+    "updates": "Aggiornamenti",
+    "updatesHeld": "Bloccati",
+    "updatesAllowed": "Consentiti",
+    "heldNewer": "Il Workshop ha una versione più recente del {date}.",
+    "updateAnyway": "Aggiorna comunque"
   },
   "loadOrder": {
     "title": "Ordine di caricamento",
@@ -1771,7 +1810,7 @@
     "mods": {
       "fromProfile": "Mod da un profilo",
       "useProfile": "Usa le sue mod",
-      "hint": "Trascina le mod nell'ordine di caricamento (o usa Alt+frecce), oppure spunta Modifica come testo per scrivere le righe. Scrivi controlla ogni ID e mostra prima le modifiche; il file com'era prima della prima modifica di PZMM resta come .ini.bak.",
+      "hint": "Trascina le mod nell'ordine di caricamento (o usa Alt+frecce), oppure spunta Modifica come testo per scrivere le righe. Salva le mod sul server controlla ogni ID e mostra prima le modifiche; il file com'era prima della prima modifica di PZMM resta come .ini.bak.",
       "readOnly": "PZMM non gestisce questo server: adottalo per cambiarne le mod da qui.",
       "modsHint": {
         "one": "{count} mod ID",
@@ -1782,7 +1821,7 @@
         "other": "{count} elementi del Workshop"
       },
       "allGood": "Ogni ID del Workshop esiste e ogni mod ID ha il suo elemento.",
-      "write": "Scrivi…",
+      "write": "Salva le mod sul server",
       "check": "Controlla gli ID",
       "checking": "Controllo…",
       "reload": "Ricarica dal file",
@@ -1831,7 +1870,7 @@
       "search": "Cerca una mod o un elemento",
       "autosort": "Ordina auto",
       "autosortTip": "Prima i framework, per ultime le traduzioni, e tutti i requisiti e le regole di caricamento delle mod installate (le altre restano al loro posto)",
-      "sorted": "Ordinato. Premi Scrivi per salvare il nuovo ordine.",
+      "sorted": "Ordinato. Premi Salva le mod sul server per tenere il nuovo ordine.",
       "raw": "Modifica come testo",
       "shown": {
         "one": "{count} mostrato",
@@ -1853,7 +1892,9 @@
         "both": "Server e giocatori",
         "server": "Solo server",
         "optional": "Facoltativa"
-      }
+      },
+      "saveConfirm": "Salva",
+      "unsavedHint": "Le tue modifiche non sono ancora sul server."
     },
     "wizard": {
       "title": "Nuovo server dedicato",
@@ -2193,7 +2234,8 @@
       "offers": "I mod di mappa di questo server hanno punti di spawn propri:",
       "file": "File",
       "textHint": "Modifica il file come testo. La versione prima di ogni salvataggio viene tenuta, così puoi tornare indietro.",
-      "saveText": "Salva file"
+      "saveText": "Salva file",
+      "editedTwice": "{file} ha modifiche nel modulo e nell'editor di testo. Salva prima una delle due."
     },
     "tag": {
       "title": "Elenco mod nella descrizione",
@@ -2408,7 +2450,8 @@
       "change": "Cambia",
       "set": "Imposta l'indirizzo per i giocatori",
       "tip": "Per un tunnel come playit.gg o un nome di dominio: PZMM lo mostra qui e nello stato su Discord."
-    }
+    },
+    "leaveSave": "Salva ed esci"
   },
   "zb": {
     "title": "ZombieBuddy",
@@ -2864,7 +2907,9 @@
     "unfavourite": "Rimuovi dai preferiti",
     "hide": "Nascondi dalla lista",
     "unhide": "Mostra di nuovo nella lista",
-    "copyIds": "Copia gli ID delle mod"
+    "copyIds": "Copia gli ID delle mod",
+    "holdUpdates": "Blocca aggiornamenti",
+    "allowUpdates": "Consenti aggiornamenti"
   },
   "backend": {
     "mapsNotUpdated": "impossibile leggere le tue mod, quindi l'elenco delle mappe del gioco non è stato aggiornato: {error}",
@@ -3034,7 +3079,13 @@
     "unsubscribed": "Iscrizione a {id} annullata su Steam: Steam rimuove i suoi file",
     "removed": "{id} rimossa ({source})",
     "mapOrderAdopted": "Preso l'ordine delle mappe impostato nel gioco.",
-    "tooManyItems": "{count} altri oggetti del Workshop esclusi: se ne aggiungono al massimo 500 alla volta"
+    "tooManyItems": "{count} altri oggetti del Workshop esclusi: se ne aggiungono al massimo 500 alla volta",
+    "heldSkipped": "{source}: i suoi aggiornamenti sono bloccati, quindi è rimasta com'era",
+    "holdCopied": "{ids}: PZMM tiene una propria copia della versione che hai, bloccata, e ha annullato l'iscrizione su Steam",
+    "holdFailed": "blocco di workshop:{item}: {error}",
+    "holdOn": "{ids}: aggiornamenti bloccati, questa versione resta",
+    "holdOff": "{ids}: aggiornamenti di nuovo consentiti",
+    "holdEnded": "{ids}: iscritta di nuovo su Steam, quindi gli aggiornamenti non sono più bloccati; la copia di Steam subentra una volta scaricata"
   },
   "doctor": {
     "notInstalled": "è attiva ma non installata: il gioco la salta",
@@ -3269,7 +3320,9 @@
     "renameSave": "Rinomina…",
     "newName": "Nuovo nome del salvataggio",
     "deleteSaveTitle": "Eliminare il salvataggio {name}?",
-    "deleteSaveWhat": "PZMM ne fa prima un backup, così puoi ripristinarlo dai suoi backup."
+    "deleteSaveWhat": "PZMM ne fa prima un backup, così puoi ripristinarlo dai suoi backup.",
+    "hold": "Blocca le mod di questo salvataggio",
+    "holdTip": "Tieni le versioni usate da questo salvataggio: PZMM smette di aggiornarne le mod."
   },
   "perf": {
     "title": "Prestazioni",
@@ -3758,6 +3811,8 @@
     "bisect_none": "Il problema si presenta ancora con tutti i sospetti disattivati, quindi non è nessuna di queste mod. La tua lista di mod è ripristinata.",
     "bisect_one_group": "Le tue mod attive hanno tutte bisogno l’una dell’altra (%1), quindi la ricerca non può dividerle in gruppi da provare: disattivane alcune a mano per restringere il campo.",
     "bisect_together": "%1 lo rompe solo insieme a mod di un altro gruppo: disattivarlo sistema la tua lista, ma da solo va bene. La tua lista di mod è ripristinata.",
+    "bulk_allow_tip": "Consenti di nuovo gli aggiornamenti delle mod scelte.",
+    "bulk_hold_tip": "Blocca gli aggiornamenti delle mod scelte: PZMM tiene queste versioni.",
     "changed_chip": "Aggiornata: %1",
     "changed_heading": "Aggiornata",
     "check_again": "Ricontrolla",
@@ -3790,6 +3845,7 @@
     "details_description": "Descrizione",
     "details_first_seen": "Vista per la prima volta",
     "details_first_seen_tip": "Quando questa mod è arrivata su questo PC, per quanto PZMM può sapere. Può azzerarsi se Steam riscarica la mod.",
+    "details_held_newer": "Il Workshop ha una versione più recente del %1.",
     "details_langs": "Ha testi in",
     "details_mod_version": "Versione della mod",
     "details_needed_by": "Richiesta da",
@@ -3803,7 +3859,11 @@
     "details_source_ws": "Iscritto sul Workshop",
     "details_tags": "Tag",
     "details_unsubscribe": "Annulla l'iscrizione nella pagina del Workshop",
+    "details_update_anyway": "Aggiorna comunque",
     "details_update_now": "Aggiorna ora",
+    "details_updates": "Aggiornamenti",
+    "details_updates_allowed": "Consentiti",
+    "details_updates_held": "Bloccati",
     "details_version_or_newer": "%1 o più recente",
     "details_what_changed": "Cosa è cambiato dalla tua versione",
     "dismiss": "Ignora",
@@ -3821,6 +3881,7 @@
     "filter_disabled_tip": "Disattivata\nMod che hai ma che non vengono caricate.",
     "filter_enabled": "Attiva",
     "filter_enabled_tip": "Attiva\nMod che vengono caricate con la tua prossima partita.",
+    "filter_held": "Bloccate",
     "filter_hidden": "Nascoste",
     "filter_hidden_tip": "Nascoste\nLe mod che hai nascosto. Mantengono il loro posto nella lista e si caricano come sono impostate.",
     "filter_installed": "Installato",
@@ -3835,9 +3896,27 @@
     "findings_find": "Trova la mod rotta",
     "get_the_app": "Scarica l'app",
     "ghost_warn": "Questa mod è attiva nel tuo profilo ma non è installata. Installala, iscriviti su Steam o disattivala.",
+    "held_chip": "Bloccata",
+    "held_chip_tip": "Aggiornamenti bloccati. Il Workshop ha una versione più recente del %1.",
+    "held_newer_tip": "Aggiornamenti bloccati. Il Workshop ha una versione più recente del %1. Fai clic per consentire di nuovo gli aggiornamenti.",
+    "held_tip": "Aggiornamenti bloccati: questa versione resta. Fai clic per consentire di nuovo gli aggiornamenti.",
     "hide_tip": "Nascondi dalla lista. Resta attiva o disattivata com'è. Utile per le parti che non ti serve vedere, come le altre varianti di una mod. La ritrovi in Nascoste.",
     "history_none": "Ancora niente scaricato.",
     "history_title": "Cronologia download",
+    "hold_allowing": "Riattivazione degli aggiornamenti di %1",
+    "hold_holding": "Blocco degli aggiornamenti di %1",
+    "hold_n_mods": "%1 mod",
+    "hold_needs_app": "Bloccare gli aggiornamenti richiede l'app PZMM: una mod bloccata è la copia di PZMM.",
+    "hold_not_done": "PZMM non ha cambiato gli aggiornamenti di %1: il registro attività spiega perché.",
+    "hold_nothing": "Niente da bloccare: le mod scelte sono già bloccate, oppure sono locali e non si aggiornano mai.",
+    "hold_off": "%1: aggiornamenti di nuovo consentiti",
+    "hold_on": "%1: aggiornamenti bloccati, questa versione resta",
+    "hold_save_ask": "Bloccare gli aggiornamenti delle %1 mod usate da %2?",
+    "hold_save_ask_one": "Bloccare gli aggiornamenti della mod usata da %2?",
+    "hold_save_none": "Le mod di %1 sono già bloccate, oppure nessuna può aggiornarsi.",
+    "hold_say_yes": "%1: conferma in PZMM.",
+    "hold_tip": "Blocca gli aggiornamenti: tieni questa versione. PZMM non la aggiornerà finché non fai di nuovo clic.",
+    "hold_updating": "Aggiornamento di %1",
     "home_activity": "Le tue mod con nuovi aggiornamenti",
     "home_browse_workshop": "Sfoglia Workshop",
     "home_continue": "Continua %1",
@@ -3978,11 +4057,13 @@
     "maps_unpreview_listed": "Togli anteprima alle elencate",
     "maps_zoom_in": "Ingrandisci",
     "maps_zoom_out": "Riduci",
+    "menu_allow_updates": "Consenti aggiornamenti",
     "menu_copy_id": "Copia l'ID della mod",
     "menu_disable": "Disattiva",
     "menu_enable": "Attiva",
     "menu_favourite": "Aggiungi ai preferiti",
     "menu_hide": "Nascondi dalla lista",
+    "menu_hold_updates": "Blocca aggiornamenti",
     "menu_list_hint": "Trascina o Alt+freccia su/giù per organizzare, Space attiva/disattiva, Ctrl/Shift+clic seleziona",
     "menu_maps": "Mostra in Mappe",
     "menu_pin": "Fissa il suo posto nell'ordine di caricamento",
@@ -4062,6 +4143,7 @@
     "promo_ask": "Lascia un pollice in su sul Workshop",
     "promo_click": "clicca qui",
     "promo_enjoying": "Ti piace PZMM?",
+    "resubscribe_held_line": "I suoi aggiornamenti sono bloccati. La copia di Steam subentra e la tiene aggiornata; la copia bloccata di PZMM se ne va quando Steam l'ha scaricata.",
     "rules_clear": "Cancella regole",
     "rules_title": "Regole di caricamento",
     "saves_auto_hint": "Backup all'avvio o alla chiusura del gioco:",
@@ -4072,6 +4154,8 @@
     "saves_delete": "Elimina",
     "saves_folder": "Apri cartella",
     "saves_give_mods": "Dagli le mie mod",
+    "saves_hold_mods": "Blocca le mod di questo salvataggio",
+    "saves_hold_tip": "Tieni le versioni usate da questo salvataggio: PZMM smette di aggiornarne le mod.",
     "saves_mods_hint": "Dai a questo salvataggio le mod di %1. Vedi cosa cambia prima che venga scritto qualcosa.",
     "saves_new_character": "Nuovo personaggio",
     "saves_no_backups": "Ancora nessun backup di questo salvataggio.",
@@ -4249,6 +4333,8 @@
     "srv_rule_public": "Elencato pubblicamente",
     "srv_rule_version": "Versione",
     "srv_rule_wipe": "Ultimo wipe",
+    "srv_save_confirm": "Salva",
+    "srv_save_mods": "Salva le mod sul server",
     "srv_search": "Cerca per nome",
     "srv_server_only": "Solo server",
     "srv_shown": "%1 server su %2",
@@ -4268,6 +4354,7 @@
     "srv_wipe_hint": "L'ultimo wipe è quando è stato creato il mondo: non cambia al riavvio del server.",
     "srv_with_password": "Con password",
     "srv_your_servers": "I tuoi server",
+    "steam_limited": "Steam sta limitando le richieste in questo momento. Attendi un minuto e riprova.",
     "tab_check": "Controlla aggiornamenti",
     "tab_checking": "Controllo...",
     "tab_feed": "Novità",
@@ -4303,6 +4390,10 @@
     "tool_leave_favs": "Lascia i preferiti",
     "tool_section": "Nuova sezione",
     "unhide_tip": "Nascosta. Clicca per mostrarla di nuovo nella lista.",
+    "up_to_date": "Le tue mod sono aggiornate.",
+    "up_to_date_held": "Tutto il resto è aggiornato: %1 mod bloccate hanno versioni più recenti.",
+    "up_to_date_held_one": "Tutto il resto è aggiornato: %1 mod bloccata ha una versione più recente.",
+    "update_anyway_ask": "Aggiornare comunque %1? I suoi aggiornamenti restano bloccati dopo.",
     "use_app_mods": "Usa le mod di PZMM",
     "vanilla": "Schermata mod del gioco",
     "view": "Vedi",

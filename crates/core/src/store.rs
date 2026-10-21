@@ -17,6 +17,9 @@ pub struct Entry {
     /// When PZMM last installed it (seconds since 1970); 0 for v0.1 imports.
     #[serde(default)]
     pub installed_at: u64,
+    /// The player holds its updates: PZMM never updates it (see `sources::fetch`), short of an Update anyway.
+    #[serde(default)]
+    pub held: bool,
 }
 
 pub fn now() -> u64 {
@@ -38,25 +41,66 @@ pub fn load(paths: &Paths) -> Result<Index> {
     let old = paths.mods().join("pzmm.json");
     let v1: BTreeMap<String, String> =
         if old.exists() { serde_json::from_str(&fs::read_to_string(old)?).unwrap_or_default() } else { BTreeMap::new() };
-    Ok(v1.into_iter().map(|(id, source)| (id, Entry { source, installed_at: 0 })).collect())
+    Ok(v1.into_iter().map(|(id, source)| (id, Entry { source, installed_at: 0, held: false })).collect())
 }
 
 pub fn save(paths: &Paths, index: &Index) -> Result<()> {
     fs::create_dir_all(&paths.data)?;
     crate::write_atomic(&index_path(paths), serde_json::to_string_pretty(index)?)?;
     installed_for_game(paths, index);
+    held_for_game(paths, index);
     Ok(())
 }
 
+/// The mods whose updates are held, for the PZMM - Client mod: `Zomboid/Lua/pzmm/held.txt`, a mod id per line, where
+/// that folder is.
+pub fn held_for_game(paths: &Paths, index: &Index) {
+    let dir = pz::bridge::dir(paths);
+    if dir.is_dir() {
+        let text: String = index.iter().filter(|(_, e)| e.held).map(|(id, _)| format!("{id}\n")).collect();
+        pz::bridge::write_for_game(&dir.join("held.txt"), text);
+    }
+}
+
+/// Hold (`on`) or allow the updates of mods PZMM installed, with the other mods of their source (they update
+/// together). Returns the ids changed; those PZMM didn't install aren't held, nor local ones (they never update).
+pub fn set_held(paths: &Paths, ids: &[String], on: bool) -> Result<Vec<String>> {
+    let mut index = load(paths)?;
+    let sources: Vec<String> =
+        ids.iter().filter_map(|id| index.get(id)).map(|e| e.source.clone()).filter(|s| s.starts_with("workshop:") || s.starts_with("github:")).collect();
+    let mut changed = vec![];
+    for (id, e) in index.iter_mut().filter(|(_, e)| sources.contains(&e.source) && e.held != on) {
+        e.held = on;
+        changed.push(id.clone());
+    }
+    if !changed.is_empty() {
+        save(paths, &index)?;
+    }
+    Ok(changed)
+}
+
+/// The player subscribed to Workshop `item` again through PZMM: a held copy of it stops being held, so Steam's copy wins
+/// and the next scan removes PZMM's once Steam's is there (never before: the mod is never gone meanwhile). Returns the
+/// mod ids that were held.
+pub fn subscribed_again(paths: &Paths, item: &str) -> Result<Vec<String>> {
+    let source = format!("workshop:{item}");
+    let ids: Vec<String> = load(paths)?.into_iter().filter(|(_, e)| e.source == source && e.held).map(|(id, _)| id).collect();
+    set_held(paths, &ids, false)
+}
+
 /// When PZMM installed each mod, for the PZMM - Client mod's "Date installed" sort: `Zomboid/Lua/pzmm/installed.txt`,
-/// a `<mod id>\t<seconds>` line per mod, where that folder is.
+/// a `<mod id>\t<seconds>\t<Workshop item>\t<source>` line per mod, where that folder is.
 pub fn installed_for_game(paths: &Paths, index: &Index) {
     let dir = pz::bridge::dir(paths);
     if dir.is_dir() {
-        // and its Workshop item (empty when it isn't from one): the game sees no Workshop ID for a mod in Zomboid/mods
+        // and its Workshop item (empty when it isn't from one): the game sees no Workshop ID for a mod in Zomboid/mods;
+        // then the source as installed.json has it, so the game tells GitHub mods (they can be held) from local ones
         let text: String = index
             .iter()
-            .map(|(id, e)| format!("{id}\t{}\t{}\n", crate::sources::installed_at(paths, id, e), e.source.strip_prefix("workshop:").unwrap_or("")))
+            .map(|(id, e)| {
+                let source = e.source.replace(['\t', '\r', '\n'], " ");
+                format!("{id}\t{}\t{}\t{source}\n", crate::sources::installed_at(paths, id, e), e.source.strip_prefix("workshop:").unwrap_or(""))
+            })
             .collect();
         pz::bridge::write_for_game(&dir.join("installed.txt"), &text);
     }
@@ -235,15 +279,20 @@ fn swap_in(paths: &Paths, m: &pz::FoundMod, dest: &Path) -> Result<bool> {
 /// folder and swapped in, then recorded, so a failure never leaves a half-copied mod.
 /// Mods that can't be installed are logged and skipped. Returns the installed ids.
 pub fn install(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> {
-    put_in(paths, root, source, false)
+    put_in(paths, root, source, false, false)
 }
 
 /// [`install`] as an update: a mod of the item the player removed (its newest record) stays out.
 pub fn update(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> {
-    put_in(paths, root, source, true)
+    put_in(paths, root, source, true, false)
 }
 
-fn put_in(paths: &Paths, root: &Path, source: &str, update: bool) -> Result<Vec<String>> {
+/// [`install`] of only the mods PZMM has no entry for: those it has (held ones, say) are left exactly as they are.
+pub fn install_new(paths: &Paths, root: &Path, source: &str) -> Result<Vec<String>> {
+    put_in(paths, root, source, false, true)
+}
+
+fn put_in(paths: &Paths, root: &Path, source: &str, update: bool, only_new: bool) -> Result<Vec<String>> {
     let found = pz::find_mods(root, 8);
     let history = if update { crate::history::list(paths) } else { vec![] };
     if found.is_empty() {
@@ -267,6 +316,10 @@ fn put_in(paths: &Paths, root: &Path, source: &str, update: bool) -> Result<Vec<
         };
         // Windows folders ignore case: an author changing only the id's case is still this entry
         let known = index.keys().find(|k| k.eq_ignore_ascii_case(&m.id)).cloned();
+        // a copy of this source on disk stays exactly as it is; an entry whose folder is gone is copied again
+        if only_new && known.as_ref().is_some_and(|k| index[k].source == source && mod_dir(paths, k).is_ok_and(|d| d.is_dir())) {
+            continue;
+        }
         if known.is_none() && history.iter().find(|r| r.id.eq_ignore_ascii_case(&m.id)).is_some_and(|r| r.action == "removed" && r.source == source) {
             crate::say!("removedStays", "{id} stays out: you removed it ({source})", id = m.id, source = source);
             continue;
@@ -335,10 +388,9 @@ fn put_in(paths: &Paths, root: &Path, source: &str, update: bool) -> Result<Vec<
                 }
             }
         }
-        if let Some(k) = &known {
-            index.remove(k);
-        }
-        index.insert(m.id.clone(), Entry { source: source.to_string(), installed_at: now() });
+        // an Update anyway keeps it held
+        let held = known.as_ref().and_then(|k| index.remove(k)).is_some_and(|e| e.held);
+        index.insert(m.id.clone(), Entry { source: source.to_string(), installed_at: now(), held });
         if let Err(e) = save(paths, &index) {
             crate::log!("error: {source}: recording {}: {e:#}", m.id);
             continue;
@@ -653,7 +705,11 @@ fn scan_in(paths: &Paths, ws: Option<&Path>, recycle: bool) -> Result<BTreeMap<S
         let source = index.get(&m.id).map_or("manual".to_string(), |e| e.source.clone());
         // Steam keeps the subscription updated, and the game would load our copy over it
         let subscribed = source.strip_prefix("workshop:").is_some_and(|item| out.get(&m.id).is_some_and(|r: &Row| r.source == format!("steam:{item}")));
-        if subscribed && remove(paths, std::slice::from_ref(&m.id), recycle)?.is_empty() {
+        // never a held copy: Steam keeps an unsubscribed item's folder until the game quits, then deletes it, so
+        // removing ours on seeing Steam's would lose the mod (Check setup's twoCopies says there are two meanwhile).
+        // Subscribing again through PZMM lets Steam's copy win: see [`subscribed_again`]
+        let held = index.get(&m.id).is_some_and(|e| e.held);
+        if subscribed && !held && remove(paths, std::slice::from_ref(&m.id), recycle)?.is_empty() {
             crate::say!("subscribedCopyRemoved", "{id}: you subscribed in Steam; PZMM's copy was removed", id = m.id);
             continue;
         }
@@ -916,6 +972,72 @@ name=v2
         set_tags(&paths, "B", &["Maps".into()]).unwrap();
         assert_eq!(set_tags(&paths, "A", &[]).unwrap().keys().collect::<Vec<_>>(), ["B"]);
         assert_eq!(tags(&paths)["B"], ["Maps"], "kept on disk");
+    }
+
+    #[test]
+    fn held_is_kept_and_told_to_the_game() {
+        let (t, paths) = temp_paths();
+        fs::create_dir_all(paths.zomboid.join("Lua/pzmm")).unwrap();
+        // an index from before holds reads as not held
+        fs::create_dir_all(&paths.data).unwrap();
+        fs::write(paths.data.join("installed.json"), r#"{"A": {"source": "workshop:1", "installed_at": 5}}"#).unwrap();
+        assert!(!load(&paths).unwrap()["A"].held);
+        for (id, item) in [("A", "1"), ("B", "1"), ("C", "2")] {
+            mod_tree(t.path(), &format!("src{item}/{id}"), &format!("id={id}\n"));
+        }
+        install(&paths, &t.path().join("src1"), "workshop:1").unwrap();
+        install(&paths, &t.path().join("src2"), "workshop:2").unwrap();
+        // the item's other mod is held with it; a mod PZMM didn't install isn't
+        assert_eq!(set_held(&paths, &["A".into(), "Nope".into()], true).unwrap(), ["A", "B"]);
+        let index = load(&paths).unwrap();
+        assert!(index["A"].held && index["B"].held && !index["C"].held);
+        assert!(fs::read_to_string(paths.data.join("installed.json")).unwrap().contains(r#""held": true"#));
+        assert_eq!(fs::read_to_string(paths.zomboid.join("Lua/pzmm/held.txt")).unwrap(), "A\nB\n");
+        // installed.txt: id, install time, Workshop item, source
+        let at = load(&paths).unwrap()["A"].installed_at;
+        assert!(fs::read_to_string(paths.zomboid.join("Lua/pzmm/installed.txt")).unwrap().starts_with(&format!("A\t{at}\t1\tworkshop:1\n")));
+        let gh: Index = [("G".to_string(), Entry { source: "github:owner/repo".into(), installed_at: 7, held: false })].into();
+        installed_for_game(&paths, &gh);
+        assert_eq!(fs::read_to_string(paths.zomboid.join("Lua/pzmm/installed.txt")).unwrap(), "G\t7\t\tgithub:owner/repo\n");
+        // an Update anyway keeps it held
+        mod_tree(t.path(), "src1/A", "id=A\nname=v2\n");
+        update(&paths, &t.path().join("src1"), "workshop:1").unwrap();
+        assert!(load(&paths).unwrap()["A"].held);
+        set_held(&paths, &["B".into()], false).unwrap();
+        assert_eq!(fs::read_to_string(paths.zomboid.join("Lua/pzmm/held.txt")).unwrap(), "");
+    }
+
+    #[test]
+    fn a_held_copy_of_a_subscribed_item_stays() {
+        let (t, paths) = temp_paths();
+        let ws = t.path().join("ws");
+        mod_tree(&ws, "42/mods/ModA", "id=ModA\n");
+        mod_tree(t.path(), "src/ModA", "id=ModA\n");
+        install(&paths, &t.path().join("src"), "workshop:42").unwrap();
+        set_held(&paths, &["ModA".into()], true).unwrap();
+        let rows = scan_in(&paths, Some(&ws), false).unwrap();
+        assert_eq!(rows["ModA"].source, "workshop:42", "PZMM's held copy, not removed while the unsubscribe lands");
+        assert!(paths.mods().join("ModA").exists());
+        // at any age (Steam keeps the folder while the game runs, then deletes it)
+        crate::history::clear(&paths, None);
+        let mut index = load(&paths).unwrap();
+        index.get_mut("ModA").unwrap().installed_at = 1;
+        save(&paths, &index).unwrap();
+        assert_eq!(scan_in(&paths, Some(&ws), false).unwrap()["ModA"].source, "workshop:42");
+        assert!(paths.mods().join("ModA").exists() && load(&paths).unwrap()["ModA"].held);
+        // subscribed again through PZMM: the hold ends, and Steam's copy wins
+        assert_eq!(subscribed_again(&paths, "42").unwrap(), ["ModA"]);
+        assert_eq!(scan_in(&paths, Some(&ws), false).unwrap()["ModA"].source, "steam:42");
+        assert!(!paths.mods().join("ModA").exists() && !load(&paths).unwrap().contains_key("ModA"));
+    }
+
+    #[test]
+    fn local_mods_are_never_held() {
+        let (t, paths) = temp_paths();
+        mod_tree(t.path(), "dl/L", "id=L\n");
+        install(&paths, &t.path().join("dl"), "local:dl").unwrap();
+        assert!(set_held(&paths, &["L".into()], true).unwrap().is_empty());
+        assert!(!load(&paths).unwrap()["L"].held);
     }
 
     #[test]

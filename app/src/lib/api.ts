@@ -59,6 +59,8 @@ export type View = {
   steam_branch: string | null;
   /** The game's language, as its Translate folders name it ("" until the game saved its options). */
   language: string;
+  /** Mods whose updates are held: PZMM doesn't update them. */
+  held: string[];
 };
 
 export type ModDetails = {
@@ -333,7 +335,8 @@ export type GameRequest = { id: string; profile: string } & ({ action: "install"
   | { action: "section"; op: "add" | "rename" | "remove" | "move"; name: string; to: string | null } | { action: "remove"; ids: string[] } | { action: "find"; mod: string }
   | { action: "import"; text: string } | { action: "profileedit"; op: "new" | "rename" | "duplicate" | "delete"; name: string; to: string | null } | { action: "serverprofile"; addr: string; ids: string[] }
   | { action: "server"; op: "start" | "stop" | "restart"; name: string } | { action: "feed" } | { action: "cancel" } | { action: "rollback"; mod: string } | { action: "set"; key: string; value: string }
-  | { action: "pics"; item: string } | { action: "snapshot"; snapshot: string } | { action: "hide"; key: string } | { action: "unhide"; key: string } | { action: "serverfav"; addr: string; on: boolean });
+  | { action: "pics"; item: string } | { action: "snapshot"; snapshot: string } | { action: "hide"; key: string } | { action: "unhide"; key: string } | { action: "serverfav"; addr: string; on: boolean }
+  | { action: "hold"; ids: string[]; on: boolean } | { action: "updateheld"; mod: string });
 /** What the game last reported: the mods it loaded, at the menu or in a game. */
 export type GameReport = { client: string; game: string; state: string; at: number; mods: string[]; save: string | null; server: string | null; zomboid: string; elsewhere: boolean };
 export type BackupView = { backups: ServerBackup[]; empty_cells: string[]; game_on_start: boolean; game_count: string; game_dir: string };
@@ -667,9 +670,14 @@ export const api = {
   findRequirement: (modId: string, neededBy: string) =>
     invoke<Candidate[]>("find_requirement", { modId, neededBy }),
   installMissing: () => invoke<[View, string[]]>("install_missing"),
-  checkUpdates: () => invoke<string[]>("check_updates"),
-  /** The view, and the ids that did install. */
-  updateMods: (ids: string[]) => invoke<[View, string[]]>("update_mods", { ids }),
+  /** Mods with an update to install, and held ones with a newer version on the Workshop (when it came out). */
+  checkUpdates: () => invoke<{ outdated: string[]; held: Record<string, number> }>("check_updates"),
+  /** The view, and the ids that did install. `anyway`: held mods too (they stay held). */
+  updateMods: (ids: string[], anyway = false) => invoke<[View, string[]]>("update_mods", { ids, anyway }),
+  /** Hold or allow mods' updates; a Subscribed one is made PZMM's own copy, then unsubscribed. */
+  holdSet: (ids: string[], on: boolean) => invoke<View>("hold_set", { ids, on }),
+  /** PZMM's window to the front (a quiet game request that needs an answer). */
+  appFront: () => invoke<void>("app_front"),
   modStats: () => invoke<Record<string, Stats>>("mod_stats"),
   categories: () => invoke<Categories>("categories"),
   conflictSummary: () => invoke<Record<string, Overlap>>("conflict_summary"),
@@ -936,6 +944,8 @@ export const api = {
 /** A download history record: `source` is `workshop:<id>`, `steam:<id>` (a subscription), `github:...` or `local:...`. */
 export type HistoryRecord = { id: string; name: string; source: string; action: "installed" | "updated" | "removed" | "subscribed" | "unsubscribed"; at: number };
 
+/** Workshop and GitHub mods update (Steam's too, by itself): only those can be held. */
+export const holdable = (m: ModRow) => /^(workshop|github|steam):/.test(m.source);
 export const isOurs = (m: ModRow) => /^(workshop|github|local):/.test(m.source);
 /** Remove can take it: PZMM's own, or a folder added to Zomboid/mods by hand (that goes to the Recycle Bin). */
 export const removable = (m: ModRow) => !m.missing && (isOurs(m) || m.source === "manual");

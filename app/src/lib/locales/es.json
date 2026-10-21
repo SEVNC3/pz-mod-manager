@@ -300,7 +300,10 @@
     },
     "newSectionTip": "Añade una sección encima del mod seleccionado (clic derecho en una sección para más)",
     "hide": "Ocultar",
-    "showAgain": "Mostrar de nuevo"
+    "showAgain": "Mostrar de nuevo",
+    "filterHeld": "Retenidos",
+    "bulkHoldTip": "Retener las actualizaciones de los mods elegidos: PZMM conserva estas versiones.",
+    "bulkAllowTip": "Volver a permitir actualizaciones para los mods elegidos."
   },
   "busy": {
     "loading": "Cargando",
@@ -405,7 +408,12 @@
     "playFailed": "No se pudo iniciar el juego: {error}",
     "appUpdateFound": "PZMM {version} está disponible: «Actualizar y reiniciar» está encima de las pestañas.",
     "bisectSaveFailed": "No se pudo guardar la siguiente lista de prueba, así que la búsqueda no avanzó. En Instantáneas está tu lista de antes de la búsqueda.",
-    "bisectRestoreFailed": "No se pudo devolver tu lista de mods a como estaba antes de la búsqueda: restáurala desde Instantáneas (Antes de buscar el mod roto)."
+    "bisectRestoreFailed": "No se pudo devolver tu lista de mods a como estaba antes de la búsqueda: restáurala desde Instantáneas (Antes de buscar el mod roto).",
+    "saveHeld": "Los mods de {save} ya están retenidos, o ninguno se puede actualizar.",
+    "upToDateHeld": {
+      "one": "Todo lo demás está al día: {count} mod retenido tiene una versión más nueva.",
+      "other": "Todo lo demás está al día: {count} mods retenidos tienen versiones más nuevas."
+    }
   },
   "confirm": {
     "group": "Agrupar por categoría sustituye tus secciones ({sections}) por secciones de categoría. Ctrl+Z lo deshace. ¿Agrupar ahora?",
@@ -481,7 +489,27 @@
     "unsubscribeTitle": "¿Cancelar la suscripción a {name}?",
     "unsubscribeLine": "Steam borra sus archivos, así que los perfiles que lo usan lo pierden.",
     "unsubscribe": "Cancelar suscripción",
-    "deletePreset": "¿Borrar la lista guardada «{name}»? Desaparece del menú de mods del juego o del Mod Manager que la guardó."
+    "deletePreset": "¿Borrar la lista guardada «{name}»? Desaparece del menú de mods del juego o del Mod Manager que la guardó.",
+    "holdSteam": {
+      "one": "Steam mantiene actualizados los mods suscritos. Para retener este, PZMM cancela la suscripción y conserva su propia copia de la versión que tienes ahora.",
+      "other": "Steam mantiene actualizados los mods suscritos. Para retener estos {count}, PZMM cancela las suscripciones y conserva sus propias copias de las versiones que tienes ahora."
+    },
+    "holdSave": {
+      "one": "¿Retener las actualizaciones del mod que usa {save}?",
+      "other": "¿Retener las actualizaciones de los {count} mods que usa {save}?"
+    },
+    "holdSaveSteam": {
+      "one": "Este está suscrito en Steam, que lo mantiene actualizado: PZMM cancela la suscripción y conserva su propia copia de la versión que tienes ahora.",
+      "other": "Estos {count} están suscritos en Steam, que los mantiene actualizados: PZMM cancela las suscripciones y conserva sus propias copias de las versiones que tienes ahora."
+    },
+    "updateAnyway": "¿Actualizar {name} de todos modos? Sus actualizaciones siguen retenidas después.",
+    "resubscribeHeld": "¿Volver a suscribirte a {name} en Steam?",
+    "resubscribeHeldLine": "Sus actualizaciones están retenidas. La copia de Steam toma el relevo y lo mantiene actualizado; la copia retenida de PZMM se va cuando Steam lo haya descargado.",
+    "resubscribe": "Volver a suscribirse",
+    "allowHeld": {
+      "one": "¿Volver a permitir actualizaciones para {count} mod?",
+      "other": "¿Volver a permitir actualizaciones para {count} mods?"
+    }
   },
   "common": {
     "imageFailed": "No se pudo cargar la imagen",
@@ -894,7 +922,8 @@
       "source": "Origen",
       "installed": "Instalado",
       "overwrites": "Sobrescribe",
-      "hide": "Ocultar"
+      "hide": "Ocultar",
+      "hold": "Retener"
     },
     "sepNameLabel": "Nombre del separador (vacío lo quita)",
     "expandLabel": "Expandir {name}",
@@ -932,7 +961,12 @@
     "newSectionBelow": "Nueva sección debajo",
     "hideTip": "Ocultar de la lista. Sigue activado o desactivado como está. Úsalo para partes que no necesitas ver, como las otras variantes de un mod. Vuelve a encontrarlo en Ocultos.",
     "unhideTip": "Oculto. Haz clic para mostrarlo de nuevo en la lista.",
-    "sortByTip": "Ordenar por esta columna (haz clic otra vez para el orden de la biblioteca)"
+    "sortByTip": "Ordenar por esta columna (haz clic otra vez para el orden de la biblioteca)",
+    "holdTip": "Retener actualizaciones: conservar esta versión. PZMM no lo actualizará hasta que vuelvas a hacer clic.",
+    "heldTip": "Actualizaciones retenidas: esta versión se queda. Haz clic para volver a permitir actualizaciones.",
+    "heldNewerTip": "Actualizaciones retenidas. El Workshop tiene una versión más nueva del {date}. Haz clic para volver a permitir actualizaciones.",
+    "held": "Retenido",
+    "heldChipTip": "Actualizaciones retenidas. El Workshop tiene una versión más nueva del {date}."
   },
   "details": {
     "firstSeen": "Visto por primera vez",
@@ -1010,7 +1044,12 @@
     "workshopId": "ID del Workshop",
     "updated": "Actualizado",
     "languages": "Tiene textos en",
-    "incompatibleOn": "Incompatible con mods activados: {names}"
+    "incompatibleOn": "Incompatible con mods activados: {names}",
+    "updates": "Actualizaciones",
+    "updatesHeld": "Retenidas",
+    "updatesAllowed": "Permitidas",
+    "heldNewer": "El Workshop tiene una versión más nueva del {date}.",
+    "updateAnyway": "Actualizar de todos modos"
   },
   "loadOrder": {
     "title": "Orden de carga",
@@ -1771,7 +1810,7 @@
     "mods": {
       "fromProfile": "Mods de un perfil",
       "useProfile": "Usar sus mods",
-      "hint": "Arrastra los mods al orden de carga (o usa Alt+flechas), o marca Editar como texto para escribir las líneas. Escribir comprueba cada ID y muestra antes los cambios; el archivo tal como estaba antes del primer cambio de PZMM se queda como .ini.bak.",
+      "hint": "Arrastra los mods al orden de carga (o usa Alt+flechas), o marca Editar como texto para escribir las líneas. Guardar mods en el servidor comprueba cada ID y muestra antes los cambios; el archivo tal como estaba antes del primer cambio de PZMM se queda como .ini.bak.",
       "readOnly": "PZMM no gestiona este servidor: adóptalo para cambiar sus mods aquí.",
       "modsHint": {
         "one": "{count} mod ID",
@@ -1782,7 +1821,7 @@
         "other": "{count} elementos del Workshop"
       },
       "allGood": "Todos los ID del Workshop existen y cada mod ID tiene su elemento.",
-      "write": "Escribir…",
+      "write": "Guardar mods en el servidor",
       "check": "Comprobar ID",
       "checking": "Comprobando…",
       "reload": "Recargar desde el archivo",
@@ -1831,7 +1870,7 @@
       "search": "Buscar un mod o elemento",
       "autosort": "Ordenar solo",
       "autosortTip": "Frameworks primero, traducciones al final, y todos los requisitos y reglas de carga de los mods instalados (los demás conservan su sitio)",
-      "sorted": "Ordenado. Pulsa Escribir para guardar el nuevo orden.",
+      "sorted": "Ordenado. Pulsa Guardar mods en el servidor para conservar el nuevo orden.",
       "raw": "Editar como texto",
       "shown": {
         "one": "{count} mostrado",
@@ -1853,7 +1892,9 @@
         "both": "Servidor y jugadores",
         "server": "Solo servidor",
         "optional": "Opcional"
-      }
+      },
+      "saveConfirm": "Guardar",
+      "unsavedHint": "Tus cambios aún no están en el servidor."
     },
     "wizard": {
       "title": "Nuevo servidor dedicado",
@@ -2193,7 +2234,8 @@
       "offers": "Los mods de mapa de este servidor tienen sus propios puntos de aparición:",
       "file": "Archivo",
       "textHint": "Edita el archivo como texto. Se guarda la versión anterior a cada cambio, así que puedes volver atrás.",
-      "saveText": "Guardar archivo"
+      "saveText": "Guardar archivo",
+      "editedTwice": "{file} tiene cambios en el formulario y en el editor de texto. Guarda primero uno de los dos."
     },
     "tag": {
       "title": "Lista de mods en la descripción",
@@ -2408,7 +2450,8 @@
       "change": "Cambiar",
       "set": "Indicar la dirección para los jugadores",
       "tip": "Para un túnel como playit.gg o un nombre de dominio: PZMM la muestra aquí y en el estado de Discord."
-    }
+    },
+    "leaveSave": "Guardar y salir"
   },
   "zb": {
     "title": "ZombieBuddy",
@@ -2864,7 +2907,9 @@
     "unfavourite": "Quitar de favoritos",
     "hide": "Ocultar de la lista",
     "unhide": "Volver a mostrar en la lista",
-    "copyIds": "Copiar IDs de los mods"
+    "copyIds": "Copiar IDs de los mods",
+    "holdUpdates": "Retener actualizaciones",
+    "allowUpdates": "Permitir actualizaciones"
   },
   "backend": {
     "mapsNotUpdated": "no se pudieron leer tus mods, así que no se actualizó la lista de mapas del juego: {error}",
@@ -3034,7 +3079,13 @@
     "unsubscribed": "Suscripción a {id} cancelada en Steam: Steam elimina sus archivos",
     "removed": "{id} eliminado ({source})",
     "mapOrderAdopted": "Se tomó el orden de mapas fijado en el juego.",
-    "tooManyItems": "{count} objetos más del Workshop omitidos: se añaden como máximo 500 a la vez"
+    "tooManyItems": "{count} objetos más del Workshop omitidos: se añaden como máximo 500 a la vez",
+    "heldSkipped": "{source}: sus actualizaciones están retenidas, así que se dejó como estaba",
+    "holdCopied": "{ids}: PZMM conserva su propia copia de la versión que tienes, retenida, y canceló la suscripción en Steam",
+    "holdFailed": "reteniendo workshop:{item}: {error}",
+    "holdOn": "{ids}: actualizaciones retenidas, esta versión se queda",
+    "holdOff": "{ids}: actualizaciones permitidas de nuevo",
+    "holdEnded": "{ids}: suscrito de nuevo en Steam, así que las actualizaciones ya no están retenidas; la copia de Steam toma el relevo cuando se descargue"
   },
   "doctor": {
     "notInstalled": "está activado pero no instalado: el juego lo omite",
@@ -3269,7 +3320,9 @@
     "renameSave": "Cambiar nombre…",
     "newName": "Nuevo nombre de la partida",
     "deleteSaveTitle": "¿Borrar la partida {name}?",
-    "deleteSaveWhat": "PZMM hace antes una copia, para que puedas restaurarla desde sus copias."
+    "deleteSaveWhat": "PZMM hace antes una copia, para que puedas restaurarla desde sus copias.",
+    "hold": "Retener los mods de esta partida",
+    "holdTip": "Conservar las versiones que usa esta partida: PZMM deja de actualizar sus mods."
   },
   "perf": {
     "title": "Rendimiento",
@@ -3758,6 +3811,8 @@
     "bisect_none": "El problema sigue ocurriendo con todos los sospechosos desactivados, así que no es ninguno de estos mods. Tu lista de mods está restaurada.",
     "bisect_one_group": "Todos tus mods activos se necesitan entre sí (%1), así que la búsqueda no puede dividirlos en grupos para probar: desactiva algunos a mano para acotarlo.",
     "bisect_together": "%1 lo rompe solo junto con mods de otro grupo: desactivarlo arregla tu lista, pero por sí solo está bien. Tu lista de mods está restaurada.",
+    "bulk_allow_tip": "Volver a permitir actualizaciones para los mods elegidos.",
+    "bulk_hold_tip": "Retener las actualizaciones de los mods elegidos: PZMM conserva estas versiones.",
     "changed_chip": "Actualizado: %1",
     "changed_heading": "Actualizado",
     "check_again": "Revisar de nuevo",
@@ -3790,6 +3845,7 @@
     "details_description": "Descripción",
     "details_first_seen": "Visto por primera vez",
     "details_first_seen_tip": "Cuándo llegó este mod a este PC, según lo que PZMM puede saber. Puede reiniciarse si Steam vuelve a descargar el mod.",
+    "details_held_newer": "El Workshop tiene una versión más nueva del %1.",
     "details_langs": "Tiene textos en",
     "details_mod_version": "Versión del mod",
     "details_needed_by": "Lo necesitan",
@@ -3803,7 +3859,11 @@
     "details_source_ws": "Suscrito en el Workshop",
     "details_tags": "Etiquetas",
     "details_unsubscribe": "Cancelar suscripción en la página del Workshop",
+    "details_update_anyway": "Actualizar de todos modos",
     "details_update_now": "Actualizar ahora",
+    "details_updates": "Actualizaciones",
+    "details_updates_allowed": "Permitidas",
+    "details_updates_held": "Retenidas",
     "details_version_or_newer": "%1 o superior",
     "details_what_changed": "Qué cambió desde tu versión",
     "dismiss": "Descartar",
@@ -3821,6 +3881,7 @@
     "filter_disabled_tip": "Desactivado\nMods que tienes pero que no se cargan.",
     "filter_enabled": "Activado",
     "filter_enabled_tip": "Activado\nMods que se cargan en tu próxima partida.",
+    "filter_held": "Retenidos",
     "filter_hidden": "Ocultos",
     "filter_hidden_tip": "Ocultos\nMods que has ocultado. Mantienen su lugar en la lista y cargan según estén configurados.",
     "filter_installed": "Instalado",
@@ -3835,9 +3896,27 @@
     "findings_find": "Encontrar el mod roto",
     "get_the_app": "Obtener la app",
     "ghost_warn": "Este mod está activado en tu perfil pero no está instalado. Instálalo, suscríbete en Steam o desactívalo.",
+    "held_chip": "Retenido",
+    "held_chip_tip": "Actualizaciones retenidas. El Workshop tiene una versión más nueva del %1.",
+    "held_newer_tip": "Actualizaciones retenidas. El Workshop tiene una versión más nueva del %1. Haz clic para volver a permitir actualizaciones.",
+    "held_tip": "Actualizaciones retenidas: esta versión se queda. Haz clic para volver a permitir actualizaciones.",
     "hide_tip": "Ocultar de la lista. Sigue activado o desactivado como está. Úsalo para partes que no necesitas ver, como las otras variantes de un mod. Vuelve a encontrarlo en Ocultos.",
     "history_none": "Aún no se ha descargado nada.",
     "history_title": "Historial de descargas",
+    "hold_allowing": "Permitiendo de nuevo las actualizaciones de %1",
+    "hold_holding": "Reteniendo las actualizaciones de %1",
+    "hold_n_mods": "%1 mods",
+    "hold_needs_app": "Retener actualizaciones necesita la app PZMM: un mod retenido es la copia propia de PZMM.",
+    "hold_not_done": "PZMM no cambió las actualizaciones de %1: su registro de actividad dice por qué.",
+    "hold_nothing": "Nada que retener: los mods elegidos ya están retenidos o son locales y nunca se actualizan.",
+    "hold_off": "%1: actualizaciones permitidas de nuevo",
+    "hold_on": "%1: actualizaciones retenidas, esta versión se queda",
+    "hold_save_ask": "¿Retener las actualizaciones de los %1 mods que usa %2?",
+    "hold_save_ask_one": "¿Retener las actualizaciones del mod que usa %2?",
+    "hold_save_none": "Los mods de %1 ya están retenidos, o ninguno se puede actualizar.",
+    "hold_say_yes": "%1: acepta en PZMM.",
+    "hold_tip": "Retener actualizaciones: conservar esta versión. PZMM no lo actualizará hasta que vuelvas a hacer clic.",
+    "hold_updating": "Actualizando %1",
     "home_activity": "Tus mods con novedades",
     "home_browse_workshop": "Explorar Workshop",
     "home_continue": "Continuar %1",
@@ -3978,11 +4057,13 @@
     "maps_unpreview_listed": "Quitar previsualización de la lista",
     "maps_zoom_in": "Acercar",
     "maps_zoom_out": "Alejar",
+    "menu_allow_updates": "Permitir actualizaciones",
     "menu_copy_id": "Copiar ID del mod",
     "menu_disable": "Desactivar",
     "menu_enable": "Activar",
     "menu_favourite": "Añadir a favoritos",
     "menu_hide": "Ocultar de la lista",
+    "menu_hold_updates": "Retener actualizaciones",
     "menu_list_hint": "Arrastra o Alt+flecha arriba/abajo para organizar, Space activa/desactiva, Ctrl/Shift+clic selecciona",
     "menu_maps": "Mostrar en Mapas",
     "menu_pin": "Fijar su lugar en el orden de carga",
@@ -4062,6 +4143,7 @@
     "promo_ask": "Dale un me gusta en el Workshop",
     "promo_click": "pulsa aquí",
     "promo_enjoying": "¿Te gusta PZMM?",
+    "resubscribe_held_line": "Sus actualizaciones están retenidas. La copia de Steam toma el relevo y lo mantiene actualizado; la copia retenida de PZMM se va cuando Steam lo haya descargado.",
     "rules_clear": "Borrar reglas",
     "rules_title": "Reglas de carga",
     "saves_auto_hint": "Copias al iniciar o cerrar el juego:",
@@ -4072,6 +4154,8 @@
     "saves_delete": "Eliminar",
     "saves_folder": "Abrir carpeta",
     "saves_give_mods": "Darle mis mods",
+    "saves_hold_mods": "Retener los mods de esta partida",
+    "saves_hold_tip": "Conservar las versiones que usa esta partida: PZMM deja de actualizar sus mods.",
     "saves_mods_hint": "Da a esta partida los mods de %1. Ves lo que cambia antes de que se escriba nada.",
     "saves_new_character": "Personaje nuevo",
     "saves_no_backups": "Todavía no hay copias de esta partida.",
@@ -4249,6 +4333,8 @@
     "srv_rule_public": "Listado públicamente",
     "srv_rule_version": "Versión",
     "srv_rule_wipe": "Último wipe",
+    "srv_save_confirm": "Guardar",
+    "srv_save_mods": "Guardar mods en el servidor",
     "srv_search": "Buscar por nombre",
     "srv_server_only": "Solo servidor",
     "srv_shown": "%1 de %2 servidores",
@@ -4268,6 +4354,7 @@
     "srv_wipe_hint": "El último wipe es cuando se creó su mundo: no cambia al reiniciar el servidor.",
     "srv_with_password": "Con contraseña",
     "srv_your_servers": "Tus servidores",
+    "steam_limited": "Steam está limitando las solicitudes ahora mismo. Espera un minuto y vuelve a intentarlo.",
     "tab_check": "Buscar actualizaciones",
     "tab_checking": "Buscando...",
     "tab_feed": "Novedades",
@@ -4303,6 +4390,10 @@
     "tool_leave_favs": "Dejar favoritos",
     "tool_section": "Nueva sección",
     "unhide_tip": "Oculto. Haz clic para mostrarlo de nuevo en la lista.",
+    "up_to_date": "Tus mods están al día.",
+    "up_to_date_held": "Todo lo demás está al día: %1 mods retenidos tienen versiones más nuevas.",
+    "up_to_date_held_one": "Todo lo demás está al día: %1 mod retenido tiene una versión más nueva.",
+    "update_anyway_ask": "¿Actualizar %1 de todos modos? Sus actualizaciones siguen retenidas después.",
     "use_app_mods": "Usar los mods de PZMM",
     "vanilla": "Pantalla de mods del juego",
     "view": "Ver",

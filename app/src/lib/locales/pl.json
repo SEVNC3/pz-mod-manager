@@ -330,7 +330,10 @@
     },
     "newSectionTip": "Dodaj sekcję nad wybranym modem (kliknij sekcję prawym przyciskiem, by zobaczyć więcej)",
     "hide": "Ukryj",
-    "showAgain": "Pokaż ponownie"
+    "showAgain": "Pokaż ponownie",
+    "filterHeld": "Wstrzymane",
+    "bulkHoldTip": "Wstrzymaj aktualizacje wybranych modów: PZMM zachowuje te wersje.",
+    "bulkAllowTip": "Znów zezwól na aktualizacje wybranych modów."
   },
   "busy": {
     "loading": "Wczytywanie",
@@ -451,7 +454,14 @@
     "playFailed": "Nie udało się uruchomić gry: {error}",
     "appUpdateFound": "Dostępny jest PZMM {version}: „Zaktualizuj i uruchom ponownie” jest nad kartami.",
     "bisectSaveFailed": "Nie udało się zapisać kolejnej listy testowej, więc szukanie nie poszło dalej. W Migawkach jest twoja lista sprzed szukania.",
-    "bisectRestoreFailed": "Nie udało się przywrócić listy modów sprzed szukania: przywróć ją z Migawek (Przed szukaniem zepsutego moda)."
+    "bisectRestoreFailed": "Nie udało się przywrócić listy modów sprzed szukania: przywróć ją z Migawek (Przed szukaniem zepsutego moda).",
+    "saveHeld": "Mody zapisu {save} są już wstrzymane albo żaden z nich nie może się aktualizować.",
+    "upToDateHeld": {
+      "one": "Wszystko inne jest aktualne: {count} wstrzymany mod ma nowszą wersję.",
+      "few": "Wszystko inne jest aktualne: {count} wstrzymane mody mają nowsze wersje.",
+      "many": "Wszystko inne jest aktualne: {count} wstrzymanych modów ma nowsze wersje.",
+      "other": "Wszystko inne jest aktualne: {count} wstrzymanego moda ma nowsze wersje."
+    }
   },
   "confirm": {
     "group": "Grupowanie według kategorii zastąpi twoje sekcje ({sections}) sekcjami kategorii. Ctrl+Z to cofa. Pogrupować teraz?",
@@ -557,7 +567,35 @@
     "unsubscribeTitle": "Anulować subskrypcję {name}?",
     "unsubscribeLine": "Steam usunie jego pliki, więc profile, które go używają, go stracą.",
     "unsubscribe": "Anuluj subskrypcję",
-    "deletePreset": "Usunąć zapisaną listę „{name}”? Zniknie z menu modów gry lub z Mod Managera, który ją zapisał."
+    "deletePreset": "Usunąć zapisaną listę „{name}”? Zniknie z menu modów gry lub z Mod Managera, który ją zapisał.",
+    "holdSteam": {
+      "one": "Steam sam aktualizuje subskrybowane mody. Aby wstrzymać ten, PZMM anuluje subskrypcję i zachowuje własną kopię wersji, którą masz teraz.",
+      "few": "Steam sam aktualizuje subskrybowane mody. Aby wstrzymać te {count}, PZMM anuluje subskrypcje i zachowuje własne kopie wersji, które masz teraz.",
+      "many": "Steam sam aktualizuje subskrybowane mody. Aby wstrzymać tych {count}, PZMM anuluje subskrypcje i zachowuje własne kopie wersji, które masz teraz.",
+      "other": "Steam sam aktualizuje subskrybowane mody. Aby wstrzymać te {count}, PZMM anuluje subskrypcje i zachowuje własne kopie wersji, które masz teraz."
+    },
+    "holdSave": {
+      "one": "Wstrzymać aktualizacje moda, którego używa {save}?",
+      "few": "Wstrzymać aktualizacje {count} modów, których używa {save}?",
+      "many": "Wstrzymać aktualizacje {count} modów, których używa {save}?",
+      "other": "Wstrzymać aktualizacje {count} modów, których używa {save}?"
+    },
+    "holdSaveSteam": {
+      "one": "Ten jest subskrybowany w Steam, który go aktualizuje: PZMM anuluje subskrypcję i zachowuje własną kopię wersji, którą masz teraz.",
+      "few": "Te {count} są subskrybowane w Steam, który je aktualizuje: PZMM anuluje subskrypcje i zachowuje własne kopie wersji, które masz teraz.",
+      "many": "Tych {count} jest subskrybowanych w Steam, który je aktualizuje: PZMM anuluje subskrypcje i zachowuje własne kopie wersji, które masz teraz.",
+      "other": "Te {count} są subskrybowane w Steam, który je aktualizuje: PZMM anuluje subskrypcje i zachowuje własne kopie wersji, które masz teraz."
+    },
+    "updateAnyway": "Zaktualizować {name} mimo to? Jego aktualizacje pozostaną potem wstrzymane.",
+    "resubscribeHeld": "Zasubskrybować {name} w Steam ponownie?",
+    "resubscribeHeldLine": "Jego aktualizacje są teraz wstrzymane. Kopia Steam przejmie go i będzie aktualizować; wstrzymana kopia PZMM zniknie, gdy Steam go pobierze.",
+    "resubscribe": "Zasubskrybuj ponownie",
+    "allowHeld": {
+      "one": "Znów zezwolić na aktualizacje {count} moda?",
+      "few": "Znów zezwolić na aktualizacje {count} modów?",
+      "many": "Znów zezwolić na aktualizacje {count} modów?",
+      "other": "Znów zezwolić na aktualizacje {count} moda?"
+    }
   },
   "common": {
     "imageFailed": "Nie udało się wczytać obrazu",
@@ -1020,7 +1058,8 @@
       "source": "Źródło",
       "installed": "Zainstalowano",
       "overwrites": "Nadpisuje",
-      "hide": "Ukryj"
+      "hide": "Ukryj",
+      "hold": "Wstrzymaj"
     },
     "sepNameLabel": "Nazwa separatora (pusta usuwa go)",
     "expandLabel": "Rozwiń {name}",
@@ -1060,7 +1099,12 @@
     "newSectionBelow": "Nowa sekcja poniżej",
     "hideTip": "Ukryj na liście. Pozostaje włączony lub wyłączony tak jak jest. Przydaje się do części, których nie musisz widzieć, np. innych wariantów moda. Znajdziesz go w Ukrytych.",
     "unhideTip": "Ukryty. Kliknij, aby znów pokazać go na liście.",
-    "sortByTip": "Sortuj według tej kolumny (kliknij ponownie, aby wrócić do kolejności biblioteki)"
+    "sortByTip": "Sortuj według tej kolumny (kliknij ponownie, aby wrócić do kolejności biblioteki)",
+    "holdTip": "Wstrzymaj aktualizacje: zachowaj tę wersję. PZMM nie zaktualizuje go, dopóki nie klikniesz ponownie.",
+    "heldTip": "Aktualizacje wstrzymane: ta wersja zostaje. Kliknij, aby znów zezwolić na aktualizacje.",
+    "heldNewerTip": "Aktualizacje wstrzymane. Warsztat ma nowszą wersję z {date}. Kliknij, aby znów zezwolić na aktualizacje.",
+    "held": "Wstrzymany",
+    "heldChipTip": "Aktualizacje wstrzymane. Warsztat ma nowszą wersję z {date}."
   },
   "details": {
     "firstSeen": "Pierwszy raz widziany",
@@ -1144,7 +1188,12 @@
     "workshopId": "ID w Warsztacie",
     "updated": "Zaktualizowano",
     "languages": "Ma teksty w",
-    "incompatibleOn": "Niezgodny z włączonymi modami: {names}"
+    "incompatibleOn": "Niezgodny z włączonymi modami: {names}",
+    "updates": "Aktualizacje",
+    "updatesHeld": "Wstrzymane",
+    "updatesAllowed": "Dozwolone",
+    "heldNewer": "Warsztat ma nowszą wersję z {date}.",
+    "updateAnyway": "Zaktualizuj mimo to"
   },
   "loadOrder": {
     "title": "Kolejność ładowania",
@@ -1951,7 +2000,7 @@
     "mods": {
       "fromProfile": "Mody z profilu",
       "useProfile": "Użyj jego modów",
-      "hint": "Przeciągaj mody w kolejności ładowania (albo użyj Alt+strzałek) lub zaznacz Edytuj jako tekst, aby wpisać wiersze. Zapis sprawdza każdy ID i najpierw pokazuje zmiany; plik sprzed pierwszej zmiany przez PZMM zostaje jako .ini.bak.",
+      "hint": "Przeciągaj mody w kolejności ładowania (albo użyj Alt+strzałek) lub zaznacz Edytuj jako tekst, aby wpisać wiersze. Zapisz mody na serwerze sprawdza każdy ID i najpierw pokazuje zmiany; plik sprzed pierwszej zmiany przez PZMM zostaje jako .ini.bak.",
       "readOnly": "PZMM nie zarządza tym serwerem: przejmij go, aby zmieniać jego mody tutaj.",
       "modsHint": {
         "one": "{count} mod ID",
@@ -1966,7 +2015,7 @@
         "other": "{count} elementów Warsztatu"
       },
       "allGood": "Każdy ID z Warsztatu istnieje, a każdy mod ID ma swój element.",
-      "write": "Zapisz…",
+      "write": "Zapisz mody na serwerze",
       "check": "Sprawdź ID",
       "checking": "Sprawdzanie…",
       "reload": "Wczytaj ponownie z pliku",
@@ -2027,7 +2076,7 @@
       "search": "Znajdź moda lub element",
       "autosort": "Sortuj automatycznie",
       "autosortTip": "Frameworki na początku, tłumaczenia na końcu oraz wszystkie wymagania i reguły ładowania zainstalowanych modów (pozostałe zostają na miejscu)",
-      "sorted": "Posortowano. Użyj Zapisz, aby zapisać nową kolejność.",
+      "sorted": "Posortowano. Użyj Zapisz mody na serwerze, aby zachować nową kolejność.",
       "raw": "Edytuj jako tekst",
       "shown": {
         "one": "Pokazano: {count}",
@@ -2053,7 +2102,9 @@
         "both": "Serwer i gracze",
         "server": "Tylko serwer",
         "optional": "Opcjonalny"
-      }
+      },
+      "saveConfirm": "Zapisz",
+      "unsavedHint": "Twoich zmian nie ma jeszcze na serwerze."
     },
     "wizard": {
       "title": "Nowy serwer dedykowany",
@@ -2421,7 +2472,8 @@
       "offers": "Mody map na tym serwerze mają własne punkty startowe:",
       "file": "Plik",
       "textHint": "Edytuj plik jako tekst. Wersja sprzed każdego zapisu zostaje, więc możesz wrócić.",
-      "saveText": "Zapisz plik"
+      "saveText": "Zapisz plik",
+      "editedTwice": "{file} ma zmiany w formularzu i w edytorze tekstu. Najpierw zapisz jedne z nich."
     },
     "tag": {
       "title": "Lista modów w opisie",
@@ -2648,7 +2700,8 @@
       "change": "Zmień",
       "set": "Ustaw adres dla graczy",
       "tip": "Dla tunelu takiego jak playit.gg albo nazwy domeny: PZMM pokazuje go tutaj i w statusie na Discordzie."
-    }
+    },
+    "leaveSave": "Zapisz i wyjdź"
   },
   "zb": {
     "title": "ZombieBuddy",
@@ -3146,7 +3199,9 @@
     "unfavourite": "Usuń z ulubionych",
     "hide": "Ukryj na liście",
     "unhide": "Pokaż znów na liście",
-    "copyIds": "Kopiuj ID modów"
+    "copyIds": "Kopiuj ID modów",
+    "holdUpdates": "Wstrzymaj aktualizacje",
+    "allowUpdates": "Zezwól na aktualizacje"
   },
   "backend": {
     "mapsNotUpdated": "nie udało się odczytać modów, więc lista map gry nie została zaktualizowana: {error}",
@@ -3344,7 +3399,13 @@
     "unsubscribed": "Anulowano subskrypcję {id} w Steam: Steam usunie jego pliki",
     "removed": "usunięto {id} ({source})",
     "mapOrderAdopted": "Przejęto kolejność map ustawioną w grze.",
-    "tooManyItems": "Pominięto jeszcze {count} elementów Warsztatu: naraz dodaje się najwyżej 500"
+    "tooManyItems": "Pominięto jeszcze {count} elementów Warsztatu: naraz dodaje się najwyżej 500",
+    "heldSkipped": "{source}: jego aktualizacje są wstrzymane, więc został bez zmian",
+    "holdCopied": "{ids}: PZMM zachowuje własną kopię wersji, którą masz, wstrzymaną, i anulował subskrypcję w Steam",
+    "holdFailed": "wstrzymywanie workshop:{item}: {error}",
+    "holdOn": "{ids}: aktualizacje wstrzymane, ta wersja zostaje",
+    "holdOff": "{ids}: aktualizacje znów dozwolone",
+    "holdEnded": "{ids}: ponownie zasubskrybowano w Steam, więc aktualizacje nie są już wstrzymane; kopia Steam przejmie go po pobraniu"
   },
   "doctor": {
     "notInstalled": "jest włączony, ale nie zainstalowany: gra go pomija",
@@ -3593,7 +3654,9 @@
     "renameSave": "Zmień nazwę…",
     "newName": "Nowa nazwa zapisu",
     "deleteSaveTitle": "Usunąć zapis {name}?",
-    "deleteSaveWhat": "PZMM najpierw robi kopię, więc możesz go przywrócić z kopii."
+    "deleteSaveWhat": "PZMM najpierw robi kopię, więc możesz go przywrócić z kopii.",
+    "hold": "Wstrzymaj mody tego zapisu",
+    "holdTip": "Zachowaj wersje używane przez ten zapis: PZMM przestaje aktualizować jego mody."
   },
   "perf": {
     "title": "Wydajność",
@@ -4118,6 +4181,8 @@
     "bisect_none": "Problem nadal występuje przy wyłączonych wszystkich podejrzanych, więc to żaden z tych modów. Twoja lista modów została przywrócona.",
     "bisect_one_group": "Wszystkie włączone mody potrzebują siebie nawzajem (%1), więc wyszukiwanie nie może podzielić ich na grupy do testu: wyłącz kilka ręcznie, aby zawęzić.",
     "bisect_together": "%1 psuje grę tylko razem z modami z innej grupy: wyłączenie naprawia listę, ale sam działa dobrze. Twoja lista modów została przywrócona.",
+    "bulk_allow_tip": "Znów zezwól na aktualizacje wybranych modów.",
+    "bulk_hold_tip": "Wstrzymaj aktualizacje wybranych modów: PZMM zachowuje te wersje.",
     "changed_chip": "Zaktualizowane: %1",
     "changed_heading": "Zaktualizowane",
     "check_again": "Sprawdź ponownie",
@@ -4150,6 +4215,7 @@
     "details_description": "Opis",
     "details_first_seen": "Pierwszy raz widziany",
     "details_first_seen_tip": "Kiedy ten mod trafił na ten komputer, na ile PZMM może to ustalić. Może się zmienić, jeśli Steam pobierze mod ponownie.",
+    "details_held_newer": "Warsztat ma nowszą wersję z %1.",
     "details_langs": "Ma teksty w",
     "details_mod_version": "Wersja moda",
     "details_needed_by": "Wymagany przez",
@@ -4163,7 +4229,11 @@
     "details_source_ws": "Subskrybowany w Warsztacie",
     "details_tags": "Tagi",
     "details_unsubscribe": "Anuluj subskrypcję na stronie Warsztatu",
+    "details_update_anyway": "Zaktualizuj mimo to",
     "details_update_now": "Zaktualizuj teraz",
+    "details_updates": "Aktualizacje",
+    "details_updates_allowed": "Dozwolone",
+    "details_updates_held": "Wstrzymane",
     "details_version_or_newer": "%1 lub nowsza",
     "details_what_changed": "Co się zmieniło od twojej wersji",
     "dismiss": "Odrzuć",
@@ -4181,6 +4251,7 @@
     "filter_disabled_tip": "Wyłączone\nMody, które masz, ale które się nie wczytują.",
     "filter_enabled": "Włączone",
     "filter_enabled_tip": "Włączone\nMody, które wczytają się w następnej grze.",
+    "filter_held": "Wstrzymane",
     "filter_hidden": "Ukryte",
     "filter_hidden_tip": "Ukryte\nMody, które ukryłeś. Zachowują swoje miejsce na liście i ładują się zgodnie z ustawieniem.",
     "filter_installed": "Zainstalowano",
@@ -4195,9 +4266,27 @@
     "findings_find": "Znajdź zepsuty mod",
     "get_the_app": "Pobierz aplikację",
     "ghost_warn": "Ten mod jest włączony w Twoim profilu, ale nie jest zainstalowany. Zainstaluj go, zasubskrybuj w Steam lub wyłącz.",
+    "held_chip": "Wstrzymany",
+    "held_chip_tip": "Aktualizacje wstrzymane. Warsztat ma nowszą wersję z %1.",
+    "held_newer_tip": "Aktualizacje wstrzymane. Warsztat ma nowszą wersję z %1. Kliknij, aby znów zezwolić na aktualizacje.",
+    "held_tip": "Aktualizacje wstrzymane: ta wersja zostaje. Kliknij, aby znów zezwolić na aktualizacje.",
     "hide_tip": "Ukryj na liście. Pozostaje włączony lub wyłączony tak jak jest. Przydaje się do części, których nie musisz widzieć, np. innych wariantów moda. Znajdziesz go w Ukrytych.",
     "history_none": "Jeszcze nic nie pobrano.",
     "history_title": "Historia pobrań",
+    "hold_allowing": "Ponowne zezwalanie na aktualizacje: %1",
+    "hold_holding": "Wstrzymywanie aktualizacji: %1",
+    "hold_n_mods": "Mody: %1",
+    "hold_needs_app": "Wstrzymanie aktualizacji wymaga aplikacji PZMM: wstrzymany mod to własna kopia PZMM.",
+    "hold_not_done": "PZMM nie zmienił aktualizacji: %1. Dziennik aktywności podaje powód.",
+    "hold_nothing": "Nie ma czego wstrzymać: wybrane mody są już wstrzymane albo są lokalne i nigdy się nie aktualizują.",
+    "hold_off": "%1: aktualizacje znów dozwolone",
+    "hold_on": "%1: aktualizacje wstrzymane, ta wersja zostaje",
+    "hold_save_ask": "Wstrzymać aktualizacje %1 modów, których używa %2?",
+    "hold_save_ask_one": "Wstrzymać aktualizacje moda, którego używa %2?",
+    "hold_save_none": "Mody zapisu %1 są już wstrzymane albo żaden z nich nie może się aktualizować.",
+    "hold_say_yes": "%1: potwierdź w PZMM.",
+    "hold_tip": "Wstrzymaj aktualizacje: zachowaj tę wersję. PZMM nie zaktualizuje go, dopóki nie klikniesz ponownie.",
+    "hold_updating": "Aktualizowanie: %1",
     "home_activity": "Twoje mody z nowymi aktualizacjami",
     "home_browse_workshop": "Przeglądaj Warsztat",
     "home_continue": "Kontynuuj %1",
@@ -4338,11 +4427,13 @@
     "maps_unpreview_listed": "Usuń wymienione z podglądu",
     "maps_zoom_in": "Przybliż",
     "maps_zoom_out": "Oddal",
+    "menu_allow_updates": "Zezwól na aktualizacje",
     "menu_copy_id": "Kopiuj ID moda",
     "menu_disable": "Wyłącz",
     "menu_enable": "Włącz",
     "menu_favourite": "Dodaj do ulubionych",
     "menu_hide": "Ukryj na liście",
+    "menu_hold_updates": "Wstrzymaj aktualizacje",
     "menu_list_hint": "Przeciągnij lub Alt+strzałka w górę/w dół, aby uporządkować, Space przełącza, Ctrl/Shift+klik zaznacza",
     "menu_maps": "Pokaż w Mapach",
     "menu_pin": "Przypnij jego miejsce w kolejności ładowania",
@@ -4422,6 +4513,7 @@
     "promo_ask": "Daj mu łapkę w górę w Warsztacie",
     "promo_click": "kliknij",
     "promo_enjoying": "Podoba ci się PZMM?",
+    "resubscribe_held_line": "Jego aktualizacje są teraz wstrzymane. Kopia Steam przejmie go i będzie aktualizować; wstrzymana kopia PZMM zniknie, gdy Steam go pobierze.",
     "rules_clear": "Wyczyść zasady",
     "rules_title": "Zasady wczytywania",
     "saves_auto_hint": "Kopie przy starcie lub zamknięciu gry:",
@@ -4432,6 +4524,8 @@
     "saves_delete": "Usuń",
     "saves_folder": "Otwórz folder",
     "saves_give_mods": "Daj mu moje mody",
+    "saves_hold_mods": "Wstrzymaj mody tego zapisu",
+    "saves_hold_tip": "Zachowaj wersje używane przez ten zapis: PZMM przestaje aktualizować jego mody.",
     "saves_mods_hint": "Daj temu zapisowi mody z %1. Zobaczysz, co się zmieni, zanim cokolwiek zostanie zapisane.",
     "saves_new_character": "Nowa postać",
     "saves_no_backups": "Brak kopii tego zapisu.",
@@ -4609,6 +4703,8 @@
     "srv_rule_public": "Wyświetlany publicznie",
     "srv_rule_version": "Wersja",
     "srv_rule_wipe": "Ostatni wipe",
+    "srv_save_confirm": "Zapisz",
+    "srv_save_mods": "Zapisz mody na serwerze",
     "srv_search": "Szukaj po nazwie",
     "srv_server_only": "Tylko serwer",
     "srv_shown": "%1 z %2 serwerów",
@@ -4628,6 +4724,7 @@
     "srv_wipe_hint": "Ostatni wipe to moment utworzenia świata: nie zmienia się po restarcie serwera.",
     "srv_with_password": "Z hasłem",
     "srv_your_servers": "Twoje serwery",
+    "steam_limited": "Steam w tej chwili ogranicza liczbę zapytań. Odczekaj minutę i spróbuj ponownie.",
     "tab_check": "Sprawdź aktualizacje",
     "tab_checking": "Sprawdzanie...",
     "tab_feed": "Co nowego",
@@ -4663,6 +4760,10 @@
     "tool_leave_favs": "Zostaw ulubione",
     "tool_section": "Nowa sekcja",
     "unhide_tip": "Ukryty. Kliknij, aby znów pokazać go na liście.",
+    "up_to_date": "Twoje mody są aktualne.",
+    "up_to_date_held": "Wszystko inne jest aktualne: %1 wstrzymanych modów ma nowsze wersje.",
+    "up_to_date_held_one": "Wszystko inne jest aktualne: %1 wstrzymany mod ma nowszą wersję.",
+    "update_anyway_ask": "Zaktualizować %1 mimo to? Jego aktualizacje pozostaną potem wstrzymane.",
     "use_app_mods": "Użyj modów PZMM",
     "vanilla": "Ekran modów gry",
     "view": "Pokaż",

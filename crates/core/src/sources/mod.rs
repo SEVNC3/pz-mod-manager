@@ -237,14 +237,65 @@ pub static STOP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::
 /// Download (network and SteamCMD only; nothing in Zomboid/mods changes). Workshop items
 /// go through one SteamCMD session; with `resolve`, collections are expanded and required
 /// items added. Errors are logged per source so one bad entry doesn't stop the rest.
+/// Every install and update comes through here, so held mods are left out here (see [`fetch_anyway`]).
 pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
-    STOP.store(false, std::sync::atomic::Ordering::SeqCst);
-    let mut out = vec![];
+    fetch_in(paths, sources, resolve, &held_sources(paths, &store::load(paths).unwrap_or_default()))
+}
+
+/// [`fetch`] with held mods too: their Update anyway.
+pub fn fetch_anyway(paths: &Paths, sources: &[Source]) -> Vec<Fetched> {
+    fetch_in(paths, sources, false, &HashSet::new())
+}
+
+/// The sources (`workshop:<id>`, `github:<spec>`) of the mods whose updates are held and that are in Zomboid/mods: one
+/// whose folder is gone is installed again (that's no update).
+pub fn held_sources(paths: &Paths, index: &store::Index) -> HashSet<String> {
+    index.iter().filter(|(id, e)| e.held && paths.mods().join(id).is_dir()).map(|(_, e)| e.source.clone()).collect()
+}
+
+/// Workshop `items` but the `held` ones (said as left out).
+fn not_held(held: &HashSet<String>, items: Vec<String>) -> Vec<String> {
+    items
+        .into_iter()
+        .filter(|i| {
+            let out = held.contains(&format!("workshop:{i}"));
+            if out {
+                crate::say!("heldSkipped", "{source}: its updates are held, so it was left as it is", source = format!("workshop:{i}"));
+            }
+            !out
+        })
+        .collect()
+}
+
+/// The Workshop items of `sources` to fetch, collections opened by `expand` with `resolve` (see [`expand_workshop`]),
+/// held ones left out after it; and the items whose pages weren't read.
+fn workshop_wanted(sources: &[Source], resolve: bool, held: &HashSet<String>, expand: impl FnOnce(Vec<String>) -> (Vec<String>, Vec<String>)) -> (Vec<String>, Vec<String>) {
     let mut workshop: Vec<String> = sources.iter().filter_map(|s| if let Source::Workshop(i) = s { Some(i.clone()) } else { None }).collect();
     let mut unchecked = vec![];
     if resolve && !workshop.is_empty() {
-        (workshop, unchecked) = expand_workshop(paths, workshop);
+        (workshop, unchecked) = expand(workshop);
     }
+    // after the expansion: a collection can hold a held item too
+    (not_held(held, workshop), unchecked)
+}
+
+/// The next round of required items the mod ID index found (`(mod, required id, item)`, see [`from_index`]): those not
+/// `tried` yet, held ones left out.
+fn required_round(found: Vec<(String, String, String)>, tried: &mut HashSet<String>, held: &HashSet<String>) -> Vec<String> {
+    not_held(held, found.into_iter().map(|(.., item)| item).filter(|i| tried.insert(i.clone())).collect())
+}
+
+fn fetch_in(paths: &Paths, sources: &[Source], resolve: bool, held: &HashSet<String>) -> Vec<Fetched> {
+    STOP.store(false, std::sync::atomic::Ordering::SeqCst);
+    let left_in = |source: String| {
+        let out = held.contains(&source);
+        if out {
+            crate::say!("heldSkipped", "{source}: its updates are held, so it was left as it is", source = source);
+        }
+        !out
+    };
+    let mut out = vec![];
+    let (mut workshop, mut unchecked) = workshop_wanted(sources, resolve, held, |ids| expand_workshop(paths, ids));
     let mut tried: HashSet<String> = workshop.iter().cloned().collect();
     loop {
         fetch_workshop(paths, std::mem::take(&mut workshop), &mut out);
@@ -271,7 +322,7 @@ pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
         for (id, req) in unresolved {
             crate::say!("requiresUnknown", "error: {id} requires {req}, and no Workshop item PZMM knows of provides it: find and install it yourself", id = id, req = req);
         }
-        workshop = items.into_iter().map(|(.., item)| item).filter(|i| tried.insert(i.clone())).collect();
+        workshop = required_round(items, &mut tried, held);
         if workshop.is_empty() {
             break;
         }
@@ -284,6 +335,7 @@ pub fn fetch(paths: &Paths, sources: &[Source], resolve: bool) -> Vec<Fetched> {
     for s in sources {
         match s {
             Source::Workshop(_) => {}
+            Source::GitHub(spec) if !left_in(format!("github:{spec}")) => {}
             Source::GitHub(spec) => report(github::download(spec).map(|t| Fetched {
                 source: format!("github:{spec}"),
                 root: t.path().to_path_buf(),
@@ -400,6 +452,88 @@ pub fn update(paths: &Paths, sources: &[Source]) -> Vec<String> {
     install_fetched(paths, &fetch(paths, sources, false), true)
 }
 
+/// Hold (`on`) or allow the updates of `ids` (rows of `mods`): a Subscribed one becomes PZMM's held copy of the version
+/// in Steam's Workshop folder `ws` (see [`hold_subscribed`], `unsubscribe` the app's own), the rest are held or allowed
+/// as they are, and feed.txt follows. A conversion that fails doesn't stop the others. Returns the ids whose hold
+/// changed and what failed.
+pub fn hold(
+    paths: &Paths,
+    mods: &std::collections::BTreeMap<String, store::Row>,
+    ws: Option<&Path>,
+    ids: &[String],
+    on: bool,
+    mut unsubscribe: impl FnMut(&str) -> Result<()>,
+) -> Result<(Vec<String>, Vec<String>)> {
+    let mut items: Vec<&str> = vec![];
+    for id in ids {
+        if let Some(item) = mods.get(id).and_then(|m| m.source.strip_prefix("steam:")).filter(|_| on)
+            && !items.contains(&item)
+        {
+            items.push(item);
+        }
+    }
+    let mut failed = vec![];
+    for item in items {
+        let Some(root) = ws.map(|w| w.join(item)) else {
+            failed.push(format!("workshop:{item}: Steam's Workshop folder wasn't found"));
+            continue;
+        };
+        match hold_subscribed(paths, item, &root, &mut unsubscribe) {
+            Ok(held) => crate::say!("holdCopied", "{ids}: PZMM keeps its own copy of the version you have, held, and unsubscribed it in Steam", ids = held.join(", ")),
+            Err(e) => {
+                crate::say!("holdFailed", "error: holding workshop:{item}: {error}", item = item, error = format!("{e:#}"));
+                failed.push(format!("workshop:{item}: {e:#}"));
+            }
+        }
+    }
+    let changed = store::set_held(paths, ids, on)?;
+    // before the game's ack (it reads them again then): held.txt and installed.txt are written by now, feed.txt here
+    pz::feed::pending_for_game(paths);
+    Ok((changed, failed))
+}
+
+/// Hold a Steam subscription's updates. Steam keeps subscriptions updated itself, so the item's files as they are now
+/// (Steam's folder `root`, not a fresh download) are copied in as PZMM's own `workshop:<item>`, recorded held, and
+/// only then is the item unsubscribed (`unsubscribe`: the app's own). A copy that fails unsubscribes nothing, and
+/// what it did copy goes again. The copy keeps the time Steam updated it (so a newer version still shows), and
+/// an unsubscribe that fails is said with the copy kept. Mods PZMM already has (an item held before, its subscription
+/// back since) are left exactly as they are: only the ones it lacks are copied, and only those go on a failure.
+/// Returns the mod ids newly held.
+pub fn hold_subscribed(paths: &Paths, item: &str, root: &Path, unsubscribe: impl FnOnce(&str) -> Result<()>) -> Result<Vec<String>> {
+    let source = format!("workshop:{item}");
+    let before = store::load(paths)?;
+    let ids = store::install_new(paths, root, &source)?;
+    // never unsubscribed unless every mod of the item has PZMM's copy on disk now: copied just now, or there before
+    let index = store::load(paths)?;
+    let copied = |id: &str| index.iter().any(|(k, e)| k.eq_ignore_ascii_case(id) && e.source == source && paths.mods().join(k).is_dir());
+    if !pz::find_mods(root, 8).iter().all(|m| copied(&m.id)) {
+        // why each one couldn't be copied was said; a part copy would only shadow the subscription. Only mods new to
+        // the index go: one it had (held, its folder gone) keeps its entry and backup
+        let added: Vec<String> = ids.iter().filter(|id| !before.keys().any(|k| k.eq_ignore_ascii_case(id))).cloned().collect();
+        if let Err(e) = store::remove(paths, &added, false) {
+            crate::log!("error: workshop:{item}: removing the part copy: {e:#}");
+        }
+        bail!("not every mod could be copied, so it stays subscribed");
+    }
+    // held before the unsubscribe: no scan takes the copy for a leftover of the subscription (see `store::scan`)
+    let at = steam_updated(item, root);
+    let mut index = store::load(paths)?;
+    for (_, e) in index.iter_mut().filter(|(id, _)| ids.contains(id)) {
+        e.held = true;
+        e.installed_at = at.unwrap_or(e.installed_at);
+    }
+    store::save(paths, &index)?;
+    unsubscribe(item).context("PZMM's held copy is made, but Steam is still subscribed (is Steam running?): unsubscribe it in Steam, or Steam's copy keeps updating alongside")?;
+    Ok(ids)
+}
+
+/// When Steam last updated subscribed item `item` in its folder `root`: its library's appworkshop_108600.acf
+/// (`<library>/steamapps/workshop/content/108600/<item>`), else the newest file's time.
+fn steam_updated(item: &str, root: &Path) -> Option<u64> {
+    let acf = root.ancestors().nth(5).and_then(|lib| pz::server_detect::downloaded(lib).get(item).copied());
+    acf.or_else(|| Some(pz::files::stats(root).modified).filter(|t| *t > 0))
+}
+
 /// The Workshop item a mod comes from: "steam:<id>" (a subscription) or "workshop:<id>" (PZMM's install).
 pub fn workshop_item(source: &str) -> Option<&str> {
     source.strip_prefix("steam:").or_else(|| source.strip_prefix("workshop:")).filter(|i| !i.is_empty())
@@ -507,18 +641,40 @@ pub fn installed_at(paths: &Paths, id: &str, e: &store::Entry) -> u64 {
         .map_or(0, |d| d.as_secs())
 }
 
+/// What [`check_updates`] found.
+#[derive(Debug, Default, PartialEq, serde::Serialize)]
+pub struct Updates {
+    /// Mods with a newer version to install.
+    pub outdated: Vec<String>,
+    /// Held mods the Workshop has a newer version of, and when it came out (seconds since 1970): not updated.
+    pub held: std::collections::BTreeMap<String, u64>,
+}
+
 /// Mods PZMM installed from the Workshop that have been updated there since.
 /// (Steam keeps subscriptions current itself; GitHub sources aren't checked yet.)
-pub fn check_updates(paths: &Paths) -> Result<Vec<String>> {
+pub fn check_updates(paths: &Paths) -> Result<Updates> {
     let index = store::load(paths)?;
-    let ours: Vec<(&String, &str, u64)> = index
-        .iter()
-        .filter_map(|(id, e)| Some((id, e.source.strip_prefix("workshop:")?, installed_at(paths, id, e))))
-        .collect();
-    let items: Vec<&str> = ours.iter().map(|o| o.1).collect::<HashSet<_>>().into_iter().collect();
+    let items: Vec<&str> = index.values().filter_map(|e| e.source.strip_prefix("workshop:")).collect::<HashSet<_>>().into_iter().collect();
     let updated: std::collections::HashMap<String, u64> =
         items.chunks(100).map(steam_workshop::details_fresh).collect::<Result<Vec<_>>>()?.concat().into_iter().map(|i| (i.id, i.time_updated)).collect();
-    Ok(ours.into_iter().filter(|(_, item, at)| updated.get(*item).is_some_and(|t| t > at)).map(|(id, ..)| id.clone()).collect())
+    Ok(updates_in(paths, &index, &updated))
+}
+
+/// [`check_updates`] from each Workshop item's last update (`updated`, by item id).
+fn updates_in(paths: &Paths, index: &store::Index, updated: &std::collections::HashMap<String, u64>) -> Updates {
+    let mut out = Updates::default();
+    for (id, e) in index {
+        let Some(&t) = e.source.strip_prefix("workshop:").and_then(|item| updated.get(item)) else { continue };
+        if t <= installed_at(paths, id, e) {
+            continue;
+        }
+        if e.held {
+            out.held.insert(id.clone(), t);
+        } else {
+            out.outdated.push(id.clone());
+        }
+    }
+    out
 }
 
 /// A Workshop item that may provide a missing mod.
@@ -797,10 +953,168 @@ mod tests {
     fn workshop_available_needs_the_folder() {
         let (_t, paths) = store::tests::temp_paths();
         std::fs::create_dir_all(paths.mods().join("Here")).unwrap();
-        let entry = |item: &str| store::Entry { source: format!("workshop:{item}"), installed_at: 1 };
+        let entry = |item: &str| store::Entry { source: format!("workshop:{item}"), installed_at: 1, held: false };
         store::save(&paths, &[("Here".to_string(), entry("90000000001")), ("Gone".to_string(), entry("90000000002"))].into()).unwrap();
         let have = workshop_available(&paths);
         assert!(have.contains("90000000001") && !have.contains("90000000002"));
+    }
+
+    #[test]
+    fn held_mods_are_not_outdated_but_their_newer_time_is_kept() {
+        let (_t, paths) = store::tests::temp_paths();
+        let entry = |item: &str, held| store::Entry { source: format!("workshop:{item}"), installed_at: 100, held };
+        let index: store::Index = [("Free".to_string(), entry("1", false)), ("Held".to_string(), entry("2", true)), ("Current".to_string(), entry("3", true))].into();
+        let updated = [("1".to_string(), 200), ("2".to_string(), 300), ("3".to_string(), 50)].into();
+        assert_eq!(updates_in(&paths, &index, &updated), Updates { outdated: vec!["Free".into()], held: [("Held".to_string(), 300)].into() });
+        // only held mods on disk: a held one whose folder is gone installs again
+        assert!(held_sources(&paths, &index).is_empty());
+        std::fs::create_dir_all(paths.mods().join("Held")).unwrap();
+        assert_eq!(held_sources(&paths, &index), HashSet::from(["workshop:2".to_string()]));
+    }
+
+    #[test]
+    fn a_subscription_is_held_by_copying_then_recording_then_unsubscribing() {
+        let (t, paths) = store::tests::temp_paths();
+        let steam = t.path().join("steam/77");
+        let steam_time = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_500_000_000);
+        for id in ["A", "B"] {
+            std::fs::create_dir_all(steam.join(format!("mods/{id}"))).unwrap();
+            std::fs::write(steam.join(format!("mods/{id}/mod.info")), format!("id={id}\n")).unwrap();
+            std::fs::File::options().write(true).open(steam.join(format!("mods/{id}/mod.info"))).unwrap().set_modified(steam_time).unwrap();
+        }
+        let mut called = vec![];
+        let ids = hold_subscribed(&paths, "77", &steam, |item| {
+            // by now the copy is in and recorded held
+            let index = store::load(&paths).unwrap();
+            assert!(["A", "B"].iter().all(|id| paths.mods().join(id).join("mod.info").exists() && index[*id].held && index[*id].source == "workshop:77"));
+            called.push(item.to_string());
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!((ids, called), (vec!["A".to_string(), "B".to_string()], vec!["77".to_string()]));
+        // Steam's time, not now: a newer Workshop version still shows as held-with-newer
+        assert_eq!(store::load(&paths).unwrap()["A"].installed_at, 1_500_000_000);
+        // a copy that fails (a hand-installed B is in the way) unsubscribes nothing and leaves no part copy
+        let (_t2, paths2) = store::tests::temp_paths();
+        std::fs::create_dir_all(paths2.mods().join("B")).unwrap();
+        std::fs::write(paths2.mods().join("B/mod.info"), "id=B\n").unwrap();
+        let mut asked = false;
+        assert!(hold_subscribed(&paths2, "77", &steam, |_| {
+            asked = true;
+            Ok(())
+        }).is_err());
+        assert!(!asked && !paths2.mods().join("A").exists() && store::load(&paths2).unwrap().is_empty());
+        // and an unsubscribe that fails is said, the held copy kept
+        let (_t3, paths3) = store::tests::temp_paths();
+        let e = hold_subscribed(&paths3, "77", &steam, |_| anyhow::bail!("Steam isn't running")).unwrap_err();
+        assert!(format!("{e:#}").contains("Steam is still subscribed"), "{e:#}");
+        assert!(store::load(&paths3).unwrap()["A"].held);
+    }
+
+    #[test]
+    fn a_held_item_in_an_expanded_collection_is_left_out() {
+        let held = HashSet::from(["workshop:2".to_string()]);
+        // the collection 9 opened (as expand_workshop would) into its items, one of them held, and one unread
+        let expand = |ids: Vec<String>| {
+            assert_eq!(ids, ["9"]);
+            (vec!["1".to_string(), "2".to_string(), "3".to_string()], vec!["3".to_string()])
+        };
+        let (items, unchecked) = workshop_wanted(&[Source::Workshop("9".into()), Source::GitHub("o/r".into())], true, &held, expand);
+        assert_eq!((items, unchecked), (vec!["1".to_string(), "3".to_string()], vec!["3".to_string()]));
+        // no resolve: what was asked, held ones out
+        let (items, _) = workshop_wanted(&[Source::Workshop("2".into()), Source::Workshop("4".into())], false, &held, |_| unreachable!());
+        assert_eq!(items, ["4"]);
+    }
+
+    #[test]
+    fn a_held_requirement_is_left_out_while_its_folder_is_there() {
+        let (_t, paths) = store::tests::temp_paths();
+        let index: store::Index = [("Req".to_string(), store::Entry { source: "workshop:5".into(), installed_at: 1, held: true })].into();
+        // the mod ID index found what an item requires: the held item 5, a new item 6, and item 1 already fetched
+        let found = || [("A", "req", "5"), ("A", "other", "6"), ("B", "x", "1")].map(|(a, b, c)| (a.to_string(), b.to_string(), c.to_string())).to_vec();
+        let round = || required_round(found(), &mut HashSet::from(["1".to_string()]), &held_sources(&paths, &index));
+        assert_eq!(round(), ["5", "6"], "missing from Zomboid/mods: not held there, so it installs");
+        std::fs::create_dir_all(paths.mods().join("Req")).unwrap();
+        assert_eq!(round(), ["6"], "on disk and held: not downloaded");
+    }
+
+    /// Steam's folder of item `item` with mods `ids`, each mod.info naming its `version`.
+    fn steam_item(root: &Path, item: &str, ids: &[&str], version: &str) -> PathBuf {
+        let dir = root.join(item);
+        for id in ids {
+            std::fs::create_dir_all(dir.join(format!("mods/{id}"))).unwrap();
+            std::fs::write(dir.join(format!("mods/{id}/mod.info")), format!("id={id}\nname={version}\n")).unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn holding_again_leaves_the_held_copies_alone() {
+        let (t, paths) = store::tests::temp_paths();
+        let v1 = steam_item(&t.path().join("v1"), "77", &["A"], "v1");
+        hold_subscribed(&paths, "77", &v1, |_| Ok(())).unwrap();
+        // subscribed again in Steam, where the item now has a newer A, and B and C
+        let v2 = steam_item(&t.path().join("v2"), "77", &["A", "B", "C"], "v2");
+        let a = || std::fs::read_to_string(paths.mods().join("A/mod.info")).unwrap();
+        // a part copy (a hand-installed B in the way): only C, which it added, goes; A stays as it was
+        std::fs::create_dir_all(paths.mods().join("B")).unwrap();
+        std::fs::write(paths.mods().join("B/mod.info"), "id=B\n").unwrap();
+        assert!(hold_subscribed(&paths, "77", &v2, |_| Ok(())).is_err());
+        let index = store::load(&paths).unwrap();
+        assert!(a().contains("v1") && index["A"].held && !index.contains_key("C") && !paths.mods().join("C").exists());
+        // the way clear: B and C are copied and held, A still the held v1
+        std::fs::remove_dir_all(paths.mods().join("B")).unwrap();
+        let mut ids = hold_subscribed(&paths, "77", &v2, |_| Ok(())).unwrap();
+        ids.sort();
+        assert_eq!(ids, ["B", "C"]);
+        let index = store::load(&paths).unwrap();
+        assert!(a().contains("v1") && ["A", "B", "C"].iter().all(|id| index[*id].held));
+        // a held mod whose folder is gone is copied again, never counted as there
+        std::fs::remove_dir_all(paths.mods().join("A")).unwrap();
+        let mut called = false;
+        assert_eq!(hold_subscribed(&paths, "77", &v2, |_| {
+            called = true;
+            Ok(())
+        }).unwrap(), ["A"]);
+        assert!(called && a().contains("v2") && store::load(&paths).unwrap()["A"].held);
+        // and when it can't be (its staging spot is taken by a file): its entry stays, and nothing is unsubscribed
+        std::fs::remove_dir_all(paths.mods().join("A")).unwrap();
+        std::fs::create_dir_all(paths.zomboid.join(".pzmm-staging")).unwrap();
+        std::fs::write(paths.zomboid.join(".pzmm-staging/A"), "x").unwrap();
+        let mut asked = false;
+        assert!(hold_subscribed(&paths, "77", &v2, |_| {
+            asked = true;
+            Ok(())
+        }).is_err());
+        assert!(!asked && store::load(&paths).unwrap()["A"].held, "its entry stays");
+    }
+
+    #[test]
+    fn a_failed_conversion_doesnt_stop_the_others() {
+        let (t, paths) = store::tests::temp_paths();
+        let ws = t.path().join("ws");
+        steam_item(&ws, "71", &["Ok"], "v1");
+        steam_item(&ws, "72", &["Blocked"], "v1");
+        std::fs::create_dir_all(paths.mods().join("Blocked")).unwrap();
+        std::fs::write(paths.mods().join("Blocked/mod.info"), "id=Blocked\n").unwrap();
+        // and a mod PZMM installed, held as it is
+        let gh = t.path().join("gh");
+        std::fs::create_dir_all(gh.join("Mine")).unwrap();
+        std::fs::write(gh.join("Mine/mod.info"), "id=Mine\n").unwrap();
+        store::install(&paths, &gh, "github:o/r").unwrap();
+        let row = |id: &str, source: &str| (id.to_string(), store::Row { id: id.into(), source: source.into(), ..Default::default() });
+        let mods = [row("Ok", "steam:71"), row("Blocked", "steam:72"), row("Mine", "github:o/r")].into();
+        let mut unsubscribed = vec![];
+        let ids = ["Ok".to_string(), "Blocked".to_string(), "Mine".to_string()];
+        let (changed, failed) = hold(&paths, &mods, Some(&ws), &ids, true, |i| {
+            unsubscribed.push(i.to_string());
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!((changed, unsubscribed), (vec!["Mine".to_string()], vec!["71".to_string()]), "Ok was held by its conversion");
+        assert!(failed.len() == 1 && failed[0].starts_with("workshop:72"), "{failed:?}");
+        let index = store::load(&paths).unwrap();
+        assert!(index["Ok"].held && index["Mine"].held && !index.contains_key("Blocked"));
     }
 
     #[test]

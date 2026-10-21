@@ -7,7 +7,7 @@
   import SaveTools from "./SaveTools.svelte";
   import { showInSettings } from "./Settings.svelte";
 
-  let { busy, lock = "", profile, enabledIds, installedIds, onUseSave, onSettings, ask }: {
+  let { busy, lock = "", profile, enabledIds, installedIds, onUseSave, onHoldSave, onSettings, ask }: {
     busy: boolean;
     /** Why switching profile is blocked now ("" when it isn't): Use these mods waits. */
     lock?: string;
@@ -17,6 +17,8 @@
     installedIds: string[];
     /** Switch to a save's mods (after a preview). */
     onUseSave: (save: Save) => Promise<boolean>;
+    /** Hold the updates of a save's mods (asks first). */
+    onHoldSave: (save: Save) => void;
     onSettings: () => void;
     /** A preview to confirm: resolves to the choice picked, -1 for Cancel. */
     ask: (title: string, lines: string[], choices: { label: string; icon: IconName }[]) => Promise<number>;
@@ -80,6 +82,7 @@
             <span class="btns">
               <button class="quiet" onclick={() => data && api.openPath(`${data.saves_dir}/${s.mode}/${s.name}`)} title={t("saves.openFolder")} aria-label={t("saves.openFolder")}><Icon name="folder" size={14} /></button>
               <button disabled={busy || !!lock} title={lock} onclick={() => onUseSave(s)}><Icon name="swap" size={14} />{t("servers.saves.useMods")}</button>
+              <button disabled={busy || !s.mods.length} title={t("saves.holdTip")} onclick={() => onHoldSave(s)}><Icon name="lock" size={14} />{t("saves.hold")}</button>
               <button aria-expanded={open === key} onclick={() => toggle(key)}><Icon name="settings" size={14} />{t("saves.tools")}</button>
             </span>
           </li>

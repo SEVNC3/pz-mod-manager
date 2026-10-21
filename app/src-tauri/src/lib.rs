@@ -85,12 +85,12 @@ async fn blocking<T: Send + 'static, E: std::fmt::Display>(f: impl FnOnce() -> R
 
 /// Download outside the lock (it can take minutes), then install under it.
 fn fetch_then<T>(sources: &[Source], resolve: bool, then: impl FnOnce(&Paths, Vec<String>) -> anyhow::Result<T>) -> Res<T> {
-    fetch_then_as(sources, resolve, false, then)
+    fetch_then_as(sources, resolve, false, false, then)
 }
 
-/// [`fetch_then`], as an `update` (see `store::update`).
-fn fetch_then_as<T>(sources: &[Source], resolve: bool, update: bool, then: impl FnOnce(&Paths, Vec<String>) -> anyhow::Result<T>) -> Res<T> {
-    let fetched = sources::fetch(&Paths::detect(), sources, resolve);
+/// [`fetch_then`], as an `update` (see `store::update`), of held mods too with `anyway` (see `sources::fetch_anyway`).
+fn fetch_then_as<T>(sources: &[Source], resolve: bool, update: bool, anyway: bool, then: impl FnOnce(&Paths, Vec<String>) -> anyhow::Result<T>) -> Res<T> {
+    let fetched = if anyway { sources::fetch_anyway(&Paths::detect(), sources) } else { sources::fetch(&Paths::detect(), sources, resolve) };
     let done = locked(|paths| {
         let ids = sources::install_fetched(paths, &fetched, update);
         then(paths, ids)
@@ -192,6 +192,8 @@ struct View {
     kinds: BTreeMap<String, String>,
     /// Profile name -> the server (its address) it was set up for.
     servers: BTreeMap<String, String>,
+    /// Mods whose updates are held (see `store::Entry::held`).
+    held: Vec<String>,
 }
 
 /// The game's version and Steam branch: they change only with a game update, so they're read once a
@@ -305,6 +307,7 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
         mode,
         kinds: profile::list(paths).into_iter().map(|n| { let kind = profile::kind_of(paths, &n); (n, kind) }).collect(),
         servers: profile::list(paths).into_iter().filter_map(|n| Some((n.clone(), profile::server_of(paths, &n)?))).collect(),
+        held: store::load(paths)?.into_iter().filter(|(_, e)| e.held).map(|(id, _)| id).collect(),
     })
 }
 
@@ -900,15 +903,61 @@ async fn workshop_subscribe(id: String, on: bool, mod_id: Option<String>, name: 
 }
 
 fn workshop_subscribe_now(id: &str, on: bool, mod_id: Option<String>, name: Option<String>) -> Res<View> {
-    let game = zb::game_dir().ok_or("Project Zomboid's game folder wasn't found in your Steam libraries")?;
-    pz::steam_client::subscribe(&game, id, on).map_err(|e| format!("{e:#}"))?;
-    pzmm_core::history::add(&Paths::detect(), mod_id.as_deref().unwrap_or(id), name.as_deref().unwrap_or(""), &format!("steam:{id}"), if on { "subscribed" } else { "unsubscribed" });
+    steam_subscribe(&Paths::detect(), id, on, mod_id.as_deref(), name.as_deref()).map_err(|e| format!("{e:#}"))?;
+    locked(|paths| {
+        // subscribed again (the app asked first): a held copy stops being held, and Steam's copy takes over
+        let ids = if on { store::subscribed_again(paths, id)? } else { vec![] };
+        if !ids.is_empty() {
+            pzmm_core::say!("holdEnded", "{ids}: subscribed in Steam again, so updates aren't held; Steam's copy takes over once it's downloaded", ids = ids.join(", "));
+        }
+        view(paths)
+    })
+}
+
+/// Bring PZMM's window to the front: a quiet game request that turns out to need an answer (a Subscribed hold).
+#[tauri::command]
+fn app_front(app: AppHandle) {
+    show_window(&app);
+}
+
+/// [`workshop_subscribe`]'s work, without the view (Hold updates unsubscribes under the lock).
+fn steam_subscribe(paths: &Paths, id: &str, on: bool, mod_id: Option<&str>, name: Option<&str>) -> anyhow::Result<()> {
+    let game = zb::game_dir().ok_or_else(|| anyhow::anyhow!("Project Zomboid's game folder wasn't found in your Steam libraries"))?;
+    pz::steam_client::subscribe(&game, id, on)?;
+    pzmm_core::history::add(paths, mod_id.unwrap_or(id), name.unwrap_or(""), &format!("steam:{id}"), if on { "subscribed" } else { "unsubscribed" });
     if on {
         pzmm_core::say!("subscribed", "Subscribed to {id} in Steam: Steam downloads it and keeps it updated", id = id);
     } else {
         pzmm_core::say!("unsubscribed", "Unsubscribed from {id} in Steam: Steam removes its files", id = id);
     }
-    locked(view)
+    Ok(())
+}
+
+/// Hold (`on`) or allow mods' updates. A Subscribed one (the app asked first) becomes PZMM's own copy of the
+/// version in Steam's folder, held, and is then unsubscribed (see `sources::hold_subscribed`); local and manual
+/// mods never update, so they're left as they are. A conversion that fails is an error (after the rest is done), so
+/// the game's ack carries why.
+#[tauri::command(async)]
+fn hold_set(ids: Vec<String>, on: bool) -> Res<View> {
+    locked(|paths| {
+        let mods = scan(paths)?;
+        let unsubscribe = |item: &str| {
+            let m = mods.values().find(|m| m.source == format!("steam:{item}"));
+            steam_subscribe(paths, item, false, m.map(|m| m.id.as_str()), m.map(|m| m.name.as_str()))
+        };
+        let (changed, failed) = sources::hold(paths, &mods, pz::workshop_dir().as_deref(), &ids, on, unsubscribe)?;
+        if !changed.is_empty() {
+            if on {
+                pzmm_core::say!("holdOn", "{ids}: updates held, this version stays", ids = changed.join(", "));
+            } else {
+                pzmm_core::say!("holdOff", "{ids}: updates allowed again", ids = changed.join(", "));
+            }
+        }
+        if !failed.is_empty() {
+            anyhow::bail!("{}", failed.join("; "));
+        }
+        view(paths)
+    })
 }
 
 #[tauri::command(async)]
@@ -1004,13 +1053,14 @@ async fn install_missing() -> Res<(View, Vec<String>)> {
 // --- updates, conflicts, servers, saves ---
 
 #[tauri::command]
-async fn check_updates() -> Res<Vec<String>> {
+async fn check_updates() -> Res<sources::Updates> {
     blocking(|| sources::check_updates(&Paths::detect())).await
 }
 
 /// Re-download specific mods PZMM installed. Also returns the ids that did install (failures are only logged).
+/// Held mods are left out, unless `anyway` (their Update anyway, asked first: they stay held).
 #[tauri::command]
-async fn update_mods(ids: Vec<String>) -> Res<(View, Vec<String>)> {
+async fn update_mods(ids: Vec<String>, anyway: Option<bool>) -> Res<(View, Vec<String>)> {
     blocking(move || {
         let index = locked(store::load)?;
         let mut seen = std::collections::HashSet::new();
@@ -1020,7 +1070,7 @@ async fn update_mods(ids: Vec<String>) -> Res<(View, Vec<String>)> {
             .filter(|e| seen.insert(e.source.clone()))
             .filter_map(|e| Source::from_index(&e.source))
             .collect();
-        fetch_then_as(&todo, false, true, |paths, installed| {
+        fetch_then_as(&todo, false, true, anyway == Some(true), |paths, installed| {
             // an update can add or rename map folders, or change a mod id's case
             let mut p = active(paths)?;
             profile::follow_case(&mut p, &scan(paths)?);
@@ -2250,6 +2300,7 @@ fn watch_game(app: &AppHandle) {
                 pz::launcher::servers_for_game(&paths, &pz::launcher::state(&paths));
                 if let Ok(index) = store::load(&paths) {
                     store::installed_for_game(&paths, &index);
+                    store::held_for_game(&paths, &index);
                 }
                 store::tags_for_game(&paths, &store::tags(&paths));
                 pz::leave_out::for_game(&paths);
@@ -2387,11 +2438,35 @@ fn lift_splash(app: &AppHandle) {
         // hidden first: closing takes a moment, and the splash stays on top of the window showing under it
         let _ = s.hide();
         if let Some(w) = app.get_webview_window("main") {
-            let _ = w.center(); // where the splash was, every launch
+            into_screen(&w); // centred where the splash was, every launch, and never bigger than the screen
         }
         show_window(app);
         let _ = s.close();
     }
+}
+
+/// Windowed, no bigger than its monitor's work area (a saved size from another resolution, screen or DPI) and
+/// centred in it, so no edge sits off-screen or under the taskbar.
+fn into_screen(w: &tauri::WebviewWindow) {
+    let _ = w.set_fullscreen(false);
+    let _ = w.unmaximize();
+    let Some(m) = w.current_monitor().ok().flatten().or_else(|| w.primary_monitor().ok().flatten()) else { return };
+    let (area, scale) = (m.work_area(), m.scale_factor());
+    let Ok(now) = w.outer_size() else { return };
+    let min = ((760.0 * scale) as u32, (520.0 * scale) as u32); // tauri.conf.json's minWidth / minHeight
+    let (size, at) = fit((now.width, now.height), (area.position.x, area.position.y), (area.size.width, area.size.height), min);
+    if size != (now.width, now.height) {
+        let _ = w.set_size(tauri::PhysicalSize::new(size.0, size.1));
+    }
+    let _ = w.set_position(tauri::PhysicalPosition::new(at.0, at.1));
+}
+
+/// A window of `size` fitted into the work area at `origin` of `area` (all physical pixels): no bigger than the
+/// area (nor smaller than `min`, unless the area is), and centred in it. Returns the size and the top-left corner.
+fn fit(size: (u32, u32), origin: (i32, i32), area: (u32, u32), min: (u32, u32)) -> ((u32, u32), (i32, i32)) {
+    let side = |s: u32, a: u32, m: u32| s.min(a).max(m.min(a));
+    let (w, h) = (side(size.0, area.0, min.0), side(size.1, area.1, min.1));
+    ((w, h), (origin.0 + ((area.0 - w) / 2) as i32, origin.1 + ((area.1 - h) / 2) as i32))
 }
 
 /// The page has mounted (it lifted the splash), so it can answer "close-ask": a page that never did can't.
@@ -4276,7 +4351,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load, save, install, remove, rollback, profile_new, profile_use, profile_delete, profiles_unused, profiles_prune, profile_rename, profile_duplicate, snapshot_create, snapshot_list, snapshot_restore, set_build,
             details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, mod_changes, feed, news, authoring_check, authoring_poster, authoring_build, workshop_comments, workshop_author, workshop_items, zb_status, zb_preview, zb_install, zb_uninstall, java_mods, workshop_subscribe,
-            find_requirement, install_missing, check_updates, update_mods, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_preview, server_check, server_export, server_import, save_use,
+            find_requirement, install_missing, check_updates, update_mods, hold_set, app_front, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_preview, server_check, server_export, server_import, save_use,
             perf_view, game_running, perf_memory_set, perf_jvm_set, profile_launch, profile_launch_set, pzopt_run, save_sandbox, save_sandbox_write, save_sandbox_preset, save_details, save_backup, save_restore, save_rename, save_delete, save_backup_delete, save_repair, save_set_mods, save_players,
             game_requests, game_ack, game_busy, game_bisect, game_bisecting, game_bisect_result, game_look, game_job, game_app_settings, game_pics, game_activity_add, game_activity, game_findings, save_restore_from_game, save_backup_from_game, feed_seen, game_settings, game_settings_set, game_report, save_backup_name, save_thumb, save_reset, save_clone, save_databases, save_table,
             host_view, host_ports, host_create, host_preflight, host_start, host_stop, host_restart, host_log, host_send, host_players, host_lines, host_lines_from_profile, leave_out_get, leave_out_set,
@@ -4297,6 +4372,17 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_window_fits_its_screen() {
+        use super::fit;
+        // a saved 2560x1400 on a 1920x1040 work area (taskbar below): shrunk to it, at its corner
+        assert_eq!(fit((2560, 1400), (0, 0), (1920, 1040), (760, 520)), ((1920, 1040), (0, 0)));
+        // fits: kept, centred; a second screen to the left has a negative origin
+        assert_eq!(fit((1240, 800), (-1920, 0), (1920, 1040), (760, 520)), ((1240, 800), (-1580, 120)));
+        // a screen smaller than the minimum: the screen wins
+        assert_eq!(fit((1240, 800), (0, 0), (700, 500), (760, 520)), ((700, 500), (0, 0)));
+    }
+
     #[test]
     fn launch_arguments_keep_their_quoted_spans() {
         assert_eq!(super::split_args(r#" -nosteam  -cachedir="D:\PZ Data" -debug"#), ["-nosteam", r"-cachedir=D:\PZ Data", "-debug"]);

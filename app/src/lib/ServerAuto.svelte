@@ -7,8 +7,8 @@
   import Icon from "./Icon.svelte";
   import { wholeNumbers } from "./ui";
 
-  /** `dirty` (out): changes not saved yet. */
-  let { server, onSaved, dirty = $bindable(false) }: { server: ServerCard; onSaved: () => void; dirty?: boolean } = $props();
+  /** `dirty` (out): changes not saved yet; `saveAll` (out): save them, true only when saved (the leave box's Save and leave). */
+  let { server, onSaved, dirty = $bindable(false), saveAll = $bindable() }: { server: ServerCard; onSaved: () => void; dirty?: boolean; saveAll?: () => Promise<boolean> } = $props();
 
   const UPDATES = ["always", "empty", "scheduled", "notify"] as const;
   const EVENTS = ["started", "stopped", "crashed", "restarting", "updated", "joined", "left", "status"];
@@ -32,6 +32,7 @@
     dirty = edited;
   });
 
+  /** Whether it was done. */
   async function run(f: () => Promise<unknown>, ok: string) {
     error = done = "";
     working = true;
@@ -39,8 +40,10 @@
       await f();
       done = ok;
       onSaved();
+      return true;
     } catch (e) {
       error = t(...keyedError(e));
+      return false;
     } finally {
       working = false;
     }
@@ -51,6 +54,7 @@
       () => api.hostAutoSet(server.name, { ...a, warn_minutes: warnings, restarts: a.restarts.filter(Boolean), broadcasts: a.broadcasts.filter((b) => b.text.trim()) }),
       t("hosting.auto.saved"),
     );
+  saveAll = save;
 
   onMount(() => {
     api.hostHistory(server.name).then((h) => (history = h)).catch(() => {});

@@ -285,7 +285,10 @@
     },
     "newSectionTip": "선택한 모드 위에 섹션을 추가합니다 (섹션을 우클릭하면 더 보기)",
     "hide": "숨기기",
-    "showAgain": "다시 보기"
+    "showAgain": "다시 보기",
+    "filterHeld": "고정됨",
+    "bulkHoldTip": "선택한 모드의 업데이트를 고정해요: PZMM이 지금 버전을 유지해요.",
+    "bulkAllowTip": "선택한 모드의 업데이트를 다시 허용해요."
   },
   "busy": {
     "loading": "불러오는 중",
@@ -382,7 +385,11 @@
     "playFailed": "게임을 시작하지 못했어요: {error}",
     "appUpdateFound": "PZMM {version}을(를) 받을 수 있어요. 탭 위의 '업데이트 후 재시작'을 누르세요.",
     "bisectSaveFailed": "다음 테스트 목록을 저장하지 못해 찾기가 진행되지 않았어요. 찾기 전 목록은 스냅샷에 있어요.",
-    "bisectRestoreFailed": "모드 목록을 찾기 전 상태로 되돌리지 못했어요. 스냅샷에서 복원하세요(문제 모드 찾기 전)."
+    "bisectRestoreFailed": "모드 목록을 찾기 전 상태로 되돌리지 못했어요. 스냅샷에서 복원하세요(문제 모드 찾기 전).",
+    "saveHeld": "{save}의 모드는 이미 고정되어 있거나 업데이트할 수 있는 모드가 없어요.",
+    "upToDateHeld": {
+      "other": "나머지는 모두 최신이에요: 고정된 모드 {count}개에 새 버전이 있어요."
+    }
   },
   "confirm": {
     "group": "카테고리별 그룹화를 하면 직접 만든 섹션({sections})이 카테고리 섹션으로 바뀌어요. Ctrl+Z로 되돌릴 수 있어요. 지금 그룹화할까요?",
@@ -443,7 +450,23 @@
     "unsubscribeTitle": "{name} 구독을 취소할까요?",
     "unsubscribeLine": "Steam이 파일을 삭제하므로 이 모드를 쓰는 프로필에서 사라집니다.",
     "unsubscribe": "구독 취소",
-    "deletePreset": "저장된 목록 “{name}”을(를) 삭제할까요? 게임 모드 메뉴나 이를 저장한 Mod Manager에서 사라집니다."
+    "deletePreset": "저장된 목록 “{name}”을(를) 삭제할까요? 게임 모드 메뉴나 이를 저장한 Mod Manager에서 사라집니다.",
+    "holdSteam": {
+      "other": "Steam은 구독한 모드를 직접 업데이트해요. {count}개를 고정하려면 PZMM이 구독을 취소하고 지금 가진 버전을 자체 사본으로 보관해요."
+    },
+    "holdSave": {
+      "other": "{save}에서 쓰는 모드 {count}개의 업데이트를 고정할까요?"
+    },
+    "holdSaveSteam": {
+      "other": "다음 {count}개는 Steam에서 구독 중이라 Steam이 업데이트해요: PZMM이 구독을 취소하고 지금 가진 버전을 자체 사본으로 보관해요."
+    },
+    "updateAnyway": "그래도 {name}을(를) 업데이트할까요? 이후에도 업데이트는 고정된 상태로 남아요.",
+    "resubscribeHeld": "Steam에서 {name}을(를) 다시 구독할까요?",
+    "resubscribeHeldLine": "지금 업데이트가 고정되어 있어요. Steam 사본이 이어받아 업데이트하고, Steam이 다운로드를 마치면 PZMM의 고정 사본은 사라져요.",
+    "resubscribe": "다시 구독",
+    "allowHeld": {
+      "other": "모드 {count}개의 업데이트를 다시 허용할까요?"
+    }
   },
   "common": {
     "imageFailed": "이미지를 불러오지 못했어요",
@@ -831,7 +854,8 @@
       "source": "출처",
       "installed": "설치일",
       "overwrites": "덮어씀",
-      "hide": "숨기기"
+      "hide": "숨기기",
+      "hold": "고정"
     },
     "sepNameLabel": "구분선 이름 (비우면 제거)",
     "expandLabel": "{name} 펼치기",
@@ -868,7 +892,12 @@
     "newSectionBelow": "아래에 새 섹션",
     "hideTip": "목록에서 숨깁니다. 켜짐/꺼짐 상태는 그대로예요. 모드의 다른 프리셋처럼 볼 필요 없는 부분에 쓰세요. 숨김에서 다시 찾을 수 있어요.",
     "unhideTip": "숨겨짐. 클릭하면 목록에 다시 보여요.",
-    "sortByTip": "이 열로 정렬 (한 번 더 클릭하면 라이브러리 순서)"
+    "sortByTip": "이 열로 정렬 (한 번 더 클릭하면 라이브러리 순서)",
+    "holdTip": "업데이트 고정: 이 버전을 유지해요. 다시 클릭할 때까지 PZMM이 업데이트하지 않아요.",
+    "heldTip": "업데이트 고정됨: 이 버전을 유지해요. 클릭하면 업데이트를 다시 허용해요.",
+    "heldNewerTip": "업데이트 고정됨. 창작마당에 {date}에 나온 새 버전이 있어요. 클릭하면 업데이트를 다시 허용해요.",
+    "held": "고정됨",
+    "heldChipTip": "업데이트 고정됨. 창작마당에 {date}에 나온 새 버전이 있어요."
   },
   "details": {
     "firstSeen": "처음 확인",
@@ -943,7 +972,12 @@
     "workshopId": "창작마당 ID",
     "updated": "업데이트",
     "languages": "텍스트 언어",
-    "incompatibleOn": "켜져 있는 모드와 호환되지 않음: {names}"
+    "incompatibleOn": "켜져 있는 모드와 호환되지 않음: {names}",
+    "updates": "업데이트",
+    "updatesHeld": "고정됨",
+    "updatesAllowed": "허용됨",
+    "heldNewer": "창작마당에 {date}에 나온 새 버전이 있어요.",
+    "updateAnyway": "그래도 업데이트"
   },
   "loadOrder": {
     "title": "로드 순서",
@@ -1681,7 +1715,7 @@
     "mods": {
       "fromProfile": "프로필의 모드",
       "useProfile": "이 모드 사용",
-      "hint": "모드를 끌어 로드 순서를 바꾸거나(Alt+방향키도 가능), 텍스트로 편집을 체크해 줄을 직접 입력하세요. 쓰기는 모든 ID를 확인하고 변경 내용을 먼저 보여 줘요. PZMM이 처음 바꾸기 전의 파일은 .ini.bak으로 남아요.",
+      "hint": "모드를 끌어 로드 순서를 바꾸거나(Alt+방향키도 가능), 텍스트로 편집을 체크해 줄을 직접 입력하세요. 서버에 모드 저장은 모든 ID를 확인하고 변경 내용을 먼저 보여 줘요. PZMM이 처음 바꾸기 전의 파일은 .ini.bak으로 남아요.",
       "readOnly": "PZMM이 관리하지 않는 서버예요. 여기서 모드를 바꾸려면 등록하세요.",
       "modsHint": {
         "other": "모드 ID {count}개"
@@ -1690,7 +1724,7 @@
         "other": "창작마당 항목 {count}개"
       },
       "allGood": "모든 창작마당 ID가 있고 모든 모드 ID에 항목이 있어요.",
-      "write": "쓰기…",
+      "write": "서버에 모드 저장",
       "check": "ID 확인",
       "checking": "확인 중…",
       "reload": "파일에서 다시 불러오기",
@@ -1733,7 +1767,7 @@
       "search": "모드 또는 항목 찾기",
       "autosort": "자동 정렬",
       "autosortTip": "프레임워크는 앞, 번역은 맨 뒤, 설치된 모드의 모든 요구 사항과 로드 규칙 반영(나머지는 제자리 유지)",
-      "sorted": "정렬했어요. 쓰기를 눌러 새 순서를 저장하세요.",
+      "sorted": "정렬했어요. 서버에 모드 저장을 눌러 새 순서를 유지하세요.",
       "raw": "텍스트로 편집",
       "shown": {
         "other": "{count}개 표시 중"
@@ -1753,7 +1787,9 @@
         "both": "서버와 플레이어",
         "server": "서버 전용",
         "optional": "선택"
-      }
+      },
+      "saveConfirm": "저장",
+      "unsavedHint": "변경 내용이 아직 서버에 없어요."
     },
     "wizard": {
       "title": "새 전용 서버",
@@ -2082,7 +2118,8 @@
       "offers": "이 서버의 맵 모드에는 자체 스폰 지점이 있습니다:",
       "file": "파일",
       "textHint": "파일을 텍스트로 편집합니다. 저장할 때마다 이전 버전이 남아 되돌릴 수 있습니다.",
-      "saveText": "파일 저장"
+      "saveText": "파일 저장",
+      "editedTwice": "{file}에 양식과 텍스트 편집기 양쪽의 변경 내용이 있어요. 먼저 하나를 저장하세요."
     },
     "tag": {
       "title": "설명의 모드 목록",
@@ -2292,7 +2329,8 @@
       "change": "바꾸기",
       "set": "플레이어 접속 주소 정하기",
       "tip": "playit.gg 같은 터널이나 도메인 이름용이에요. PZMM이 여기와 Discord 상태 메시지에 보여 줘요."
-    }
+    },
+    "leaveSave": "저장하고 나가기"
   },
   "zb": {
     "title": "ZombieBuddy",
@@ -2727,7 +2765,9 @@
     "unfavourite": "즐겨찾기에서 제거",
     "hide": "목록에서 숨기기",
     "unhide": "목록에 다시 표시",
-    "copyIds": "모드 ID들 복사"
+    "copyIds": "모드 ID들 복사",
+    "holdUpdates": "업데이트 고정",
+    "allowUpdates": "업데이트 허용"
   },
   "backend": {
     "mapsNotUpdated": "모드를 읽지 못해서 게임의 지도 목록을 갱신하지 않았어요: {error}",
@@ -2883,7 +2923,13 @@
     "unsubscribed": "Steam에서 {id} 구독을 취소했습니다. Steam이 파일을 삭제합니다",
     "removed": "{id} 제거됨 ({source})",
     "mapOrderAdopted": "게임에서 정한 지도 순서를 가져왔습니다.",
-    "tooManyItems": "창작마당 아이템 {count}개를 더 빼놓았습니다. 한 번에 최대 500개까지 추가됩니다"
+    "tooManyItems": "창작마당 아이템 {count}개를 더 빼놓았습니다. 한 번에 최대 500개까지 추가됩니다",
+    "heldSkipped": "{source}: 업데이트가 고정되어 있어 그대로 두었어요",
+    "holdCopied": "{ids}: 지금 가진 버전을 PZMM 자체 사본으로 고정해 보관하고 Steam 구독을 취소했어요",
+    "holdFailed": "workshop:{item} 고정 중: {error}",
+    "holdOn": "{ids}: 업데이트 고정됨, 이 버전을 유지해요",
+    "holdOff": "{ids}: 업데이트를 다시 허용했어요",
+    "holdEnded": "{ids}: Steam에서 다시 구독해서 업데이트 고정을 풀었어요. 다운로드가 끝나면 Steam 사본이 이어받아요"
   },
   "doctor": {
     "notInstalled": "활성화돼 있지만 설치되지 않았어요: 게임이 건너뛰어요",
@@ -3111,7 +3157,9 @@
     "renameSave": "이름 바꾸기…",
     "newName": "세이브의 새 이름",
     "deleteSaveTitle": "세이브 {name}을(를) 삭제할까요?",
-    "deleteSaveWhat": "PZMM이 먼저 백업하므로 백업에서 복원할 수 있습니다."
+    "deleteSaveWhat": "PZMM이 먼저 백업하므로 백업에서 복원할 수 있습니다.",
+    "hold": "이 세이브의 모드 고정",
+    "holdTip": "이 세이브가 쓰는 버전을 유지해요: PZMM이 이 세이브의 모드를 더 이상 업데이트하지 않아요."
   },
   "perf": {
     "title": "성능",
@@ -3582,6 +3630,8 @@
     "bisect_none": "의심되는 모드를 모두 꺼도 문제가 생기므로 이 중 어느 것도 원인이 아니에요. 모드 목록을 되돌렸어요.",
     "bisect_one_group": "켜진 모드가 모두 서로 필요해서(%1) 테스트할 그룹으로 나눌 수 없어요. 직접 몇 개를 꺼서 범위를 좁혀 보세요.",
     "bisect_together": "%1은(는) 다른 그룹의 모드와 함께 있을 때만 문제가 생겨요. 끄면 목록이 고쳐지지만 단독으로는 괜찮아요. 모드 목록을 되돌렸어요.",
+    "bulk_allow_tip": "선택한 모드의 업데이트를 다시 허용해요.",
+    "bulk_hold_tip": "선택한 모드의 업데이트를 고정해요: PZMM이 지금 버전을 유지해요.",
     "changed_chip": "업데이트됨: %1",
     "changed_heading": "업데이트됨",
     "check_again": "다시 확인",
@@ -3614,6 +3664,7 @@
     "details_description": "설명",
     "details_first_seen": "처음 확인",
     "details_first_seen_tip": "PZMM이 알 수 있는 범위에서 이 모드가 이 PC에 들어온 시점이에요. Steam이 모드를 다시 받으면 바뀔 수 있어요.",
+    "details_held_newer": "창작마당에 %1에 나온 새 버전이 있어요.",
     "details_langs": "텍스트 언어",
     "details_mod_version": "모드 버전",
     "details_needed_by": "필요로 하는 모드",
@@ -3627,7 +3678,11 @@
     "details_source_ws": "창작마당에서 구독함",
     "details_tags": "태그",
     "details_unsubscribe": "창작마당 페이지에서 구독 취소",
+    "details_update_anyway": "그래도 업데이트",
     "details_update_now": "지금 업데이트",
+    "details_updates": "업데이트",
+    "details_updates_allowed": "허용됨",
+    "details_updates_held": "고정됨",
     "details_version_or_newer": "%1 이상",
     "details_what_changed": "내 버전 이후 바뀐 점",
     "dismiss": "닫기",
@@ -3645,6 +3700,7 @@
     "filter_disabled_tip": "비활성화됨\n가지고 있지만 불러오지 않는 모드.",
     "filter_enabled": "활성화됨",
     "filter_enabled_tip": "활성화됨\n다음 게임에서 불러오는 모드.",
+    "filter_held": "고정됨",
     "filter_hidden": "숨김",
     "filter_hidden_tip": "숨김\n숨긴 모드예요. 목록에서 자리를 유지하고 설정된 대로 불러와요.",
     "filter_installed": "설치됨",
@@ -3659,9 +3715,27 @@
     "findings_find": "문제의 모드 찾기",
     "get_the_app": "앱 받기",
     "ghost_warn": "이 모드는 프로필에서 활성화되어 있지만 설치되어 있지 않습니다. 설치하거나 Steam에서 구독하거나 비활성화하세요.",
+    "held_chip": "고정됨",
+    "held_chip_tip": "업데이트 고정됨. 창작마당에 %1에 나온 새 버전이 있어요.",
+    "held_newer_tip": "업데이트 고정됨. 창작마당에 %1에 나온 새 버전이 있어요. 클릭하면 업데이트를 다시 허용해요.",
+    "held_tip": "업데이트 고정됨: 이 버전을 유지해요. 클릭하면 업데이트를 다시 허용해요.",
     "hide_tip": "목록에서 숨깁니다. 켜짐/꺼짐 상태는 그대로예요. 모드의 다른 프리셋처럼 볼 필요 없는 부분에 쓰세요. 숨김에서 다시 찾을 수 있어요.",
     "history_none": "아직 받은 것이 없습니다.",
     "history_title": "다운로드 기록",
+    "hold_allowing": "%1 업데이트 다시 허용 중",
+    "hold_holding": "%1 업데이트 고정 중",
+    "hold_n_mods": "모드 %1개",
+    "hold_needs_app": "업데이트 보류에는 PZMM 앱이 필요합니다: 보류된 모드는 PZMM의 자체 사본입니다.",
+    "hold_not_done": "PZMM이 %1의 업데이트 설정을 바꾸지 못했어요: 이유는 활동 로그에 있어요.",
+    "hold_nothing": "고정할 모드가 없어요: 선택한 모드는 이미 고정되어 있거나 업데이트되지 않는 로컬 모드예요.",
+    "hold_off": "%1: 업데이트를 다시 허용했어요",
+    "hold_on": "%1: 업데이트 고정됨, 이 버전을 유지해요",
+    "hold_save_ask": "%2에서 쓰는 모드 %1개의 업데이트를 고정할까요?",
+    "hold_save_ask_one": "%2에서 쓰는 모드 %1개의 업데이트를 고정할까요?",
+    "hold_save_none": "%1의 모드는 이미 고정되어 있거나 업데이트할 수 있는 모드가 없어요.",
+    "hold_say_yes": "%1: PZMM에서 확인해 주세요.",
+    "hold_tip": "업데이트 고정: 이 버전을 유지해요. 다시 클릭할 때까지 PZMM이 업데이트하지 않아요.",
+    "hold_updating": "%1 업데이트 중",
     "home_activity": "새 업데이트가 있는 내 모드",
     "home_browse_workshop": "창작마당 둘러보기",
     "home_continue": "%1 계속",
@@ -3802,11 +3876,13 @@
     "maps_unpreview_listed": "목록 미리 보기 해제",
     "maps_zoom_in": "확대",
     "maps_zoom_out": "축소",
+    "menu_allow_updates": "업데이트 허용",
     "menu_copy_id": "모드 ID 복사",
     "menu_disable": "비활성화",
     "menu_enable": "활성화",
     "menu_favourite": "즐겨찾기에 추가",
     "menu_hide": "목록에서 숨기기",
+    "menu_hold_updates": "업데이트 고정",
     "menu_list_hint": "드래그 또는 Alt+위/아래 화살표로 정리, Space로 켜기/끄기, Ctrl/Shift+클릭으로 선택",
     "menu_maps": "맵에서 보기",
     "menu_pin": "로드 순서에서 위치 고정",
@@ -3886,6 +3962,7 @@
     "promo_ask": "창작마당에서 추천을 눌러 주세요",
     "promo_click": "여기를 클릭",
     "promo_enjoying": "PZMM이 마음에 드시나요?",
+    "resubscribe_held_line": "지금 업데이트가 고정되어 있어요. Steam 사본이 이어받아 업데이트하고, Steam이 다운로드를 마치면 PZMM의 고정 사본은 사라져요.",
     "rules_clear": "규칙 지우기",
     "rules_title": "불러오기 규칙",
     "saves_auto_hint": "게임을 시작하거나 끌 때의 백업:",
@@ -3896,6 +3973,8 @@
     "saves_delete": "삭제",
     "saves_folder": "폴더 열기",
     "saves_give_mods": "내 모드 넣기",
+    "saves_hold_mods": "이 세이브의 모드 고정",
+    "saves_hold_tip": "이 세이브가 쓰는 버전을 유지해요: PZMM이 이 세이브의 모드를 더 이상 업데이트하지 않아요.",
     "saves_mods_hint": "이 저장에 %1의 모드를 줍니다. 무엇이 바뀌는지 저장하기 전에 보여 줍니다.",
     "saves_new_character": "새 캐릭터",
     "saves_no_backups": "이 세이브의 백업이 아직 없어요.",
@@ -4073,6 +4152,8 @@
     "srv_rule_public": "공개 목록에 표시",
     "srv_rule_version": "버전",
     "srv_rule_wipe": "마지막 초기화",
+    "srv_save_confirm": "저장",
+    "srv_save_mods": "서버에 모드 저장",
     "srv_search": "이름으로 검색",
     "srv_server_only": "서버 전용",
     "srv_shown": "서버 %2개 중 %1개",
@@ -4092,6 +4173,7 @@
     "srv_wipe_hint": "마지막 초기화는 월드가 만들어진 시점이며, 서버를 다시 시작해도 바뀌지 않습니다.",
     "srv_with_password": "비밀번호 있음",
     "srv_your_servers": "내 서버",
+    "steam_limited": "Steam이 지금 요청을 제한하고 있어요. 잠시 후 다시 시도하세요.",
     "tab_check": "업데이트 확인",
     "tab_checking": "확인 중...",
     "tab_feed": "새 소식",
@@ -4127,6 +4209,10 @@
     "tool_leave_favs": "즐겨찾기 유지",
     "tool_section": "새 섹션",
     "unhide_tip": "숨겨짐. 클릭하면 목록에 다시 보여요.",
+    "up_to_date": "모드가 모두 최신 상태예요.",
+    "up_to_date_held": "나머지는 모두 최신이에요: 고정된 모드 %1개에 새 버전이 있어요.",
+    "up_to_date_held_one": "나머지는 모두 최신이에요: 고정된 모드 %1개에 새 버전이 있어요.",
+    "update_anyway_ask": "그래도 %1을(를) 업데이트할까요? 이후에도 업데이트는 고정된 상태로 남아요.",
     "use_app_mods": "PZMM의 모드 사용",
     "vanilla": "게임의 모드 화면",
     "view": "보기",

@@ -154,12 +154,21 @@ pub enum Request {
     /// Star (`on`) or unstar the server joined at `addr` (`host:port`, as `servers.txt` gives it) in the app's favourites. Quiet.
     #[serde(rename = "serverfav")]
     ServerFav { addr: String, on: bool },
+    /// Hold (`on`) or allow these mods' updates. A hold is quiet (a Subscribed one asks in the app first: it's
+    /// unsubscribed); allowing them again asks first, so any mod writing it can't lift holds unseen.
+    Hold { ids: Vec<String>, on: bool },
+    /// Update a held mod anyway (after asking), and keep it held.
+    #[serde(rename = "updateheld")]
+    UpdateHeld {
+        #[serde(rename = "mod")]
+        id: String,
+    },
 }
 
 impl Request {
     /// A sorting change, or one that waits on nothing: PZMM doesn't come to the front for it, or start for it.
     fn quiet(&self) -> bool {
-        self.sorting() || matches!(self, Request::LeaveOut { .. } | Request::Feed | Request::Cancel | Request::Set { .. } | Request::Pics { .. } | Request::Hide { .. } | Request::Unhide { .. } | Request::ServerFav { .. } | Request::Tags { .. })
+        self.sorting() || matches!(self, Request::LeaveOut { .. } | Request::Feed | Request::Cancel | Request::Set { .. } | Request::Pics { .. } | Request::Hide { .. } | Request::Unhide { .. } | Request::ServerFav { .. } | Request::Tags { .. } | Request::Hold { on: true, .. })
     }
     /// An edit to the profile the game showed: not made to another (tags are every profile's).
     fn sorting(&self) -> bool {
@@ -373,8 +382,8 @@ pub fn overlaps_for_game(paths: &Paths, overlaps: &std::collections::HashMap<Str
 }
 
 /// What PZMM writes for the game (app.txt aside): a game playing in another folder gets copies (see [`mirror`]).
-const MIRRORED: [&str; 19] = [
-    "library.txt", "order.txt", "maps.txt", "firstseen.txt", "leaveout.txt", "overlaps.txt", "profiles.txt", "tags.txt", "findings.txt", "installed.txt", "categories.txt", "feed.txt", "servers.txt",
+const MIRRORED: [&str; 20] = [
+    "library.txt", "order.txt", "maps.txt", "firstseen.txt", "leaveout.txt", "overlaps.txt", "profiles.txt", "tags.txt", "findings.txt", "installed.txt", "held.txt", "categories.txt", "feed.txt", "servers.txt",
     "news.txt", "hosted.txt", "settings_app.txt", "history.txt", "snapshots.txt",
     // the app's only (the game writes its own activity_game.txt); not client.txt, which the game writes too
     "activity_app.txt",
@@ -492,6 +501,15 @@ fn parse(text: &str, now: Option<u64>, active: &str) -> (Vec<Stamped>, Vec<Ack>)
             }
             "find" => named(arg).then(|| Request::Find { id: arg.into() }),
             "rollback" => named(arg).then(|| Request::Rollback { id: arg.into() }),
+            "updateheld" => named(arg).then(|| Request::UpdateHeld { id: arg.into() }),
+            // `<mod id,...>\t1|0`
+            "hold" => match arg.rsplit_once('\t') {
+                Some((list, on @ ("1" | "0"))) => {
+                    let ids = commas(list);
+                    (!ids.is_empty() && ids.len() <= 2000 && ids.iter().all(|i| named(i))).then(|| Request::Hold { ids, on: on == "1" })
+                }
+                _ => None,
+            },
             "import" => (!arg.is_empty() && arg.len() <= 100_000 && !arg.chars().any(char::is_control)).then(|| Request::Import { text: arg.into() }),
             "serverprofile" => {
                 let (addr, list) = arg.split_once('\t').unwrap_or((arg, ""));
@@ -1022,6 +1040,22 @@ mod tests {
         assert_eq!(ok.len(), 1);
         let json = serde_json::to_value(&parse(&stamped("rollback\tModA\nserverprofile\th:1\t\n"), Some(NOW), "Default").0).unwrap();
         assert_eq!((json[0]["action"].as_str(), json[0]["mod"].as_str(), json[1]["action"].as_str(), json[1]["ids"].as_array().map(Vec::len)), (Some("rollback"), Some("ModA"), Some("serverprofile"), Some(0)));
+    }
+
+    #[test]
+    fn a_hold_names_mods_and_on_or_off() {
+        let s = |v: &str| v.to_string();
+        let text = "hold\tA,B\t1\nhold\tA\t0\nhold\tA\nhold\t\t1\nhold\tA\tyes\nupdateheld\tModA\nupdateheld\t\n";
+        assert_eq!(reqs(text), vec![
+            Request::Hold { ids: vec![s("A"), s("B")], on: true },
+            Request::Hold { ids: vec![s("A")], on: false },
+            Request::UpdateHeld { id: s("ModA") },
+        ]);
+        assert!(Request::Hold { ids: vec![], on: true }.quiet() && !Request::UpdateHeld { id: s("A") }.quiet(), "Update anyway asks, so the game waits for it");
+        assert!(!Request::Hold { ids: vec![], on: false }.quiet(), "allowing updates again asks too");
+        let json = serde_json::to_value(&parse(&stamped("hold\tA\t1\nupdateheld\tA\n"), Some(NOW), "Default").0).unwrap();
+        assert_eq!((json[0]["action"].as_str(), json[0]["on"].as_bool(), json[1]["action"].as_str(), json[1]["mod"].as_str()), (Some("hold"), Some(true), Some("updateheld"), Some("A")));
+        assert!(MIRRORED.contains(&"held.txt"));
     }
 
     #[test]

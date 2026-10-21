@@ -188,8 +188,9 @@ pub fn feed(paths: &Paths, mods: &BTreeMap<String, store::Row>, notes: bool) -> 
             e.bundled = rows.iter().find_map(|r| bundled_changelog(r));
         }
         out.unloaded += usize::from(!e.loaded);
+        // (a held mod's update doesn't wait: it's left out on purpose)
         e.pending = rows.iter().any(|r| {
-            index.get(&r.id).is_some_and(|i| i.source.starts_with("workshop:") && sources::installed_at(paths, &r.id, i) < d.time_updated)
+            index.get(&r.id).is_some_and(|i| i.source.starts_with("workshop:") && !i.held && sources::installed_at(paths, &r.id, i) < d.time_updated)
         });
         e.mods = rows.iter().map(|r| r.id.clone()).collect();
         e.item = d.id;
@@ -217,6 +218,35 @@ fn for_game(paths: &Paths, f: &Feed) {
     if dir.is_dir() {
         super::bridge::write_for_game(&dir.join("feed.txt"), game_text(f));
     }
+}
+
+/// A hold changed: feed.txt's pending marks follow (as [`feed`] sets them: held mods' updates don't wait), without
+/// asking the Workshop again.
+pub fn pending_for_game(paths: &Paths) {
+    let file = crate::pz::bridge::dir(paths).join("feed.txt");
+    let Ok(text) = std::fs::read_to_string(&file) else { return };
+    let index = store::load(paths).unwrap_or_default();
+    let waits = |id: &str, updated: u64| index.get(id).is_some_and(|i| i.source.starts_with("workshop:") && !i.held && sources::installed_at(paths, id, i) < updated);
+    super::bridge::write_for_game(&file, repend(&text, waits));
+}
+
+/// feed.txt's `entry` lines with pending set again by `waits(mod, updated)` for the mods on the `mods` line after each.
+fn repend(text: &str, waits: impl Fn(&str, u64) -> bool) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut out = String::new();
+    for (i, l) in lines.iter().enumerate() {
+        let mut f: Vec<&str> = l.split('\t').collect();
+        if f[0] == "entry"
+            && f.len() > 3
+            && let Ok(updated) = f[2].parse()
+        {
+            let mods = lines.get(i + 1).and_then(|m| m.strip_prefix("mods\t")).unwrap_or("");
+            f[3] = if mods.split(',').any(|id| waits(id, updated)) { "1" } else { "0" };
+        }
+        out += &f.join("\t");
+        out.push('\n');
+    }
+    out
 }
 
 fn game_text(f: &Feed) -> String {
@@ -454,6 +484,10 @@ mod tests {
         let (head, rest) = text.split_once("entry").unwrap();
         assert!(head.starts_with("since=10\nbasis=launch\nat=") && head.ends_with("\nmore=0\n"), "{head}");
         assert_eq!(format!("entry{rest}"), "entry\t42\t20\t1\tmap,notes\t\t\tCool Mod\t0\nmods\tA,B\nnote\t15\tfixed\\nthings \\\\o/\n");
+        // held (no mod of it waits): pending 0, the rest as it was; allowed again, back to 1
+        let held = repend(&text, |_, _| false);
+        assert!(held.contains("\nentry\t42\t20\t0\tmap,notes\t\t\tCool Mod\t0\nmods\tA,B\n") && held.starts_with("since=10\n"), "{held}");
+        assert_eq!(repend(&held, |id, updated| id == "B" && updated == 20), text);
     }
 
     #[test]
