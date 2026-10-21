@@ -167,7 +167,7 @@ K.TAPE_L, K.TAPE_M, K.TAPE_R = tex("tape_l"), tex("tape_m"), tex("tape_r")
 -- the app's list icons, white, drawn tinted: grip dots, fold chevrons, the hover marker and the drop feather
 -- the app's toolbar icons (tb_<name>), white, drawn tinted
 local TB = {}
-for _, n in ipairs({ "layers", "filter", "sort", "plus", "pulse", "x", "undo", "redo", "check", "chev_up", "chev_down", "copy", "alert", "trash", "download", "play", "update", "overlap", "lock", "search", "tag", "folder", "star", "steam", "swap", "settings", "external", "link", "maximize", "minimize", "pencil", "eye", "eye_off", "server", "info" }) do TB[n] = tex("tb_" .. n) end
+for _, n in ipairs({ "layers", "filter", "sort", "plus", "pulse", "x", "undo", "redo", "check", "chev_up", "chev_down", "copy", "alert", "trash", "download", "play", "update", "overlap", "lock", "search", "tag", "folder", "star", "steam", "swap", "settings", "external", "link", "maximize", "minimize", "pencil", "eye", "eye_off", "server", "info", "unlock" }) do TB[n] = tex("tb_" .. n) end
 K.GRIP, K.CHEV_DOWN, K.CHEV_RIGHT, K.SEL_MARK, K.FEATHER = tex("grip"), tex("chev_down"), tex("chev_right"), tex("marker"), tex("feather")
 K.CHEV_LEFT = tex("chev_left")
 local MARKER = (function()
@@ -661,6 +661,8 @@ end
 
 --- Workshop items of mods PZMM installed (installed.txt column 3; they sit in Zomboid/mods, so the game has no Workshop ID for them).
 local installedItem = {}
+--- Where PZMM installed each mod from (installed.txt column 4, e.g. "workshop:<id>", "github:owner/repo"): id -> source.
+K.instSrc = {}
 --- A mod's Workshop item ID as a string: the game's, else the one PZMM installed it from; "" when it has none.
 local function wsOf(d)
     local ws
@@ -841,6 +843,7 @@ end
 
 --- PZMM's save backups (Zomboid/Lua/pzmm/backups.txt): "mode/save" -> { { file, at, slot }, ... }, newest first.
 local function readBackups()
+    if K.BACKUPS and getTimestampMs() - K.BACKUPS.at < 2000 then return K.BACKUPS.by end
     local by = {}
     pcall(function()
         local r = getFileReader("pzmm/backups.txt", false)
@@ -857,6 +860,7 @@ local function readBackups()
         r:close()
     end)
     for _, list in pairs(by) do table.sort(list, function(a, b) return a.at > b.at end) end
+    K.BACKUPS = { at = getTimestampMs(), by = by }
     return by
 end
 
@@ -881,25 +885,114 @@ local function readTags()
     return by
 end
 
---- When PZMM installed each mod (Zomboid/Lua/pzmm/installed.txt: "<mod id>\t<secs>\t<Workshop item>"): id -> secs, and whether any; the items go to installedItem.
+--- When PZMM installed each mod (Zomboid/Lua/pzmm/installed.txt: "<mod id>\t<secs>\t<Workshop item>\t<source>", the
+--- source missing on older lines): id -> secs, and whether any; the items go to installedItem, the sources to K.instSrc.
 local function readInstalled()
-    local by, any, items = {}, false, {}
+    local by, any, items, srcs = {}, false, {}, {}
     pcall(function()
         local r = getFileReader("pzmm/installed.txt", false)
         if not r then return end
         local line = r:readLine()
         while line do
-            local id, at, item = line:match("^([^\t]+)\t(%d+)\t?(%d*)")
+            local id, at, item, src = line:match("^([^\t]+)\t(%d+)\t?(%d*)\t?([^\t\r]*)")
             if id then
                 by[id], any = tonumber(at), true
                 if item and item ~= "" and item ~= "0" then items[id] = item end
+                if src and src ~= "" then srcs[id] = src end
             end
             line = r:readLine()
         end
         r:close()
     end)
-    installedItem = items
+    installedItem, K.instSrc = items, srcs
     return by, any
+end
+
+--- The mods PZMM holds updates on (Zomboid/Lua/pzmm/held.txt, the app's: one mod ID per line): id -> true, their
+--- Workshop items -> true and their sources -> true (installed.txt's, so read that first).
+function K.readHeld()
+    local by, items, srcs = {}, {}, {}
+    pcall(function()
+        local r = getFileReader("pzmm/held.txt", false)
+        if not r then return end
+        local line = r:readLine()
+        while line do
+            local id = line:match("^%s*(.-)%s*$")
+            if id ~= "" then
+                by[id] = true
+                if installedItem[id] then items[installedItem[id]] = true end
+                if K.instSrc[id] then srcs[K.instSrc[id]] = true end
+            end
+            line = r:readLine()
+        end
+        r:close()
+    end)
+    return by, items, srcs
+end
+--- Held ids as one string, to tell when held.txt changed.
+function K.heldKey(by)
+    local ids = {}
+    for id in pairs(by or {}) do ids[#ids + 1] = id end
+    table.sort(ids)
+    return table.concat(ids, ",")
+end
+--- Whether every picked mod that can be held is held already (and one can): the bulk bar then allows updates.
+function K.pickedHeld(ui)
+    local any = false
+    for id in pairs(ui.picked or {}) do
+        local d = ui.model.mods[id]
+        if d and K.canHold(ui, d) then
+            if not K.isHeld(ui, d) then return false end
+            any = true
+        end
+    end
+    return any
+end
+--- Whether any picked mod can be held (the bulk bar shows Hold / Allow updates only then, as the app's pickedHoldable).
+function K.pickedHoldable(ui)
+    for id in pairs(ui.picked or {}) do
+        local d = ui.model.mods[id]
+        if d and K.canHold(ui, d) then return true end
+    end
+    return false
+end
+--- The mods a row's menu acts on, as the app's batch(): the picked ones when the row is one of several picked, else it.
+function K.batch(ui, d)
+    local list, n = {}, 0
+    for id in pairs(ui.picked or {}) do
+        n = n + 1
+        if ui.model.mods[id] then list[#list + 1] = ui.model.mods[id] end
+    end
+    if n < 2 or not ui.picked[d.modId] then return { d } end
+    table.sort(list, byName)
+    return list
+end
+--- Whether PZMM holds mod `d`'s updates (it, or another mod of its Workshop item or GitHub repo: a hold covers its source).
+function K.isHeld(ui, d)
+    return (ui.held and ui.held[d.modId]) == true or (ui.heldWs and ui.heldWs[wsOf(d)]) == true
+        or (ui.heldSrc and K.instSrc[d.modId] and ui.heldSrc[K.instSrc[d.modId]]) == true
+end
+--- Whether mod `d` can be held: a Workshop one (Subscribed or PZMM's copy), one PZMM installed from GitHub, or one
+--- held already; local and manual mods never update.
+function K.canHold(ui, d)
+    local src = source(d)
+    return src == 1 or src == 4 or (K.instSrc[d.modId] or ""):sub(1, 7) == "github:" or K.isHeld(ui, d)
+end
+--- A What's new entry's update still waiting to download, unless its item is held.
+function K.pend(ui, e)
+    return e.pending == true and not (ui.heldWs and ui.heldWs[tostring(e.item)])
+end
+--- The hold button's tooltip on mod `d`: hold it, held, or held with a newer version; without the app, that it needs it.
+function K.holdTip(ui, d)
+    local str
+    if not K.isHeld(ui, d) then
+        str = T("hold_tip", "Hold updates: keep this version. PZMM won't update it until you click again.")
+    else
+        local st = ui:steamOf(d)
+        str = (st and st.state == "Held") and T("held_newer_tip", "Updates held. The Workshop has a newer version from %1. Click to allow updates again.", K.fmtDate(st.updated))
+            or T("held_tip", "Updates held: this version stays. Click to allow updates again.")
+    end
+    return ui.app and str or (str .. "\n" .. T("hold_needs_app", "Holding updates needs the PZMM app: a held mod is PZMM's own copy."))
 end
 
 --- When each enabled mod first arrived on this PC, as the app knows it (Zomboid/Lua/pzmm/firstseen.txt, "<id>\t<secs>":
@@ -1087,6 +1180,7 @@ K.PZMM_UPDATE = { "Update available", "warn", "Update available\nA newer version
 function K.look(st)
     if not st then return nil end
     if st.state == "NeedsUpdate" and st.pzmm then return K.PZMM_UPDATE end
+    if st.state == "Held" then return { T("held_chip", "Held"), "muted", T("held_chip", "Held") .. "\n" .. T("held_chip_tip", "Updates held. The Workshop has a newer version from %1.", K.fmtDate(st.updated)) } end
     return K.STEAM_STATES[st.state]
 end
 
@@ -1191,6 +1285,8 @@ end
 
 -- the model calls this after every change
 function PZMMMods:updateView()
+    -- Held is one Show value with the status tabs (the app's): a tab other than All ends it
+    if self.heldOnly and self.tab ~= "All" then self.heldOnly = false end
     local q = self.search and self.search:getText():lower() or ""
     local keep = SHOWN[self.tab]
     -- sections in the library's order (the app's), else by source; a name used twice is one section
@@ -1381,7 +1477,7 @@ K.COL_NAMES = { num = "#", mod = T("col_mod", "Mod"), size = T("col_size", "Size
 for k, v in pairs(K.COL_NAMES) do K.COL_NAMES[k] = v:upper() end
 -- in order, with the sort each one's header click picks (Overwrites and Source don't sort)
 K.HEADS = { { "num", "order" }, { "mod", "name" }, { "size", "size" }, { "installed", "installed" }, { "changed", "changed" }, { "ovl" }, { "src" } }
---- The columns of a row at x, w wide: id -> { x0, x1 }. grip 22, checkbox 28, eye 26, # 40, Mod the rest; from the
+--- The columns of a row at x, w wide: id -> { x0, x1 }. grip 22, checkbox 28, eye 26, lock 26, # 40, Mod the rest; from the
 --- right Source (the widest shown last frame), Overwrites 44, and only from 760 px Last changed, Installed and Size,
 --- 78 each. A column is at least as wide as its header (and its sort chevron), as a table's are.
 function K.cols(ui, x, w)
@@ -1399,8 +1495,8 @@ function K.cols(ui, x, w)
             r = c[id][1]
         end
     end
-    c.grip, c.box, c.eye, c.num = { x + 4, x + 26 }, { x + 26, x + 54 }, { x + 54, x + 80 }, { x + 80, x + 120 }
-    c.mod = { x + 124, r - 8 }
+    c.grip, c.box, c.eye, c.lock, c.num = { x + 4, x + 26 }, { x + 26, x + 54 }, { x + 54, x + 80 }, { x + 80, x + 106 }, { x + 106, x + 146 }
+    c.mod = { x + 150, r - 8 }
     return c
 end
 --- The header row: small capitals; a sortable one sorts by its column, again for the library order (a chevron on it).
@@ -2373,7 +2469,8 @@ local SORTS = { { "order", T("sort_library", "Library order") }, { "name", T("sr
 K.WINDOWS = { { 86400, T("within1", "Last 24 hours") }, { 7 * 86400, T("within7", "Last 7 days") }, { 30 * 86400, T("within30", "Last 30 days") } }
 function K.windowName(s) for _, w in ipairs(K.WINDOWS) do if w[1] == s then return w[2] end end return "" end
 function K.dateOk(ui, d)
-    if not (ui.addedIn or ui.updatedIn or ui.updOnly) then return true end
+    if not (ui.addedIn or ui.updatedIn or ui.updOnly or ui.heldOnly) then return true end
+    if ui.heldOnly and not K.isHeld(ui, d) then return false end
     local now = math.floor(getTimestampMs() / 1000)
     if ui.addedIn then
         local t = ui.firstSeen and ui.firstSeen[d.modId]
@@ -2388,7 +2485,7 @@ end
 --- Whether the list isn't all of it in library order (a search, a tab, a filter or a sort): drags need it to be.
 function PZMMMods:filtering()
     local q = self.search and self.search:getText() or ""
-    return q ~= "" or self.tab ~= "All" or self.favOnly or self.filterKind ~= nil or self.langOnly == true or self.filterTag ~= nil or self.addedIn ~= nil or self.updatedIn ~= nil or self.updOnly == true or (self.sortBy or "order") ~= "order"
+    return q ~= "" or self.tab ~= "All" or self.favOnly or self.filterKind ~= nil or self.langOnly == true or self.filterTag ~= nil or self.addedIn ~= nil or self.updatedIn ~= nil or self.updOnly == true or self.heldOnly == true or (self.sortBy or "order") ~= "order"
 end
 
 --- The list's toolbar, as the app's: Group by category (PZMM's categories), Filters, Sort, Install missing and Fix
@@ -2422,7 +2519,7 @@ function PZMMMods:drawTools(x, y, mx, my)
     local left = {}
     left[#left + 1] = { "group", TB.layers, T("tool_group", "Group by category"), T("tool_group_tip_title", "Group by category") .. "\nOne section per category: Frameworks & libraries first, Translations last. Asks first if you have sections of your own." }
     local nf = (self.favOnly and 1 or 0) + (self.filterKind and 1 or 0) + (self.langOnly and 1 or 0) + (self.filterTag and 1 or 0)
-        + (self.addedIn and 1 or 0) + (self.updatedIn and 1 or 0) + (self.updOnly and 1 or 0)
+        + (self.addedIn and 1 or 0) + (self.updatedIn and 1 or 0) + (self.updOnly and 1 or 0) + (self.heldOnly and 1 or 0)
     left[#left + 1] = { "filters", TB.filter, nf > 0 and ("Filters (" .. nf .. ")") or "Filters", "Filters\nFavourites, kinds and tags. Search finds authors too.", nf > 0 }
     left[#left + 1] = { "sort", TB.sort, sortName, "Sort the list\nWithin each section. Drag mods in library order." }
     -- required mods that aren't installed: PZMM can install the ones Steam told us about
@@ -2444,8 +2541,10 @@ function PZMMMods:drawTools(x, y, mx, my)
             { "bulkOff", TB.x, T("menu_disable", "Disable"), "Disable\nTurn just the picked mods off." },
             { "leaveFavs" },
             { "bulkMove", TB.layers, "Move to", "Move to\nA section, the top or the bottom of the list.", false, self:filtering() },
-            self.app and { "bulkRemove", TB.trash, T("menu_remove", "Remove"), "Remove\nPZMM removes its copies of the picked mods (it asks first); Steam subscriptions are unsubscribed on their Workshop pages." } or nil,
             { "bulkHide", TB.filter, K.pickedHidden(self) and "Show again" or "Hide", "Hide\nOut of the list (Hidden shows them). Mod Manager and PZMM hide them too." },
+            K.pickedHoldable(self) and (K.pickedHeld(self) and { "bulkHold", TB.unlock, T("menu_allow_updates", "Allow updates"), T("menu_allow_updates", "Allow updates") .. "\n" .. (self.app and T("bulk_allow_tip", "Allow updates again for the picked mods.") or T("hold_needs_app", "Holding updates needs the PZMM app: a held mod is PZMM's own copy.")), false, not self.app }
+                or { "bulkHold", TB.lock, T("menu_hold_updates", "Hold updates"), T("menu_hold_updates", "Hold updates") .. "\n" .. (self.app and T("bulk_hold_tip", "Hold updates for the picked mods: PZMM keeps these versions.") or T("hold_needs_app", "Holding updates needs the PZMM app: a held mod is PZMM's own copy.")), false, not self.app }) or nil,
+            self.app and { "bulkRemove", TB.trash, T("menu_remove", "Remove"), "Remove\nPZMM removes its copies of the picked mods (it asks first); Steam subscriptions are unsubscribed on their Workshop pages." } or nil,
             { "bulkClear", TB.x, "Clear", "Clear\nUnpick them." },
         }
     end
@@ -2472,6 +2571,7 @@ function PZMMMods:drawTools(x, y, mx, my)
             if self.langOnly then active[#active + 1] = { "unlang", T("filter_lang", "In my language") } end
             if self.filterTag then active[#active + 1] = { "untag", self.filterTag } end
             if self.updOnly then active[#active + 1] = { "unupd", T("filter_updates", "Has an update") } end
+            if self.heldOnly then active[#active + 1] = { "unheld", T("filter_held", "Held") } end
             if self.addedIn then active[#active + 1] = { "unadded", T("added_chip", "Added: %1", K.windowName(self.addedIn)) } end
             if self.updatedIn then active[#active + 1] = { "unupdated", T("changed_chip", "Updated: %1", K.windowName(self.updatedIn)) } end
             local ch = BAR - 2
@@ -2544,9 +2644,31 @@ function K.tabActions(ui)
     else
         local asking = ui.steamState == "asking"
         first = { label = asking and T("tab_checking", "Checking...") or T("tab_check", "Check for updates"), icon = TB.update,
-            tip = "Check for updates\nAsk the Workshop whether any mod has a newer version.", fn = function() if ui.steamState ~= "asking" then ui:querySteam(true) end end }
+            tip = "Check for updates\nAsk the Workshop whether any mod has a newer version.", fn = function()
+                if ui.steamState == "asking" then return end
+                ui.checkSay = true
+                ui:querySteam(true)
+                -- said once Steam answers this ask: while it cools down, its last answer is stale
+                if ui.steamState ~= "asking" then
+                    ui.checkSay = nil
+                    if K.steamCooling() then ui:say(T("steam_limited", "Steam is limiting requests right now. Wait a minute and try again.")) end
+                end
+            end }
     end
     return { first, { label = T("home_play", "Play"), icon = TB.play, tip = "Play\nAs Home's Play: your latest save, else a new game.", fn = function() ui:playLatest() end } }
+end
+--- Once Check for updates has Steam's answer: nothing waits is said, with how many held mods have a newer version.
+function K.saidUpToDate(ui)
+    if not ui.checkSay or ui.steamState == "asking" then return end
+    ui.checkSay, ui.updAt = nil, nil
+    if ui.steamState ~= "done" or #ui:waitingUpdates() > 0 then return end
+    local n = 0
+    for _, d in pairs(ui.model.mods) do
+        local st = ui:steamOf(d)
+        if st and st.state == "Held" then n = n + 1 end
+    end
+    ui:say(n == 0 and T("up_to_date", "Your mods are up to date.") or n == 1 and T("up_to_date_held_one", "Everything else is up to date: %1 held mod has a newer version.", n)
+        or T("up_to_date_held", "Everything else is up to date: %1 held mods have newer versions.", n))
 end
 --- Update what Steam says waits: PZMM does it, else Steam does when it next can.
 function PZMMMods:updateMods()
@@ -2600,8 +2722,8 @@ function PZMMMods:onTool(id, mx, my)
     elseif id == "untag" then
         self.filterTag, self.scroll = nil, 0
         self:updateView()
-    elseif id == "unupd" or id == "unadded" or id == "unupdated" then
-        if id == "unupd" then self.updOnly = false elseif id == "unadded" then self.addedIn = nil else self.updatedIn = nil end
+    elseif id == "unupd" or id == "unheld" or id == "unadded" or id == "unupdated" then
+        if id == "unupd" then self.updOnly = false elseif id == "unheld" then self.heldOnly = false elseif id == "unadded" then self.addedIn = nil else self.updatedIn = nil end
         self.scroll = 0
         self:updateView()
     elseif id == "group" then
@@ -2610,13 +2732,14 @@ function PZMMMods:onTool(id, mx, my)
         local function redo() self.scroll = 0; self:updateView() end
         local items = {
             { T("filter_show", "Show"), heading = true },
-            { T("home_favourites", "Favourites"), function() self.favOnly = not self.favOnly; redo() end, function() return self.favOnly == true end, keep = true },
+            { T("home_favourites", "Favourites"), function() self.favOnly, self.updOnly, self.heldOnly = not self.favOnly, false, false; redo() end, function() return self.favOnly == true end, keep = true },
             { T("filter_lang", "In my language"), function()
                 self.langOnly = not self.langOnly
                 self.langDone = false
                 redo()
             end, function() return self.langOnly == true end, keep = true },
-            { (function() local n = #self:waitingUpdates() return n > 0 and T("filter_updates_n", "Has an update (%1)", n) or T("filter_updates", "Has an update") end)(), function() self.updOnly = not self.updOnly; redo() end, function() return self.updOnly == true end, keep = true },
+            { (function() local n = #self:waitingUpdates() return n > 0 and T("filter_updates_n", "Has an update (%1)", n) or T("filter_updates", "Has an update") end)(), function() self.updOnly, self.favOnly, self.heldOnly = not self.updOnly, false, false; redo() end, function() return self.updOnly == true end, keep = true },
+            { T("filter_held", "Held"), function() self.heldOnly, self.favOnly, self.updOnly = not self.heldOnly, false, false; if self.heldOnly then self.tab = "All" end; redo() end, function() return self.heldOnly == true end, keep = true },
         }
         for _, f in ipairs({ { "addedIn", T("added_heading", "Added") }, { "updatedIn", T("changed_heading", "Updated") } }) do
             items[#items + 1] = { f[2], heading = true }
@@ -2706,6 +2829,13 @@ function PZMMMods:onTool(id, mx, my)
         self.picked = {}
         self:updateView()
         self:say(hide and "Hidden: Hidden shows them." or "Shown again.")
+    elseif id == "bulkHold" then
+        local list = {}
+        for mid in pairs(self.picked) do if self.model.mods[mid] then list[#list + 1] = self.model.mods[mid] end end
+        table.sort(list, byName)
+        local on, any = not K.pickedHeld(self), false
+        for _, d in ipairs(list) do if K.canHold(self, d) and K.isHeld(self, d) ~= on then any = true end end
+        if self.app and not self:holdMods(list, on) and not any then self:say(T("hold_nothing", "Nothing to hold: the picked mods are held already, or are local ones that never update.")) end
     elseif id == "bulkRemove" then
         local list = {}
         for mid in pairs(self.picked) do if self.model.mods[mid] then list[#list + 1] = self.model.mods[mid] end end
@@ -2716,7 +2846,7 @@ function PZMMMods:onTool(id, mx, my)
     elseif id == "clear" then
         self.search:setText("")
         self.langOnly = false
-        self.filterTag, self.addedIn, self.updatedIn, self.updOnly = nil, nil, nil, false
+        self.filterTag, self.addedIn, self.updatedIn, self.updOnly, self.heldOnly = nil, nil, nil, false, false
         self.tab, self.favOnly, self.filterKind, self.sortBy, self.scroll = "All", false, nil, "order", 0
         self:updateView()
     elseif id == "check" then
@@ -2946,7 +3076,7 @@ function PZMMMods:checkSetup()
             end
             local st = self:steamOf(d)
             local look = K.look(st)
-            if look then
+            if look and st.state ~= "Held" then
                 local why = look[3]:gsub("^[^\n]*\n", "")
                 local fixes
                 if st.pzmm then
@@ -3051,7 +3181,7 @@ end
 function PZMMMods:checkFoot(x, y, w)
     local b = {}
     if self.app then
-        b[#b + 1] = { T("check_log", "Read the log"), "quiet", TB.info, "Read the log\nOpens PZMM on the game's log: its first error and the mods it points at.", function() self:request("open\tlog", "PZMM asked to open the game's log.") end }
+        b[#b + 1] = { T("check_log", "Read the log"), "quiet", TB.info, "Read the log\nOpens PZMM's activity log: what it did, and why anything failed.", function() self:request("open\tlog", "PZMM asked to open its activity log.") end }
     end
     if not self.bisect then
         b[#b + 1] = { T("findings_find", "Find the broken mod"), "quiet", TB.search, "Find the broken mod\nTurns off half of your mods at a time, keeping mods that need each other together, and asks whether the problem still happens, until one mod or group is left. Your mod list is restored after.", function() self:bisectStart() end }
@@ -4260,7 +4390,16 @@ function PZMMMods:appUp()
         if self.app and not editing then
             self.tags = readTags()
             self.installed, self.hasInstalled = readInstalled()
-            if self.filterTag then self:updateView() end
+            local heldWas = K.heldKey(self.held)
+            self.held, self.heldWs, self.heldSrc = K.readHeld()
+            -- holds changed in PZMM (a desktop Allow): What's new, Home's and the play bar's counts follow
+            if K.heldKey(self.held) ~= heldWas then
+                self.feed = K.readFeed()
+                self.updAt, self.liteFeedCache = nil, nil
+                self:updateView()
+            elseif self.filterTag then
+                self:updateView()
+            end
         end
         local a = self.app
         if was and a then
@@ -4309,7 +4448,7 @@ function PZMMMods:appUp()
         -- default.txt changed while this screen is open, and not by it (open() and its first seconds baseline it)
         if a and a.default_rev then
             -- while our own edits wait for PZMM's ack, and for a few seconds after it, default.txt changing is those edits
-            local mine = self:waiting()
+            local mine = K.libWaiting(self)
             local ours = mine or (self.rebaseUntil and t < self.rebaseUntil)
             if not self.defRev or (self.openedAt and t - self.openedAt < 10000) or (ours and not mine) then
                 self.defRev = a.default_rev
@@ -4379,11 +4518,22 @@ end
 --- A sorting change: with the app, PZMM makes it in the profile too (quietly); without it, said here.
 function PZMMMods:toApp(line, said)
     self:appUp()
-    if self.app then self:request(line, said, true) else self:say(said) end
+    if self.app then
+        local id = self:request(line, said, true)
+        if id then K.LIBQ[id] = true end
+    else
+        self:say(said)
+    end
     -- a request that couldn't be written won't be acked: what's shown is what's on disk
     if self.overlay and not self:waiting() then self:settle() end
 end
 
+--- The quiet requests that edit the library (toApp's): only their acks are this screen's own default.txt changes.
+K.LIBQ = {}
+function K.libWaiting(ui)
+    for id in pairs(ui.pending) do if K.LIBQ[id] then return true end end
+    return false
+end
 --- Whether any request is still waiting for its ack.
 function PZMMMods:waiting()
     for _ in pairs(self.pending) do return true end
@@ -4415,6 +4565,7 @@ function PZMMMods:afterAcks()
         self.sent[g[1]], self.sentAt[g[1]], self.afterAck[g[1]] = nil, nil, nil
         if self.kinds then self.kinds[g[1]] = nil end
         self:say(g[3] and (g[2] .. ": PZMM didn't answer in time.") or ("PZMM didn't answer (" .. tostring(g[2]) .. ")."), "error")
+        if g[4] and g[4][6] then g[4][6]() end
         if g[4] and g[4][4] then self:offerWithout(g[4], "PZMM didn't answer in time.") end
     end
     local waiting = false
@@ -4437,6 +4588,7 @@ function PZMMMods:afterAcks()
                     if not self.afterAck[id] then self:say("PZMM didn't do it (" .. what .. "): " .. (said ~= "" and said or "no reason given."), "error") end
                 elseif kind == "install" then self:say("Installed: Rescan to see the new mods.")
                 elseif kind == "restore" then self.saves = nil end
+                if kind == "backup" or kind == "restore" then K.BACKUPS = nil end
                 if self.kinds then self.kinds[id] = nil end
                 self.sent[id], self.sentAt[id] = nil, nil
             end
@@ -4476,8 +4628,10 @@ function PZMMMods:settle()
             if t - at > 20000 then stale[#stale + 1] = id end
         end
     end
-    for _, id in ipairs(stale) do self.pending[id] = nil end
-    if #stale > 0 then self.rebaseUntil = t + 6000 end
+    for _, id in ipairs(stale) do
+        self.pending[id] = nil
+        if K.LIBQ[id] then self.rebaseUntil = t + 6000 end
+    end
     local why
     pcall(function()
         local r = getFileReader("pzmm/acks.txt", false)
@@ -4492,7 +4646,7 @@ function PZMMMods:settle()
                     if ok ~= "ok" then K.PICS_ASKED[K.PICS_FLY[id]] = getTimestampMs() + 5000 end
                 elseif ok ~= "ok" and said ~= "" then why = said end
                 -- PZMM did our edit: what it did to default.txt is no change of its own
-                if ok == "ok" then self.rebaseUntil = getTimestampMs() + 6000 end
+                if ok == "ok" and K.LIBQ[id] then self.rebaseUntil = getTimestampMs() + 6000 end
             end
             line = r:readLine()
         end
@@ -4659,9 +4813,22 @@ function PZMMMods:drawRow(e, x, y, w, mx, my)
         self:drawTextureScaled(et, x + 60, y + math.floor((ROW - 14) / 2), 14, 14, (hid or over) and 1 or 0.4, ec.r, ec.g, ec.b)
     end
     if eyeOver then tip(self, hid and T("unhide_tip", "Hidden. Click to show it in the list again.") or T("hide_tip", "Hide from the list. It stays on or off as it is. Use it for parts you don't need to see, like a mod's other presets. Find it again under Hidden.")) end
+    -- the lock: holds its updates; closed in the text colour once held (white on dark, as the app's), a faint open one
+    -- until the row is pointed at;
+    -- none for local and manual mods (they never update)
+    if K.canHold(self, d) then
+        local held = K.isHeld(self, d)
+        local lockOver = mx >= x + 80 and mx < x + 106 and my >= y and my < y + ROW
+        local lt = held and TB.lock or TB.unlock
+        if lt then
+            local lc = lit and C.onSelected or (held or lockOver) and C.text or C.muted
+            self:drawTextureScaled(lt, x + 86, y + math.floor((ROW - 14) / 2), 14, 14, (held or over) and 1 or 0.4, lc.r, lc.g, lc.b)
+        end
+        if lockOver then tip(self, K.holdTip(self, d)) end
+    end
     local mid = y + (ROW - H_SMALL) / 2
     local n = d.isActive and self.place[d.modId]
-    if n then text(self, tostring(n), x + 116 - width(tostring(n)), mid, lit and C.onSelected or C.accentText) end
+    if n then text(self, tostring(n), x + 142 - width(tostring(n)), mid, lit and C.onSelected or C.accentText) end
 
     -- right: where it's from (click: its Workshop page), and an update waiting
     local right = x + w - 16
@@ -4689,6 +4856,11 @@ function PZMMMods:drawRow(e, x, y, w, mx, my)
         bold(self, ptxt, px + (TB.alert and 18 or 0), mid, pc)
         if mx >= px and mx < right and my >= y and my < y + ROW then tip(self, ptip) end
         right = px
+    elseif st and st.state == "Held" then
+        -- held with a newer version: the muted Held chip instead of Update available
+        local r0 = right
+        right = pill(self, look[1], right, py, C.muted, false, lit, nil, TB.lock)
+        if mx >= right and mx < r0 and my >= y and my < y + ROW then tip(self, look[3]) end
     elseif waiting then
         -- an update waiting stands in for where it's from
         local r0 = right
@@ -4701,7 +4873,8 @@ function PZMMMods:drawRow(e, x, y, w, mx, my)
         right = pill(self, lbl, right, py, C.ok, true, lit, nil, nil, hot)
         local ws = wsOf(d)
         if hot then
-            tip(self, src == 4 and "Workshop\nDownloaded from the Workshop by PZMM. Click: its page in Steam, where Subscribe has Steam keep it updated."
+            tip(self, src == 4 and ("Workshop\nDownloaded from the Workshop by PZMM. Click: its page in Steam, where Subscribe has Steam keep it updated."
+                .. (K.isHeld(self, d) and ("\n" .. T("resubscribe_held_line", "Its updates are held now. Steam's copy takes over and keeps it updated; PZMM's held copy goes once Steam has downloaded it.")) or ""))
                 or "Subscribed\nSubscribed in Steam; Steam keeps it updated. Click: its page in Steam, where you can unsubscribe.")
         end
         pillHit = { kind = "fn", fn = function() self:openWorkshop(ws) end, x = right, y = py, w = r0 - right, h = H_SMALL + 4 }
@@ -4735,7 +4908,7 @@ function PZMMMods:drawRow(e, x, y, w, mx, my)
     end
     right = cols.mod[2] + 8
     -- the star of a favourite, the name (bold), mod ID, then chips; cut short before the pills
-    local tx = x + 124
+    local tx = x + 150
     local c = lit and C.onSelected or d.isActive and C.text or C.muted
     if hid and not lit then c = copy(c, 0.7) end
     local room = right - 16 - tx
@@ -4789,7 +4962,7 @@ function PZMMMods:drawRow(e, x, y, w, mx, my)
         tx = tx + width(ptext) + 7
         if mx >= cx and mx < tx and my >= y and my < y + ROW then tip(self, "Load order problem\n" .. prob[1] .. (prob[2] and "\nFix in the load order panel puts it right." or "")) end
     end
-    if look and not waiting and tx + 110 < right then
+    if look and not waiting and st.state ~= "Held" and tx + 110 < right then
         local cx = tx
         tx = chip(self, look[1], tx, cy, C[look[2]], lit) + 6
         if mx >= cx and mx < tx and my >= y and my < y + ROW then tip(self, look[3]) end
@@ -4804,6 +4977,7 @@ function PZMMMods:drawRow(e, x, y, w, mx, my)
     self.hits[#self.hits + 1] = { kind = "drag", mod = d, x = x + 6, y = y, w = 20, h = ROW }
     self.hits[#self.hits + 1] = { kind = "box", mod = d, x = bx - 6, y = by - 6, w = BOX + 12, h = BOX + 12 }
     self.hits[#self.hits + 1] = { kind = "fn", fn = function() self:toggleHidden(d) end, x = x + 54, y = y, w = 26, h = ROW }
+    if K.canHold(self, d) then self.hits[#self.hits + 1] = { kind = "fn", fn = function() self:holdMods({ d }, not K.isHeld(self, d)) end, x = x + 80, y = y, w = 26, h = ROW } end
     if pillHit then self.hits[#self.hits + 1] = pillHit end
     self.hits[#self.hits + 1] = { kind = "row", mod = d, x = x, y = y, w = w, h = ROW }
 end
@@ -5566,6 +5740,7 @@ function PZMMMods:drawDetails(d, x, y, w, bottom)
     self.cats = cats
     local own = { map = "Map", vehicle = "Vehicles", features = "Features", modpack = "Mod pack" }
     field("Category", cats.of[d.modId] or own[d.category or ""])
+    y = K.holdFacts(self, d, x, y, w)
     local tg = (self.tags and self.tags[d.modId]) or {}
     if #tg > 0 or self.app then
         text(self, T("details_tags", "Tags"), x, y, C.muted)
@@ -5913,6 +6088,7 @@ local function readFeed()
     end)
     return ok and f or nil
 end
+K.readFeed = readFeed
 
 --- A note as plain text: BBCode tags, Markdown marks and runs of blank lines out.
 local function plain(str)
@@ -6040,7 +6216,7 @@ function PZMMMods:drawScrap(e, x, y, w, h, k, mx, my)
     self.feedHits[#self.feedHits + 1] = { kind = "read", e = e, x = px, y = actionsY, w = bw, h = bh }
     if mx >= px and mx < px + bw and my >= actionsY and my < actionsY + bh then tip(self, "Read all notes\nOpens its full change notes in the history below.") end
     -- an update still waiting to download: Update (PZMM installs it; else Steam's page)
-    if e.pending then
+    if K.pend(self, e) then
         local ux = px + bw + 8
         local uw, uh = inkButton(self, T("feed_update", "Update"), ux, actionsY, mx, my)
         local item = e.item
@@ -6154,7 +6330,7 @@ function PZMMMods:drawEntry(e, x, y, w, mx, my, top, bottom)
     self.feedHits[#self.feedHits + 1] = { kind = "url", url = "https://steamcommunity.com/sharedfiles/filedetails/changelog/" .. e.item, x = lx, y = bty, w = lw, h = BAR }
     -- an update still waiting to download: Update (PZMM installs it; else Steam's page)
     local eyeAfter = lx
-    if e.pending then
+    if K.pend(self, e) then
         local label = T("feed_update", "Update")
         local ubw = width(label) + 48
         lx = lx - 8 - ubw
@@ -6630,7 +6806,7 @@ function PZMMMods:onMouseDown(x, y)
     end
     for _, t in ipairs(self.tabBoxes or {}) do
         if x >= t[2] and x < t[2] + t[4] and y >= t[3] and y < t[3] + t[5] then
-            self.tab = t[1]
+            self.tab, self.heldOnly = t[1], false
             self.scroll = 0
             self:updateView()
             return true
@@ -6805,6 +6981,121 @@ function PZMMMods:onRightMouseDown(x, y)
     end
     return true
 end
+--- Details' Updates row for a mod that can be held: Held or Allowed, the toggle, and Update anyway when it's held
+--- (PZMM asks first and keeps it held). Returns the y under it.
+function K.holdFacts(ui, d, x, y, w)
+    if not K.canHold(ui, d) then return y end
+    local mx, my = ui:getMouseX(), ui:getMouseY()
+    local held = K.isHeld(ui, d)
+    local ty = y + (BAR - H_SMALL) / 2
+    text(ui, T("details_updates", "Updates"), x, ty, C.muted)
+    local val = held and T("details_updates_held", "Held") or T("details_updates_allowed", "Allowed")
+    text(ui, val, x + 110, ty, held and C.accentText or C.text)
+    local bx = x + 110 + width(val) + 12
+    local label = held and T("menu_allow_updates", "Allow updates") or T("menu_hold_updates", "Hold updates")
+    local bw = width(label) + 48
+    if bx + bw > x + w then bx, y = x + 110, y + BAR + 4 end
+    local _, _, over = flatButton(ui, label, bx, y, mx, my, "quiet", held and TB.unlock or TB.lock)
+    if over then tip(ui, K.holdTip(ui, d)) end
+    ui.hits[#ui.hits + 1] = { kind = "fn", fn = function() ui:holdMods({ d }, not held) end, x = bx, y = y, w = bw, h = BAR }
+    if held and source(d) ~= 1 then
+        local st = ui:steamOf(d)
+        local ul = T("details_update_anyway", "Update anyway")
+        local uw = width(ul) + 48
+        local ux = bx + bw + 8
+        if ux + uw > x + w then ux, y = x + 110, y + BAR + 4 end
+        local _, _, uo = flatButton(ui, ul, ux, y, mx, my, "quiet", TB.update)
+        local newer = st and st.state == "Held" and (T("details_held_newer", "The Workshop has a newer version from %1.", K.fmtDate(st.updated)) .. "\n") or ""
+        if uo then tip(ui, ul .. "\n" .. newer .. (ui.app and T("update_anyway_ask", "Update %1 anyway? Its updates stay held after this.", d.name) or T("hold_needs_app", "Holding updates needs the PZMM app: a held mod is PZMM's own copy."))) end
+        ui.hits[#ui.hits + 1] = { kind = "fn", fn = function() ui:updateHeld(d) end, x = ux, y = y, w = uw, h = BAR }
+    end
+    -- held with a newer version on the Workshop: said under it, as the app's
+    local stn = held and ui:steamOf(d)
+    if stn and stn.state == "Held" then
+        y = y + BAR + 2
+        for _, l in ipairs(wrap(T("details_held_newer", "The Workshop has a newer version from %1.", K.fmtDate(stn.updated)), w - 110)) do
+            text(ui, l, x + 110, y, C.muted)
+            y = y + H_SMALL + 2
+        end
+        return y + 6
+    end
+    return y + BAR + 6
+end
+--- Hold updates on the mods in `list` (on) or allow them again: one quiet hold request for those that can be,
+--- acked once PZMM's held.txt has them; a Subscribed one makes PZMM ask first (it keeps its own copy instead).
+--- Returns the request's id (nil: nothing sent).
+function PZMMMods:holdMods(list, on)
+    if not self.app then
+        self:say(T("hold_needs_app", "Holding updates needs the PZMM app: a held mod is PZMM's own copy."), "error")
+        return nil
+    end
+    local ids, subs = {}, false
+    -- (a mod whose hold request PZMM hasn't acked yet isn't asked about again)
+    self.holdFly = self.holdFly or {}
+    for _, d in ipairs(list) do
+        local fly = self.holdFly[d.modId]
+        if K.canHold(self, d) and K.isHeld(self, d) ~= on and not (fly and self.afterAck[fly]) then
+            ids[#ids + 1] = d.modId
+            if source(d) == 1 then subs = true end
+        end
+    end
+    if #ids == 0 then return nil end
+    local what = #ids == 1 and ((self.model.mods[ids[1]] or {}).name or ids[1]) or T("hold_n_mods", "%1 mods", #ids)
+    local label = on and T("hold_holding", "Holding updates on %1", what) or T("hold_allowing", "Allowing updates on %1", what)
+    -- PZMM asks before holding a Subscribed one, and before allowing updates again (any mod could ask for that)
+    local asks = subs or not on
+    local id = self:request("hold\t" .. table.concat(ids, ",") .. "\t" .. (on and "1" or "0"), asks and T("hold_say_yes", "%1: say yes in PZMM.", label) or "", true)
+    if not id then return nil end
+    for _, mid in ipairs(ids) do self.holdFly[mid] = id end
+    -- it has to be running to take it (and to ask): started if it doesn't soon
+    self.launchAt = getTimestampMs() + 2500
+    -- a refused or half-done hold rewrote the files too: read them either way
+    local function reread()
+        self.installed, self.hasInstalled = readInstalled()
+        self.held, self.heldWs, self.heldSrc = K.readHeld()
+        self.updAt, self.liteFeedCache = nil, nil
+        -- What's new marks which updates wait: read afresh (Home's and the play bar's counts too)
+        self.feed = readFeed()
+        for _, mid in ipairs(ids) do if self.holdFly[mid] == id then self.holdFly[mid] = nil end end
+        self:updateView()
+    end
+    self.afterAck[id] = { function()
+        reread()
+        -- acked, yet PZMM didn't change some (its activity log says why): named, not said as done
+        local left = {}
+        for _, mid in ipairs(ids) do
+            local d = self.model.mods[mid]
+            if d and K.isHeld(self, d) ~= on then left[#left + 1] = d.name or mid end
+        end
+        if #left > 0 then return self:say(T("hold_not_done", "PZMM didn't change the updates of %1: its activity log says why.", table.concat(left, ", ")), "error") end
+        self:say(on and T("hold_on", "%1: updates held, this version stays", what) or T("hold_off", "%1: updates allowed again", what))
+    end, label, nil, nil, nil, reread }
+    return id
+end
+--- A held mod's Update anyway (its details): PZMM asks first, updates it and keeps it held.
+function PZMMMods:updateHeld(d)
+    if not self.app then return self:say(T("hold_needs_app", "Holding updates needs the PZMM app: a held mod is PZMM's own copy."), "error") end
+    return self:requestOnce("updateheld\t" .. d.modId, T("hold_say_yes", "%1: say yes in PZMM.", T("hold_updating", "Updating %1", d.name)))
+end
+--- Saves' Hold this save's mods: asks first, naming the Subscribed ones PZMM turns into its own copies, then one hold request.
+function PZMMMods:holdSave(s)
+    if not self.app then return self:say(T("hold_needs_app", "Holding updates needs the PZMM app: a held mod is PZMM's own copy."), "error") end
+    local list, subs = {}, {}
+    for _, id in ipairs(s.mods or {}) do
+        local d = self.model.mods[id]
+        if d and K.canHold(self, d) and not K.isHeld(self, d) then
+            list[#list + 1] = d
+            if source(d) == 1 then subs[#subs + 1] = d.name end
+        end
+    end
+    if #list == 0 then return self:say(T("hold_save_none", "%1's mods are already held, or none of them can update.", s.name)) end
+    table.sort(list, byName)
+    -- Subscribed ones: PZMM asks about them itself (naming them), so it's asked once, there
+    if #subs > 0 then return self:holdMods(list, true) end
+    local title = #list == 1 and T("hold_save_ask_one", "Hold the updates of the mod %2 uses?", #list, s.name)
+        or T("hold_save_ask", "Hold the updates of the %1 mods %2 uses?", #list, s.name)
+    self:ask({ title = title, choices = { { T("menu_hold_updates", "Hold updates"), function() self:holdMods(list, true) end } } })
+end
 --- Hide mod `d` from the list, or show it again (the row menu's and the eye's): on or off stays as it is.
 function PZMMMods:toggleHidden(d)
     local hid = self.hidden[d.modId]
@@ -6823,13 +7114,15 @@ function K.pickedHidden(ui)
     return any
 end
 --- Several picked mods' menu: what it does, it does to all of them.
-function PZMMMods:manyMenu(list)
+function PZMMMods:manyMenu(list, d)
     local n = #list
     local favs, hid = true, true
     for _, m in ipairs(list) do
         if not m.favorite then favs = false end
         if not self.hidden[m.modId] then hid = false end
     end
+    -- the row clicked decides, as the app's row menu: its state flipped on all of them
+    if d then favs, hid = d.favorite == true, self.hidden[d.modId] == true end
     local ids = {}
     for _, m in ipairs(list) do ids[#ids + 1] = m.modId end
     local items = {
@@ -6856,6 +7149,11 @@ function PZMMMods:manyMenu(list)
         end },
         { T("tool_group", "Group by category"), function() self:groupByCategory() end },
     }
+    -- Hold / Allow updates after Hide, by the clicked row (holdMods skips the ones that can't)
+    if d and K.canHold(self, d) then
+        local held = K.isHeld(self, d)
+        table.insert(items, 8, { held and T("menu_allow_updates", "Allow updates") or T("menu_hold_updates", "Hold updates"), function() self:holdMods(list, not held) end, icon = held and TB.unlock or TB.lock, disabled = not self.app })
+    end
     if self.app then
         items[#items + 1] = false
         items[#items + 1] = { T("menu_remove", "Remove"), function() self:removeMods(list) end, danger = true }
@@ -6908,7 +7206,7 @@ function K.sendPics(ui)
     while n < 3 and #K.PICS_Q > 0 do
         local ws = table.remove(K.PICS_Q, 1)
         local id = ui:request("pics\t" .. ws, "", true)
-        if not id then return end
+        if not id then K.PICS_ASKED[ws] = getTimestampMs() + 5000; return end
         K.PICS_FLY[id], n = ws, n + 1
         local till = getTimestampMs() + 30000
         for i = 1, 8 do
@@ -6991,7 +7289,7 @@ function PZMMMods:modMenu(d)
             if m then list[#list + 1] = m end
         end
         table.sort(list, byName)
-        if #list > 1 then return self:manyMenu(list) end
+        if #list > 1 then return self:manyMenu(list, d) end
     end
     self:menu(self:modMenuItems(d))
 end
@@ -7017,6 +7315,10 @@ function PZMMMods:modMenuItems(d)
         self.model:refreshMods()
     end }
     items[#items + 1] = { hid and T("menu_unhide", "Show in the list again") or T("menu_hide", "Hide from the list"), function() self:toggleHidden(d) end }
+    if K.canHold(self, d) then
+        local held = K.isHeld(self, d)
+        items[#items + 1] = { held and T("menu_allow_updates", "Allow updates") or T("menu_hold_updates", "Hold updates"), function() self:holdMods(K.batch(self, d), not held) end, icon = held and TB.unlock or TB.lock, disabled = not self.app }
+    end
     items[#items + 1] = false
     items[#items + 1] = { T("menu_show_files", "Show files"), function() pcall(function() showFolderInDesktop(d.modInfo:getDir()) end) end }
     if ws and ws ~= "" and ws ~= "0" then
@@ -7557,6 +7859,8 @@ function PZMMMods:steamOf(d)
         if st.raw == nil then st.raw = st.state or false end
         local at = self.installed and self.installed[d.modId]
         if not K.STEAM_STATES[st.raw or ""] and at and (st.updated or 0) > at then st.state = "NeedsUpdate"; st.pzmm = true else st.state = st.raw or nil; st.pzmm = nil end
+        -- held: PZMM never updates it, so a newer version is Held, not an update waiting
+        if st.state == "NeedsUpdate" and K.isHeld(self, d) then st.state = "Held" end
     end
     return st
 end
@@ -7635,6 +7939,7 @@ function PZMMMods:onSteamDetails(status, info, batch)
         K.steamFailed()
         for _, ui in ipairs(uis) do
             if ui.steamState == "asking" then ui.steamState = S.known and "done" or "failed" end
+            K.saidUpToDate(ui)
         end
         return
     end
@@ -7671,6 +7976,7 @@ function PZMMMods:onSteamDetails(status, info, batch)
     for _, ui in ipairs(uis) do
         ui.liteFeedCache = nil
         if ui.sortBy == "size" or ui.sortBy == "changed" then ui:updateView() end
+        K.saidUpToDate(ui)
     end
     if #wanted > 0 then
         pcall(function()
@@ -7953,7 +8259,7 @@ function PZMMMods:openImport()
     end
     PZMMOverlay.show({ ask = { title = T("import_intro", "Import a profile: paste a share code, Workshop collection or item links (several at once), or a preset shared from the game's mod menu."),
         lines = { self.app and T("import_app", "PZMM makes a profile of it and installs the missing Workshop mods.") or T("import_noapp", "Without PZMM it becomes this list: you see what turns on and off first, and missing Workshop mods show in Browse Workshop to subscribe.") },
-        input = pre, max = 200000, choices = choices } })
+        input = pre, max = 100000, choices = choices } })
 end
 --- Import what was pasted: PZMM makes a new profile of it; without PZMM a share code or preset becomes this list
 --- (asked first, with what turns on and off), and links show in Browse Workshop to subscribe.
@@ -8049,7 +8355,7 @@ function PZMMMods:onAction(id)
         end
         self.model:refreshMods()
         self.liteFeedCache = nil
-        self:querySteam()
+        self:querySteam(true)
         self:say("Mods rescanned.")
     elseif id == "check" then
         self:request("check", "Check setup asked for.")
@@ -8121,6 +8427,7 @@ function PZMMMods.open()
     s.lib, s.app, s.feed = s:readLib(), readApp(), readFeed()
     s.tags = readTags()
     s.installed, s.hasInstalled = readInstalled()
+    s.held, s.heldWs, s.heldSrc = K.readHeld()
     s.firstSeen = K.readFirstSeen()
     pcall(function() s:sendLeaveOuts() end)
     s.bisect = readBisect()
@@ -8226,6 +8533,15 @@ function PZMMMods:nudge(dir)
     self:placeMod(d, g, before)
 end
 
+--- The screen's text boxes: one focused means keys are typed into it.
+K.BOXES = { "search", "homeSearch", "installBox", "wsSearch" }
+function K.typing(s)
+    for _, n in ipairs(K.BOXES) do
+        local ok, f = pcall(function() return s[n]:isFocused() end)
+        if ok and f then return true end
+    end
+    return false
+end
 function PZMMMods.onKey(key)
     local s = PZMMMods.instance
     if not s or not s:isVisible() then return end
@@ -8233,13 +8549,8 @@ function PZMMMods.onKey(key)
     if key == Keyboard.KEY_ESCAPE then
         if ov then return ov:closeIt() end
         -- a box being typed in lets go first
-        local typing0 = false
-        pcall(function() typing0 = (s.search:isFocused() or s.homeSearch:isFocused()) and true or false end)
-        pcall(function() typing0 = typing0 or s.installBox:isFocused() end)
-        if typing0 then
-            pcall(function() s.search:unfocus() end)
-            pcall(function() s.homeSearch:unfocus() end)
-            pcall(function() s.installBox:unfocus() end)
+        if K.typing(s) then
+            for _, n in ipairs(K.BOXES) do pcall(function() s[n]:unfocus() end) end
             return
         end
         if s.drag or s.odrag then s.drag, s.odrag = nil, nil return end
@@ -8251,11 +8562,8 @@ function PZMMMods.onKey(key)
     end
     if ov then return ov:onKey(key) end
     if PZMMMods.overlayShut and getTimestampMs() - PZMMMods.overlayShut < 150 then return end
-    local typing = false
-    pcall(function() typing = s.search:isFocused() end)
-    -- (keys typed into the Install box are its own)
-    pcall(function() typing = typing or s.installBox:isFocused() end)
-    if typing then return end
+    -- (keys typed into a box are its own)
+    if K.typing(s) then return end
     local ctrl = false
     pcall(function() ctrl = isCtrlKeyDown() end)
     -- the list they undo is on the My mods page only
@@ -8672,6 +8980,15 @@ function PZMMMods:request(line, said, quiet)
     return ok and id or nil
 end
 
+--- A loud request not sent again while the same one waits for its ack (a double click): its id, nil when not sent.
+K.FLY = {}
+function PZMMMods:requestOnce(line, said)
+    local was = K.FLY[line]
+    if was and (self.sent[was] or self.afterAck[was]) then return nil end
+    local id = self:request(line, said)
+    K.FLY[line] = id
+    return id
+end
 --- PZMM didn't take the requests and isn't running, so start it.
 function PZMMMods:launchIfNeeded()
     if not (self.launchAt and getTimestampMs() >= self.launchAt) then return end
@@ -9499,7 +9816,7 @@ function PZMMMods:drawHomeUpdates(x, y, w, mx, my)
         local ry = y + (i - 1) * rh
         local over = listRow(self, x, ry, w, rh, i == n, mx, my)
         local right = x + w - 16
-        if self.app and e.pending then
+        if self.app and K.pend(self, e) then
             local ul = T("home_update", "Update")
             local uw = width(ul) + 48
             local uy = ry + (rh - BAR) / 2
@@ -9581,6 +9898,11 @@ function PZMMMods:drawHomeNews(x, y, w, mx, my)
     if not self.newsAt or t - self.newsAt > 10000 then
         self.newsAt = t
         self.news, self.newsFile = K.readNews()
+        local top = self.news[1] and self.news[1].url
+        if top ~= K.newsTop then
+            for name in pairs(K.PIC) do if name:sub(1, 5) == "news_" then K.PIC[name] = nil end end
+            K.newsTop = top
+        end
     end
     local posts = self.news or {}
     local function heading(label)
@@ -9966,7 +10288,7 @@ function PZMMMods:drawPlayBar(y, mx, my)
                 self:selectServer({ name = server.name, ip = server.ip, port = server.port, sv = server.sv, join = function() self:joinEntry(server) end })
                 self.page = "servers"
             end, icon = TB.info }
-            items[#items + 1] = { T("home_favourite", "Favourite"), function() self:toggleFavourite(server); self.libLists = nil end, K.favKey(self, server) and true or false, icon = TB.star }
+            items[#items + 1] = { T("home_favourite", "Favourite"), function() self:toggleFavourite(server); self.libLists = nil end, K.isFav(self, server), icon = TB.star }
             items[#items + 1] = { T("home_copy_address", "Copy address"), function() Clipboard.setClipboard(addr) end }
             items[#items + 1] = link(T("launcher_battlemetrics", "BattleMetrics"), "https://www.battlemetrics.com/servers/zomboid?q=" .. urlEncode(tostring(server.ip)))
             if server.discord then items[#items + 1] = link(T("home_server_discord", "Server Discord"), server.discord) end
@@ -10082,7 +10404,7 @@ function PZMMMods:drawPlayBar(y, mx, my)
         -- with PZMM's feed: the updates still waiting to download, as the app counts them
         if self.feed then
             updates = 0
-            for _, e in ipairs(self.feed.entries) do if e.pending then updates = updates + 1 end end
+            for _, e in ipairs(self.feed.entries) do if K.pend(self, e) then updates = updates + 1 end end
         end
         rightStats = {
             { "MODS", tostring(on), "Mods\nYour enabled mods.", function() self.page, self.tab = "mods", "Enabled"; self:updateView() end },
@@ -12677,6 +12999,7 @@ function PZMMMods:drawSaves(x, y, w, mx, my)
             { T("saves_tools", "Tools"), "quiet", T("saves_tools", "Tools") .. "\nBackups, Give it my mods, characters and recovery, with Rename, Folder and Delete.", function()
                 self.saveTool = self.saveTool ~= s.folder and s.folder or nil
             end },
+            { T("saves_hold_mods", "Hold this save's mods"), "quiet", T("saves_hold_mods", "Hold this save's mods") .. "\n" .. (self.app and T("saves_hold_tip", "Keep the versions this save uses: PZMM stops updating its mods.") or T("hold_needs_app", "Holding updates needs the PZMM app: a held mod is PZMM's own copy.")), function() self:holdSave(s) end, TB.lock },
             { "Use its mods", nil, "Use its mods\nTurns on exactly this save's mods in My mods. Accept keeps them.", function() self:useSaveMods(s) end },
             { "Play", "primary", self:cantPlay(s) or "Play\nLoad this save with its own mods.", function()
                 local why = self:cantPlay(s)
@@ -12714,7 +13037,7 @@ function PZMMMods:drawSaves(x, y, w, mx, my)
                 if mx >= dx and mx < right and my >= cy and my < cy + H_SMALL + 2 then tip(self, "Mods differ\n" .. diff .. "\nPlay loads the save with its own mods. Use its mods or Give it my mods makes them match.") end
             end
         end
-        -- Play, Folder, Delete at the right
+        -- the row's buttons at the right, laid out right to left (on screen: Play, Use its mods, Hold, Tools)
         local bx = x + w - 16
         local by = ry + (rh - BAR) / 2
         for _, b in ipairs(buttons) do
@@ -12727,7 +13050,8 @@ function PZMMMods:drawSaves(x, y, w, mx, my)
         end
     end
     y = y + #saves * rh + 16
-    -- the app's hint: its automatic backups are set in its Settings
+    -- the app's hint: its automatic backups are set in its Settings (only there with the app)
+    if not self.app then return y end
     local hint, link = T("saves_auto_hint", "Backups when the game starts or closes:"), T("saves_auto_settings", "set them in Settings")
     text(self, hint, x, y, C.muted)
     local lx = x + width(hint) + 6
@@ -12799,7 +13123,7 @@ function PZMMMods:drawSaveTools(s, x, y, w, h, mx, my)
         if not self.app then
             para(T("saves_backups_noapp", "Backups are PZMM's: install the app to back up and restore saves."))
         else
-            btn(T("saves_back_up_now", "Back up now"), px, py, "primary", TB.download, nil, function() self:request("backup\t" .. key, "Backup of " .. s.name .. " asked for.") end)
+            btn(T("saves_back_up_now", "Back up now"), px, py, "primary", TB.download, nil, function() self:requestOnce("backup\t" .. key, "Backup of " .. s.name .. " asked for.") end)
             py = py + BAR + 14
             local backups = readBackups()[key] or {}
             if #backups == 0 then para(T("saves_no_backups", "No backups of this save yet.")) end
@@ -12811,7 +13135,7 @@ function PZMMMods:drawSaveTools(s, x, y, w, h, mx, my)
                 text(self, fit(label, pw - rw - 12), px, py + (BAR - H_SMALL) / 2, C.text)
                 local bb = b
                 btn(rl, px + pw - rw, py, nil, nil, nil, function()
-                    self:request("restore\t" .. key .. "\t" .. bb.file, "Restoring " .. s.name .. ": say yes in PZMM.")
+                    self:requestOnce("restore\t" .. key .. "\t" .. bb.file, "Restoring " .. s.name .. ": say yes in PZMM.")
                 end)
                 py = py + BAR + 6
             end
@@ -12820,7 +13144,8 @@ function PZMMMods:drawSaveTools(s, x, y, w, h, mx, my)
         para(T("saves_mods_hint", "Give this save the mods of %1. You see what changes before anything is written.", (self.lib and self.lib.profile) or T("tab_mods", "My mods")))
         local gw = btn(T("saves_give_mods", "Give it my mods"), px, py, "primary", TB.swap, nil, function() self:giveMods(s) end)
         btn(T("banner_use_mods", "Use this save's mods"), px + gw + 8, py, nil, TB.check, nil, function() self:useSaveMods(s) end)
-        py = py + BAR + 14
+        py = py + BAR + 8
+        py = py + 6
     elseif tab == "players" then
         local any = false
         for _, pl in ipairs(s.info and s.info.players or {}) do
@@ -13249,6 +13574,13 @@ function K.favs(ui)
 end
 --- The saved server that is this one (nil: not a favourite).
 function K.favKey(ui, sel) return K.favs(ui)[tostring(sel.ip) .. ":" .. tostring(sel.port or 16261)] end
+--- Whether a server is a favourite: the game's saved one, or PZMM's.
+function K.isFav(ui, sel)
+    if K.favKey(ui, sel) then return true end
+    local key = tostring(sel.ip) .. ":" .. tostring(sel.port or 16261)
+    for _, f in ipairs(K.appFavs(ui)) do if f.key == key then return true end end
+    return false
+end
 --- Add a server to the game's saved servers, or take it out (as its server browser's star does); PZMM's favourites
 --- follow (serverfav), and one only PZMM has is taken out there.
 function PZMMMods:toggleFavourite(sel)
@@ -13258,6 +13590,7 @@ function PZMMMods:toggleFavourite(sel)
     if not saved then
         for _, f in ipairs(K.appFavs(self)) do
             if f.key == key then
+                if not self.app then return self:say(name .. " is a favourite in PZMM: start PZMM to take it out.") end
                 K.serverFav(self, key, false)
                 return self:say(name .. " is no longer a favourite.")
             end
@@ -13392,7 +13725,7 @@ end
 function PZMMMods:serverProfileJoin(sel, ids)
     local addr = tostring(sel.ip) .. ":" .. tostring(sel.port or 16261)
     local name = sel.name ~= "" and sel.name or addr
-    local id = self:request("serverprofile\t" .. addr .. "\t" .. table.concat(ids, ","), "Setting up " .. name .. "'s profile to join: say yes in PZMM.")
+    local id = self:requestOnce("serverprofile\t" .. addr .. "\t" .. table.concat(ids, ","), "Setting up " .. name .. "'s profile to join: say yes in PZMM.")
     if not id then return end
     local join = sel.join
     self.afterAck[id] = { function()
@@ -13522,7 +13855,7 @@ function PZMMMods:drawServerPanel(x, y, w, mx, my)
         return out
     end
     if not sel.hosted then
-        local fav = K.favKey(self, sel)
+        local fav = K.isFav(self, sel)
         if sel.ip and sel.ip ~= "" then
             button(head, fav and T("launcher_unfavourite", "Remove favourite") or T("launcher_favourite", "Favourite"), nil, "Favourite\nAdds it to the game's saved servers (a server with a password is added in the game's server browser), or takes it out.", function() self:toggleFavourite(sel) end, TB.star)
         end
@@ -13550,7 +13883,7 @@ function PZMMMods:drawServerPanel(x, y, w, mx, my)
     end
     if sel.hosted then
         local stx = sel.hosted
-        button(foot, "Give it my mods", nil, "Give it my mods\nIts Mods, WorkshopItems and Map settings become the mods on in My mods now.", function() self:giveServerMods(stx) end)
+        button(foot, T("srv_save_mods", "Save mods to server"), nil, T("srv_save_mods", "Save mods to server") .. "\nIts Mods, WorkshopItems and Map settings become the mods on in My mods now (you pick which first).", function() self:giveServerMods(stx) end)
         button(foot, T("srv_edit", "Edit settings"), nil, "Edit settings\nThe game's own server settings screen for it. Back brings you here.", function() self:editServerSettings(sel.name) end)
     else
         local fav = K.favKey(self, sel)
@@ -14443,7 +14776,7 @@ function PZMMMods:drawServers(x, y, w, mx, my, top, bh)
             pcall(function() name = st:getName() end)
             listRow(self, x, ry, w, rh, i == #hosted, mx, my, self.srvSel and self.srvSel.key == "hosted:" .. name)
             bold(self, name, x + 16, ry + (rh - H_SMALL) / 2, C.text)
-            local label = "Give it my mods"
+            local label = T("srv_save_mods", "Save mods to server")
             local gw = width(label) + 28
             local gx, gy = x + w - 16 - gw, ry + (rh - BAR) / 2
             -- PZMM's state for it, and its Start / Stop / Restart / Join (left of Edit settings)
@@ -14477,7 +14810,7 @@ function PZMMMods:drawServers(x, y, w, mx, my, top, bh)
                 self:srvChips(self:srvInfoFor("127.0.0.1", hp), nil, nil, x + 16 + width(name) + 14, ry + math.floor((rh - H_SMALL - 2) / 2), sx - 4, mx, my)
             end
             local _, _, o = flatButton(self, label, gx, gy, mx, my)
-            if o then tip(self, "Give it my mods\nIts Mods, WorkshopItems and Map settings become the mods on in My mods now, in load order, and your map order.") end
+            if o then tip(self, label .. "\nIts Mods, WorkshopItems and Map settings become the mods on in My mods now, in load order, and your map order (you pick which first).") end
             local stx = st
             self.feedHits[#self.feedHits + 1] = { kind = "fn", fn = function() self:giveServerMods(stx) end, x = gx, y = gy, w = gw, h = BAR }
             local el = T("srv_edit", "Edit settings")
@@ -14587,7 +14920,7 @@ function PZMMMods:giveServerMods(st)
     q = { title = T("leaveout_title", "Mods this server gets") .. ": " .. name, checks = checks,
         lines = { T("leaveout_hint", "Untick mods the server shouldn't get, like client-side add-ons. PZMM remembers this for %1.", name), count() },
         choices = {
-        { "Give it my mods", function()
+        { T("srv_save_confirm", "Save"), function()
             local now = {}
             for _, c in ipairs(checks) do if not c.on then now[c.id] = true end end
             self:saveLeaveOut(name, now)
@@ -14943,7 +15276,9 @@ function PZMMMods:setApp(key, value)
     K.readAppSettings(self)[key] = value
     self.appSetAt = getTimestampMs() + 5000
     local id = self:request("set\t" .. key .. "\t" .. value, "", true)
-    if id then self.afterAck[id] = { function() end, T("set_refused", "Settings"), nil, nil, nil, function() self.appSetAt = nil; if K.twinWait then K.twinWait[key] = nil end end } end
+    if id then self.afterAck[id] = { function() if K.twinWait then K.twinWait[key] = nil end end, T("set_refused", "Settings"), nil, nil, nil, function() self.appSetAt = nil; if K.twinWait then K.twinWait[key] = nil end end }
+    -- (not written: nothing waits for PZMM to take it)
+    elseif K.twinWait then K.twinWait[key] = nil end
 end
 --- The options both have (this one's key = PZMM's): a change in PZMM's Settings (settings_app.txt) shows here,
 --- not sent back. Only a change seen in its file is taken, so a toggle here PZMM hasn't taken yet (twinWait) stays.
@@ -14957,7 +15292,7 @@ function K.appTwins(ui)
             local was = K.twinSeen[twin]
             K.twinSeen[twin] = v
             if K.twinWait[twin] then
-                if K.twinWait[twin] == v then K.twinWait[twin] = nil end
+                -- (PZMM hasn't acked the toggle sent from here yet: its file may still have the old value)
             elseif ((was and was ~= v) or (not was and ui.app and ui.app.running)) and SETTINGS[key] ~= (v == "1") then
                 ui:toggleClient(key)
             end
