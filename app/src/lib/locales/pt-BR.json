@@ -3667,7 +3667,7 @@
     "settingsHint": "Você pode mudar isso depois nas Configurações."
   },
   "whatsNew": {
-    "notes": "Obrigado a Lyven Ka Vinsxy, GhostyAshes, newbee, Gentle_Hilt e Yagoyuki pelas ideias e relatos de bugs recentes.\nMuito menos pedidos à Steam: \"A Steam está limitando pedidos\" fica raro\nMeus mods tem colunas: Tamanho, Instalado, Última mudança, Sobrescreve\nUm olho oculta um mod da lista sem desligá-lo\nImagens da Oficina com setas, novos filtros Adicionado e Atualizado\nEntrar nas linhas de servidores, Renomear e Excluir saves\nO gerenciador no jogo pode passar tarefas para o app",
+    "notes": "Obrigado a Lyven Ka Vinsxy, GhostyAshes, newbee, Gentle_Hilt e Yagoyuki pelas ideias e relatos de bugs recentes.\nSegurar atualizações: o cadeado da linha mantém essa versão\nSegurar os mods deste save em Saves\nSalvar mods no servidor, e Salvar e sair\nO PZMM abre em janela e cabe na sua tela",
     "title": "Novidades da {version}",
     "enjoying": "Curtindo o PZMM?",
     "upvote": "Se você curte este app, vote nele no Steam!",

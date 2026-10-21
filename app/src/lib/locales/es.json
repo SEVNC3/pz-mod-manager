@@ -3667,7 +3667,7 @@
     "settingsHint": "Puedes cambiarlo luego en Ajustes."
   },
   "whatsNew": {
-    "notes": "Gracias a Lyven Ka Vinsxy, GhostyAshes, newbee, Gentle_Hilt y Yagoyuki por sus ideas e informes de errores recientes.\nMuchas menos peticiones a Steam: «Steam limita las peticiones» es raro\nMis mods tiene columnas: Tamaño, Instalado, Último cambio, Sobrescribe\nUn ojo oculta un mod de la lista sin desactivarlo\nImágenes del Workshop con flechas y filtros Añadido y Actualizado\nUnirse en las filas de servidores, Renombrar y Borrar partidas\nEl gestor del juego puede pasar tareas a la app",
+    "notes": "Gracias a Lyven Ka Vinsxy, GhostyAshes, newbee, Gentle_Hilt y Yagoyuki por sus ideas e informes de errores recientes.\nRetener actualizaciones: el candado de una fila mantiene esa versión\nRetener los mods de esta partida en Partidas\nGuardar mods en el servidor, y Guardar y salir\nPZMM se abre en ventana y cabe en tu pantalla",
     "title": "Novedades de {version}",
     "enjoying": "¿Te gusta PZMM?",
     "upvote": "Si te gusta esta app, ¡vótala en Steam!",
