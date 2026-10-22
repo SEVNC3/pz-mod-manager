@@ -3498,7 +3498,7 @@
     "settingsHint": "之后可以在设置中更改。"
   },
   "whatsNew": {
-    "notes": "感谢 Lyven Ka Vinsxy、GhostyAshes、newbee、Gentle_Hilt、Yagoyuki 最近提出的想法和错误报告。\n暂停更新：行上的锁会保留当前版本\n在存档中暂停该存档的模组\n将模组保存到服务器，以及保存并离开\nPZMM 以窗口方式打开并适应屏幕",
+    "notes": "感谢 yustin、Mittens The Feared 最近提出的想法和错误报告。\n新建分组只放入你选中的模组\n右键：添加到分组；再点一次取消选择\n其他排序下也有分组标记和分组筛选\n拖到列表边缘即可滚动\n可以移除 Steam 留下的已取消订阅模组",
     "title": "{version} 更新内容",
     "enjoying": "喜欢 PZMM 吗？",
     "upvote": "如果你喜欢这个应用，请在 Steam 上点个赞！",

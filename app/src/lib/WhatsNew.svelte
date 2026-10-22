@@ -1,6 +1,6 @@
 <script lang="ts" module>
   /** The release whatsNew.notes describe (in every locale): bump it with them. Another version shows no notes. */
-  export const NOTES_FOR = "1.4.0";
+  export const NOTES_FOR = "1.5.0";
 </script>
 
 <script lang="ts">

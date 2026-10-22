@@ -3676,7 +3676,7 @@
     "settingsHint": "You can change this later in Settings."
   },
   "whatsNew": {
-    "notes": "Thanks to Lyven Ka Vinsxy, GhostyAshes, newbee, Gentle_Hilt and Yagoyuki for recent ideas and bug reports.\nHold updates: the lock on a row keeps that version\nHold this save's mods in Saves\nSave mods to server, and Save and leave\nPZMM opens windowed and fits your screen",
+    "notes": "Thanks to yustin and Mittens The Feared for recent ideas and bug reports.\nNew group takes only the mods you picked\nRight-click: Add to group; click again to deselect\nGroup tags and a Group filter in other sorts\nDrag near the list edge to scroll\nUnsubscribed mods Steam left behind can be removed",
     "title": "What's new in {version}",
     "enjoying": "Enjoying PZMM?",
     "upvote": "If you're enjoying this app please upvote it on Steam!",

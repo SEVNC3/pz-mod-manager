@@ -3676,7 +3676,7 @@
     "settingsHint": "Puedes cambiarlo luego en Ajustes."
   },
   "whatsNew": {
-    "notes": "Gracias a Lyven Ka Vinsxy, GhostyAshes, newbee, Gentle_Hilt y Yagoyuki por sus ideas e informes de errores recientes.\nRetener actualizaciones: el candado de una fila mantiene esa versión\nRetener los mods de esta partida en Partidas\nGuardar mods en el servidor, y Guardar y salir\nPZMM se abre en ventana y cabe en tu pantalla",
+    "notes": "Gracias a yustin y Mittens The Feared por sus ideas e informes de errores recientes.\nNuevo grupo solo toma los mods que elegiste\nClic derecho: Añadir a grupo; otro clic quita la selección\nEtiquetas de grupo y filtro de grupo en otros órdenes\nArrastra cerca del borde de la lista para desplazarte\nLos mods desuscritos que Steam dejó se pueden quitar",
     "title": "Novedades de {version}",
     "enjoying": "¿Te gusta PZMM?",
     "upvote": "Si te gusta esta app, ¡vótala en Steam!",

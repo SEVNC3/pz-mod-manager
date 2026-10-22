@@ -92,10 +92,21 @@ fn fresh(asked: Option<Asked>, now: std::time::Instant, subscribes: u64) -> bool
 /// Ask Steam for the subscribed items again; Steam not running (or the helper failing) keeps what was known for the rows.
 /// Whether Steam answered just now (a Remove of a leftover needs that).
 fn refresh_subscriptions() -> bool {
+    // which ask this is: a slower, older answer never replaces a newer one already taken
+    static ASKS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    static TAKEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let ask = ASKS.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+    let asked = SUBSCRIBES.load(std::sync::atomic::Ordering::SeqCst);
     let on_disk: std::collections::BTreeSet<String> = pz::workshop_dir().map(|ws| store::workshop_rows(&ws).filter_map(|r| r.source.strip_prefix("steam:").map(String::from)).collect()).unwrap_or_default();
     let Some(set) = zb::game_dir().and_then(|g| pz::steam_client::subscribed(&g, &on_disk).ok()) else { return false };
     let history = pzmm_core::history::list(&Paths::detect());
-    subs().refreshed(set, &on_disk, |item| pzmm_core::history::unsubscribed_last(&history, item))
+    let mut s = subs();
+    // a subscribe or unsubscribe of PZMM's ran while Steam answered: the answer may not have it, so it's dropped
+    if SUBSCRIBES.load(std::sync::atomic::Ordering::SeqCst) != asked || ask < TAKEN.load(std::sync::atomic::Ordering::SeqCst) {
+        return false;
+    }
+    TAKEN.store(ask, std::sync::atomic::Ordering::SeqCst);
+    s.refreshed(set, &on_disk, |item| pzmm_core::history::unsubscribed_last(&history, item))
 }
 
 fn scan(paths: &Paths) -> anyhow::Result<BTreeMap<String, store::Row>> {
@@ -1016,7 +1027,10 @@ fn steam_subscribe(paths: &Paths, id: &str, on: bool, mod_id: Option<&str>, name
     let game = zb::game_dir().ok_or_else(|| anyhow::anyhow!("Project Zomboid's game folder wasn't found in your Steam libraries"))?;
     // before Steam hears it: an answer a Remove asked for until now may not have it
     SUBSCRIBES.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    pz::steam_client::subscribe(&game, id, on)?;
+    let done = pz::steam_client::subscribe(&game, id, on);
+    // and after: an answer asked while Steam was taking it in may not have it either
+    SUBSCRIBES.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    done?;
     // a leftover at once (Steam deletes the folder when it gets to it), or a subscription again
     subs().changed(id, on);
     pzmm_core::history::add(paths, mod_id.unwrap_or(id), name.unwrap_or(""), &format!("steam:{id}"), if on { "subscribed" } else { "unsubscribed" });

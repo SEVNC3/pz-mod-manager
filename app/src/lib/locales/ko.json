@@ -3498,7 +3498,7 @@
     "settingsHint": "나중에 설정에서 바꿀 수 있습니다."
   },
   "whatsNew": {
-    "notes": "최근 아이디어와 버그 제보를 해 준 Lyven Ka Vinsxy, GhostyAshes, newbee, Gentle_Hilt, Yagoyuki에게 감사드려요.\n업데이트 보류: 행의 자물쇠가 그 버전을 유지해요\n저장에서 이 저장의 모드 보류\n서버에 모드 저장, 저장하고 나가기\nPZMM이 창 모드로 화면에 맞게 열려요",
+    "notes": "최근 아이디어와 버그 제보를 해 준 yustin, Mittens The Feared에게 감사드려요.\n새 그룹은 고른 모드만 담아요\n우클릭: 그룹에 추가, 다시 클릭하면 선택 해제\n다른 정렬에서도 그룹 표시와 그룹 필터\n목록 가장자리로 끌면 스크롤돼요\nSteam이 남긴 구독 취소 모드를 제거할 수 있어요",
     "title": "{version}의 새로운 점",
     "enjoying": "PZMM이 마음에 드나요?",
     "upvote": "이 앱이 마음에 든다면 Steam에서 추천해 주세요!",

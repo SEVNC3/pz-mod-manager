@@ -1,5 +1,7 @@
-# 1.4.0
-- Thanks to Lyven Ka Vinsxy, GhostyAshes, newbee, Gentle_Hilt and Yagoyuki for recent ideas and bug reports.
-- Hold updates on any mod: click the lock on its row and PZMM keeps that version until you click again. Hold this save's mods in Saves does a whole save at once. Steam can't hold a subscribed mod, so PZMM keeps its own copy of the version you have and unsubscribes it, after asking. Thanks yustin on the Workshop page.
-- Saving a server's mods is clearer: the button says Save mods to server, a save bar sits at the bottom while you have unsaved changes, and "Leave without saving?" now has Save and leave. Thanks Mittens The Feared on Discord.
-- PZMM opens windowed and fits your screen, even after a resolution change or with a monitor unplugged.
+# 1.5.0
+- Thanks to yustin and Mittens The Feared for recent ideas and bug reports.
+- New group makes a group of just the mods you picked, instead of taking every mod below them. Right-click a mod for Add to group, and click a selected mod again to deselect it. Thanks Yagoyuki on Discord.
+- Sorted by name, size or date, each mod shows a coloured tag with its group, and Filters has a Group filter. The column header lines up properly now too. Thanks Yagoyuki on Discord.
+- Dragging a mod near the top or bottom of the list scrolls it, since the mouse wheel doesn't work while dragging. Thanks Yagoyuki on Discord.
+- Unsubscribed from a mod but Steam hasn't deleted it yet? It shows Unsubscribed now, and Remove deletes it. PZMM checks with Steam first and never deletes a mod you're still subscribed to.
+- Copy diagnostics logs how your list loads, so if groups ever go missing after an update, send it before launching the game.

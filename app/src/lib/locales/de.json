@@ -3676,7 +3676,7 @@
     "settingsHint": "Das lässt sich später in den Einstellungen ändern."
   },
   "whatsNew": {
-    "notes": "Danke an Lyven Ka Vinsxy, GhostyAshes, newbee, Gentle_Hilt und Yagoyuki für die Ideen und Fehlerberichte der letzten Zeit.\nUpdates anhalten: Das Schloss in einer Zeile behält diese Version\nMods dieses Spielstands anhalten unter Spielstände\nMods auf dem Server speichern, und Speichern und verlassen\nPZMM öffnet im Fenster und passt auf deinen Bildschirm",
+    "notes": "Danke an yustin und Mittens The Feared für die Ideen und Fehlerberichte der letzten Zeit.\nNeue Gruppe nimmt nur die ausgewählten Mods\nRechtsklick: Zur Gruppe hinzufügen; erneut klicken hebt die Auswahl auf\nGruppen-Markierungen und ein Gruppenfilter in anderen Sortierungen\nZum Scrollen an den Listenrand ziehen\nAbbestellte Mods, die Steam zurückgelassen hat, lassen sich entfernen",
     "title": "Neu in {version}",
     "enjoying": "Gefällt dir PZMM?",
     "upvote": "Wenn dir die App gefällt, gib ihr bitte einen Daumen hoch auf Steam!",
