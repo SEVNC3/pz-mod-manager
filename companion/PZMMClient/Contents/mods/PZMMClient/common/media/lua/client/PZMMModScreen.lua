@@ -678,13 +678,44 @@ local function pzmmCopy(d)
     ws = tostring(ws or "")
     return (ws == "" or ws == "0") and (installedItem[d.modId] or "") ~= ""
 end
---- 1 Subscribed (Steam's), 2 on this PC, 3 can't load on this build, 4 Workshop (PZMM's copy).
+--- Steam's subscribed items (getSteamWorkshopItemIDs) as a set, asked again every 5 s; nil when Steam can't say (down,
+--- or an empty answer before it has listed any this session): then folders are trusted, as before. Once it has
+--- listed some, an empty answer is believed (you unsubscribed from everything).
+function K.subSet()
+    local t = getTimestampMs()
+    if not K.SUBS or t - K.SUBS.at > 5000 then
+        local set, any = {}, false
+        local ok = pcall(function()
+            local ids = getSteamWorkshopItemIDs()
+            for i = 0, ids:size() - 1 do set[tostring(ids:get(i))], any = true, true end
+        end)
+        if any then K.SUBS_SEEN = true end
+        K.SUBS = { at = t, set = (any or (ok and K.SUBS_SEEN)) and set or nil }
+    end
+    return K.SUBS.set
+end
+--- Whether mod `d`'s folder is in Steam's Workshop content (steamapps/workshop/content/108600), read once.
+function K.inSteam(d)
+    if d.inSteam == nil then
+        local dir = ""
+        pcall(function() dir = tostring(d.modInfo:getDir() or "") end)
+        d.inSteam = dir:gsub("\\", "/"):lower():find("workshop/content/108600/", 1, true) ~= nil
+    end
+    return d.inSteam
+end
+--- 1 Subscribed (Steam's), 2 on this PC, 3 can't load on this build, 4 Workshop (PZMM's copy), 5 Unsubscribed: Steam's
+--- folder of an item you've unsubscribed from, left until Steam deletes it (the app's leftover).
 local function source(d)
     if not d.isAvailable then return 3 end
     if pzmmCopy(d) then return 4 end
-    return wsOf(d) ~= "" and 1 or 2
+    local ws = wsOf(d)
+    if ws == "" then return 2 end
+    local subs = K.subSet()
+    if subs and not subs[ws] and K.inSteam(d) then return 5 end
+    return 1
 end
-K.SOURCES = { "Subscribed", "On this PC", "Can't load", "Workshop" }
+K.SOURCES = { "Subscribed", "On this PC", "Can't load", "Workshop", T("source_unsubscribed", "Unsubscribed") }
+K.UNSUB_TIP = T("source_unsubscribed", "Unsubscribed") .. "\n" .. T("unsub_tip", "You've unsubscribed. Steam deletes these files when it gets to it, usually after the game closes. Remove deletes them now.")
 --- A to Z by name, ignoring case; the mod ID settles equal names.
 local function byName(a, b)
     local la, lb = (a.name or ""):lower(), (b.name or ""):lower()
@@ -694,8 +725,8 @@ end
 
 --- A library from its lines: its profile's name, its sections in order, and each mod's section and place.
 local function parseLibrary(lines)
-    local lib = { sections = {}, of = {}, pos = {}, lines = {}, count = {}, header = {} }
-    local section, n = nil, 0
+    local lib = { sections = {}, of = {}, pos = {}, lines = {}, count = {}, header = {}, named = {} }
+    local section, n, named = nil, 0, {}
     for _, line in ipairs(lines) do
         lib.lines[#lib.lines + 1] = line
         local profile = line:match("^# PZMM profile: (.*)$")
@@ -703,16 +734,19 @@ local function parseLibrary(lines)
         if profile then
             lib.profile = profile
         elseif name then
-            section = name ~= "" and name or "Other"
+            -- a nameless break is "" (K.groupLabel shows it as Other), so a group really called Other is its own
+            section = name
             lib.sections[#lib.sections + 1] = section
+            -- the groups Add to group, Move to and the Group filter offer, as the app's: named ones, each once
+            if name ~= "" and not named[name] then named[name], lib.named[#lib.named + 1] = true, name end
             lib.count[section] = lib.count[section] or 0
             lib.header[section] = true
         else
             local id = line:match("^[+-](.+)$")
             if id then
                 n = n + 1
-                lib.of[id], lib.pos[id] = section or "Other", n
-                lib.count[section or "Other"] = (lib.count[section or "Other"] or 0) + 1
+                lib.of[id], lib.pos[id] = section or "", n
+                lib.count[section or ""] = (lib.count[section or ""] or 0) + 1
             end
         end
     end
@@ -1285,6 +1319,7 @@ end
 
 -- the model calls this after every change
 function PZMMMods:updateView()
+    if self.filterGroup and not (self.lib and self.lib.header[self.filterGroup]) then self.filterGroup = nil end
     -- Held is one Show value with the status tabs (the app's): a tab other than All ends it
     if self.heldOnly and self.tab ~= "All" then self.heldOnly = false end
     local q = self.search and self.search:getText():lower() or ""
@@ -1351,17 +1386,28 @@ function PZMMMods:updateView()
         local hid = self.hidden and self.hidden[d.modId] or false
         if hid then counts.Hidden = counts.Hidden + 1 end
         local shown = hid == (self.tab == "Hidden") or (hid and (q ~= "" or self.tab == "Problems"))
-        if match and shown and (not keep or keep(d)) and (not self.favOnly or d.favorite) and (not self.filterKind or K.hasKind(self, d, self.filterKind)) and (not self.langOnly or d.hasLang) and (not self.filterTag or self:hasTag(d, self.filterTag)) and K.dateOk(self, d) then
-            local name = lib and (lib.of[d.modId] or "Other") or K.SOURCES[source(d)]
+        if match and shown and (not keep or keep(d)) and (not self.favOnly or d.favorite) and (not self.filterKind or K.hasKind(self, d, self.filterKind)) and (not self.langOnly or d.hasLang) and (not self.filterTag or self:hasTag(d, self.filterTag)) and K.dateOk(self, d)
+            and (not self.filterGroup or not lib or (lib.of[d.modId] or "") == self.filterGroup) then
+            local name = lib and (lib.of[d.modId] or "") or K.SOURCES[source(d)]
             table.insert(byGroup[section(name)], d)
         end
     end
     self.counts = counts
     self.entries = {}
     local pos = lib and lib.pos or {}
-    for g, name in ipairs(names) do
+    -- filtering (a search, filter, tab or other sort), as the app's: one flat list sorted across sections, no heads
+    -- (each row's group chip says where it is) and nothing folded
+    local groups, of = names, {}
+    if self:filtering() then
+        local one = {}
+        for g, name in ipairs(names) do
+            for _, d in ipairs(byGroup[g]) do one[#one + 1], of[d] = d, name end
+        end
+        groups, byGroup = { false }, { one }
+    end
+    for g, name in ipairs(groups) do
         local mods = byGroup[g]
-        if #mods > 0 or (lib and lib.header[name] and q == "" and self.tab == "All") then
+        if #mods > 0 or (name and lib and lib.header[name] and q == "" and self.tab == "All") then
             -- the library's order, then by name for mods it doesn't list yet; or the Sort menu's, within each section
             local by = self.sortBy or "order"
             local function bad(m) return SHOWN.Problems(m) and 0 or 1 end
@@ -1391,9 +1437,9 @@ function PZMMMods:updateView()
             end)
             local on = 0
             for _, d in ipairs(mods) do if d.isActive then on = on + 1 end end
-            table.insert(self.entries, { head = name, on = on, n = #mods, first = mods[1] and mods[1].modId })
-            if not self.collapsed[name] then
-                for i, d in ipairs(mods) do table.insert(self.entries, { mod = d, last = i == #mods, g = name, nextId = mods[i + 1] and mods[i + 1].modId }) end
+            if name then table.insert(self.entries, { head = name, on = on, n = #mods, first = mods[1] and mods[1].modId }) end
+            if not (name and self.collapsed[name]) then
+                for i, d in ipairs(mods) do table.insert(self.entries, { mod = d, last = i == #mods, g = name or of[d], nextId = mods[i + 1] and mods[i + 1].modId }) end
             end
         end
     end
@@ -2249,7 +2295,7 @@ function PZMMMods:drawList()
                 else
                     text(self, self.collapsed[e.head] and ">" or "v", lx + 30, top + (HEAD - H_SMALL) / 2, C.muted)
                 end
-                local right = tape(self, e.head, lx + 48, top + HEAD / 2)
+                local right = tape(self, K.groupLabel(e.head), lx + 48, top + HEAD / 2)
                 text(self, e.on .. " of " .. e.n .. " enabled", right + 12, top + (HEAD - H_SMALL) / 2, C.muted)
                 if self.collapsed[e.head] then
                     round(self, lx, top + HEAD - 8, w, 8, 8, C.panel, nil, false, true)
@@ -2259,11 +2305,11 @@ function PZMMMods:drawList()
                 if movable and mx >= lx + 6 and mx < lx + 26 and my >= top and my < top + HEAD and not self.drag then
                     tip(self, "Drag to sort\nMove the whole section, its mods with it.")
                 elseif mx >= lx and mx < lx + w - 40 and my >= top and my < top + HEAD and not self.drag then
-                    tip(self, e.head .. "\nClick to fold or unfold. Right-click to add, rename or remove sections.")
+                    tip(self, K.groupLabel(e.head) .. "\nClick to fold or unfold. Right-click to add, rename or remove sections.")
                 end
                 if movable then self.hits[#self.hits + 1] = { kind = "dragsec", g = e.head, x = lx + 6, y = top, w = 20, h = HEAD } end
                 -- a section of the profile's can be removed from its right end (on hover), as in the app
-                if movable and e.head ~= "Other" and mx >= lx and mx < lx + w and my >= top and my < top + HEAD and not self.drag then
+                if movable and e.head ~= "" and mx >= lx and mx < lx + w and my >= top and my < top + HEAD and not self.drag then
                     local tx0 = lx + w - 40
                     local tover = mx >= tx0 and mx < tx0 + 28
                     local tc = tover and C.danger or C.muted
@@ -2313,10 +2359,23 @@ function PZMMMods:drawList()
     scrollbar(self, "scroll", lx, ly, lw, lh, self.listHeight)
 end
 
---- A library line's section name ("Other" for a nameless break), or nil when it isn't a section's line.
+--- A library line's section name ("" for a nameless break), or nil when it isn't a section's line.
 local function sectionName(l)
-    local n = l:match("^# %-%-%-%s*(.*)$")
-    return n and (n ~= "" and n or "Other")
+    return l:match("^# %-%-%-%s*(.*)$")
+end
+--- How a section's key reads on screen: a nameless break ("", and the mods above every section) is "Other".
+function K.groupLabel(g) return g == "" and "Other" or g end
+--- Section `g` as every place and section request names it to the app: after 1.4.0 the nameless break (and the top)
+--- is "", so a group really called Other is "Other"; 1.4.0 and older refuse "" and read "Other" as the break, so it's
+--- "Other" there (and a real Other group is ambiguous to them). No version known: the old way.
+function K.reqGroup(g, app)
+    if g ~= "" then return g end
+    local v = {}
+    for n in tostring(app and app.version or ""):gmatch("%d+") do v[#v + 1] = tonumber(n) end
+    for i, old in ipairs({ 1, 4, 0 }) do
+        if (v[i] or 0) ~= old then return (v[i] or 0) > old and "" or "Other" end
+    end
+    return "Other"
 end
 --- Where section `g` ends in `lines` (the next section's line, else past the end), and whether it's there.
 local function sectionEnd(lines, g)
@@ -2334,14 +2393,22 @@ end
 --- A drag from a mod's or a section's handle: where it would land (a mod before a mod or at the end of a
 --- section; a section between sections), drawn as the app's red feather, with a see-through copy of what's
 --- dragged under the mouse. The list scrolls near its edges.
+--- How far a drag scrolls its list this frame with the mouse at `y` in a box `top`..`bottom` (negative: up), as the
+--- app's edgeSpeed: within 56 px of an edge, ceil(18 * depth / 56) px, 18 at the very edge; 0 outside the box.
+function K.edgeSpeed(y, top, bottom)
+    if y < top or y > bottom then return 0 end
+    local near = (y - top < 56) and -(56 - (y - top)) or (bottom - y < 56) and (56 - (bottom - y)) or 0
+    if near == 0 then return 0 end
+    return (near < 0 and -1 or 1) * math.ceil(18 * math.min(1, math.abs(near) / 56))
+end
+
 function PZMMMods:drawDrag(lx, ly, w, lh, mx, my)
     local dr = self.drag
     if not dr.moved then
         if math.abs(my - dr.y0) < 5 then return end
         dr.moved = true
     end
-    if my < ly + 30 then self.scroll = math.max(0, self.scroll - 8) end
-    if my > ly + lh - 30 then self.scroll = math.max(0, math.min(self.scroll + 8, (self.listHeight or 0) - lh)) end
+    self.scroll = math.max(0, math.min(self.scroll + K.edgeSpeed(my, ly, ly + lh), (self.listHeight or 0) - lh))
     dr.target = nil
     -- off the list, a drop does nothing
     local onList = mx >= lx and mx < lx + w and my >= ly and my <= ly + lh
@@ -2365,7 +2432,7 @@ function PZMMMods:drawDrag(lx, ly, w, lh, mx, my)
         local h = entryHeight(e, i)
         if my >= y and my < y + h then
             local g = e.head or e.g
-            local known = not self.lib or g == "Other" or self.lib.header[g]
+            local known = not self.lib or g == "" or self.lib.header[g]
             if known and e.head then
                 dr.target = { g = e.head, before = e.first, y = y + h }
             elseif known then
@@ -2387,7 +2454,7 @@ function PZMMMods:drawDrag(lx, ly, w, lh, mx, my)
     outline(self, gx, gy, gw, ROW, 6, C.accent, 0.7)
     handle(self, gx + 12, gy + half - 6)
     if dr.sec then
-        tape(self, dr.sec, gx + 32, gy + half)
+        tape(self, K.groupLabel(dr.sec), gx + 32, gy + half)
     else
         bold(self, fit(dr.mod.name, gw - 48), gx + 32, gy + math.floor((ROW - H_SMALL) / 2), C.text)
     end
@@ -2410,8 +2477,8 @@ function PZMMMods:placeMod(d, g, before)
         local found
         at, found = sectionEnd(lines, g)
         if not found then
-            -- mods outside any section are "Other": a nameless break, as the app writes it
-            if g ~= "Other" then return end
+            -- mods outside any section (""): a nameless break, as the app writes it
+            if g ~= "" then return end
             lines[#lines + 1] = "# ---"
             at = #lines + 1
         end
@@ -2427,7 +2494,7 @@ function PZMMMods:placeMod(d, g, before)
     self:remember()
     self.collapsed[g] = nil
     if not self:writeLibrary(lines) then return end
-    self:toApp("place\t" .. d.modId .. "\t" .. g .. "\t" .. (before or ""), d.name .. " moved to " .. g .. ".")
+    self:toApp("place\t" .. d.modId .. "\t" .. K.reqGroup(g, self.app) .. "\t" .. (before or ""), d.name .. " moved to " .. K.groupLabel(g) .. ".")
 end
 
 --- Move section `g` (its line and its mods) before section `before`, else to the end, as the app does.
@@ -2451,7 +2518,7 @@ function PZMMMods:placeSection(g, before)
     for k, l in ipairs(block) do table.insert(rest, at + k - 1, l) end
     if table.concat(rest, "\n") == table.concat(lines, "\n") then return end
     self:remember()
-    if self:writeLibrary(rest) then self:toApp("section\tmove\t" .. g .. "\t" .. (before or ""), g .. " moved.") end
+    if self:writeLibrary(rest) then self:toApp("section\tmove\t" .. K.reqGroup(g, self.app) .. "\t" .. (before and K.reqGroup(before, self.app) or ""), K.groupLabel(g) .. " moved.") end
 end
 
 --- A library's lines for a request, tab-separated, without its "# PZMM profile:" line.
@@ -2485,7 +2552,7 @@ end
 --- Whether the list isn't all of it in library order (a search, a tab, a filter or a sort): drags need it to be.
 function PZMMMods:filtering()
     local q = self.search and self.search:getText() or ""
-    return q ~= "" or self.tab ~= "All" or self.favOnly or self.filterKind ~= nil or self.langOnly == true or self.filterTag ~= nil or self.addedIn ~= nil or self.updatedIn ~= nil or self.updOnly == true or self.heldOnly == true or (self.sortBy or "order") ~= "order"
+    return q ~= "" or self.tab ~= "All" or self.favOnly or self.filterKind ~= nil or self.langOnly == true or self.filterTag ~= nil or self.addedIn ~= nil or self.updatedIn ~= nil or self.updOnly == true or self.heldOnly == true or self.filterGroup ~= nil or (self.sortBy or "order") ~= "order"
 end
 
 --- The list's toolbar, as the app's: Group by category (PZMM's categories), Filters, Sort, Install missing and Fix
@@ -2519,7 +2586,7 @@ function PZMMMods:drawTools(x, y, mx, my)
     local left = {}
     left[#left + 1] = { "group", TB.layers, T("tool_group", "Group by category"), T("tool_group_tip_title", "Group by category") .. "\nOne section per category: Frameworks & libraries first, Translations last. Asks first if you have sections of your own." }
     local nf = (self.favOnly and 1 or 0) + (self.filterKind and 1 or 0) + (self.langOnly and 1 or 0) + (self.filterTag and 1 or 0)
-        + (self.addedIn and 1 or 0) + (self.updatedIn and 1 or 0) + (self.updOnly and 1 or 0) + (self.heldOnly and 1 or 0)
+        + (self.addedIn and 1 or 0) + (self.updatedIn and 1 or 0) + (self.updOnly and 1 or 0) + (self.heldOnly and 1 or 0) + (self.filterGroup and 1 or 0)
     left[#left + 1] = { "filters", TB.filter, nf > 0 and ("Filters (" .. nf .. ")") or "Filters", "Filters\nFavourites, kinds and tags. Search finds authors too.", nf > 0 }
     left[#left + 1] = { "sort", TB.sort, sortName, "Sort the list\nWithin each section. Drag mods in library order." }
     -- required mods that aren't installed: PZMM can install the ones Steam told us about
@@ -2574,6 +2641,7 @@ function PZMMMods:drawTools(x, y, mx, my)
             if self.heldOnly then active[#active + 1] = { "unheld", T("filter_held", "Held") } end
             if self.addedIn then active[#active + 1] = { "unadded", T("added_chip", "Added: %1", K.windowName(self.addedIn)) } end
             if self.updatedIn then active[#active + 1] = { "unupdated", T("changed_chip", "Updated: %1", K.windowName(self.updatedIn)) } end
+            if self.filterGroup then active[#active + 1] = { "ungroup", T("group_chip", "Group: %1", self.filterGroup) } end
             local ch = BAR - 2
             local cy = y + 1
             for _, a in ipairs(active) do
@@ -2722,6 +2790,9 @@ function PZMMMods:onTool(id, mx, my)
     elseif id == "untag" then
         self.filterTag, self.scroll = nil, 0
         self:updateView()
+    elseif id == "ungroup" then
+        self.filterGroup, self.scroll = nil, 0
+        self:updateView()
     elseif id == "unupd" or id == "unheld" or id == "unadded" or id == "unupdated" then
         if id == "unupd" then self.updOnly = false elseif id == "unheld" then self.heldOnly = false elseif id == "unadded" then self.addedIn = nil else self.updatedIn = nil end
         self.scroll = 0
@@ -2753,6 +2824,13 @@ function PZMMMods:onTool(id, mx, my)
         }) do items[#items + 1] = it end
         for _, c in ipairs(K.kindNames()) do
             items[#items + 1] = { c, function() self.filterKind = self.filterKind ~= c and c or nil; redo() end, function() return self.filterKind == c end, keep = true }
+        end
+        -- the groups (the library's sections): just one's mods, in any sort; the one on, clicked again, is off (the app's)
+        if self.lib and #self.lib.named > 0 then
+            items[#items + 1] = { T("filter_group", "Group"), heading = true }
+            for _, g in ipairs(self.lib.named) do
+                items[#items + 1] = { g, function() self.filterGroup = self.filterGroup ~= g and g or nil; redo() end, function() return self.filterGroup == g end, keep = true }
+            end
         end
         -- the tags PZMM has on mods
         local seen, tagList = {}, {}
@@ -2789,7 +2867,7 @@ function PZMMMods:onTool(id, mx, my)
     elseif id == "more" then
         local items = {
             { T("menu_select_all", "Select all"), function() self:selectShown() end },
-            { T("tool_section", "New section"), function() self:newSection() end },
+            { T("tool_section", "New section"), function() self:newSection() end, disabled = self:filtering(), tip = T("tool_section", "New section") .. "\n" .. T("new_section_tip", "Make a section of the picked mods, or an empty one at the end when none are picked (right-click a section for more)") },
         }
         -- the game's presets: copy or delete one
         for _, it in ipairs(self:presetItems(mx, my)) do items[#items + 1] = it end
@@ -2819,7 +2897,7 @@ function PZMMMods:onTool(id, mx, my)
         if kept > 0 then self:say(kept .. (kept == 1 and " favourite" or " favourites") .. " left as " .. (kept == 1 and "it was." or "they were.")) end
     elseif id == "bulkMove" then
         local items = { { "Top of the list", function() self:moveMany(PZMMMods.MOVE_TOP) end } }
-        for _, g in ipairs(self.lib and self.lib.sections or {}) do items[#items + 1] = { "Under " .. g, function() self:moveMany(g) end } end
+        for _, g in ipairs(self.lib and self.lib.named or {}) do items[#items + 1] = { "Under " .. g, function() self:moveMany(g) end } end
         items[#items + 1] = { "Bottom of the list", function() self:moveMany(PZMMMods.MOVE_BOTTOM) end }
         self:menu(items, mx, my)
     elseif id == "bulkHide" then
@@ -2846,7 +2924,7 @@ function PZMMMods:onTool(id, mx, my)
     elseif id == "clear" then
         self.search:setText("")
         self.langOnly = false
-        self.filterTag, self.addedIn, self.updatedIn, self.updOnly, self.heldOnly = nil, nil, nil, false, false
+        self.filterTag, self.addedIn, self.updatedIn, self.updOnly, self.heldOnly, self.filterGroup = nil, nil, nil, false, false, nil
         self.tab, self.favOnly, self.filterKind, self.sortBy, self.scroll = "All", false, nil, "order", 0
         self:updateView()
     elseif id == "check" then
@@ -2935,7 +3013,7 @@ function PZMMMods:groupByCategory()
     for _, n in ipairs(order) do known[n] = true end
     local own = {}
     for _, n in ipairs(self.lib and self.lib.sections or {}) do
-        if not known[n] and n ~= "Other" then own[#own + 1] = n end
+        if not known[n] and n ~= "" then own[#own + 1] = n end
     end
     self:countNeeded()
     local function group()
@@ -3496,8 +3574,10 @@ end
 -- sentinels, so a section really called "top" or "bottom" isn't taken for them
 PZMMMods.MOVE_TOP, PZMMMods.MOVE_BOTTOM = {}, {}
 
---- Move the picked mods, in their list order, to the end of section `g` (or the top or bottom of the list).
-function PZMMMods:moveMany(g)
+--- Move the picked mods, in their list order, to the end of section `g` (or the top or bottom of the list). With
+--- `new`, into a new section of that name instead: its line at the end of the section the first picked mod is in
+--- (the list's end when none is listed, or none is picked), the picked mods right after it, as the app's New group.
+function PZMMMods:moveMany(g, new)
     if not self:ensureLibrary() then return end
     local all, lines, moving = self:libLines(), {}, {}
     for _, l in ipairs(all) do
@@ -3513,6 +3593,17 @@ function PZMMMods:moveMany(g)
     end
     table.sort(extra, byName)
     for _, d in ipairs(extra) do moving[#moving + 1] = (d.isActive and "+" or "-") .. d.modId end
+    if new then
+        -- after the lines kept above the next section's line after the first picked one (none listed: the end)
+        local at, kept, first = #lines + 1, 0, false
+        for _, l in ipairs(all) do
+            local id = l:match("^[+-](.+)$")
+            if first and sectionName(l) then at = kept + 1; break end
+            if id and self.picked[id] then first = true else kept = kept + 1 end
+        end
+        table.insert(lines, at, "# --- " .. new)
+        g = new
+    end
     local at
     if g == PZMMMods.MOVE_TOP then
         -- right under the first section's line: above it they'd fall into the implicit "Other", shown last
@@ -3524,13 +3615,53 @@ function PZMMMods:moveMany(g)
     elseif g == PZMMMods.MOVE_BOTTOM then
         at = #lines + 1
     else
-        at = sectionEnd(lines, g)
+        local found
+        at, found = sectionEnd(lines, g)
+        if not found then return self:say(g .. " isn't there any more: nothing moved.") end
     end
     for k, l in ipairs(moving) do table.insert(lines, at + k - 1, l) end
+    lines = K.tidyBreaks(lines)
     if table.concat(lines, "\n") == table.concat(all, "\n") then return end
     self:remember()
     self.picked = {}
-    if self:writeLibrary(lines) then self:toApp("library\t" .. libBody(lines), #moving .. " mods moved.") end
+    if self:writeLibrary(lines) then
+        self:toApp("library\t" .. libBody(lines), new and (new .. " added.") or (#moving .. " mods moved."))
+        return true
+    end
+end
+--- The library's lines without the nameless breaks ("# ---") that break nothing, as the app's tidyBreaks: one is kept
+--- only after a named section and right before a mod (an empty one, one above every section, or a second in a row goes).
+function K.tidyBreaks(lines)
+    local out, named = {}, false
+    for i, l in ipairs(lines) do
+        local n = l:match("^# %-%-%-%s*(.*)$")
+        if not n then
+            out[#out + 1] = l
+        elseif n ~= "" then
+            named = true
+            out[#out + 1] = l
+        elseif named and (lines[i + 1] or ""):match("^[+-]") then
+            named = false
+            out[#out + 1] = l
+        end
+    end
+    return out
+end
+--- Mods `set` (id -> true) into section `g`, or a new one called `new` (moveMany's), as one Undo step. The picked
+--- ones stay picked when it's one mod or nothing moved.
+function PZMMMods:intoGroup(set, g, new)
+    local was, n = self.picked, 0
+    for _ in pairs(set) do n = n + 1 end
+    self.picked = set
+    local moved = self:moveMany(g, new)
+    if n < 2 or self.picked == set then self.picked = was end
+    -- into a folded group (a new one's name may have an old fold): unfolded, so they're seen landing
+    local to = new or g
+    if moved and to and self.collapsed[to] then
+        self.collapsed[to] = nil
+        K.writeCollapsed(self.collapsed)
+        self:updateView()
+    end
 end
 
 --- The picked mods to the top or bottom as one block, as the app's bulk move: in the library list (their order
@@ -3582,25 +3713,26 @@ function PZMMMods:moveOne(d, g)
     self.picked = was
 end
 
---- A new section at the end of the list, or under the picked mod's section, as the app's Add separator.
-function PZMMMods:newSection()
-    local under = self.selected and self.lib and self.lib.of[self.selected.modId]
+--- New group (More, a row's Add to group): asks its name, then a section holding just the mods in `set` (id -> true;
+--- by default the picked ones, else the selected one; none: an empty one at the list's end), as the app's.
+function PZMMMods:newSection(set)
+    if not set then
+        set = {}
+        local any = false
+        for id in pairs(self.picked) do set[id], any = true, true end
+        if not any and self.selected then set[self.selected.modId] = true end
+    end
+    local n = 0
+    for _ in pairs(set) do n = n + 1 end
     local taken, name = {}, "New section"
-    for _, n in ipairs(self.lib and self.lib.sections or {}) do taken[n:lower()] = true end
-    local n = 2
-    while taken[name:lower()] do name = "New section " .. n; n = n + 1 end
-    self:prompt("New section" .. (under and (", under " .. under) or ""), name, "Add", function(typed)
+    for _, g in ipairs(self.lib and self.lib.sections or {}) do taken[g:lower()] = true end
+    local free = 2
+    while taken[name:lower()] do name = "New section " .. free; free = free + 1 end
+    local title = n == 0 and T("tool_section", "New section") or n == 1 and T("new_section_one", "New section with 1 mod") or T("new_section_n", "New section with %1 mods", n)
+    self:prompt(title, name, "Add", function(typed)
         if not self:ensureLibrary() then return end
         typed = self:sectionNameOk(typed)
-        if not typed then return end
-        self:remember()
-        local lines = self:libLines()
-        local g = under or self.lib.sections[#self.lib.sections]
-        local at = g and sectionEnd(lines, g) or #lines + 1
-        table.insert(lines, at, "# --- " .. typed)
-        if self:writeLibrary(lines) then
-            if g then self:toApp("section\tadd\t" .. typed .. "\t" .. g, typed .. " added.") else self:toApp("library\t" .. libBody(lines), typed .. " added.") end
-        end
+        if typed then self:intoGroup(set, nil, typed) end
     end, nil, 60)
 end
 
@@ -4695,8 +4827,8 @@ end
 
 --- A name for a new or renamed section: trimmed, one line, not taken. nil (and why, in the footer) if not.
 function PZMMMods:sectionNameOk(name, old)
-    name = (name or ""):gsub("^%s+", ""):gsub("%s+$", "")
-    if name == "" or #name > 60 or name:find("%c") then
+    name = (name or ""):gsub("%c", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    if name == "" or #name > 60 then
         self:say("A section's name is one line of up to 60 characters.")
         return nil
     end
@@ -4724,12 +4856,12 @@ function PZMMMods:removeSection(g)
         end
     end
     if done then self:remember() end
-    if done and self:writeLibrary(lines) then self:toApp("section\tremove\t" .. g, g .. " removed" .. (empty and "." or ": its mods are under Other now.")) end
+    if done and self:writeLibrary(lines) then self:toApp("section\tremove\t" .. K.reqGroup(g, self.app), g .. " removed" .. (empty and "." or ": its mods are under Other now.")) end
 end
 
 --- Rename section `g` (asks for the new name).
 function PZMMMods:renameSection(g)
-    self:prompt("Rename " .. g, g, "Rename", function(name)
+    self:prompt("Rename " .. K.groupLabel(g), g, "Rename", function(name)
         if not self:ensureLibrary() then return end
         name = self:sectionNameOk(name, g)
         if not name or name == g then return end
@@ -4740,7 +4872,7 @@ function PZMMMods:renameSection(g)
         if not done then return end
         self:remember()
         self.collapsed[name] = self.collapsed[g]
-        if self:writeLibrary(lines) then self:toApp("section\trename\t" .. g .. "\t" .. name, g .. " is now " .. name .. ".") end
+        if self:writeLibrary(lines) then self:toApp("section\trename\t" .. K.reqGroup(g, self.app) .. "\t" .. name, K.groupLabel(g) .. " is now " .. name .. ".") end
     end, nil, 60)
 end
 
@@ -4748,7 +4880,7 @@ end
 function PZMMMods:sectionMenu(g)
     local items = {
         { "New section below", function()
-            self:prompt("New section, under " .. g, "", "Add", function(name)
+            self:prompt("New section, under " .. K.groupLabel(g), "", "Add", function(name)
                 if not self:ensureLibrary() then return end
                 name = self:sectionNameOk(name)
                 if not name then return end
@@ -4756,13 +4888,13 @@ function PZMMMods:sectionMenu(g)
                 local lines = self:libLines()
                 local at = sectionEnd(lines, g)
                 table.insert(lines, at, "# --- " .. name)
-                if self:writeLibrary(lines) then self:toApp("section\tadd\t" .. name .. "\t" .. g, name .. " added.") end
+                if self:writeLibrary(lines) then self:toApp("section\tadd\t" .. name .. "\t" .. K.reqGroup(g, self.app), name .. " added.") end
             end, nil, 60)
         end },
     }
     if not self.lib or self.lib.header[g] then
         items[#items + 1] = { "Rename", function() self:renameSection(g) end }
-        if g ~= "Other" then
+        if g ~= "" then
             items[#items + 1] = { "Remove section", function() self:removeSection(g) end, danger = true }
         end
     end
@@ -4778,6 +4910,42 @@ end
 --- Ask for a line of text: `fn(text)` runs on `label` (or Enter).
 function PZMMMods:prompt(title, text0, label, fn, mask, max)
     PZMMOverlay.show({ ask = { title = title, input = text0, mask = mask, max = max, choices = { { label, fn } } } })
+end
+
+-- a group's chip colour, as the app's: h = (h * 31 + byte) % 2^24 over its name's UTF-8 bytes, palette[h % 8 + 1]
+K.HUES = { hex("c0504d"), hex("d9883b"), hex("c9b03c"), hex("6aa84f"), hex("3d9e9e"), hex("4a86c5"), hex("8064a2"), hex("c25b9b") }
+--- The palette index (0-7) of a name given as UTF-16 char codes (Kahlua's string.byte gives those, not bytes):
+--- each encoded to UTF-8 first, a surrogate pair as one 4-byte character.
+function K.hueIndex(codes)
+    local h, i = 0, 1
+    local function add(b) h = (h * 31 + b) % 16777216 end
+    while i <= #codes do
+        local c, lo = codes[i], codes[i + 1]
+        if c >= 0xD800 and c < 0xDC00 and lo and lo >= 0xDC00 and lo < 0xE000 then
+            c, i = 0x10000 + (c - 0xD800) * 1024 + (lo - 0xDC00), i + 1
+        end
+        if c < 0x80 then
+            add(c)
+        elseif c < 0x800 then
+            add(0xC0 + math.floor(c / 64)); add(0x80 + c % 64)
+        elseif c < 0x10000 then
+            add(0xE0 + math.floor(c / 4096)); add(0x80 + math.floor(c / 64) % 64); add(0x80 + c % 64)
+        else
+            add(0xF0 + math.floor(c / 262144)); add(0x80 + math.floor(c / 4096) % 64); add(0x80 + math.floor(c / 64) % 64); add(0x80 + c % 64)
+        end
+        i = i + 1
+    end
+    return h % 8
+end
+K.HUE_OF = {}
+--- Group `g`'s chip colour (the same name, the same colour everywhere).
+function K.groupHue(g)
+    if not K.HUE_OF[g] then
+        local codes = {}
+        for i = 1, #g do codes[i] = g:byte(i) end
+        K.HUE_OF[g] = K.HUES[K.hueIndex(codes) + 1]
+    end
+    return K.HUE_OF[g]
 end
 
 function PZMMMods:drawRow(e, x, y, w, mx, my)
@@ -4878,6 +5046,10 @@ function PZMMMods:drawRow(e, x, y, w, mx, my)
                 or "Subscribed\nSubscribed in Steam; Steam keeps it updated. Click: its page in Steam, where you can unsubscribe.")
         end
         pillHit = { kind = "fn", fn = function() self:openWorkshop(ws) end, x = right, y = py, w = r0 - right, h = H_SMALL + 4 }
+    elseif src == 5 then
+        local r0 = right
+        right = pill(self, K.SOURCES[5], right, py, C.muted, false, lit)
+        if mx >= right and mx < r0 and my >= y and my < y + ROW then tip(self, K.UNSUB_TIP) end
     elseif src == 2 then
         right = pill(self, "Local", right, py, C.muted, false, lit, nil, K.FOLDER)
     end
@@ -4925,6 +5097,13 @@ function PZMMMods:drawRow(e, x, y, w, mx, my)
         tx = tx + width(d.modId) + 10
     end
     local cy = y + (ROW - H_SMALL - 2) / 2
+    -- its group (section) in the flat list (filtering hides the heads), as the app's chip: a 3 px bar in the group's
+    -- colour; none outside a named one, as the app's
+    if self.lib and e.g ~= "" and self:filtering() and tx + width(e.g) + 40 < right then
+        rect(self, tx, cy + 1, 3, H_SMALL, K.groupHue(e.g), 1)
+        text(self, e.g, tx + 8, mid, lit and C.onSelected or C.muted)
+        tx = tx + 8 + width(e.g) + 10
+    end
     -- New (installed since you last played), what kind of mod it is, its language when that filter is on
     if self:isNew(d) and tx + 60 < right then
         local cx = tx
@@ -5203,8 +5382,7 @@ function PZMMMods:drawOrder(x, y, w, h)
     local od = self.odrag
     if od and not od.moved and math.abs(my - od.y0) >= 5 then od.moved = true end
     if od and od.moved then
-        if my < top + 20 then self.orderScroll = math.max(0, self.orderScroll - 8) end
-        if my > top + room - 20 then self.orderScroll = math.max(0, math.min(self.orderScroll + 8, full - room)) end
+        self.orderScroll = math.max(0, math.min(self.orderScroll + K.edgeSpeed(my, top, top + room), full - room))
         od.to = math.max(1, math.min(#self.order + 1, math.floor((my - top + self.orderScroll) / rh + 0.5) + 1))
     end
     self:setStencilRect(x - 6, top, w + 6, room)
@@ -5684,6 +5862,8 @@ function PZMMMods:drawDetails(d, x, y, w, bottom)
         acts[#acts + 1] = { T("details_restore", "Restore previous version"), nil, function() self:request("rollback\t" .. d.modId, d.name .. ": PZMM asks before it puts the previous version back.") end, TB.undo }
     elseif rk == "steam" then
         acts[#acts + 1] = { T("details_unsubscribe", "Unsubscribe on the Workshop page"), nil, function() self:removeMods({ d }) end, TB.steam }
+    elseif rk == "leftover" then
+        acts[#acts + 1] = { T("menu_remove", "Remove"), nil, function() self:removeMods({ d }) end, TB.trash }
     end
     local ax = x
     for _, a in ipairs(acts) do
@@ -5700,7 +5880,7 @@ function PZMMMods:drawDetails(d, x, y, w, bottom)
         text(self, fit(tostring(value), w - 110), x + 110, y, C.text)
         y = y + H_SMALL + 6
     end
-    field("Source", pzmmCopy(d) and T("details_source_pzmm", "Workshop: PZMM's copy of a Workshop item") or (ws and ws ~= "" and ws ~= "0") and T("details_source_ws", "Subscribed on the Workshop") or T("details_source_local", "Local file"))
+    field("Source", source(d) == 5 and K.SOURCES[5] or pzmmCopy(d) and T("details_source_pzmm", "Workshop: PZMM's copy of a Workshop item") or (ws and ws ~= "" and ws ~= "0") and T("details_source_ws", "Subscribed on the Workshop") or T("details_source_local", "Local file"))
     -- Steam says a newer version is waiting: the app's update box
     local stNew = self:steamOf(d)
     if stNew and stNew.state == "NeedsUpdate" then
@@ -6901,11 +7081,19 @@ function PZMMMods:onMouseDown(x, y)
                     end
                     self.anchor = h.mod
                 else
+                    local np = 0
+                    for _ in pairs(self.picked) do np = np + 1 end
                     self.picked = {}
                     self.anchor = h.mod
                     self.orderSel = nil
-                    self.selected = h.mod
-                    self.checkOpen = false
+                    -- the selected row again: deselected, its details closed (as their X); with several picked, the
+                    -- click picks just it (the app's)
+                    if self.selected == h.mod and np <= 1 then
+                        self.selected = nil
+                    else
+                        self.selected = h.mod
+                        self.checkOpen = false
+                    end
                 end
             end
             return true
@@ -7130,6 +7318,7 @@ function PZMMMods:manyMenu(list, d)
         { "Disable " .. n .. " mods", function() self:onTool("bulkOff") end },
         { T("menu_to_top", "Move to the top of the load order"), function() self:blockMove(ids, true) end, disabled = self:filtering() },
         { T("menu_to_bottom", "Move to the bottom of the load order"), function() self:blockMove(ids, false) end, disabled = self:filtering() },
+        K.groupItem(self, list),
         false,
         { favs and T("menu_unfavourite", "Remove from favourites") or T("menu_favourite", "Add to favourites"), function()
             for _, m in ipairs(list) do self.model:setFavorite(m.modId, not favs) end
@@ -7152,13 +7341,27 @@ function PZMMMods:manyMenu(list, d)
     -- Hold / Allow updates after Hide, by the clicked row (holdMods skips the ones that can't)
     if d and K.canHold(self, d) then
         local held = K.isHeld(self, d)
-        table.insert(items, 8, { held and T("menu_allow_updates", "Allow updates") or T("menu_hold_updates", "Hold updates"), function() self:holdMods(list, not held) end, icon = held and TB.unlock or TB.lock, disabled = not self.app })
+        table.insert(items, 9, { held and T("menu_allow_updates", "Allow updates") or T("menu_hold_updates", "Hold updates"), function() self:holdMods(list, not held) end, icon = held and TB.unlock or TB.lock, disabled = not self.app })
     end
     if self.app then
         items[#items + 1] = false
         items[#items + 1] = { T("menu_remove", "Remove"), function() self:removeMods(list) end, danger = true }
     end
     self:menu(items)
+end
+
+--- A row menu's Add to group...: a second menu with New group... and each section (to its end) for `list`'s mods.
+--- Not while a search, filter or sort is on, as other moves.
+function K.groupItem(ui, list)
+    local mx0, my0 = getMouseX(), getMouseY()
+    return { T("menu_add_group", "Add to group..."), function()
+        local set = {}
+        for _, m in ipairs(list) do set[m.modId] = true end
+        local items = { { T("menu_new_group", "New group..."), function() ui:newSection(set) end } }
+        for _, g in ipairs(ui.lib and ui.lib.named or {}) do items[#items + 1] = { g, function() ui:intoGroup(set, g) end } end
+        -- where the row menu was (the mouse when it was built), as the app's
+        ui:menu(items, mx0 - ui:getAbsoluteX(), my0 - ui:getAbsoluteY())
+    end, disabled = ui:filtering(), icon = TB.layers }
 end
 
 --- Maps, with this map mod picked in its list.
@@ -7239,16 +7442,23 @@ end
 function PZMMMods:removeKind(d)
     if d.ghost then return nil end
     if pzmmCopy(d) or (self.installed and self.installed[d.modId]) then return "pzmm" end
-    if source(d) == 1 then return "steam" end
+    local src = source(d)
+    if src == 1 then return "steam" end
+    if src == 5 then return "leftover" end
     return nil
 end
 --- Remove these mods: PZMM's copies through PZMM (it asks first), subscriptions by unsubscribing on their page.
 function PZMMMods:removeMods(list)
-    local ids, steam = {}, {}
+    local ids, steam, left = {}, {}, 0
     for _, d in ipairs(list) do
         local k = self:removeKind(d)
         if k == "pzmm" then ids[#ids + 1] = d.modId elseif k == "steam" then steam[#steam + 1] = d end
+        -- an unsubscribed leftover: PZMM deletes Steam's files (it asks first); without it, Steam does in time
+        if k == "leftover" then
+            if self.app then ids[#ids + 1] = d.modId else left = left + 1 end
+        end
     end
+    if left > 0 then self:say(T("unsub_no_app", "Steam deletes these files when it gets to it, usually after the game closes.")) end
     if #ids > 0 then
         if self.app then
             self:request("remove\t" .. table.concat(ids, ","), (#ids == 1 and list[1] and #list == 1 and list[1].name or (#ids .. " mods")) .. ": PZMM asks before it removes.")
@@ -7262,7 +7472,7 @@ function PZMMMods:removeMods(list)
     elseif #steam > 0 then
         self:say(#steam .. " of them are Steam subscriptions: unsubscribe on their Workshop pages (Workshop page in each one's menu).")
     end
-    if #ids == 0 and #steam == 0 then self:say("Those are your own local mods: remove their folders from Zomboid/mods.") end
+    if #ids == 0 and #steam == 0 and left == 0 then self:say("Those are your own local mods: remove their folders from Zomboid/mods.") end
 end
 --- Install a mod that isn't installed by its mod ID: PZMM finds its Workshop item (and asks first).
 function PZMMMods:findMod(id)
@@ -7308,6 +7518,7 @@ function PZMMMods:modMenuItems(d)
     elseif inOrder then
         items[#items + 1] = { T("menu_pin", "Pin its place in the load order"), function() self:pin(d, true) end, disabled = #self:activeOrder() < 2 }
     end
+    items[#items + 1] = K.groupItem(self, K.batch(self, d))
     local hid = self.hidden[d.modId]
     items[#items + 1] = false
     items[#items + 1] = { d.favorite and T("menu_unfavourite", "Remove from favourites") or T("menu_favourite", "Add to favourites"), function()
@@ -7333,7 +7544,7 @@ function PZMMMods:modMenuItems(d)
     if isMap then items[#items + 1] = { T("menu_maps", "Show in Maps"), function() self:showInMaps(d) end } end
     -- last, as the app's: Remove (PZMM's copy, with PZMM), or unsubscribe on its page
     local rk = self:removeKind(d)
-    if rk == "pzmm" and self.app then
+    if (rk == "pzmm" and self.app) or rk == "leftover" then
         items[#items + 1] = false
         items[#items + 1] = { T("menu_remove", "Remove"), function() self:removeMods({ d }) end, danger = true }
     elseif rk == "steam" then
@@ -7730,6 +7941,7 @@ function PZMMOverlay:prerender()
                 if ticked ~= nil then ic = ticked and TB.check or nil end
                 if ic then self:drawTextureScaled(ic, x + 14, iy + math.floor((IH - 14) / 2), 14, 14, a, tc.r, tc.g, tc.b) end
                 self:drawText(it[1], x + 14 + ind, iy + 6, tc.r, tc.g, tc.b, a, SMALL)
+                if lit and it.tip then tip(self, it.tip) end
                 if not off then self.hits[idx] = { x = x, y = iy, w = w, h = IH, fn = it[2], keep = it.keep } end
                 iy = iy + IH
             else
@@ -7739,6 +7951,9 @@ function PZMMOverlay:prerender()
         end
     end
 end
+
+-- a menu item's tip (`tip`), over the menu
+function PZMMOverlay:render() drawTip(self) end
 
 --- The wheel scrolls an ask's checklist.
 function PZMMOverlay:onMouseWheel(del)
@@ -8529,7 +8744,7 @@ function PZMMMods:nudge(dir)
         end
     end
     if not g or not self:ensureLibrary() then return end
-    if not (g == "Other" or self.lib.header[g]) then return end
+    if not (g == "" or self.lib.header[g]) then return end
     self:placeMod(d, g, before)
 end
 
