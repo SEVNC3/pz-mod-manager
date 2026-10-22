@@ -35,7 +35,7 @@
   import Settings from "$lib/Settings.svelte";
   import { applyPrefs, prefs } from "$lib/prefs.svelte";
   import ModTable from "$lib/ModTable.svelte";
-  import { autosort, bisectGroups, bisectNext, bisectOrder, bisectRound, bisectUpgrade, dependants, findProblems, groupByCategory, loadList, moveSection, neededBy, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortByName, sortLoadOrder, syncOrder, tiers } from "$lib/order";
+  import { autosort, bisectGroups, bisectNext, bisectOrder, bisectRound, bisectUpgrade, dependants, findProblems, groupByCategory, loadList, moveSection, moveToGroup, neededBy, newGroup, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortByName, sortLoadOrder, syncOrder, tiers, freeName, leftoverSiblings, leftoverAck } from "$lib/order";
   import LoadOrder from "$lib/LoadOrder.svelte";
   import WindowControls from "$lib/WindowControls.svelte";
   import ProfilePicker from "$lib/ProfilePicker.svelte";
@@ -258,6 +258,8 @@
   /** Only mods first seen, or changed, in the last this many days (0: any time). Not remembered: they're relative. */
   let addedDays = $state(0);
   let changedDays = $state(0);
+  /** Only the mods of this section (any sort); "": every section. */
+  let group = $state("");
   /** Presets, favourites and hidden mods the game's mod menu and the Workshop mod managers keep (shared with them),
    * and the player's own tags (PZMM's). */
   let marks = $state<Marks>({ presets: [], favourites: [], hidden: [], tags: {} });
@@ -309,7 +311,7 @@
   });
   const language = $derived(view?.language ?? "");
 
-  const filtering = $derived(search.trim() !== "" || filter !== "all" || kind !== "" || tag !== "" || (inLanguage && !!language) || addedDays > 0 || changedDays > 0 || sortBy !== "order");
+  const filtering = $derived(search.trim() !== "" || filter !== "all" || kind !== "" || tag !== "" || (inLanguage && !!language) || addedDays > 0 || changedDays > 0 || group !== "" || sortBy !== "order");
   // --- sections: separators can be collapsed (remembered per profile on this computer) ---
   let collapsed = $state<Set<string>>(new Set());
   const collapsedKey = $derived(`pzmm.collapsed.${view?.profile ?? ""}`);
@@ -321,13 +323,23 @@
     }
   });
   function toggleSection(name: string) {
+    setFold(name, !collapsed.has(name));
+  }
+  /** Fold (`on`) or unfold section `name`. */
+  function setFold(name: string, on: boolean) {
     const next = new Set(collapsed);
-    next.has(name) ? next.delete(name) : next.add(name);
+    on ? next.add(name) : next.delete(name);
     collapsed = next;
     try {
       localStorage.setItem(collapsedKey, JSON.stringify([...next]));
     } catch {}
   }
+  // named groups once each (a repeated name moves to its first): Move to, Add to group and the Group filter
+  const separators = $derived([...new Set(rows.flatMap((r) => (r.kind === "sep" && r.name ? [r.name] : [])))]);
+  // the group filtered on was renamed or removed: the filter goes with it
+  $effect(() => {
+    if (group && !separators.includes(group)) group = "";
+  });
   /** For each row, the separator it sits under ("" above the first one). */
   const sectionOf = $derived.by(() => {
     let current = "";
@@ -350,6 +362,7 @@
         if (filter === "held" && !held.has(r.id)) return false;
         if (addedDays && (stats[r.id]?.first_seen ?? 0) < Date.now() / 1000 - addedDays * 86400) return false;
         if (changedDays && (stats[r.id]?.modified ?? 0) < Date.now() / 1000 - changedDays * 86400) return false;
+        if (group && sectionOf[i] !== group) return false;
         // hidden mods only show under Hidden, or when searched for
         if (filter === "hidden" ? !hidden.has(r.id) : hidden.has(r.id) && !q && filter !== "problems") return false; // Problems counts them too
         if (kind && !cats?.kinds[r.id]?.includes(kind)) return false;
@@ -387,6 +400,8 @@
     // not before the profile has loaded (the requests wait in their queue file); every focus, but not twice at
     // once: what comes meanwhile is taken right after
     if (!view) return;
+    // not while a section's name is typed (an edit would move the row it names): right after
+    if (editingSep !== null) return void (afterRename = true);
     if (takingRequests) return void (takeAgain = true);
     takingRequests = true;
     api.gameBusy(true).catch(() => {});
@@ -402,6 +417,13 @@
   }
   let takingRequests = false;
   let takeAgain = false;
+  let afterRename = $state(false);
+  $effect(() => {
+    if (editingSep === null && afterRename) {
+      afterRename = false;
+      fromGame();
+    }
+  });
   /** A question for the game: it waits for a dialog already open, and asks again if another one takes its place
    * (so neither cancels the other's answer). */
   async function askGame(question: string, yes: Choice, lines: string[] = []) {
@@ -430,6 +452,8 @@
       // why it wasn't done (in English, as the game is): the game's sorting edits settle on the ack
       let why = "";
       const sorting = r.action === "place" || r.action === "section" || r.action === "library";
+      // a section's name being typed (started while this batch ran): its edit would move the row it names
+      while (sorting && editingSep !== null) await new Promise((done) => setTimeout(done, 200));
       // a profile switch earlier in this batch: sorting edits made for the old profile aren't this one's
       // i18n-ignore: the game's words, in English as the game is
       if (sorting && r.profile !== view?.profile) why = `PZMM's profile is now ${view?.profile}.`;
@@ -515,16 +539,16 @@
       api.gameAck([{ id: r.id, ok: !why, why }]).catch(() => {});
     }
   }
-  /** A drag in the game's My mods: the mod before `before`, else at the end of `section` (the game names
-   * mods before any section, and those after a nameless break, "Other"). Returns why it wasn't done ("" if it was). */
+  /** A drag in the game's My mods: the mod before `before`, else at the end of `section` ("": the mods after the nameless
+   * break, or before any section; "Other" is a group really called Other). Returns why it wasn't done ("" if it was). */
   async function placeFromGame(r: Extract<GameRequest, { action: "place" }>) {
     const from = rows.findIndex((x) => x.kind === "mod" && x.id === r.mod);
     if (from < 0) return `${r.mod} isn't in your PZMM profile.`;
     let to = r.before ? rows.findIndex((x) => x.kind === "mod" && x.id === r.before) : -1;
     if (to < 0) {
-      const s = rows.findIndex((x) => x.kind === "sep" && (x.name || "Other") === r.section);
-      // the mods before any section: the game calls them "Other" too
-      if (s < 0 && r.section === "Other") {
+      const s = rows.findIndex((x) => x.kind === "sep" && x.name === r.section);
+      // the mods before any section: the game names them "" too
+      if (s < 0 && r.section === "") {
         // no nameless break yet: as the game makes it, one at the end with the mod after it
         const next: Row[] = [...rows.filter((_, i) => i !== from), { kind: "sep", name: "" }, rows[from]];
         return (await commit(next)) === false ? `PZMM couldn't move ${r.mod}: see its activity log.` : "";
@@ -689,12 +713,26 @@
 
   /** PZMM's copies of mods the game asks to remove, as Remove does (it asks first). Returns why they weren't removed. */
   async function removeFromGame(ids: string[]) {
+    // a Subscribed row the game takes for a leftover (it asks Steam itself): Steam asked again, and the list read afresh
+    const subscribed = (id: string) => { const m = mods.get(id); return !!m && !m.missing && m.source.startsWith("steam:") && !m.unsubscribed; };
+    let answered = true;
+    if (ids.some(subscribed)) {
+      answered = await api.steamSubscriptions().catch(() => false);
+      await loadView();
+    }
     const ours = ids.filter((id) => mods.get(id) && removable(mods.get(id)!));
+    // Steam couldn't say whether those are still subscribed
+    const unchecked = answered ? [] : ids.filter(subscribed);
+    // i18n-ignore: the game's words, in English as the game is
+    if (!ours.length && unchecked.length) return `${unchecked.join(", ")}: Steam needs to be running to check you've unsubscribed, so not removed.`;
     // i18n-ignore: the game's words, in English as the game is
     if (!ours.length) return "PZMM didn't install those, so it can't remove them.";
     const skipped = ids.length - ours.length;
+    const asked = ours.map((id) => mods.get(id)!);
     // i18n-ignore: the game's words, in English as the game is
-    return (await removeMods(ours, skipped ? [t("confirm.removeSkipped", { count: skipped })] : [])) ? "" : "Not removed: you said no in PZMM, or see its activity log.";
+    if (!(await removeMods(ours, skipped ? [t("confirm.removeSkipped", { count: skipped })] : []))) return "Not removed: you said no in PZMM, or see its activity log.";
+    // a leftover still there: Steam didn't answer, or says it's subscribed
+    return leftoverAck(asked, mods);
   }
 
   /** A mod the game wants by its ID: the Workshop item that surely provides it, as Install missing finds it, after asking. */
@@ -851,23 +889,26 @@
 
   /** A section added, renamed or removed in the game's My mods. Returns why it wasn't done ("" if it was). */
   async function sectionFromGame(r: Extract<GameRequest, { action: "section" }>) {
-    const at = (name: string) => rows.findIndex((x) => x.kind === "sep" && (x.name || "Other") === name);
+    // "": the nameless break; "Other" is a group really called Other
+    const at = (name: string) => rows.findIndex((x) => x.kind === "sep" && x.name === name);
     const i = at(r.name);
-    const done = (ok: boolean | undefined) => (ok === false ? `PZMM couldn't change ${r.name}: see its activity log.` : "");
+    // i18n-ignore: the game's words, in English as the game is
+    const label = r.name || "the nameless group (the mods after a break, or at the top of the list)";
+    const done = (ok: boolean | undefined) => (ok === false ? `PZMM couldn't change ${label}: see its activity log.` : "");
     if (r.op === "add") {
       // i18n-ignore: the game's words, in English as the game is
-      if (!r.to || i >= 0) return i >= 0 ? "" : "No section to add it under.";
-      // at the end of the section it was added under (else the end of the list)
-      const s = at(r.to);
+      if (i >= 0) return "";
+      // at the end of the section it was added under (none: the nameless break, else the end of the list)
+      const s = at(r.to ?? "");
       let end = s < 0 ? rows.length : s + 1;
       while (s >= 0 && end < rows.length && rows[end].kind !== "sep") end++;
       return done(await commit([...rows.slice(0, end), { kind: "sep", name: r.name }, ...rows.slice(end)]));
     }
     // i18n-ignore: the game's words, in English as the game is
-    if (i < 0) return `There's no section called ${r.name} in your PZMM profile.`;
+    if (i < 0) return r.name ? `There's no section called ${r.name} in your PZMM profile.` : "There's no nameless group (a break) in your PZMM profile.";
     if (r.op === "rename" && r.to) {
       // i18n-ignore: the game's words, in English as the game is
-      if (r.to !== r.name && separators.includes(r.to)) return `There's a section called ${r.to} already.`;
+      if (r.to !== r.name && sectionTaken(r.to, r.name)) return `There's a section called ${r.to} already.`;
       return done(await renameSep(i, r.to));
     }
     if (r.op === "remove") return done(await removeSep(i));
@@ -1284,6 +1325,11 @@
 
   /** Steam downloads (or deletes) in the background: look again once it has had a moment, unless an edit started meanwhile. */
   const reloadSoon = () => setTimeout(reloadList, 10_000);
+  /** Steam's subscriptions asked again (at start and on Rescan): rows Steam hasn't deleted yet show as Unsubscribed. */
+  const checkSubscriptions = () => ((subscriptionsAt = Date.now()), api.steamSubscriptions().then(reloadList, () => {}));
+  /** When Steam was last asked: on focus at most every 30 s (an unsubscribe in the overlay or on the website shows). */
+  let subscriptionsAt = 0;
+  const subscriptionsOnFocus = () => Date.now() - subscriptionsAt >= 30_000 && checkSubscriptions();
   const installWorkshop = (id: string) => installAndSettle(t("busy.installingWorkshop", { id }), () => api.install([id]));
   /** Put back a Workshop item from the activity or the download history: installed as PZMM's copy, or subscribed in Steam again. */
   const reinstall = async (item: string, steam: boolean) =>
@@ -2005,6 +2051,7 @@
     ...(filter === "held" ? [{ key: "held", label: t("mods.filterHeld"), clear: () => (filter = "all") }] : []),
     ...(addedDays ? [{ key: "added", label: t("mods.addedChip", { when: t(WITHIN[addedDays]) }), clear: () => (addedDays = 0) }] : []),
     ...(changedDays ? [{ key: "changed", label: t("mods.changedChip", { when: t(WITHIN[changedDays]) }), clear: () => (changedDays = 0) }] : []),
+    ...(group ? [{ key: "group", label: t("mods.groupChip", { name: group }), clear: () => (group = "") }] : []),
     ...(kind ? [{ key: "kind", label: t(`kinds.${kind}`), clear: () => pickKind("") }] : []),
     ...(tag ? [{ key: "tag", label: tag, clear: () => (tag = "") }] : []),
     ...(inLanguage && language ? [{ key: "lang", label: t("mods.inLanguage", { language }), clear: () => (inLanguage = false) }] : []),
@@ -2019,6 +2066,7 @@
     ...DAYS.map((d) => ({ label: t(WITHIN[d]), checked: addedDays === d, keep: true, run: () => (addedDays = addedDays === d ? 0 : d) })),
     { heading: t("mods.changedHeading") },
     ...DAYS.map((d) => ({ label: t(WITHIN[d]), checked: changedDays === d, keep: true, run: () => (changedDays = changedDays === d ? 0 : d) })),
+    ...(separators.length ? [{ heading: t("mods.groupHeading") }, ...separators.map((s) => ({ label: s, checked: group === s, keep: true, run: () => (group = group === s ? "" : s) }))] : []),
     { heading: t("mods.kindHeading") },
     { label: t("mods.kindAny"), checked: !kind, keep: true, run: () => pickKind("") },
     ...KINDS.map((k) => ({ label: t(`kinds.${k}`), checked: kind === k, keep: true, run: () => pickKind(kind === k ? "" : k) })),
@@ -2030,6 +2078,7 @@
     tag = "";
     inLanguage = false;
     addedDays = changedDays = 0;
+    group = "";
     sortBy = "order";
     pickKind("");
   }
@@ -2206,13 +2255,37 @@
     await installAndSettle(sources.length === 1 ? t("busy.installingOne", { name: sources[0] }) : t("busy.installingMany", { count: sources.length }), () => api.install(sources), sources.length > 1);
   }
 
-  /** A new separator at row `at` (else above the selected mod, or at the top), ready to rename. */
-  async function addSeparator(at = Math.max(0, selected ? rows.findIndex((r) => r.kind === "mod" && r.id === selected) : 0)) {
-    const taken = new Set(separators);
-    let name = t("mods.newSection");
-    for (let n = 2; taken.has(name); n++) name = t("mods.newSectionN", { n });
-    await commit([...rows.slice(0, at), { kind: "sep", name }, ...rows.slice(at)]);
+  /** A section name not taken yet (ignoring case, as the game does). */
+  const freeSectionName = () => freeName(separators, t("mods.newSection"), (n) => t("mods.newSectionN", { n }));
+  /** A new separator at row `at`, ready to rename. */
+  async function addSeparator(at: number) {
+    await commit([...rows.slice(0, at), { kind: "sep", name: freeSectionName() }, ...rows.slice(at)]);
     editingSep = at;
+  }
+  /** The group just made, while its name is typed: naming it is part of the same undo step. */
+  let namingNew = $state<number | null>(null);
+  $effect(() => {
+    if (editingSep !== namingNew) namingNew = null;
+  });
+  /** New group: a section holding only `ids` (the picked mods, else the selected one; none: an empty one at the end), ready to name. */
+  async function addGroup(ids = new Set(picked.size > 1 ? picked : selected ? [selected] : [])) {
+    const name = freeSectionName();
+    // a fold left under this name (an older group's) would hide the mods while it's named
+    if (collapsed.has(name)) toggleSection(name);
+    const next = tidyBreaks(newGroup(rows, name, ids));
+    if (await commit(next)) {
+      namingStep = undoStack.at(-1);
+      editingSep = namingNew = next.findIndex((r) => r.kind === "sep" && r.name === name);
+    }
+  }
+  /** The undo step New group made: a cleared name undoes it only while it's still the last one. */
+  let namingStep: unknown = null;
+  /** Add to group: `ids` to the end of section `name` (opened if it's folded). */
+  function addToGroup(name: string, ids: Set<string>) {
+    const next = moveToGroup(rows, name, ids);
+    if (!next) return;
+    if (collapsed.has(name)) toggleSection(name);
+    return commit(tidyBreaks(next));
   }
 
   /** A section's right-click menu, as in the game's: a new section after it, rename, remove, fold. */
@@ -2233,6 +2306,8 @@
 
   /** Drop a separator. Its mods stay where they are as loose mods (a nameless break ends the section above). */
   function removeSep(i: number) {
+    const r = rows[i];
+    if (r?.kind === "sep" && collapsed.has(r.name)) toggleSection(r.name); // its fold goes with it
     return commit(tidyBreaks(rows.map((r, j) => (j === i ? { kind: "sep", name: "" } : r))));
   }
 
@@ -2248,14 +2323,36 @@
     });
   }
 
-  function renameSep(i: number, name: string) {
-    editingSep = null;
+  /** Another section is called `name` (ignoring case, as the game does). */
+  const sectionTaken = (name: string, own: string) => name.toLowerCase() !== own.toLowerCase() && separators.some((s) => s.toLowerCase() === name.toLowerCase());
+
+  function renameSep(i: number, typed: string) {
+    const fresh = namingNew === i;
+    editingSep = namingNew = null;
     const r = rows[i];
     if (r?.kind !== "sep") return;
-    if (name.trim() === r.name) return;
-    if (!name.trim()) return removeSep(i);
-    else if (name.trim() !== r.name && separators.includes(name.trim())) say("log.sectionExists", { name: name.trim() }, true);
-    else return commit(rows.map((x, j) => (j === i ? { kind: "sep", name: name.trim() } : x)));
+    // one line of text: a pasted tab would break the game's requests that name it
+    const name = typed.replace(/\p{Cc}/gu, " ").trim();
+    if (name === r.name) return;
+    if (!name) {
+      // a new group left nameless: never made (its mods back where they were), in the one undo step it took, once its
+      // save has ended (undo waits for it)
+      if (!fresh) return removeSep(i);
+      const step = namingStep;
+      return void (async () => {
+        while (busy) await new Promise((r) => setTimeout(r, 50));
+        // another step since (a game edit, say): undoing would take that one instead, so the group stays
+        if (!step || undoStack.at(-1) !== step) return;
+        undo();
+        redoStack = redoStack.slice(0, -1);
+      })();
+    }
+    if (sectionTaken(name, r.name)) return say("log.sectionExists", { name }, true), false;
+    // its fold goes with it, set rather than flipped: a stale fold left under the new name mustn't decide
+    const folded = collapsed.has(r.name);
+    setFold(r.name, false);
+    setFold(name, folded);
+    return commit(rows.map((x, j) => (j === i ? { kind: "sep", name } : x)), order, !fresh);
   }
 
   async function submitName(e: Event) {
@@ -2302,7 +2399,7 @@
   const rowMenuItems = $derived.by((): MenuItem[] => {
     const m = rowMenu && mods.get(rowMenu.id);
     if (!rowMenu || !m) return [];
-    const { id, d } = rowMenu;
+    const { id, d, x, y } = rowMenu;
     const at = order.indexOf(id);
     const ids = batch(id);
     const many = ids.length > 1;
@@ -2314,6 +2411,7 @@
           { label: t("menu.toBottom"), icon: "chevron-down" as IconName, run: () => bulkMove("bottom"), disabled: editBusy || filtering }]
         : [{ label: t("menu.toTop"), icon: "chevron-up" as IconName, run: () => moveInOrder(at, 0), disabled: editBusy || at <= 0 },
           { label: t("menu.toBottom"), icon: "chevron-down" as IconName, run: () => moveInOrder(at, order.length), disabled: editBusy || at < 0 || at === order.length - 1 }]),
+      { label: t("menu.addToGroup"), icon: "layers", run: () => (groupMenu = { ids, x, y }), disabled: editBusy || filtering },
       ...(many ? [] : m.pinned ? [{ label: t("menu.unpin"), icon: "lock" as IconName, run: () => pin(id, false), disabled: editBusy }]
         : at >= 0 ? [{ label: t("menu.pin"), icon: "lock" as IconName, run: () => pin(id, true), disabled: editBusy || order.length < 2 }] : []),
       null,
@@ -2327,6 +2425,18 @@
       { label: t("mods.group"), icon: "layers", run: () => groupLibrary(), disabled: editBusy },
       ...(d?.maps ? [{ label: t("menu.showInMaps"), icon: "search" as IconName, run: () => ((mapsFind = id), (tab = "maps")) }] : []),
       ...(removable(m) ? [null, { label: t("common.remove"), icon: "trash" as IconName, run: () => (picked.size > 1 && picked.has(id) ? bulkRemove() : remove(id)), disabled: editBusy, danger: true }] : []),
+    ];
+  });
+
+  /** Add to group's list, where the row menu was: a new group for those mods, or one of the groups in library order. */
+  let groupMenu = $state<{ ids: string[]; x: number; y: number } | null>(null);
+  const groupMenuItems = $derived.by((): MenuItem[] => {
+    if (!groupMenu) return [];
+    const ids = new Set(groupMenu.ids);
+    return [
+      { label: t("menu.newGroup"), icon: "plus", run: () => addGroup(ids), disabled: editBusy || filtering },
+      ...(separators.length ? [null] : []),
+      ...separators.map((s) => ({ label: s, run: () => addToGroup(s, ids), disabled: editBusy || filtering })),
     ];
   });
 
@@ -2362,6 +2472,12 @@
   let anchor = $state<string | null>(null);
 
   function rowClick(e: MouseEvent, id: string) {
+    // the selected mod clicked again: deselected, its details closed (as their X does)
+    if (!e.shiftKey && !(e.ctrlKey || e.metaKey) && selected === id && picked.size <= 1) {
+      selected = null;
+      picked = new Set();
+      return;
+    }
     if (e.shiftKey && anchor) {
       const ids = visible.filter(({ r }) => r.kind === "mod").map(({ r }) => (r as ModRow).id);
       const [a, b] = [ids.indexOf(anchor), ids.indexOf(id)].sort((x, y) => x - y);
@@ -2433,6 +2549,9 @@
   /** Whether it removed them. */
   async function removeMods(ids: string[], notes: string[] = []) {
     if (profileLocked()) return false;
+    // a leftover goes as its whole Workshop item: its other mods go too, so they're asked about (and other profiles' use)
+    const siblings = leftoverSiblings(ids, [...mods.values()]);
+    if (siblings.length) [ids, notes] = [[...ids, ...siblings], [...notes, t("confirm.removeItemToo", { ids: listed(siblings) })]];
     const s = cfg?.settings;
     const key = `confirm.remove${s?.recycle === false ? "Delete" : WINDOWS ? "Recycle" : "Trash"}${ids.length === 1 ? "One" : "Many"}`;
     // other profiles lose them too
@@ -2451,7 +2570,6 @@
     return run(all === 1 ? t("busy.removingOne", { name: ids[0] }) : t("busy.removingMany", { count: all }), () => api.remove([...ids, ...extra]));
   }
 
-  const separators = $derived(rows.flatMap((r) => (r.kind === "sep" && r.name ? [r.name] : [])));
 
   const remove = (id: string) => removeMods([id]);
   /** A mod's previous version back (PZMM keeps one when it updates). */
@@ -2602,6 +2720,7 @@
       workshopSeen = true; // the Workshop tab loads its first page now (for the build just read), so it opens at once
       api.feed(true).then(keepFeed, () => {}); // What's new: its change notes, kept for when the tab opens
       if (loaded) whatsNewCheck(!!view?.created); // a first load that failed can't tell a first install
+      checkSubscriptions();
       fromGame(); // what the game asked while PZMM was closed, now there's a profile to apply it to
       refreshStats();
       if (kind) pickKind(kind); // a kind filter left on: its kinds come with the Workshop tags
@@ -2631,7 +2750,7 @@
   });
 </script>
 
-<svelte:window onkeydown={globalKey} onfocus={() => (refreshOnFocus(), busy || fromGame())} onblur={() => (blurredAt = Date.now())}
+<svelte:window onkeydown={globalKey} onfocus={() => (refreshOnFocus(), subscriptionsOnFocus(), busy || fromGame())} onblur={() => (blurredAt = Date.now())}
   oncontextmenu={(e) => !(e.target as HTMLElement).closest?.("input:is([type=text], [type=search], [type=url], [type=number], [type=password], :not([type])), textarea, [contenteditable]") && e.preventDefault()} />
 
 <div class="app">
@@ -2658,7 +2777,7 @@
           onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); shareAt = shareAt ? null : { x: r.left, y: r.bottom + 4 }; }}><Icon name="share" size={14} /><span class="lbl">{t("app.share")}</span></button>
         <button class="quiet" onclick={openImport} disabled={busy || !!profileLock} title={profileLock || t("app.importTip")} aria-label={t("common.import")}><Icon name="upload" size={14} /><span class="lbl">{t("common.import")}</span></button>
         <!-- mods subscribed or copied in while PZMM was open -->
-        <button class="quiet" onclick={() => { refreshLists(); loadView(); }} disabled={busy} title={t("app.rescanTip")} aria-label={t("app.rescan")}><Icon name="refresh" size={14} /><span class="lbl">{t("app.rescan")}</span></button>
+        <button class="quiet" onclick={() => { refreshLists(); loadView().then(checkSubscriptions); }} disabled={busy} title={t("app.rescanTip")} aria-label={t("app.rescan")}><Icon name="refresh" size={14} /><span class="lbl">{t("app.rescan")}</span></button>
         <button class="quiet icon" onclick={() => view && api.openPath(`${view.zomboid}/mods`)} title={t("app.modsFolderTip")} aria-label={t("app.modsFolder")}><Icon name="folder" size={14} /></button>
       {/if}
     </div>
@@ -2683,7 +2802,7 @@
     {#if moreAt}
       <Menu x={moreAt.x} y={moreAt.y} label={t("mods.more")} onClose={() => (moreAt = null)} items={[
         { label: t("mods.selectAll"), icon: "check", run: selectAll, disabled: !visible.length },
-        { label: t("mods.addSeparator"), icon: "plus", run: addSeparator, disabled: editBusy || filtering },
+        { label: t("mods.addSeparator"), icon: "plus", run: () => addGroup(), disabled: editBusy || filtering },
         null,
         { heading: t("mods.hint"), hint: true },
       ]} />
@@ -2701,6 +2820,9 @@
     {/if}
     {#if rowMenu}
       <Menu x={rowMenu.x} y={rowMenu.y} label={t("menu.label", { name: mods.get(rowMenu.id)?.name || rowMenu.id })} items={rowMenuItems} onClose={() => (rowMenu = null)} />
+    {/if}
+    {#if groupMenu}
+      <Menu x={groupMenu.x} y={groupMenu.y} label={t("menu.addToGroup")} items={groupMenuItems} onClose={() => (groupMenu = null)} />
     {/if}
 
   </header>
@@ -2931,7 +3053,7 @@
       {/each}
     </div>
     <button class="quiet" onclick={() => groupLibrary()} disabled={editBusy}><Icon name="layers" size={14} /><span class="lbl">{t("mods.group")}</span></button>
-    <button class="quiet" onclick={() => addSeparator()} disabled={editBusy || filtering} title={t("mods.newSectionTip")}><Icon name="plus" size={14} /><span class="lbl">{t("mods.newSection")}</span></button>
+    <button class="quiet" onclick={() => addGroup()} disabled={editBusy || filtering} title={t("mods.newSectionTip")}><Icon name="plus" size={14} /><span class="lbl">{t("mods.newSection")}</span></button>
     <button class="quiet" class:on={extraFilters.length} aria-haspopup="menu" aria-expanded={!!filtersAt} onpointerdown={(e) => filtersAt && e.stopPropagation()} title={t("mods.filtersTip")}
       onclick={(e) => { const r = e.currentTarget.getBoundingClientRect(); filtersAt = filtersAt ? null : { x: r.left, y: r.bottom + 4 }; }}>
       <Icon name="filter" size={14} /><span class="lbl">{extraFilters.length ? t("mods.filtersN", { count: extraFilters.length }) : t("mods.filters")}</span></button>
@@ -3401,7 +3523,8 @@
   .list {
     overflow-y: auto;
     min-height: 0;
-    padding: 14px 16px 0;
+    /* no top padding: the table's sticky header would stick below it, with scrolled rows showing above */
+    padding: 0 16px;
     container-type: inline-size; /* the table drops columns by its own width */
   }
   .tools {

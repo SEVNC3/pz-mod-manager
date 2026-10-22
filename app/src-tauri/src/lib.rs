@@ -65,6 +65,38 @@ fn quick_read<T>(f: impl FnOnce(&Paths) -> anyhow::Result<T>) -> Res<T> {
 /// and details/poster/conflicts run on each row click, so reads reuse it for a few
 /// seconds; anything that changes mods goes through `locked`, which clears it.
 static SCAN: Mutex<Option<(std::time::Instant, BTreeMap<String, store::Row>)>> = Mutex::new(None);
+/// The account's Workshop subscriptions as Steam last said (see [`steam_subscriptions`]): what marks leftover rows.
+static SUBS: Mutex<pz::steam_client::Subscriptions> = Mutex::new(pz::steam_client::Subscriptions::new());
+
+fn subs() -> std::sync::MutexGuard<'static, pz::steam_client::Subscriptions> {
+    SUBS.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// PZMM's own subscribes and unsubscribes started (see [`steam_subscribe`]): a Steam answer asked before one is stale.
+static SUBSCRIBES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// A Steam answer for a Remove: when it came, and [`SUBSCRIBES`] when it was asked.
+type Asked = (std::time::Instant, u64);
+
+/// Ask Steam (outside the data lock: it can take the helper's 30 s). None when Steam didn't answer.
+fn ask_steam() -> Option<Asked> {
+    let n = SUBSCRIBES.load(std::sync::atomic::Ordering::SeqCst);
+    refresh_subscriptions().then(|| (std::time::Instant::now(), n))
+}
+
+/// An answer a Remove can delete a leftover on: under 3 s old, and no subscribe or unsubscribe started since it was asked.
+fn fresh(asked: Option<Asked>, now: std::time::Instant, subscribes: u64) -> bool {
+    asked.is_some_and(|(at, n)| n == subscribes && now.saturating_duration_since(at) < std::time::Duration::from_secs(3))
+}
+
+/// Ask Steam for the subscribed items again; Steam not running (or the helper failing) keeps what was known for the rows.
+/// Whether Steam answered just now (a Remove of a leftover needs that).
+fn refresh_subscriptions() -> bool {
+    let on_disk: std::collections::BTreeSet<String> = pz::workshop_dir().map(|ws| store::workshop_rows(&ws).filter_map(|r| r.source.strip_prefix("steam:").map(String::from)).collect()).unwrap_or_default();
+    let Some(set) = zb::game_dir().and_then(|g| pz::steam_client::subscribed(&g, &on_disk).ok()) else { return false };
+    let history = pzmm_core::history::list(&Paths::detect());
+    subs().refreshed(set, &on_disk, |item| pzmm_core::history::unsubscribed_last(&history, item))
+}
 
 fn scan(paths: &Paths) -> anyhow::Result<BTreeMap<String, store::Row>> {
     let mut cache = SCAN.lock().unwrap_or_else(|e| e.into_inner());
@@ -157,6 +189,9 @@ enum Row {
         /// The profile didn't mention it yet (installed since): appended, off.
         #[serde(default)]
         new: bool,
+        /// A `steam:` folder Steam hasn't deleted yet, though the account isn't subscribed any more.
+        #[serde(default)]
+        unsubscribed: bool,
     },
     Sep {
         name: String,
@@ -231,7 +266,9 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
         }
     }
     let pinned = |id: &str| rules.get(id).is_some_and(|r| !r.load_after.is_empty() || !r.load_before.is_empty());
+    let leftover = |source: &str| subs().leftover(source);
     let row = |m: store::Row, on: bool, new: bool| Row::Mod {
+        unsubscribed: leftover(&m.source),
         pinned: pinned(&m.id),
         id: m.id,
         name: m.name,
@@ -274,6 +311,7 @@ fn view(paths: &Paths) -> anyhow::Result<View> {
                     only42: false,
                     languages: vec![],
                     new: false,
+                    unsubscribed: false,
                 }),
                 None => {} // disabled and gone: drop it
             },
@@ -324,7 +362,28 @@ fn apply(paths: &Paths, p: &Profile) -> anyhow::Result<()> {
 #[tauri::command(async)]
 fn load() -> Res<View> {
     pz::files::forget();
-    locked(view)
+    locked(|paths| {
+        let v = view(paths)?;
+        // what this load read, for Copy diagnostics (a view missing its groups shows there, with when modlist.txt last changed)
+        let seps = v.rows.iter().filter(|r| matches!(r, Row::Sep { .. })).count();
+        let named = v.rows.iter().filter(|r| matches!(r, Row::Sep { name } if !name.is_empty())).count();
+        let file = paths.data.join("profiles").join(&v.profile).join("modlist.txt");
+        let changed = std::fs::metadata(file).and_then(|m| m.modified()).ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs());
+        let line = format!("at {}: \"{}\", {} mods, {seps} separators ({named} named); modlist.txt changed at {changed}", store::now(), v.profile, v.rows.len() - seps);
+        note_load(&mut LOADS.lock().unwrap_or_else(|e| e.into_inner()), line);
+        Ok(v)
+    })
+}
+
+/// What each list load read (see [`load`]): the first this run, then the latest.
+static LOADS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// Note `line` in `loads`: the first stays, with the latest nine after it.
+fn note_load(loads: &mut Vec<String>, line: String) {
+    if loads.len() >= 10 {
+        loads.remove(1);
+    }
+    loads.push(line);
 }
 
 /// Save the library (order, on/off, separators) and the load order to the active profile and the game.
@@ -345,7 +404,8 @@ fn save(rows: Vec<Row>, order: Vec<String>, profile: String) -> Res<View> {
             .into_iter()
             .map(|r| match r {
                 Row::Mod { id, on, .. } => Line::Mod { id, on },
-                Row::Sep { name } => Line::Separator(name),
+                // one line of text: a tab would split the game's library requests (tab-separated) and fail them all
+                Row::Sep { name } => Line::Separator(name.replace(char::is_control, " ").trim().into()),
             })
             .collect();
         p.order = order;
@@ -387,17 +447,41 @@ async fn install(sources: Vec<String>) -> Res<View> {
 
 #[tauri::command(async)]
 fn remove(ids: Vec<String>) -> Res<View> {
-    locked(|paths| {
-        let refused = store::remove(paths, &ids, settings::load().recycle)?;
-        let refused = store::remove_manual(paths, &refused)?; // added outside PZMM: to the Recycle Bin
-        for id in &refused {
-            pzmm_core::say!("notOurs", "{id}: not installed by PZMM (Workshop subscription or manual install); left alone", id = id);
+    // what Steam left of an unsubscribed item goes only on Steam's answer from now, so a subscribed one is never touched.
+    // Asked before the lock (a slow Steam would hold up every other command); a stale answer is asked again once.
+    let ws = pz::workshop_dir();
+    let needs = ws.as_deref().is_some_and(|ws| store::workshop_rows(ws).any(|r| ids.contains(&r.id)));
+    let mut asked = if needs { ask_steam() } else { None };
+    let mut again = asked.is_some();
+    loop {
+        let done = locked(|paths| {
+            let answered = fresh(asked, std::time::Instant::now(), SUBSCRIBES.load(std::sync::atomic::Ordering::SeqCst));
+            if again && !answered {
+                return Ok(None);
+            }
+            remove_now(paths, &ids, ws.as_deref(), answered).map(Some)
+        })?;
+        match done {
+            Some(v) => return Ok(v),
+            None => (asked, again) = (ask_steam(), false),
         }
-        let mut p = active(paths)?;
-        ids.iter().filter(|i| !refused.contains(i)).for_each(|i| p.forget(i));
-        apply(paths, &p)?;
-        view(paths)
-    })
+    }
+}
+
+/// [`remove`]'s work under the lock; `answered`: Steam's fresh answer is in [`SUBS`] (else leftovers stay, and it says why).
+fn remove_now(paths: &Paths, ids: &[String], ws: Option<&std::path::Path>, answered: bool) -> anyhow::Result<View> {
+    let refused = store::remove(paths, ids, settings::load().recycle)?;
+    let refused = store::remove_manual(paths, &refused)?; // added outside PZMM: to the Recycle Bin
+    let not_ours = refused;
+    let (leftovers, refused, _) = store::remove_leftovers(paths, ws, &not_ours, settings::load().recycle, answered.then_some(|s: &str| subs().leftover(s)))?;
+    for id in &refused {
+        pzmm_core::say!("notOurs", "{id}: not installed by PZMM (Workshop subscription or manual install); left alone", id = id);
+    }
+    let mut p = active(paths)?;
+    // a leftover's whole item went: each of its mods, but one installed another way too (PZMM's held copy) stays
+    ids.iter().filter(|i| !not_ours.contains(i)).chain(&leftovers).for_each(|i| p.forget(i));
+    apply(paths, &p)?;
+    view(paths)
 }
 
 #[tauri::command(async)]
@@ -914,6 +998,13 @@ fn workshop_subscribe_now(id: &str, on: bool, mod_id: Option<String>, name: Opti
     })
 }
 
+/// Ask Steam which Workshop items the account is subscribed to (at start, after a Rescan or a subscribe), so
+/// rows Steam hasn't deleted yet show as leftovers. Without Steam, folders are trusted as before.
+#[tauri::command]
+async fn steam_subscriptions() -> Res<bool> {
+    blocking(|| Ok::<_, String>(refresh_subscriptions())).await
+}
+
 /// Bring PZMM's window to the front: a quiet game request that turns out to need an answer (a Subscribed hold).
 #[tauri::command]
 fn app_front(app: AppHandle) {
@@ -923,7 +1014,11 @@ fn app_front(app: AppHandle) {
 /// [`workshop_subscribe`]'s work, without the view (Hold updates unsubscribes under the lock).
 fn steam_subscribe(paths: &Paths, id: &str, on: bool, mod_id: Option<&str>, name: Option<&str>) -> anyhow::Result<()> {
     let game = zb::game_dir().ok_or_else(|| anyhow::anyhow!("Project Zomboid's game folder wasn't found in your Steam libraries"))?;
+    // before Steam hears it: an answer a Remove asked for until now may not have it
+    SUBSCRIBES.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     pz::steam_client::subscribe(&game, id, on)?;
+    // a leftover at once (Steam deletes the folder when it gets to it), or a subscription again
+    subs().changed(id, on);
     pzmm_core::history::add(paths, mod_id.unwrap_or(id), name.unwrap_or(""), &format!("steam:{id}"), if on { "subscribed" } else { "unsubscribed" });
     if on {
         pzmm_core::say!("subscribed", "Subscribed to {id} in Steam: Steam downloads it and keeps it updated", id = id);
@@ -2283,7 +2378,9 @@ fn watch_game(app: &AppHandle) {
             tick = tick.wrapping_add(1);
             // at the start, and when the bridge moves: everything the game reads, written there (the feed follows on its
             // next load, Check setup's findings with the UI's next check)
-            let now_in = pz::bridge::dir(&paths);
+            // state.json unread: its "Default" stand-in would look like the bridge moving, so this round waits
+            let Some(active) = profile::try_active_name(&paths) else { return };
+            let now_in = pz::bridge::dir_for(&paths, &active);
             let appeared = !there && now_in.is_dir();
             there = now_in.is_dir();
             if bridge.as_ref() != Some(&now_in) || appeared {
@@ -2293,7 +2390,7 @@ fn watch_game(app: &AppHandle) {
                 profile::profiles_for_game(&paths);
                 // edits the game made while PZMM was closed write it once they're done: written now, the game's view flickers back
                 if !pz::bridge::sorting_queued(&now_in) {
-                    profile::library_for_game(&paths, &profile::peek(&paths));
+                    profile::peek_for_game(&paths);
                 }
                 profile::maps_for_game(&paths);
                 pz::saves::backups_for_game(&played(&paths));
@@ -3520,6 +3617,12 @@ async fn doctor(online: Option<bool>) -> Res<Vec<pz::doctor::Finding>> {
         if online == Some(true) {
             out.extend(pz::doctor::check_workshop(&Paths::detect(), &enabled, &mods));
         }
+        // a Zomboid/mods copy beside an unsubscribed item's leftover isn't two copies for long: Steam deletes its own
+        if let Some(ws) = pz::workshop_dir() {
+            let left: Vec<String> = store::workshop_rows(&ws).filter(|r| subs().leftover(&r.source)).map(|r| r.id).collect();
+            let kept: Vec<String> = store::workshop_rows(&ws).filter(|r| !subs().leftover(&r.source)).map(|r| r.id).collect();
+            out.retain(|f| f.key != "twoCopies" || !left.contains(&f.subject) || kept.contains(&f.subject));
+        }
         pz::doctor::mark_hidden(&Paths::detect(), &mods, &mut out);
         Ok::<_, String>(out)
     })
@@ -4140,6 +4243,15 @@ fn diagnostics(app: AppHandle) -> Res<String> {
         let build = profile::effective_build(paths);
         writeln!(out, "Profile: {} ({}), Build {build}", p.name, profile::kind_of(paths, &p.name))?;
         writeln!(out, "Mods: {} installed, {} enabled", mods.len(), p.enabled().len())?;
+        // groups: the profile's against the game's copy, and what each list load this run read
+        let seps = |t: &str| t.lines().filter(|l| l.trim_start().starts_with("# ---")).count();
+        let library = std::fs::read_to_string(pz::bridge::dir_for(paths, &p.name).join("library.txt")).unwrap_or_default();
+        let header = library.lines().next().unwrap_or("not there");
+        writeln!(out, "Separators: {} in the profile, {} in the game's library.txt ({header})", seps(&p.to_text()), seps(&library))?;
+        writeln!(out, "List loads (the first this run, then the latest):")?;
+        for l in LOADS.lock().unwrap_or_else(|e| e.into_inner()).iter() {
+            writeln!(out, "- {l}")?;
+        }
         let need_zb = zb::required_by(&p.enabled(), &mods);
         writeln!(out, "ZombieBuddy: needed by {}, agent {}", need_zb.len(), if zb::agent_ready(&mods) { "set up" } else { "not set up" })?;
         if let Some(server) = profile::server_of(paths, &p.name) {
@@ -4350,7 +4462,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             load, save, install, remove, rollback, profile_new, profile_use, profile_delete, profiles_unused, profiles_prune, profile_rename, profile_duplicate, snapshot_create, snapshot_list, snapshot_restore, set_build,
-            details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, mod_changes, feed, news, authoring_check, authoring_poster, authoring_build, workshop_comments, workshop_author, workshop_items, zb_status, zb_preview, zb_install, zb_uninstall, java_mods, workshop_subscribe,
+            details, poster, open_path, open_url, workshop_browse, workshop_info, workshop_changes, mod_changes, feed, news, authoring_check, authoring_poster, authoring_build, workshop_comments, workshop_author, workshop_items, zb_status, zb_preview, zb_install, zb_uninstall, java_mods, workshop_subscribe, steam_subscriptions,
             find_requirement, install_missing, check_updates, update_mods, hold_set, app_front, conflicts, conflict_summary, mod_stats, categories, servers_and_saves, server_maps, server_preview, server_check, server_export, server_import, save_use,
             perf_view, game_running, perf_memory_set, perf_jvm_set, profile_launch, profile_launch_set, pzopt_run, save_sandbox, save_sandbox_write, save_sandbox_preset, save_details, save_backup, save_restore, save_rename, save_delete, save_backup_delete, save_repair, save_set_mods, save_players,
             game_requests, game_ack, game_busy, game_bisect, game_bisecting, game_bisect_result, game_look, game_job, game_app_settings, game_pics, game_activity_add, game_activity, game_findings, save_restore_from_game, save_backup_from_game, feed_seen, game_settings, game_settings_set, game_report, save_backup_name, save_thumb, save_reset, save_clone, save_databases, save_table,
@@ -4372,6 +4484,27 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn diagnostics_keep_the_first_load_and_the_latest() {
+        let mut loads = vec![];
+        for i in 0..15 {
+            super::note_load(&mut loads, i.to_string());
+        }
+        assert_eq!(loads, ["0", "6", "7", "8", "9", "10", "11", "12", "13", "14"]);
+    }
+
+    #[test]
+    fn a_remove_deletes_leftovers_only_on_a_fresh_answer() {
+        use super::fresh;
+        use std::time::{Duration, Instant};
+        let now = Instant::now();
+        let ago = |s| now.checked_sub(Duration::from_secs(s)).unwrap();
+        assert!(fresh(Some((ago(1), 7)), now, 7), "a second old, no subscribe since");
+        assert!(!fresh(Some((ago(4), 7)), now, 7), "over 3 s old");
+        assert!(!fresh(Some((now, 7)), now, 8), "a subscribe or unsubscribe started after it was asked");
+        assert!(!fresh(None, now, 7), "Steam didn't answer");
+    }
+
     #[test]
     fn the_window_fits_its_screen() {
         use super::fit;

@@ -279,6 +279,8 @@
     "filterUpdatesN": "Has an update ({count})",
     "addedHeading": "Added",
     "changedHeading": "Updated",
+    "groupHeading": "Group",
+    "groupChip": "Group: {name}",
     "within1": "Last 24 hours",
     "within7": "Last 7 days",
     "within30": "Last 30 days",
@@ -298,7 +300,7 @@
       "problems": "Mods that can't load on this build of the game, or clash with another mod.",
       "hidden": "Mods you've hidden. They keep their place in the list and load as they are set."
     },
-    "newSectionTip": "Add a section above the selected mod (right-click a section for more)",
+    "newSectionTip": "Make a section of the picked mods, or an empty one at the end when none are picked (right-click a section for more)",
     "hide": "Hide",
     "showAgain": "Show again",
     "filterHeld": "Held",
@@ -509,7 +511,8 @@
     "allowHeld": {
       "one": "Allow updates again for {count} mod?",
       "other": "Allow updates again for {count} mods?"
-    }
+    },
+    "removeItemToo": "Removed with it, from the same Workshop item: {ids}"
   },
   "common": {
     "imageFailed": "Image failed to load",
@@ -548,7 +551,8 @@
     "steam": "Subscribed",
     "local": "Local file",
     "localShort": "Local",
-    "manual": "Manual"
+    "manual": "Manual",
+    "unsubscribed": "Unsubscribed"
   },
   "api": {
     "badShareCode": "That isn't a PZMM profile code."
@@ -944,7 +948,8 @@
       "workshop": "Downloaded from the Workshop by PZMM",
       "github": "Installed from GitHub by PZMM",
       "local": "Installed from a file by PZMM",
-      "manual": "Added to the mods folder outside PZMM"
+      "manual": "Added to the mods folder outside PZMM",
+      "unsubscribed": "You've unsubscribed. Steam deletes these files when it gets to it, usually after the game closes. Remove deletes them now."
     },
     "favourite": "Favourite",
     "byAuthor": "{name} by {author}",
@@ -2899,6 +2904,8 @@
     "label": "{name}: actions",
     "toTop": "Move to the top of the load order",
     "toBottom": "Move to the bottom of the load order",
+    "addToGroup": "Add to group ▸",
+    "newGroup": "New group…",
     "copyId": "Copy mod ID",
     "showInMaps": "Show in Maps",
     "pin": "Pin its place in the load order",
@@ -3085,7 +3092,9 @@
     "holdFailed": "holding workshop:{item}: {error}",
     "holdOn": "{ids}: updates held, this version stays",
     "holdOff": "{ids}: updates allowed again",
-    "holdEnded": "{ids}: subscribed in Steam again, so updates aren't held; Steam's copy takes over once it's downloaded"
+    "holdEnded": "{ids}: subscribed in Steam again, so updates aren't held; Steam's copy takes over once it's downloaded",
+    "leftoverRemoved": "{item}: removed the files Steam left after the unsubscribe",
+    "leftoverNoSteam": "{id}: Steam needs to be running to check you've unsubscribed, so it wasn't removed"
   },
   "doctor": {
     "notInstalled": "enabled but not installed: the game skips it",
@@ -3881,6 +3890,7 @@
     "filter_disabled_tip": "Disabled\nMods you have but aren't loading.",
     "filter_enabled": "Enabled",
     "filter_enabled_tip": "Enabled\nMods that load with your next game.",
+    "filter_group": "Group",
     "filter_held": "Held",
     "filter_hidden": "Hidden",
     "filter_hidden_tip": "Hidden\nMods you've hidden. They keep their place in the list and load as they are set.",
@@ -3896,6 +3906,7 @@
     "findings_find": "Find the broken mod",
     "get_the_app": "Get the app",
     "ghost_warn": "This mod is enabled in your profile but isn't installed. Install it, subscribe to it in Steam, or disable it.",
+    "group_chip": "Group: %1",
     "held_chip": "Held",
     "held_chip_tip": "Updates held. The Workshop has a newer version from %1.",
     "held_newer_tip": "Updates held. The Workshop has a newer version from %1. Click to allow updates again.",
@@ -4057,6 +4068,7 @@
     "maps_unpreview_listed": "Unpreview listed",
     "maps_zoom_in": "Zoom in",
     "maps_zoom_out": "Zoom out",
+    "menu_add_group": "Add to group...",
     "menu_allow_updates": "Allow updates",
     "menu_copy_id": "Copy mod ID",
     "menu_disable": "Disable",
@@ -4066,6 +4078,7 @@
     "menu_hold_updates": "Hold updates",
     "menu_list_hint": "Drag or Alt+Up/Down to organise, Space toggles, Ctrl/Shift+click selects",
     "menu_maps": "Show in Maps",
+    "menu_new_group": "New group...",
     "menu_pin": "Pin its place in the load order",
     "menu_remove": "Remove",
     "menu_select_all": "Select all",
@@ -4080,6 +4093,9 @@
     "missing_modal": "Missing from the in-game manager",
     "mods_empty_hint": "Subscribe to mods in Steam: subscriptions show up here once you Rescan.",
     "mods_empty_title": "Nothing in the stockpile yet.",
+    "new_section_n": "New section with %1 mods",
+    "new_section_one": "New section with 1 mod",
+    "new_section_tip": "Make a section of the picked mods, or an empty one at the end when none are picked (right-click a section for more)",
     "next": "Next",
     "not_installed": "Not installed",
     "notice_feed": "change notes and their history, and loading the notes for more mods.",
@@ -4273,6 +4289,7 @@
     "sort_library": "Library order",
     "sort_problems": "Problems first",
     "sort_size": "Size",
+    "source_unsubscribed": "Unsubscribed",
     "srv_all_here": "all here",
     "srv_and_more": "and %1 more: the server runs %2 mods, but only the first few show outside the game",
     "srv_any_build": "Any build",
@@ -4390,6 +4407,8 @@
     "tool_leave_favs": "Leave favourites",
     "tool_section": "New section",
     "unhide_tip": "Hidden. Click to show it in the list again.",
+    "unsub_no_app": "Steam deletes these files when it gets to it, usually after the game closes.",
+    "unsub_tip": "You've unsubscribed. Steam deletes these files when it gets to it, usually after the game closes. Remove deletes them now.",
     "up_to_date": "Your mods are up to date.",
     "up_to_date_held": "Everything else is up to date: %1 held mods have newer versions.",
     "up_to_date_held_one": "Everything else is up to date: %1 held mod has a newer version.",

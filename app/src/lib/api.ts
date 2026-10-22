@@ -30,6 +30,8 @@ export type ModRow = {
   only42: boolean;
   /** Languages it has texts in (its `Translate/<LANG>` folders: EN, RU, PTBR...). */
   languages: string[];
+  /** A `steam:` folder Steam hasn't deleted yet, though the account isn't subscribed any more: Remove deletes it. */
+  unsubscribed?: boolean;
 };
 type SepRow = { kind: "sep"; name: string };
 export type Row = ModRow | SepRow;
@@ -666,6 +668,9 @@ export const api = {
   splashDone: () => invoke<void>("splash_done"),
   appClose: (toTray: boolean) => invoke<void>("app_close", { toTray }),
   workshopSubscribe: (id: string, on: boolean, modId?: string, name?: string) => invoke<View>("workshop_subscribe", { id, on, modId: modId ?? null, name: name ?? null }),
+  /** Ask Steam for the subscribed items again: the next view marks leftover rows. Whether Steam answered (without it,
+   * nothing changes). */
+  steamSubscriptions: () => invoke<boolean>("steam_subscriptions"),
   javaMods: () => invoke<JavaMod[]>("java_mods"),
   findRequirement: (modId: string, neededBy: string) =>
     invoke<Candidate[]>("find_requirement", { modId, neededBy }),
@@ -945,10 +950,10 @@ export const api = {
 export type HistoryRecord = { id: string; name: string; source: string; action: "installed" | "updated" | "removed" | "subscribed" | "unsubscribed"; at: number };
 
 /** Workshop and GitHub mods update (Steam's too, by itself): only those can be held. */
-export const holdable = (m: ModRow) => /^(workshop|github|steam):/.test(m.source);
+export const holdable = (m: ModRow) => !m.unsubscribed && /^(workshop|github|steam):/.test(m.source);
 export const isOurs = (m: ModRow) => /^(workshop|github|local):/.test(m.source);
-/** Remove can take it: PZMM's own, or a folder added to Zomboid/mods by hand (that goes to the Recycle Bin). */
-export const removable = (m: ModRow) => !m.missing && (isOurs(m) || m.source === "manual");
+/** Remove can take it: PZMM's own, a folder added to Zomboid/mods by hand (that goes to the Recycle Bin), or what Steam left of an unsubscribed item. */
+export const removable = (m: ModRow) => !m.missing && (isOurs(m) || m.source === "manual" || !!m.unsubscribed);
 
 /** Human label + page URL for a source string from the backend. */
 export function describeSource(source: string): { label: string; url: string | null } {

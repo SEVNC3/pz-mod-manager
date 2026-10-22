@@ -301,6 +301,68 @@ export function moveSection(rows: Row[], from: number, to: number): Row[] | null
   return rest;
 }
 
+/** The other mods of the Workshop items whose leftovers `ids` take in (Remove of a leftover deletes its whole item),
+ * in list order. A mod installed another way too (PZMM's copy) shows that source instead, so it isn't one of them. */
+export function leftoverSiblings(ids: string[], mods: ModRow[]): string[] {
+  const picked = new Set(ids);
+  const items = new Set(mods.filter((m) => picked.has(m.id) && m.unsubscribed).map((m) => m.source));
+  return mods.filter((m) => !picked.has(m.id) && m.unsubscribed && items.has(m.source)).map((m) => m.id);
+}
+
+/** The game's ack for leftovers it asked to remove (`asked`, as listed before), from the list after the Remove: why any of
+ * them is still there, in English as the game is ("" when they all went). Still a leftover: Steam didn't answer the check;
+ * no longer one: Steam says it's subscribed. */
+export function leftoverAck(asked: ModRow[], after: Map<string, ModRow>): string {
+  const still = asked.filter((m) => m.unsubscribed && after.get(m.id)?.source === m.source && !after.get(m.id)!.missing);
+  const subscribed = still.filter((m) => !after.get(m.id)!.unsubscribed).map((m) => m.id);
+  const unchecked = still.filter((m) => after.get(m.id)!.unsubscribed).map((m) => m.id);
+  return [
+    // i18n-ignore: the game's words, in English as the game is
+    unchecked.length ? `${unchecked.join(", ")}: Steam needs to be running to check you've unsubscribed, so not removed.` : "",
+    // i18n-ignore: the game's words, in English as the game is
+    subscribed.length ? `${subscribed.join(", ")}: still subscribed in Steam, so not removed: unsubscribe first.` : "",
+  ].filter(Boolean).join(" ");
+}
+
+/** `first`, else the first `nth(2)`, `nth(3)`... that no name in `taken` already is, ignoring case (as the game does). */
+export function freeName(taken: string[], first: string, nth: (n: number) => string): string {
+  const used = new Set(taken.map((s) => s.toLowerCase()));
+  let name = first;
+  for (let n = 2; used.has(name.toLowerCase()); n++) name = nth(n);
+  return name;
+}
+
+/** A new group `name` holding only the mods `ids`, in their order: its separator at the end of the section the first of
+ * them is in (before the next separator, else at the list's end), the mods right after it; the rest stay where they are.
+ * None of them in the list: an empty group at the end. */
+export function newGroup(rows: Row[], name: string, ids: Set<string>): Row[] {
+  const picked = (r: Row) => isMod(r) && ids.has(r.id);
+  const first = rows.findIndex(picked);
+  if (first < 0) return [...rows, { kind: "sep", name }];
+  let end = first + 1;
+  while (end < rows.length && rows[end].kind !== "sep") end++;
+  const rest = rows.filter((r) => !picked(r));
+  const at = rows.slice(0, end).filter((r) => !picked(r)).length;
+  return [...rest.slice(0, at), { kind: "sep", name }, ...rows.filter(picked), ...rest.slice(at)];
+}
+
+/** The mods `ids` (in their order) moved to the end of group `name`; null when there's no such group. */
+export function moveToGroup(rows: Row[], name: string, ids: Set<string>): Row[] | null {
+  const rest = rows.filter((r) => !(isMod(r) && ids.has(r.id)));
+  const s = rest.findIndex((r) => r.kind === "sep" && r.name === name);
+  if (s < 0) return null;
+  let end = s + 1;
+  while (end < rest.length && rest[end].kind !== "sep") end++;
+  return [...rest.slice(0, end), ...rows.filter((r) => isMod(r) && ids.has(r.id)), ...rest.slice(end)];
+}
+
+/** A group's chip colour, 0-7, as the game picks it: h = (h * 31 + byte) mod 2^24 over the name's UTF-8 bytes, then mod 8. */
+export function groupColour(name: string): number {
+  let h = 0;
+  for (const b of new TextEncoder().encode(name)) h = (h * 31 + b) % 16777216;
+  return h % 8;
+}
+
 /**
  * The groups Find the broken mod tests together: `enabled` (in load order) joined by each requirement that is
  * enabled too, or by the enabled mods a requirement that's off needs (one not installed joins nothing). Each connected set is a group, in load order, groups by

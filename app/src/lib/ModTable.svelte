@@ -1,10 +1,11 @@
 <script lang="ts">
   import { describeSource, holdable, type ModRow, type Overlap, type Row, type Stats } from "./api";
+  import { dragScroll } from "./dragscroll";
   import { fmtDate, fmtNum, fmtSize } from "./format";
   import { t } from "./i18n.svelte";
   import Icon from "./Icon.svelte";
   import LayerIcon, { overlapLabel } from "./LayerIcon.svelte";
-  import { sectionDrop, type Problem } from "./order";
+  import { groupColour, sectionDrop, type Problem } from "./order";
   import { prefs } from "./prefs.svelte";
 
   // The library: rows, separators as section cards, drag and drop. Edits go back through the callbacks.
@@ -118,6 +119,9 @@
 
   let dropAt = $state<number | null>(null);
 
+  /** The group chips' colours, by `groupColour` (the game's palette too). */
+  const GROUP_COLOURS = ["#c0504d", "#d9883b", "#c9b03c", "#6aa84f", "#3d9e9e", "#4a86c5", "#8064a2", "#c25b9b"];
+
   const SOURCE_HINTS: Record<string, string> = {
     steam: "modTable.sourceHint.steam",
     workshop: "modTable.sourceHint.workshop",
@@ -165,17 +169,18 @@
   }
 </script>
 
-<table>
+<table use:dragScroll>
   <thead>
     <tr>
-      <th><span class="visually-hidden">{t("modTable.col.move")}</span></th><th><span class="visually-hidden">{t("common.enabled")}</span></th><th><span class="visually-hidden">{t("modTable.col.hide")}</span></th><th><span class="visually-hidden">{t("modTable.col.hold")}</span></th>
+      <!-- each header cell has its column's class (and padding), so it lines up with the cells under it -->
+      <th class="grip"><span class="visually-hidden">{t("modTable.col.move")}</span></th><th class="check"><span class="visually-hidden">{t("common.enabled")}</span></th><th class="eye"><span class="visually-hidden">{t("modTable.col.hide")}</span></th><th class="eye"><span class="visually-hidden">{t("modTable.col.hold")}</span></th>
       {#each HEADS as [cls, by, key]}
         <th class={cls} aria-sort={sortBy === by && by !== "order" ? "descending" : undefined}>
           <!-- i18n-ignore: "#" is the load order number -->
           <button class="head" class:on={sortBy === by} title={t("modTable.sortByTip")} onclick={() => onSort(by)}>{key === "#" ? "#" : t(key)}{#if sortBy === by && by !== "order"}<Icon name="chevron-down" size={12} />{/if}</button>
         </th>
       {/each}
-      <th class="overlap-head">{t("modTable.col.overwrites")}</th><th class="src">{t("modTable.col.source")}</th>
+      <th class="overlap overlap-head">{t("modTable.col.overwrites")}</th><th class="src">{t("modTable.col.source")}</th>
     </tr>
   </thead>
   <tbody>
@@ -241,6 +246,8 @@
             {#if favourites.has(r.id)}<span class="fav" title={t("modTable.favourite")}><Icon name="star" size={12} /></span>{/if}
             <span class="title" title={r.author ? t("modTable.byAuthor", { name: r.name || r.id, author: r.author }) : r.name || r.id}>{r.name || r.id}</span>
             {#if prefs.showIds && r.name && r.name !== r.id}<span class="id mono">{r.id}</span>{/if}
+            <!-- out of library order the tapes are gone: each mod says its group -->
+            {#if filtering && sectionOf[i]}<span class="group-chip" style:--group={GROUP_COLOURS[groupColour(sectionOf[i])]}>{sectionOf[i]}</span>{/if}
             {#if fresh.has(r.id)}<span class="build-badge new" title={t("modTable.newTip")}>{t("modTable.new")}</span>{/if}
             {#each kinds[r.id] ?? [] as k}<span class="build-badge kind">{t(`kinds.${k}`)}</span>{/each}
             {#if langsOf(r).length}
@@ -280,7 +287,9 @@
             {:else}
               {@const kind = r.source.split(":")[0]}
               {@const hint = t(SOURCE_HINTS[kind] ?? "modTable.sourceHint.manual")}
-              {#if (kind === "workshop" || kind === "steam") && src.url}
+              {#if r.unsubscribed}
+                <span class="badge" data-kind="unsubscribed" title={t("modTable.sourceHint.unsubscribed")}><Icon name="x" size={12} />{t("source.unsubscribed")}</span>
+              {:else if (kind === "workshop" || kind === "steam") && src.url}
                 <button class="badge go" data-kind={kind} title="{hint} · {t(kind === 'steam' ? 'modTable.unsubscribeTip' : 'modTable.subscribeTip')}"
                   onclick={(e) => { e.stopPropagation(); onSubscribe(r.id, kind !== "steam"); }}><Icon name={kind === "steam" ? "check" : "steam"} size={12} />{kind === "steam" ? t("source.steam") : t("source.workshop")}</button>
               {:else}
@@ -388,9 +397,9 @@
   }
   /* pills and problems on a highlighted row take its text colour: muted grey and warning red fall under 4.5:1
      on Daylight's pale red */
-  tr.mod:hover :is(.build-badge, .badge, .missing, .fav),
-  tr.mod.picked :is(.build-badge, .badge, .missing, .fav),
-  tr.mod.selected :is(.build-badge, .badge, .missing, .fav) {
+  tr.mod:hover :is(.build-badge, .badge, .missing, .fav, .group-chip),
+  tr.mod.picked :is(.build-badge, .badge, .missing, .fav, .group-chip),
+  tr.mod.selected :is(.build-badge, .badge, .missing, .fav, .group-chip) {
     color: var(--on-selected);
   }
   /* the row the details show, among picked ones: a solid on-selected edge where the others have the hover line */
@@ -480,12 +489,16 @@
   tr.mod:focus-within .eye button {
     opacity: 1;
   }
-  /* the header row: sticks above the cards while the list scrolls */
+  /* the header row: sticks flush to the top of the list (.list has no top padding, which sticky would leave
+     a strip of scrolled rows above it), opaque, over the rows' chevrons (z-index 1); the side padding is the
+     cells', so the headings line up with them */
   thead th {
     position: sticky;
     top: 0;
-    z-index: 1;
+    z-index: 2;
     background: var(--bg);
+    padding-left: 8px;
+    padding-right: 8px;
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
@@ -586,6 +599,15 @@
     border-color: var(--line);
     border-radius: 999px;
     background: var(--raised);
+  }
+  /* a mod's group out of library order: the group's colour as an edge, its name muted, no fill (reads in both themes) */
+  .group-chip {
+    margin-left: 8px;
+    padding: 0 6px;
+    border-left: 3px solid var(--group);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
   }
   .fav {
     color: var(--accent-text);

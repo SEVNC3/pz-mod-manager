@@ -1,7 +1,8 @@
 // Self-check for src/lib/order.ts. Run: node scripts/order-check.ts
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { modNeed, keptServers, autosort, bisectGroups, bisectNext, bisectOrder, bisectRound, bisectUpgrade, dependants, findProblems, neededBy, sortByName, groupByCategory, loadList, moveSection, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortLoadOrder, sortMaps, autosortMaps, solveBackground, syncOrder } from "../src/lib/order.ts";
+import { modNeed, keptServers, autosort, bisectGroups, bisectNext, bisectOrder, bisectRound, bisectUpgrade, dependants, findProblems, neededBy, sortByName, groupByCategory, groupColour, loadList, moveSection, moveToGroup, newGroup, orderOf, orphanedRequirements, parsePreset, placeInOrder, placeInSections, sortLoadOrder, sortMaps, autosortMaps, solveBackground, syncOrder, freeName, leftoverSiblings, leftoverAck } from "../src/lib/order.ts";
+import { edgeSpeed } from "../src/lib/dragscroll.ts";
 import type { GameServer, ModRow, Row, ServerMods } from "../src/lib/api.ts";
 
 const mod = (id: string, on = true, extra: Partial<ModRow> = {}): Row => ({
@@ -176,6 +177,19 @@ assert.equal(ids(moveSection(secs, 1, 8)!), "+Top #B +b1 #C +c1 #A +a1 +a2", "dr
 assert.equal(moveSection(secs, 1, 3), null, "inside itself");
 assert.equal(moveSection(secs, 1, 4), null, "right where it is");
 
+// New group: only the picked mods join it, at the end of the first one's section; the rest stay in theirs
+const set = (...x: string[]) => new Set(x);
+assert.equal(ids(newGroup(secs, "N", set("a1"))), "+Top #A +a2 #N +a1 #B +b1 #C +c1", "one picked: the rest of A stays in A");
+assert.equal(ids(newGroup(secs, "N", set("b1", "a2"))), "+Top #A +a1 #N +a2 +b1 #B #C +c1", "picked in two sections: after the first one's, in list order");
+assert.equal(ids(newGroup(secs, "N", set("c1"))), "+Top #A +a1 +a2 #B +b1 #C #N +c1", "the last section: at the list's end");
+assert.equal(ids(newGroup(secs, "N", set("Top"))), "#N +Top #A +a1 +a2 #B +b1 #C +c1", "a loose mod above the first separator");
+assert.equal(ids(newGroup(secs, "N", set())), "+Top #A +a1 +a2 #B +b1 #C +c1 #N", "nothing picked: an empty group at the end");
+// Add to group: to the end of that group
+assert.equal(ids(moveToGroup(secs, "A", set("c1", "Top"))!), "#A +a1 +a2 +Top +c1 #B +b1 #C", "to A's end, in list order");
+assert.equal(moveToGroup(secs, "Z", set("a1")), null, "no such group");
+// the chip colour matches the game's (same vectors on both sides)
+assert.deepEqual(["Maps", "Hot Brass", "UI & QoL", "Été"].map(groupColour), [7, 6, 0, 4]);
+
 // removing a mod: requirements nothing else uses go too, through chains; shared ones stay
 const deps = [mod("A", true, { requires: ["Lib", "Patch"] }), mod("Patch", true, { requires: ["Lib", "Core"] }), mod("Lib"), mod("Core"),
   mod("B", false, { requires: ["Shared", "Gone"] }), mod("Shared"), mod("C", true, { requires: ["Shared"] })] as ModRow[];
@@ -243,3 +257,35 @@ const b41 = [mod("App", true, { requires: ["Old"] }), mod("Old", false)];
 assert.equal(ids(sortLoadOrder(b41, (m) => m.id !== "Old")), "+App -Old");
 assert.equal(ids(sortLoadOrder(b41)), "+Old +App", "loadable by default");
 console.log("order-check: requirements this build can't load stay off");
+
+// New group's name: never a case-insensitive twin of one there, which the game refuses
+const nth = (n: number) => `New section ${n}`;
+assert.equal(freeName([], "New section", nth), "New section");
+assert.equal(freeName(["new section"], "New section", nth), "New section 2");
+assert.equal(freeName(["NEW SECTION", "new section 2", "Other"], "New section", nth), "New section 3");
+console.log("order-check: new section names ignore case");
+
+// Remove of a leftover takes its whole Workshop item: the item's other mods are asked about, PZMM's own copy isn't one
+const left = (id: string, item: string) => mod(id, true, { source: `steam:${item}`, unsubscribed: true }) as ModRow;
+const pack = [left("A", "42"), left("B", "42"), mod("C", true, { source: "workshop:42" }) as ModRow, left("D", "43"), mod("E", true, { source: "steam:42" }) as ModRow];
+assert.deepEqual(leftoverSiblings(["A"], pack), ["B"], "B is in 42 too; C is PZMM's copy; E isn't a leftover");
+assert.deepEqual(leftoverSiblings(["A", "B"], pack), []);
+assert.deepEqual(leftoverSiblings(["C", "E"], pack), [], "not leftovers: nothing more");
+console.log("order-check: a leftover's item mates are listed");
+
+// the game's ack for leftovers it asked to remove: "" when gone, else why each one is still there
+const asked = [left("A", "42"), left("D", "43")];
+assert.equal(leftoverAck(asked, new Map()), "", "both gone");
+assert.match(leftoverAck(asked, new Map([["A", left("A", "42")]])), /^A: Steam needs to be running/);
+assert.match(leftoverAck(asked, new Map([["D", mod("D", true, { source: "steam:43" }) as ModRow]])), /^D: still subscribed in Steam/);
+assert.equal(leftoverAck(asked, new Map([["A", mod("A", true, { source: "workshop:42" }) as ModRow]])), "", "PZMM's own copy stays: the leftover went");
+console.log("order-check: leftover remove acks say why");
+
+// drag edge auto-scroll: up near the top, down near the bottom, faster closer in, none in the middle
+assert.equal(edgeSpeed(500, 100, 900), 0);
+assert.equal(edgeSpeed(100, 100, 900), -18);
+assert.equal(edgeSpeed(900, 100, 900), 18);
+assert.ok(edgeSpeed(130, 100, 900) < 0 && edgeSpeed(130, 100, 900) > -18 && edgeSpeed(870, 100, 900) > 0 && edgeSpeed(870, 100, 900) < 18);
+assert.equal(edgeSpeed(156, 100, 900), 0, "56 px in: still");
+assert.equal(edgeSpeed(50, 100, 900), -18, "past the edge: capped");
+console.log("order-check: drag edge scroll speeds");

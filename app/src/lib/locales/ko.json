@@ -264,6 +264,8 @@
     "filterUpdatesN": "업데이트 있음 ({count})",
     "addedHeading": "추가됨",
     "changedHeading": "업데이트됨",
+    "groupHeading": "그룹",
+    "groupChip": "그룹: {name}",
     "within1": "최근 24시간",
     "within7": "최근 7일",
     "within30": "최근 30일",
@@ -283,7 +285,7 @@
       "problems": "이 게임 빌드에서 불러올 수 없거나 다른 모드와 충돌하는 모드.",
       "hidden": "숨긴 모드예요. 목록에서 자리를 유지하고 설정된 대로 불러와요."
     },
-    "newSectionTip": "선택한 모드 위에 섹션을 추가합니다 (섹션을 우클릭하면 더 보기)",
+    "newSectionTip": "선택한 모드로 섹션을 만들거나, 선택한 모드가 없으면 맨 아래에 빈 섹션을 만듭니다 (섹션을 우클릭하면 더 보기)",
     "hide": "숨기기",
     "showAgain": "다시 보기",
     "filterHeld": "고정됨",
@@ -466,7 +468,8 @@
     "resubscribe": "다시 구독",
     "allowHeld": {
       "other": "모드 {count}개의 업데이트를 다시 허용할까요?"
-    }
+    },
+    "removeItemToo": "같은 창작마당 항목이라 함께 제거됩니다: {ids}"
   },
   "common": {
     "imageFailed": "이미지를 불러오지 못했어요",
@@ -505,7 +508,8 @@
     "steam": "구독",
     "local": "로컬 파일",
     "localShort": "로컬",
-    "manual": "수동"
+    "manual": "수동",
+    "unsubscribed": "구독 취소됨"
   },
   "api": {
     "badShareCode": "PZMM 프로필 코드가 아니에요."
@@ -876,7 +880,8 @@
       "workshop": "PZMM이 창작마당에서 다운로드함",
       "github": "PZMM이 GitHub에서 설치함",
       "local": "PZMM이 파일에서 설치함",
-      "manual": "PZMM 밖에서 모드 폴더에 추가함"
+      "manual": "PZMM 밖에서 모드 폴더에 추가함",
+      "unsubscribed": "구독을 취소했습니다. Steam은 보통 게임을 닫은 뒤 차례가 오면 이 파일을 삭제합니다. 제거하면 지금 삭제합니다."
     },
     "favourite": "즐겨찾기",
     "byAuthor": "{name} (제작: {author})",
@@ -2757,6 +2762,8 @@
     "label": "{name}: 작업",
     "toTop": "로드 순서 맨 위로 이동",
     "toBottom": "로드 순서 맨 아래로 이동",
+    "addToGroup": "그룹에 추가 ▸",
+    "newGroup": "새 그룹…",
     "copyId": "모드 ID 복사",
     "showInMaps": "지도에서 보기",
     "pin": "로드 순서에서 위치 고정",
@@ -2929,7 +2936,9 @@
     "holdFailed": "workshop:{item} 고정 중: {error}",
     "holdOn": "{ids}: 업데이트 고정됨, 이 버전을 유지해요",
     "holdOff": "{ids}: 업데이트를 다시 허용했어요",
-    "holdEnded": "{ids}: Steam에서 다시 구독해서 업데이트 고정을 풀었어요. 다운로드가 끝나면 Steam 사본이 이어받아요"
+    "holdEnded": "{ids}: Steam에서 다시 구독해서 업데이트 고정을 풀었어요. 다운로드가 끝나면 Steam 사본이 이어받아요",
+    "leftoverRemoved": "{item}: 구독 취소 후 Steam이 남긴 파일을 제거했습니다",
+    "leftoverNoSteam": "{id}: 구독 취소를 확인하려면 Steam이 실행 중이어야 해서 제거하지 않았습니다"
   },
   "doctor": {
     "notInstalled": "활성화돼 있지만 설치되지 않았어요: 게임이 건너뛰어요",
@@ -3700,6 +3709,7 @@
     "filter_disabled_tip": "비활성화됨\n가지고 있지만 불러오지 않는 모드.",
     "filter_enabled": "활성화됨",
     "filter_enabled_tip": "활성화됨\n다음 게임에서 불러오는 모드.",
+    "filter_group": "그룹",
     "filter_held": "고정됨",
     "filter_hidden": "숨김",
     "filter_hidden_tip": "숨김\n숨긴 모드예요. 목록에서 자리를 유지하고 설정된 대로 불러와요.",
@@ -3715,6 +3725,7 @@
     "findings_find": "문제의 모드 찾기",
     "get_the_app": "앱 받기",
     "ghost_warn": "이 모드는 프로필에서 활성화되어 있지만 설치되어 있지 않습니다. 설치하거나 Steam에서 구독하거나 비활성화하세요.",
+    "group_chip": "그룹: %1",
     "held_chip": "고정됨",
     "held_chip_tip": "업데이트 고정됨. 창작마당에 %1에 나온 새 버전이 있어요.",
     "held_newer_tip": "업데이트 고정됨. 창작마당에 %1에 나온 새 버전이 있어요. 클릭하면 업데이트를 다시 허용해요.",
@@ -3876,6 +3887,7 @@
     "maps_unpreview_listed": "목록 미리 보기 해제",
     "maps_zoom_in": "확대",
     "maps_zoom_out": "축소",
+    "menu_add_group": "그룹에 추가...",
     "menu_allow_updates": "업데이트 허용",
     "menu_copy_id": "모드 ID 복사",
     "menu_disable": "비활성화",
@@ -3885,6 +3897,7 @@
     "menu_hold_updates": "업데이트 고정",
     "menu_list_hint": "드래그 또는 Alt+위/아래 화살표로 정리, Space로 켜기/끄기, Ctrl/Shift+클릭으로 선택",
     "menu_maps": "맵에서 보기",
+    "menu_new_group": "새 그룹...",
     "menu_pin": "로드 순서에서 위치 고정",
     "menu_remove": "제거",
     "menu_select_all": "모두 선택",
@@ -3899,6 +3912,9 @@
     "missing_modal": "게임 내 관리자에 없는 기능",
     "mods_empty_hint": "Steam에서 모드를 구독하세요. 다시 스캔하면 구독한 모드가 여기에 표시됩니다.",
     "mods_empty_title": "아직 아무것도 없어요.",
+    "new_section_n": "모드 %1개로 새 섹션",
+    "new_section_one": "모드 1개로 새 섹션",
+    "new_section_tip": "선택한 모드로 섹션을 만들거나, 선택한 모드가 없으면 맨 아래에 빈 섹션을 만듭니다 (섹션을 우클릭하면 더 보기)",
     "next": "다음",
     "not_installed": "설치 안 됨",
     "notice_feed": "변경 사항과 그 기록, 그리고 더 많은 모드의 변경 사항 불러오기.",
@@ -4092,6 +4108,7 @@
     "sort_library": "라이브러리 순서",
     "sort_problems": "문제 우선",
     "sort_size": "크기",
+    "source_unsubscribed": "구독 취소됨",
     "srv_all_here": "모두 있음",
     "srv_and_more": "외 %1개: 서버는 모드 %2개를 쓰지만 게임 밖에서는 처음 몇 개만 보입니다",
     "srv_any_build": "모든 빌드",
@@ -4209,6 +4226,8 @@
     "tool_leave_favs": "즐겨찾기 유지",
     "tool_section": "새 섹션",
     "unhide_tip": "숨겨짐. 클릭하면 목록에 다시 보여요.",
+    "unsub_no_app": "Steam이 때가 되면 이 파일을 삭제하며, 보통 게임을 닫은 뒤입니다.",
+    "unsub_tip": "구독을 취소했습니다. Steam은 보통 게임을 닫은 뒤 차례가 오면 이 파일을 삭제합니다. 제거하면 지금 삭제합니다.",
     "up_to_date": "모드가 모두 최신 상태예요.",
     "up_to_date_held": "나머지는 모두 최신이에요: 고정된 모드 %1개에 새 버전이 있어요.",
     "up_to_date_held_one": "나머지는 모두 최신이에요: 고정된 모드 %1개에 새 버전이 있어요.",

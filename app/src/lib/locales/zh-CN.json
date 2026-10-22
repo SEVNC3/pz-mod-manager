@@ -264,6 +264,8 @@
     "filterUpdatesN": "有更新（{count}）",
     "addedHeading": "添加时间",
     "changedHeading": "更新时间",
+    "groupHeading": "分组",
+    "groupChip": "分组：{name}",
     "within1": "最近 24 小时",
     "within7": "最近 7 天",
     "within30": "最近 30 天",
@@ -283,7 +285,7 @@
       "problems": "无法在此游戏版本上加载，或与其他模组冲突的模组。",
       "hidden": "你隐藏的模组。它们保留在列表中的位置，并按设置加载。"
     },
-    "newSectionTip": "在所选模组上方添加分组（右键点击分组查看更多）",
+    "newSectionTip": "用选中的模组新建一个分组；未选中模组时在末尾新建空分组（右键点击分组查看更多）",
     "hide": "隐藏",
     "showAgain": "重新显示",
     "filterHeld": "已锁定",
@@ -466,7 +468,8 @@
     "resubscribe": "重新订阅",
     "allowHeld": {
       "other": "再次允许 {count} 个模组的更新？"
-    }
+    },
+    "removeItemToo": "同一创意工坊物品中的这些也会一并移除：{ids}"
   },
   "common": {
     "imageFailed": "图片加载失败",
@@ -505,7 +508,8 @@
     "steam": "已订阅",
     "local": "本地文件",
     "localShort": "本地",
-    "manual": "手动"
+    "manual": "手动",
+    "unsubscribed": "已取消订阅"
   },
   "api": {
     "badShareCode": "这不是 PZMM 配置方案代码。"
@@ -876,7 +880,8 @@
       "workshop": "由 PZMM 从创意工坊下载",
       "github": "由 PZMM 从 GitHub 安装",
       "local": "由 PZMM 从文件安装",
-      "manual": "在 PZMM 之外添加到模组文件夹"
+      "manual": "在 PZMM 之外添加到模组文件夹",
+      "unsubscribed": "你已取消订阅。Steam 会在轮到时删除这些文件，通常在游戏关闭后。“移除”会立即删除它们。"
     },
     "favourite": "已收藏",
     "byAuthor": "{name}，作者 {author}",
@@ -2757,6 +2762,8 @@
     "label": "{name}：操作",
     "toTop": "移到加载顺序的最前面",
     "toBottom": "移到加载顺序的最后面",
+    "addToGroup": "添加到分组 ▸",
+    "newGroup": "新建分组…",
     "copyId": "复制模组 ID",
     "showInMaps": "在地图中显示",
     "pin": "固定其在加载顺序中的位置",
@@ -2929,7 +2936,9 @@
     "holdFailed": "锁定 workshop:{item}：{error}",
     "holdOn": "{ids}：更新已锁定，此版本保持不变",
     "holdOff": "{ids}：已再次允许更新",
-    "holdEnded": "{ids}：已在 Steam 重新订阅，因此不再锁定更新；下载完成后由 Steam 的副本接手"
+    "holdEnded": "{ids}：已在 Steam 重新订阅，因此不再锁定更新；下载完成后由 Steam 的副本接手",
+    "leftoverRemoved": "{item}：已移除取消订阅后 Steam 留下的文件",
+    "leftoverNoSteam": "{id}：需要运行 Steam 才能确认你已取消订阅，因此未移除"
   },
   "doctor": {
     "notInstalled": "已启用但未安装：游戏会跳过它",
@@ -3700,6 +3709,7 @@
     "filter_disabled_tip": "已禁用\n你拥有但不会加载的模组。",
     "filter_enabled": "已启用",
     "filter_enabled_tip": "已启用\n下次游戏时会加载的模组。",
+    "filter_group": "分组",
     "filter_held": "已锁定",
     "filter_hidden": "已隐藏",
     "filter_hidden_tip": "已隐藏\n你隐藏的模组。它们保留在列表中的位置，并按设置加载。",
@@ -3715,6 +3725,7 @@
     "findings_find": "找出损坏的模组",
     "get_the_app": "获取应用",
     "ghost_warn": "此模组已在你的配置中启用，但尚未安装。请安装它、在 Steam 中订阅，或将其禁用。",
+    "group_chip": "分组：%1",
     "held_chip": "已锁定",
     "held_chip_tip": "更新已锁定。创意工坊有 %1 发布的新版本。",
     "held_newer_tip": "更新已锁定。创意工坊有 %1 发布的新版本。点击可再次允许更新。",
@@ -3876,6 +3887,7 @@
     "maps_unpreview_listed": "取消预览所列地图",
     "maps_zoom_in": "放大",
     "maps_zoom_out": "缩小",
+    "menu_add_group": "添加到分组...",
     "menu_allow_updates": "允许更新",
     "menu_copy_id": "复制模组 ID",
     "menu_disable": "禁用",
@@ -3885,6 +3897,7 @@
     "menu_hold_updates": "锁定更新",
     "menu_list_hint": "拖动或 Alt+上/下方向键 整理，Space 切换启用，Ctrl/Shift+点击 多选",
     "menu_maps": "在地图中显示",
+    "menu_new_group": "新建分组...",
     "menu_pin": "固定其在加载顺序中的位置",
     "menu_remove": "移除",
     "menu_select_all": "全选",
@@ -3899,6 +3912,9 @@
     "missing_modal": "游戏内管理器缺少的功能",
     "mods_empty_hint": "在 Steam 中订阅模组：重新扫描后，订阅内容会显示在这里。",
     "mods_empty_title": "库存里还什么都没有。",
+    "new_section_n": "用 %1 个模组新建分组",
+    "new_section_one": "用 1 个模组新建分组",
+    "new_section_tip": "用选中的模组新建一个分组；未选中模组时在末尾新建空分组（右键点击分组查看更多）",
     "next": "下一页",
     "not_installed": "未安装",
     "notice_feed": "更新日志及其历史，以及为更多模组加载日志。",
@@ -4092,6 +4108,7 @@
     "sort_library": "库顺序",
     "sort_problems": "有问题优先",
     "sort_size": "大小",
+    "source_unsubscribed": "已取消订阅",
     "srv_all_here": "都已有",
     "srv_and_more": "以及另外 %1 个：服务器运行 %2 个模组，但游戏外只显示前几个",
     "srv_any_build": "任意版本",
@@ -4209,6 +4226,8 @@
     "tool_leave_favs": "保留收藏",
     "tool_section": "新分组",
     "unhide_tip": "已隐藏。点击在列表中重新显示。",
+    "unsub_no_app": "Steam 会在处理时删除这些文件，通常是在游戏关闭后。",
+    "unsub_tip": "你已取消订阅。Steam 会在轮到时删除这些文件，通常在游戏关闭后。“移除”会立即删除它们。",
     "up_to_date": "你的模组均为最新版本。",
     "up_to_date_held": "其余都是最新的：%1 个已锁定的模组有新版本。",
     "up_to_date_held_one": "其余都是最新的：%1 个已锁定的模组有新版本。",

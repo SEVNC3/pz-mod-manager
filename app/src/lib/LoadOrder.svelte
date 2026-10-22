@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte";
+  import { dragScroll } from "./dragscroll";
   import { fmtNum } from "./format";
   import Icon from "./Icon.svelte";
   import { t, th } from "./i18n.svelte";
@@ -105,7 +106,7 @@
   {#if order.length}
     <h3>{t("loadOrder.modsInOrder")}</h3>
     <p class="hint">{t("loadOrder.dragHint")}</p>
-    <ol class="drag-list" role="listbox" aria-label={t("loadOrder.modsInOrder")} bind:this={list}>
+    <ol class="drag-list" role="listbox" aria-label={t("loadOrder.modsInOrder")} bind:this={list} use:dragScroll>
       {#each order as id, i (id)}
         {@const m = mods.get(id)}
         {@const p = problems.get(id)}

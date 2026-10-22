@@ -30,6 +30,12 @@ pub fn list(paths: &Paths) -> Vec<Record> {
     crate::read_json(&file(paths)).unwrap_or_default()
 }
 
+/// PZMM's last subscription change to Workshop item `item` in `records` (newest first) was an unsubscribe.
+pub fn unsubscribed_last(records: &[Record], item: &str) -> bool {
+    let source = format!("steam:{item}");
+    records.iter().find(|r| r.source == source && (r.action == "subscribed" || r.action == "unsubscribed")).is_some_and(|r| r.action == "unsubscribed")
+}
+
 /// Note one change (its name, when not given, from the last record of the same id).
 static WRITING: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
@@ -77,6 +83,14 @@ pub fn for_game(paths: &Paths, all: &[Record]) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn unsubscribed_last_takes_the_newest_change() {
+        let r = |source: &str, action: &str, at| super::Record { id: "M".into(), name: String::new(), source: source.into(), action: action.into(), at };
+        // newest first: 42 subscribed again after an unsubscribe; 43 unsubscribed last; 44 never through PZMM
+        let all = [r("steam:42", "subscribed", 3), r("steam:43", "removed", 3), r("steam:43", "unsubscribed", 2), r("steam:42", "unsubscribed", 1), r("steam:43", "subscribed", 0)];
+        assert!(!super::unsubscribed_last(&all, "42") && super::unsubscribed_last(&all, "43") && !super::unsubscribed_last(&all, "44"));
+    }
+
     use super::*;
 
     #[test]

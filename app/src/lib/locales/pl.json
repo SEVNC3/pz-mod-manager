@@ -309,6 +309,8 @@
     "filterUpdatesN": "Ma aktualizację ({count})",
     "addedHeading": "Dodane",
     "changedHeading": "Zaktualizowane",
+    "groupHeading": "Grupa",
+    "groupChip": "Grupa: {name}",
     "within1": "Ostatnie 24 godziny",
     "within7": "Ostatnie 7 dni",
     "within30": "Ostatnie 30 dni",
@@ -328,7 +330,7 @@
       "problems": "Mody, które nie wczytają się w tej wersji gry albo kolidują z innym modem.",
       "hidden": "Mody, które ukryłeś. Zachowują swoje miejsce na liście i ładują się zgodnie z ustawieniem."
     },
-    "newSectionTip": "Dodaj sekcję nad wybranym modem (kliknij sekcję prawym przyciskiem, by zobaczyć więcej)",
+    "newSectionTip": "Utwórz sekcję z wybranych modów, a gdy nic nie wybrano, pustą na końcu (prawy klik na sekcji, by zobaczyć więcej)",
     "hide": "Ukryj",
     "showAgain": "Pokaż ponownie",
     "filterHeld": "Wstrzymane",
@@ -595,7 +597,8 @@
       "few": "Znów zezwolić na aktualizacje {count} modów?",
       "many": "Znów zezwolić na aktualizacje {count} modów?",
       "other": "Znów zezwolić na aktualizacje {count} moda?"
-    }
+    },
+    "removeItemToo": "Usuwane razem, z tego samego elementu Warsztatu: {ids}"
   },
   "common": {
     "imageFailed": "Nie udało się wczytać obrazu",
@@ -634,7 +637,8 @@
     "steam": "Subskrybowany",
     "local": "Plik lokalny",
     "localShort": "Lokalny",
-    "manual": "Ręcznie"
+    "manual": "Ręcznie",
+    "unsubscribed": "Anulowano subskrypcję"
   },
   "api": {
     "badShareCode": "To nie jest kod profilu PZMM."
@@ -1080,7 +1084,8 @@
       "workshop": "Pobrany z Warsztatu przez PZMM",
       "github": "Zainstalowany z GitHub przez PZMM",
       "local": "Zainstalowany z pliku przez PZMM",
-      "manual": "Dodany do folderu modów poza PZMM"
+      "manual": "Dodany do folderu modów poza PZMM",
+      "unsubscribed": "Anulowano subskrypcję. Steam usunie te pliki, gdy do tego dojdzie, zwykle po zamknięciu gry. Usuń kasuje je od razu."
     },
     "favourite": "Ulubiony",
     "byAuthor": "{name}, autor: {author}",
@@ -3191,6 +3196,8 @@
     "label": "{name}: akcje",
     "toTop": "Przenieś na początek kolejności ładowania",
     "toBottom": "Przenieś na koniec kolejności ładowania",
+    "addToGroup": "Dodaj do grupy ▸",
+    "newGroup": "Nowa grupa…",
     "copyId": "Kopiuj ID moda",
     "showInMaps": "Pokaż w Mapach",
     "pin": "Przypnij jego miejsce w kolejności ładowania",
@@ -3405,7 +3412,9 @@
     "holdFailed": "wstrzymywanie workshop:{item}: {error}",
     "holdOn": "{ids}: aktualizacje wstrzymane, ta wersja zostaje",
     "holdOff": "{ids}: aktualizacje znów dozwolone",
-    "holdEnded": "{ids}: ponownie zasubskrybowano w Steam, więc aktualizacje nie są już wstrzymane; kopia Steam przejmie go po pobraniu"
+    "holdEnded": "{ids}: ponownie zasubskrybowano w Steam, więc aktualizacje nie są już wstrzymane; kopia Steam przejmie go po pobraniu",
+    "leftoverRemoved": "{item}: usunięto pliki pozostawione przez Steam po anulowaniu subskrypcji",
+    "leftoverNoSteam": "{id}: Steam musi być uruchomiony, by sprawdzić, że anulowano subskrypcję, więc nie usunięto"
   },
   "doctor": {
     "notInstalled": "jest włączony, ale nie zainstalowany: gra go pomija",
@@ -4251,6 +4260,7 @@
     "filter_disabled_tip": "Wyłączone\nMody, które masz, ale które się nie wczytują.",
     "filter_enabled": "Włączone",
     "filter_enabled_tip": "Włączone\nMody, które wczytają się w następnej grze.",
+    "filter_group": "Grupa",
     "filter_held": "Wstrzymane",
     "filter_hidden": "Ukryte",
     "filter_hidden_tip": "Ukryte\nMody, które ukryłeś. Zachowują swoje miejsce na liście i ładują się zgodnie z ustawieniem.",
@@ -4266,6 +4276,7 @@
     "findings_find": "Znajdź zepsuty mod",
     "get_the_app": "Pobierz aplikację",
     "ghost_warn": "Ten mod jest włączony w Twoim profilu, ale nie jest zainstalowany. Zainstaluj go, zasubskrybuj w Steam lub wyłącz.",
+    "group_chip": "Grupa: %1",
     "held_chip": "Wstrzymany",
     "held_chip_tip": "Aktualizacje wstrzymane. Warsztat ma nowszą wersję z %1.",
     "held_newer_tip": "Aktualizacje wstrzymane. Warsztat ma nowszą wersję z %1. Kliknij, aby znów zezwolić na aktualizacje.",
@@ -4427,6 +4438,7 @@
     "maps_unpreview_listed": "Usuń wymienione z podglądu",
     "maps_zoom_in": "Przybliż",
     "maps_zoom_out": "Oddal",
+    "menu_add_group": "Dodaj do grupy...",
     "menu_allow_updates": "Zezwól na aktualizacje",
     "menu_copy_id": "Kopiuj ID moda",
     "menu_disable": "Wyłącz",
@@ -4436,6 +4448,7 @@
     "menu_hold_updates": "Wstrzymaj aktualizacje",
     "menu_list_hint": "Przeciągnij lub Alt+strzałka w górę/w dół, aby uporządkować, Space przełącza, Ctrl/Shift+klik zaznacza",
     "menu_maps": "Pokaż w Mapach",
+    "menu_new_group": "Nowa grupa...",
     "menu_pin": "Przypnij jego miejsce w kolejności ładowania",
     "menu_remove": "Usuń",
     "menu_select_all": "Zaznacz wszystko",
@@ -4450,6 +4463,9 @@
     "missing_modal": "Czego brakuje w menedżerze w grze",
     "mods_empty_hint": "Subskrybuj mody w Steam: subskrypcje pojawią się tutaj po ponownym skanowaniu.",
     "mods_empty_title": "W magazynie jeszcze pusto.",
+    "new_section_n": "Nowa sekcja z modami (%1)",
+    "new_section_one": "Nowa sekcja z 1 modem",
+    "new_section_tip": "Utwórz sekcję z wybranych modów, a gdy nic nie wybrano, pustą na końcu (prawy klik na sekcji, by zobaczyć więcej)",
     "next": "Następna",
     "not_installed": "Nie zainstalowano",
     "notice_feed": "lista zmian i jej historia oraz wczytywanie list zmian dla kolejnych modów.",
@@ -4643,6 +4659,7 @@
     "sort_library": "Kolejność biblioteki",
     "sort_problems": "Najpierw problemy",
     "sort_size": "Rozmiar",
+    "source_unsubscribed": "Anulowano subskrypcję",
     "srv_all_here": "wszystkie są",
     "srv_and_more": "i %1 więcej: serwer używa %2 modów, ale poza grą widać tylko pierwsze",
     "srv_any_build": "Dowolny build",
@@ -4760,6 +4777,8 @@
     "tool_leave_favs": "Zostaw ulubione",
     "tool_section": "Nowa sekcja",
     "unhide_tip": "Ukryty. Kliknij, aby znów pokazać go na liście.",
+    "unsub_no_app": "Steam usuwa te pliki, gdy się do tego zabierze, zwykle po zamknięciu gry.",
+    "unsub_tip": "Anulowano subskrypcję. Steam usunie te pliki, gdy do tego dojdzie, zwykle po zamknięciu gry. Usuń kasuje je od razu.",
     "up_to_date": "Twoje mody są aktualne.",
     "up_to_date_held": "Wszystko inne jest aktualne: %1 wstrzymanych modów ma nowsze wersje.",
     "up_to_date_held_one": "Wszystko inne jest aktualne: %1 wstrzymany mod ma nowszą wersję.",

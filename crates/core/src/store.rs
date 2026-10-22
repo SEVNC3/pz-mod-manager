@@ -536,6 +536,50 @@ pub fn remove_manual(paths: &Paths, ids: &[String]) -> Result<Vec<String>> {
     Ok(refused)
 }
 
+/// Remove what Steam left of Workshop items unsubscribed (their folder `<ws>/<item>` is still there, see
+/// `steam_client::Subscriptions`): the whole item folder goes, to the Recycle Bin when `recycle`. `leftover` is Steam's
+/// answer from this moment; None (Steam closed, or it didn't answer) removes nothing, as a still-subscribed item must never
+/// be touched. Returns (the mod ids gone: every mod of the items removed that isn't installed another way too, such as
+/// PZMM's own held copy; the ids refused as not leftovers; the `steam:` ids left because Steam didn't answer).
+pub fn remove_leftovers(paths: &Paths, ws: Option<&Path>, ids: &[String], recycle: bool, leftover: Option<impl Fn(&str) -> bool>) -> Result<(Vec<String>, Vec<String>, Vec<String>)> {
+    let rows: Vec<Row> = ws.map(|ws| workshop_rows(ws).collect()).unwrap_or_default();
+    let (mut removed, mut refused, mut unchecked) = (vec![], vec![], vec![]);
+    for id in ids {
+        if removed.contains(id) {
+            continue; // its item went with another of its mods
+        }
+        let row = rows.iter().find(|r| &r.id == id);
+        let Some(leftover) = leftover.as_ref().filter(|_| row.is_some()) else {
+            if row.is_some() {
+                crate::say!("leftoverNoSteam", "{id}: Steam needs to be running to check you've unsubscribed, so it wasn't removed", id = id);
+                unchecked.push(id.clone());
+            } else {
+                refused.push(id.clone());
+            }
+            continue;
+        };
+        let item = row.filter(|r| leftover(&r.source)).and_then(|r| r.source.strip_prefix("steam:"));
+        let (Some(ws), Some(item)) = (ws, item.filter(|i| crate::sources::steam_workshop::valid_id(i))) else {
+            refused.push(id.clone());
+            continue;
+        };
+        let dir = ws.join(item);
+        if dir.exists() && recycle {
+            trash::delete(&dir).with_context(|| format!("moving {} to the Recycle Bin", dir.display()))?;
+        } else if dir.exists() {
+            fs::remove_dir_all(&dir)?;
+        }
+        let source = format!("steam:{item}");
+        removed.extend(rows.iter().filter(|r| r.source == source && !removed.contains(&r.id)).map(|r| r.id.clone()).collect::<Vec<_>>());
+        crate::say!("leftoverRemoved", "{item}: removed the files Steam left after the unsubscribe", item = item);
+    }
+    // a mod installed another way too (PZMM's held copy, a manual folder, another Workshop item still there) stays in the profiles
+    let mut kept: std::collections::HashSet<String> = pz::local_mods(paths).into_iter().chain(pz::staged_mods(paths)).map(|m| m.id).collect();
+    kept.extend(ws.into_iter().flat_map(|ws| workshop_rows(ws).map(|r| r.id)));
+    removed.retain(|id| !kept.contains(id));
+    Ok((removed, refused, unchecked))
+}
+
 /// Each backup (a mod's previous version) with its size and age (its newest file).
 fn backups(paths: &Paths) -> Vec<(PathBuf, pz::files::Stats)> {
     let dirs = fs::read_dir(paths.data.join("backups")).into_iter().flatten().flatten();
@@ -1005,6 +1049,43 @@ name=v2
         assert!(load(&paths).unwrap()["A"].held);
         set_held(&paths, &["B".into()], false).unwrap();
         assert_eq!(fs::read_to_string(paths.zomboid.join("Lua/pzmm/held.txt")).unwrap(), "");
+    }
+
+    #[test]
+    fn remove_leftovers_never_touches_a_subscription() {
+        let (t, paths) = temp_paths();
+        let ws = t.path().join("ws");
+        mod_tree(&ws, "42/mods/ModA", "id=ModA\n");
+        mod_tree(&ws, "42/mods/ModB", "id=ModB\n");
+        mod_tree(&ws, "43/mods/ModC", "id=ModC\n");
+        let ids = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        // still subscribed: refused, its folder stays
+        let (gone, refused, _) = remove_leftovers(&paths, Some(&ws), &ids(&["ModA", "Nope"]), false, Some(|s: &str| s != "steam:42")).unwrap();
+        assert_eq!((gone, refused), (vec![], ids(&["ModA", "Nope"])));
+        assert!(ws.join("42").is_dir());
+        // Steam didn't answer just now (closed, timed out): nothing goes, whatever was known before
+        let (gone, refused, unchecked) = remove_leftovers(&paths, Some(&ws), &ids(&["ModA", "Nope"]), false, None::<fn(&str) -> bool>).unwrap();
+        assert_eq!((gone, refused, unchecked), (vec![], ids(&["Nope"]), ids(&["ModA"])));
+        assert!(ws.join("42").is_dir());
+        // a leftover: the whole item goes, with each of its mods; the other item stays. ModB has PZMM's own copy too,
+        // so it stays in the profiles
+        mod_tree(&paths.mods(), "ModB", "id=ModB\n");
+        let (gone, refused, _) = remove_leftovers(&paths, Some(&ws), &ids(&["ModA", "ModB", "ModC"]), false, Some(|s: &str| s == "steam:42")).unwrap();
+        assert_eq!((gone, refused), (ids(&["ModA"]), ids(&["ModC"])));
+        assert!(!ws.join("42").exists() && ws.join("43").is_dir());
+        assert!(remove_leftovers(&paths, None, &ids(&["ModC"]), false, Some(|_: &str| true)).unwrap().1 == ids(&["ModC"]));
+    }
+
+    #[test]
+    fn a_mod_another_workshop_item_provides_stays_in_the_profiles() {
+        let (t, paths) = temp_paths();
+        let ws = t.path().join("ws");
+        mod_tree(&ws, "42/mods/ModA", "id=ModA\n");
+        mod_tree(&ws, "42/mods/ModB", "id=ModB\n");
+        mod_tree(&ws, "77/mods/ModB", "id=ModB\n"); // a fork or re-upload, still subscribed
+        let (gone, refused, _) = remove_leftovers(&paths, Some(&ws), &["ModA".to_string()], false, Some(|s: &str| s == "steam:42")).unwrap();
+        assert_eq!((gone, refused), (vec!["ModA".to_string()], vec![]));
+        assert!(!ws.join("42").exists() && ws.join("77/mods/ModB").is_dir());
     }
 
     #[test]

@@ -279,6 +279,8 @@
     "filterUpdatesN": "Hat ein Update ({count})",
     "addedHeading": "Hinzugefügt",
     "changedHeading": "Aktualisiert",
+    "groupHeading": "Gruppe",
+    "groupChip": "Gruppe: {name}",
     "within1": "Letzte 24 Stunden",
     "within7": "Letzte 7 Tage",
     "within30": "Letzte 30 Tage",
@@ -298,7 +300,7 @@
       "problems": "Mods, die in diesem Build des Spiels nicht laden können oder mit einer anderen Mod kollidieren.",
       "hidden": "Mods, die du ausgeblendet hast. Sie behalten ihren Platz in der Liste und laden, wie sie eingestellt sind."
     },
-    "newSectionTip": "Einen Abschnitt über der gewählten Mod hinzufügen (Rechtsklick auf einen Abschnitt für mehr)",
+    "newSectionTip": "Einen Abschnitt aus den gewählten Mods machen, oder einen leeren am Ende, wenn keine gewählt sind (Rechtsklick auf einen Abschnitt für mehr)",
     "hide": "Ausblenden",
     "showAgain": "Wieder zeigen",
     "filterHeld": "Angehalten",
@@ -509,7 +511,8 @@
     "allowHeld": {
       "one": "Updates für {count} Mod wieder zulassen?",
       "other": "Updates für {count} Mods wieder zulassen?"
-    }
+    },
+    "removeItemToo": "Wird mit entfernt, aus demselben Workshop-Objekt: {ids}"
   },
   "common": {
     "imageFailed": "Bild konnte nicht geladen werden",
@@ -548,7 +551,8 @@
     "steam": "Abonniert",
     "local": "Lokale Datei",
     "localShort": "Lokal",
-    "manual": "Manuell"
+    "manual": "Manuell",
+    "unsubscribed": "Abbestellt"
   },
   "api": {
     "badShareCode": "Das ist kein PZMM-Profilcode."
@@ -944,7 +948,8 @@
       "workshop": "Von PZMM aus dem Workshop heruntergeladen",
       "github": "Von PZMM aus GitHub installiert",
       "local": "Von PZMM aus einer Datei installiert",
-      "manual": "Außerhalb von PZMM in den Modordner gelegt"
+      "manual": "Außerhalb von PZMM in den Modordner gelegt",
+      "unsubscribed": "Du hast das abbestellt. Steam löscht diese Dateien, wenn es dazu kommt, meist nachdem das Spiel geschlossen wurde. Entfernen löscht sie jetzt."
     },
     "favourite": "Favorit",
     "byAuthor": "{name} von {author}",
@@ -2899,6 +2904,8 @@
     "label": "{name}: Aktionen",
     "toTop": "An den Anfang der Ladereihenfolge",
     "toBottom": "An das Ende der Ladereihenfolge",
+    "addToGroup": "Zu Gruppe hinzufügen ▸",
+    "newGroup": "Neue Gruppe…",
     "copyId": "Mod-ID kopieren",
     "showInMaps": "In Karten zeigen",
     "pin": "Platz in der Ladereihenfolge festlegen",
@@ -3085,7 +3092,9 @@
     "holdFailed": "workshop:{item} anhalten: {error}",
     "holdOn": "{ids}: Updates angehalten, diese Version bleibt",
     "holdOff": "{ids}: Updates wieder zugelassen",
-    "holdEnded": "{ids}: in Steam wieder abonniert, Updates sind daher nicht mehr angehalten; Steams Kopie übernimmt, sobald sie heruntergeladen ist"
+    "holdEnded": "{ids}: in Steam wieder abonniert, Updates sind daher nicht mehr angehalten; Steams Kopie übernimmt, sobald sie heruntergeladen ist",
+    "leftoverRemoved": "{item}: die Dateien entfernt, die Steam nach dem Abbestellen zurückgelassen hat",
+    "leftoverNoSteam": "{id}: Steam muss laufen, um zu prüfen, dass du es abbestellt hast, daher wurde es nicht entfernt"
   },
   "doctor": {
     "notInstalled": "ist aktiviert, aber nicht installiert: Das Spiel überspringt ihn",
@@ -3881,6 +3890,7 @@
     "filter_disabled_tip": "Deaktiviert\nMods, die du hast, die aber nicht geladen werden.",
     "filter_enabled": "Aktiviert",
     "filter_enabled_tip": "Aktiviert\nMods, die mit deinem nächsten Spiel geladen werden.",
+    "filter_group": "Gruppe",
     "filter_held": "Angehalten",
     "filter_hidden": "Ausgeblendet",
     "filter_hidden_tip": "Ausgeblendet\nMods, die du ausgeblendet hast. Sie behalten ihren Platz in der Liste und laden, wie sie eingestellt sind.",
@@ -3896,6 +3906,7 @@
     "findings_find": "Die kaputte Mod finden",
     "get_the_app": "App herunterladen",
     "ghost_warn": "Dieser Mod ist in deinem Profil aktiviert, aber nicht installiert. Installiere ihn, abonniere ihn in Steam oder deaktiviere ihn.",
+    "group_chip": "Gruppe: %1",
     "held_chip": "Angehalten",
     "held_chip_tip": "Updates angehalten. Im Workshop gibt es eine neuere Version vom %1.",
     "held_newer_tip": "Updates angehalten. Im Workshop gibt es eine neuere Version vom %1. Klicke, um Updates wieder zuzulassen.",
@@ -4057,6 +4068,7 @@
     "maps_unpreview_listed": "Gelistete aus Vorschau",
     "maps_zoom_in": "Vergrößern",
     "maps_zoom_out": "Verkleinern",
+    "menu_add_group": "Zu Gruppe hinzufügen...",
     "menu_allow_updates": "Updates zulassen",
     "menu_copy_id": "Mod-ID kopieren",
     "menu_disable": "Deaktivieren",
@@ -4066,6 +4078,7 @@
     "menu_hold_updates": "Updates anhalten",
     "menu_list_hint": "Ziehen oder Alt+Pfeil hoch/runter zum Ordnen, Space schaltet um, Ctrl/Shift+Klick wählt aus",
     "menu_maps": "In Karten zeigen",
+    "menu_new_group": "Neue Gruppe...",
     "menu_pin": "Platz in der Ladereihenfolge festlegen",
     "menu_remove": "Entfernen",
     "menu_select_all": "Alle auswählen",
@@ -4080,6 +4093,9 @@
     "missing_modal": "Fehlt im Mod-Manager im Spiel",
     "mods_empty_hint": "Abonniere Mods in Steam: Abos erscheinen hier, sobald du neu scannst.",
     "mods_empty_title": "Noch nichts im Vorrat.",
+    "new_section_n": "Neuer Abschnitt mit %1 Mods",
+    "new_section_one": "Neuer Abschnitt mit 1 Mod",
+    "new_section_tip": "Einen Abschnitt aus den gewählten Mods machen, oder einen leeren am Ende, wenn keine gewählt sind (Rechtsklick auf einen Abschnitt für mehr)",
     "next": "Weiter",
     "not_installed": "Nicht installiert",
     "notice_feed": "Änderungsnotizen und ihr Verlauf sowie das Laden der Notizen für weitere Mods.",
@@ -4273,6 +4289,7 @@
     "sort_library": "Bibliotheksreihenfolge",
     "sort_problems": "Probleme zuerst",
     "sort_size": "Größe",
+    "source_unsubscribed": "Abbestellt",
     "srv_all_here": "alle da",
     "srv_and_more": "und %1 weitere: der Server nutzt %2 Mods, aber nur die ersten werden außerhalb des Spiels angezeigt",
     "srv_any_build": "Beliebiger Build",
@@ -4390,6 +4407,8 @@
     "tool_leave_favs": "Favoriten lassen",
     "tool_section": "Neuer Abschnitt",
     "unhide_tip": "Ausgeblendet. Klicke, um sie wieder in der Liste zu zeigen.",
+    "unsub_no_app": "Steam löscht diese Dateien, wenn es dazu kommt, meist nachdem das Spiel geschlossen wurde.",
+    "unsub_tip": "Du hast das abbestellt. Steam löscht diese Dateien, wenn es dazu kommt, meist nachdem das Spiel geschlossen wurde. Entfernen löscht sie jetzt.",
     "up_to_date": "Deine Mods sind auf dem neuesten Stand.",
     "up_to_date_held": "Alles andere ist aktuell: %1 angehaltene Mods haben neuere Versionen.",
     "up_to_date_held_one": "Alles andere ist aktuell: %1 angehaltene Mod hat eine neuere Version.",

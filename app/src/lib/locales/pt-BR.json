@@ -279,6 +279,8 @@
     "filterUpdatesN": "Tem atualização ({count})",
     "addedHeading": "Adicionado",
     "changedHeading": "Atualizado",
+    "groupHeading": "Grupo",
+    "groupChip": "Grupo: {name}",
     "within1": "Últimas 24 horas",
     "within7": "Últimos 7 dias",
     "within30": "Últimos 30 dias",
@@ -298,7 +300,7 @@
       "problems": "Mods que não carregam nesta versão do jogo ou que entram em conflito com outro mod.",
       "hidden": "Mods que você ocultou. Eles mantêm o lugar na lista e carregam conforme configurados."
     },
-    "newSectionTip": "Adiciona uma seção acima do mod selecionado (clique com o botão direito numa seção para mais)",
+    "newSectionTip": "Cria uma seção com os mods escolhidos, ou uma vazia no fim se nenhum for escolhido (clique direito numa seção para mais)",
     "hide": "Ocultar",
     "showAgain": "Mostrar de novo",
     "filterHeld": "Segurados",
@@ -509,7 +511,8 @@
     "allowHeld": {
       "one": "Permitir de novo as atualizações de {count} mod?",
       "other": "Permitir de novo as atualizações de {count} mods?"
-    }
+    },
+    "removeItemToo": "Removido junto, do mesmo item da Oficina: {ids}"
   },
   "common": {
     "imageFailed": "Não foi possível carregar a imagem",
@@ -548,7 +551,8 @@
     "steam": "Inscrito",
     "local": "Arquivo local",
     "localShort": "Local",
-    "manual": "Manual"
+    "manual": "Manual",
+    "unsubscribed": "Inscrição cancelada"
   },
   "api": {
     "badShareCode": "Isso não é um código de perfil do PZMM."
@@ -944,7 +948,8 @@
       "workshop": "Baixado da Oficina pelo PZMM",
       "github": "Instalado do GitHub pelo PZMM",
       "local": "Instalado de um arquivo pelo PZMM",
-      "manual": "Adicionado à pasta de mods fora do PZMM"
+      "manual": "Adicionado à pasta de mods fora do PZMM",
+      "unsubscribed": "Você cancelou a inscrição. A Steam apaga estes arquivos quando chega a vez, geralmente depois que o jogo fecha. Remover apaga agora."
     },
     "favourite": "Favorito",
     "byAuthor": "{name}, de {author}",
@@ -2899,6 +2904,8 @@
     "label": "{name}: ações",
     "toTop": "Mover para o início da ordem de carregamento",
     "toBottom": "Mover para o fim da ordem de carregamento",
+    "addToGroup": "Adicionar a um grupo ▸",
+    "newGroup": "Novo grupo…",
     "copyId": "Copiar ID do mod",
     "showInMaps": "Mostrar em Mapas",
     "pin": "Fixar o lugar na ordem de carregamento",
@@ -3085,7 +3092,9 @@
     "holdFailed": "segurando workshop:{item}: {error}",
     "holdOn": "{ids}: atualizações seguradas, esta versão fica",
     "holdOff": "{ids}: atualizações permitidas de novo",
-    "holdEnded": "{ids}: inscrito no Steam de novo, então as atualizações não estão mais seguradas; a cópia do Steam assume quando for baixada"
+    "holdEnded": "{ids}: inscrito no Steam de novo, então as atualizações não estão mais seguradas; a cópia do Steam assume quando for baixada",
+    "leftoverRemoved": "{item}: removidos os arquivos que a Steam deixou após cancelar a inscrição",
+    "leftoverNoSteam": "{id}: a Steam precisa estar aberta para conferir que você cancelou a inscrição, então não foi removido"
   },
   "doctor": {
     "notInstalled": "está ativado, mas não instalado: o jogo o ignora",
@@ -3881,6 +3890,7 @@
     "filter_disabled_tip": "Desativado\nMods que você tem, mas que não são carregados.",
     "filter_enabled": "Ativado",
     "filter_enabled_tip": "Ativado\nMods que carregam no seu próximo jogo.",
+    "filter_group": "Grupo",
     "filter_held": "Segurados",
     "filter_hidden": "Ocultos",
     "filter_hidden_tip": "Ocultos\nMods que você ocultou. Eles mantêm o lugar na lista e carregam conforme configurados.",
@@ -3896,6 +3906,7 @@
     "findings_find": "Encontrar o mod quebrado",
     "get_the_app": "Baixar o app",
     "ghost_warn": "Este mod está ativado no seu perfil, mas não está instalado. Instale-o, inscreva-se no Steam ou desative-o.",
+    "group_chip": "Grupo: %1",
     "held_chip": "Segurado",
     "held_chip_tip": "Atualizações seguradas. A Oficina tem uma versão mais nova de %1.",
     "held_newer_tip": "Atualizações seguradas. A Oficina tem uma versão mais nova de %1. Clique para permitir atualizações de novo.",
@@ -4057,6 +4068,7 @@
     "maps_unpreview_listed": "Tirar listados da prévia",
     "maps_zoom_in": "Aumentar zoom",
     "maps_zoom_out": "Diminuir zoom",
+    "menu_add_group": "Adicionar a um grupo...",
     "menu_allow_updates": "Permitir atualizações",
     "menu_copy_id": "Copiar ID do mod",
     "menu_disable": "Desativar",
@@ -4066,6 +4078,7 @@
     "menu_hold_updates": "Segurar atualizações",
     "menu_list_hint": "Arraste ou use Alt+seta para cima/baixo para organizar, Space alterna, Ctrl/Shift+clique seleciona",
     "menu_maps": "Mostrar em Mapas",
+    "menu_new_group": "Novo grupo...",
     "menu_pin": "Fixar o lugar na ordem de carregamento",
     "menu_remove": "Remover",
     "menu_select_all": "Selecionar tudo",
@@ -4080,6 +4093,9 @@
     "missing_modal": "O que falta no gerenciador do jogo",
     "mods_empty_hint": "Inscreva-se em mods na Steam: as inscrições aparecem aqui depois que você escanear de novo.",
     "mods_empty_title": "Ainda não há nada no estoque.",
+    "new_section_n": "Nova seção com %1 mods",
+    "new_section_one": "Nova seção com 1 mod",
+    "new_section_tip": "Cria uma seção com os mods escolhidos, ou uma vazia no fim se nenhum for escolhido (clique direito numa seção para mais)",
     "next": "Próxima",
     "not_installed": "Não instalado",
     "notice_feed": "as notas de alteração e seu histórico, e o carregamento das notas de mais mods.",
@@ -4273,6 +4289,7 @@
     "sort_library": "Ordem da biblioteca",
     "sort_problems": "Problemas primeiro",
     "sort_size": "Tamanho",
+    "source_unsubscribed": "Inscrição cancelada",
     "srv_all_here": "todos aqui",
     "srv_and_more": "e mais %1: o servidor usa %2 mods, mas só os primeiros aparecem fora do jogo",
     "srv_any_build": "Qualquer build",
@@ -4390,6 +4407,8 @@
     "tool_leave_favs": "Manter favoritos",
     "tool_section": "Nova seção",
     "unhide_tip": "Oculto. Clique para mostrar na lista de novo.",
+    "unsub_no_app": "A Steam apaga estes arquivos quando chega a eles, geralmente depois que o jogo fecha.",
+    "unsub_tip": "Você cancelou a inscrição. A Steam apaga estes arquivos quando chega a vez, geralmente depois que o jogo fecha. Remover apaga agora.",
     "up_to_date": "Seus mods estão atualizados.",
     "up_to_date_held": "Todo o resto está atualizado: %1 mods segurados têm versões mais novas.",
     "up_to_date_held_one": "Todo o resto está atualizado: %1 mod segurado tem uma versão mais nova.",

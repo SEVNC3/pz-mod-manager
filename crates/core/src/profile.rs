@@ -842,12 +842,14 @@ fn save_state(paths: &Paths, s: &State) -> Result<()> {
 /// The profiles for the PZMM - Client mod's in-game screen: `Zomboid/Lua/pzmm/profiles.txt`, `active\t<name>`
 /// then a `<name>\t<kind>` line per profile. Written with every profile change, where that folder is.
 pub fn profiles_for_game(paths: &Paths) {
-    let dir = crate::pz::bridge::dir(paths);
+    // state.json unread: its stand-in, "Default", may be another profile (and another folder), so nothing is written
+    let Some(active) = try_active_name(paths) else { return };
+    let dir = crate::pz::bridge::dir_for(paths, &active);
     if !dir.is_dir() {
         return;
     }
     let s = state(paths);
-    let mut text = format!("active\t{}\n", active_name(paths));
+    let mut text = format!("active\t{active}\n");
     for n in list(paths) {
         text += &format!("{n}\t{}\n", s.kinds.get(&n).map_or(DEFAULT_KIND, String::as_str));
     }
@@ -855,7 +857,17 @@ pub fn profiles_for_game(paths: &Paths) {
 }
 
 pub fn active_name(paths: &Paths) -> String {
-    Some(state(paths).active).filter(|s| !s.is_empty()).unwrap_or_else(|| "Default".into())
+    try_active_name(paths).unwrap_or_else(|| "Default".into())
+}
+
+/// [`active_name`], or None when state.json can't be read: its stand-in, "Default", may be another profile.
+pub fn try_active_name(paths: &Paths) -> Option<String> {
+    let s = state(paths);
+    (!s.unread).then(|| active_of(&s))
+}
+
+fn active_of(s: &State) -> String {
+    Some(s.active.clone()).filter(|a| !a.is_empty()).unwrap_or_else(|| "Default".into())
 }
 
 /// Forced default.txt format (41 or 42), or None to keep the file's own.
@@ -881,11 +893,22 @@ pub fn peek(paths: &Paths) -> Profile {
     load(paths, &name).unwrap_or(Profile { name, ..Default::default() })
 }
 
+/// The active profile's library for the game ([`library_for_game`]) as saved, when it can be read: a read that fails
+/// (state.json or the profile's files mid-write, say just after an update) writes nothing, rather than an empty library or
+/// another profile's over the game's until the next change.
+pub fn peek_for_game(paths: &Paths) {
+    match try_active_name(paths).map(|n| load(paths, &n)) {
+        Some(Ok(p)) => library_for_game(paths, &p),
+        Some(Err(e)) => crate::log!("error: the game's library wasn't written: {e:#}"),
+        None => {}
+    }
+}
+
 /// Load the active profile (creating "Default" from the game's list on first run) and
 /// adopt any changes made in-game. Returns the profile and whether it adopted changes.
 pub fn sync(paths: &Paths) -> Result<(Profile, bool)> {
-    state_to_change(paths)?;
-    let name = active_name(paths);
+    // the name from the state just read: a second read failing would stand in "Default"
+    let name = active_of(&state_to_change(paths)?);
     // a profile that exists but can't be read is an error: starting empty would replace it with the game's list
     let mut p = if dir(paths).join(&name).join("modlist.txt").exists() { load(paths, &name)? } else { Profile { name, ..Default::default() } };
     // a missing or unreadable default.txt (game running, odd encoding) says nothing about
@@ -1098,20 +1121,26 @@ pub fn apply(paths: &Paths, profile: &Profile, mods: Option<&std::collections::B
 /// mod's in-game mod screen: `Zomboid/Lua/pzmm/library.txt`, where that folder is (the mod or the app's start makes it),
 /// with its load order and snapshots.
 pub fn library_for_game(paths: &Paths, p: &Profile) {
-    let dir = crate::pz::bridge::dir(paths);
+    // `p` is the active profile: its folder, without reading state.json again (a failed read would stand in Default's)
+    let dir = crate::pz::bridge::dir_for(paths, &p.name);
     if dir.is_dir() {
         crate::pz::bridge::write_for_game(&dir.join("library.txt"), format!("# PZMM profile: {}\n{}", p.name, p.to_text()));
         // the load order (library.txt only says on or off): the game's "Use PZMM's mods" takes PZMM's places too
         crate::pz::bridge::write_for_game(&dir.join("order.txt"), p.enabled().iter().map(|id| format!("{id}\n")).collect::<String>());
         snapshots_for_game(paths, &dir, &p.name);
-        maps_for_game(paths);
+        maps_to(paths, &dir);
     }
 }
 
 /// The active profile's `Map=` order (default.txt's `maps` block, as `apply` wrote it) for the game's "Use PZMM's mods":
 /// `maps.txt`, a map folder per line. Written when it differs, where PZMM - Client is.
 pub fn maps_for_game(paths: &Paths) {
-    let file = crate::pz::bridge::dir(paths).join("maps.txt");
+    maps_to(paths, &crate::pz::bridge::dir(paths));
+}
+
+/// [`maps_for_game`] in bridge folder `dir`.
+fn maps_to(paths: &Paths, dir: &std::path::Path) {
+    let file = dir.join("maps.txt");
     let text: String = pz::read_default(&paths.default_txt()).map_folders().iter().map(|m| format!("{m}\n")).collect();
     if file.parent().is_some_and(std::path::Path::is_dir) && fs::read_to_string(&file).ok() != Some(text.clone()) {
         crate::pz::bridge::write_for_game(&file, text);
@@ -1130,11 +1159,12 @@ fn snapshots_for_game(paths: &Paths, dir: &std::path::Path, name: &str) {
 /// only read under `Zomboid/Lua`), written every few seconds while PZMM runs, so a `running_at` more than
 /// 15 s old means it's closed. Plain `key=value` lines, which Lua reads easily.
 pub fn app_for_game(paths: &Paths, version: &str) {
-    let dir = crate::pz::bridge::dir(paths);
+    // state.json unread: no `profile=Default` stand-in (nor Default's folder); the next beat writes it
+    let Some(name) = try_active_name(paths) else { return };
+    let dir = crate::pz::bridge::dir_for(paths, &name);
     // where the game has run (its Lua folder): the folder for PZMM - Client is made here
     if dir.parent().is_some_and(std::path::Path::is_dir) {
         let _ = std::fs::create_dir_all(&dir);
-        let name = active_name(paths);
         // busy: the game's requests are still being handled (queued, or a question about one is open), so its
         // sorting edits wait for PZMM rather than giving up. default_rev: when default.txt last changed, so the game
         // can tell PZMM changed the mod list since its screen opened. job: the download or install running (`bridge::JOB`).
@@ -1156,7 +1186,7 @@ pub fn app_for_game(paths: &Paths, version: &str) {
         let _ = crate::write_atomic(&dir.join("app.txt"), text);
         // a folder made since PZMM started (a profile's own game folder, on its first run): what the game reads from it
         if !dir.join("library.txt").exists() {
-            library_for_game(paths, &peek(paths));
+            peek_for_game(paths);
             profiles_for_game(paths);
         }
     }
@@ -1302,6 +1332,58 @@ mod tests {
         std::fs::create_dir_all(file.parent().unwrap()).unwrap();
         apply(&paths, &p).unwrap();
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "# PZMM profile: Solo\n# --- Frameworks & libraries\n+A\n-B\n");
+    }
+
+    /// The reported "groups gone after a PZMM update, back after a game run", step by step on a temp data folder that is
+    /// also the install folder (both `%LOCALAPPDATA%\pzmm` on Windows).
+    #[test]
+    fn an_update_installed_over_the_data_folder_keeps_the_sections() {
+        let (_t, paths) = temp_paths();
+        let library = paths.zomboid.join("Lua/pzmm/library.txt");
+        fs::create_dir_all(library.parent().unwrap()).unwrap();
+        let named = |p: &Profile| p.lines.iter().filter(|l| matches!(l, Line::Separator(s) if !s.is_empty())).count();
+        apply(&paths, &Profile::parse("Viewpoint", "# --- 框架\n+A\n# --- 地图\n-B\n")).unwrap();
+        set_kind(&paths, "Viewpoint", pz::viewpoint::KIND).unwrap();
+        assert_eq!(named(&sync(&paths).unwrap().0), 2, "before the update");
+        // the update: Tauri's NSIS installer run with /UPDATE skips the old uninstaller and writes only the exe and
+        // uninstall.exe into $INSTDIR (the rest is the registry and shortcuts)
+        fs::write(paths.data.join("pzmm.exe"), "new").unwrap();
+        fs::write(paths.data.join("uninstall.exe"), "new").unwrap();
+        // the first start: the watcher's first round, then the UI's first load
+        peek_for_game(&paths);
+        assert_eq!(named(&sync(&paths).unwrap().0), 2, "the first view after the update");
+        assert!(fs::read_to_string(&library).unwrap().contains("# --- 地图\n"), "the game's copy too");
+        // a game run: game.json at the main menu, and Accept writing default.txt again
+        fs::write(paths.zomboid.join("Lua/pzmm/game.json"), "{}").unwrap();
+        pz::write_default(&paths.default_txt(), &["A".to_string()], None, None).unwrap();
+        assert_eq!(named(&sync(&paths).unwrap().0), 2, "after the game run");
+    }
+
+    #[test]
+    fn an_unreadable_state_leaves_the_games_library_alone() {
+        let (_t, paths) = temp_paths();
+        let file = paths.zomboid.join("Lua/pzmm/library.txt");
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        apply(&paths, &Profile::parse("Solo", "# --- S
++A
+")).unwrap();
+        // state.json can't be read (held by another program past the retries): it can't say which profile is active
+        let state = paths.data.join("state.json");
+        fs::remove_file(&state).unwrap();
+        fs::create_dir(&state).unwrap();
+        peek_for_game(&paths);
+        assert_eq!(fs::read_to_string(&file).unwrap(), "# PZMM profile: Solo
+# --- S
++A
+", "not Default's empty library");
+        // nor "Default" told to the game as the active profile
+        let profiles = fs::read_to_string(paths.zomboid.join("Lua/pzmm/profiles.txt")).unwrap();
+        assert!(profiles.starts_with("active\tSolo\n"), "{profiles}");
+        profiles_for_game(&paths);
+        app_for_game(&paths, "1.0");
+        assert_eq!(fs::read_to_string(paths.zomboid.join("Lua/pzmm/profiles.txt")).unwrap(), profiles);
+        assert!(!paths.zomboid.join("Lua/pzmm/app.txt").exists());
+        assert!(sync(&paths).is_err(), "nor a view of Default");
     }
 
     #[test]

@@ -279,6 +279,8 @@
     "filterUpdatesN": "Ha un aggiornamento ({count})",
     "addedHeading": "Aggiunta",
     "changedHeading": "Aggiornata",
+    "groupHeading": "Gruppo",
+    "groupChip": "Gruppo: {name}",
     "within1": "Ultime 24 ore",
     "within7": "Ultimi 7 giorni",
     "within30": "Ultimi 30 giorni",
@@ -298,7 +300,7 @@
       "problems": "Mod che non possono caricarsi su questa build del gioco o che vanno in conflitto con un'altra mod.",
       "hidden": "Le mod che hai nascosto. Mantengono il loro posto nella lista e si caricano come sono impostate."
     },
-    "newSectionTip": "Aggiungi una sezione sopra la mod selezionata (clic destro su una sezione per altro)",
+    "newSectionTip": "Crea una sezione con le mod scelte, o una vuota in fondo se non ne hai scelte (clic destro su una sezione per altro)",
     "hide": "Nascondi",
     "showAgain": "Mostra di nuovo",
     "filterHeld": "Bloccate",
@@ -509,7 +511,8 @@
     "allowHeld": {
       "one": "Consentire di nuovo gli aggiornamenti per {count} mod?",
       "other": "Consentire di nuovo gli aggiornamenti per {count} mod?"
-    }
+    },
+    "removeItemToo": "Rimosso insieme, dallo stesso elemento del Workshop: {ids}"
   },
   "common": {
     "imageFailed": "Impossibile caricare l’immagine",
@@ -548,7 +551,8 @@
     "steam": "Iscrizione",
     "local": "File locale",
     "localShort": "Locale",
-    "manual": "Manuale"
+    "manual": "Manuale",
+    "unsubscribed": "Iscrizione annullata"
   },
   "api": {
     "badShareCode": "Questo non è un codice profilo di PZMM."
@@ -944,7 +948,8 @@
       "workshop": "Scaricata dal Workshop da PZMM",
       "github": "Installata da GitHub da PZMM",
       "local": "Installata da un file da PZMM",
-      "manual": "Aggiunta alla cartella delle mod al di fuori di PZMM"
+      "manual": "Aggiunta alla cartella delle mod al di fuori di PZMM",
+      "unsubscribed": "Hai annullato l'iscrizione. Steam elimina questi file quando ci arriva, di solito dopo la chiusura del gioco. Rimuovi li elimina subito."
     },
     "favourite": "Preferita",
     "byAuthor": "{name} di {author}",
@@ -2899,6 +2904,8 @@
     "label": "{name}: azioni",
     "toTop": "Sposta in cima all'ordine di caricamento",
     "toBottom": "Sposta in fondo all'ordine di caricamento",
+    "addToGroup": "Aggiungi a un gruppo ▸",
+    "newGroup": "Nuovo gruppo…",
     "copyId": "Copia l'ID della mod",
     "showInMaps": "Mostra in Mappe",
     "pin": "Fissa il suo posto nell'ordine di caricamento",
@@ -3085,7 +3092,9 @@
     "holdFailed": "blocco di workshop:{item}: {error}",
     "holdOn": "{ids}: aggiornamenti bloccati, questa versione resta",
     "holdOff": "{ids}: aggiornamenti di nuovo consentiti",
-    "holdEnded": "{ids}: iscritta di nuovo su Steam, quindi gli aggiornamenti non sono più bloccati; la copia di Steam subentra una volta scaricata"
+    "holdEnded": "{ids}: iscritta di nuovo su Steam, quindi gli aggiornamenti non sono più bloccati; la copia di Steam subentra una volta scaricata",
+    "leftoverRemoved": "{item}: rimossi i file lasciati da Steam dopo l'annullamento dell'iscrizione",
+    "leftoverNoSteam": "{id}: Steam deve essere avviato per verificare che hai annullato l'iscrizione, quindi non è stato rimosso"
   },
   "doctor": {
     "notInstalled": "è attiva ma non installata: il gioco la salta",
@@ -3881,6 +3890,7 @@
     "filter_disabled_tip": "Disattivata\nMod che hai ma che non vengono caricate.",
     "filter_enabled": "Attiva",
     "filter_enabled_tip": "Attiva\nMod che vengono caricate con la tua prossima partita.",
+    "filter_group": "Gruppo",
     "filter_held": "Bloccate",
     "filter_hidden": "Nascoste",
     "filter_hidden_tip": "Nascoste\nLe mod che hai nascosto. Mantengono il loro posto nella lista e si caricano come sono impostate.",
@@ -3896,6 +3906,7 @@
     "findings_find": "Trova la mod rotta",
     "get_the_app": "Scarica l'app",
     "ghost_warn": "Questa mod è attiva nel tuo profilo ma non è installata. Installala, iscriviti su Steam o disattivala.",
+    "group_chip": "Gruppo: %1",
     "held_chip": "Bloccata",
     "held_chip_tip": "Aggiornamenti bloccati. Il Workshop ha una versione più recente del %1.",
     "held_newer_tip": "Aggiornamenti bloccati. Il Workshop ha una versione più recente del %1. Fai clic per consentire di nuovo gli aggiornamenti.",
@@ -4057,6 +4068,7 @@
     "maps_unpreview_listed": "Togli anteprima alle elencate",
     "maps_zoom_in": "Ingrandisci",
     "maps_zoom_out": "Riduci",
+    "menu_add_group": "Aggiungi a un gruppo...",
     "menu_allow_updates": "Consenti aggiornamenti",
     "menu_copy_id": "Copia l'ID della mod",
     "menu_disable": "Disattiva",
@@ -4066,6 +4078,7 @@
     "menu_hold_updates": "Blocca aggiornamenti",
     "menu_list_hint": "Trascina o Alt+freccia su/giù per organizzare, Space attiva/disattiva, Ctrl/Shift+clic seleziona",
     "menu_maps": "Mostra in Mappe",
+    "menu_new_group": "Nuovo gruppo...",
     "menu_pin": "Fissa il suo posto nell'ordine di caricamento",
     "menu_remove": "Rimuovi",
     "menu_select_all": "Seleziona tutto",
@@ -4080,6 +4093,9 @@
     "missing_modal": "Cosa manca nel gestore di gioco",
     "mods_empty_hint": "Iscriviti alle mod su Steam: le iscrizioni compariranno qui dopo una nuova scansione.",
     "mods_empty_title": "Ancora niente nella scorta.",
+    "new_section_n": "Nuova sezione con %1 mod",
+    "new_section_one": "Nuova sezione con 1 mod",
+    "new_section_tip": "Crea una sezione con le mod scelte, o una vuota in fondo se non ne hai scelte (clic destro su una sezione per altro)",
     "next": "Successiva",
     "not_installed": "Non installata",
     "notice_feed": "le note sulle modifiche e la loro cronologia, e il caricamento delle note per più mod.",
@@ -4273,6 +4289,7 @@
     "sort_library": "Ordine della libreria",
     "sort_problems": "Prima i problemi",
     "sort_size": "Dimensione",
+    "source_unsubscribed": "Iscrizione annullata",
     "srv_all_here": "tutte presenti",
     "srv_and_more": "e altri %1: il server usa %2 mod, ma solo le prime si vedono fuori dal gioco",
     "srv_any_build": "Qualsiasi build",
@@ -4390,6 +4407,8 @@
     "tool_leave_favs": "Lascia i preferiti",
     "tool_section": "Nuova sezione",
     "unhide_tip": "Nascosta. Clicca per mostrarla di nuovo nella lista.",
+    "unsub_no_app": "Steam elimina questi file quando ci arriva, di solito dopo la chiusura del gioco.",
+    "unsub_tip": "Hai annullato l'iscrizione. Steam elimina questi file quando ci arriva, di solito dopo la chiusura del gioco. Rimuovi li elimina subito.",
     "up_to_date": "Le tue mod sono aggiornate.",
     "up_to_date_held": "Tutto il resto è aggiornato: %1 mod bloccate hanno versioni più recenti.",
     "up_to_date_held_one": "Tutto il resto è aggiornato: %1 mod bloccata ha una versione più recente.",

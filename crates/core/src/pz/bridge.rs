@@ -300,6 +300,8 @@ pub fn queue_requests(paths: &Paths) -> Option<bool> {
 /// `queue_requests` for bridge folder `dir`: the active one, or one a profile switch left that a game may still
 /// have open (its requests are taken, and acked there, from then on).
 pub fn queue_requests_in(paths: &Paths, dir: &std::path::Path) -> Option<bool> {
+    // which profile is active decides which sorting edits are dropped: unknown (state.json unread), they wait
+    let active = crate::profile::try_active_name(paths)?;
     let _one = QUEUE.lock().unwrap_or_else(|e| e.into_inner());
     if !same_dir(dir, &self::dir(paths)) {
         let mut earlier = EARLIER.lock().unwrap_or_else(|e| e.into_inner());
@@ -322,7 +324,7 @@ pub fn queue_requests_in(paths: &Paths, dir: &std::path::Path) -> Option<bool> {
     // a byte that isn't UTF-8 (any mod can write here) spoils its line, not the batch
     let text = String::from_utf8_lossy(&std::fs::read(&taken).ok()?).into_owned();
     // aged now, when they're taken off the game: one PZMM took in time stays fresh while the UI is busy
-    let (reqs, dropped) = parse(&text, Some(crate::store::now()), &crate::profile::active_name(paths));
+    let (reqs, dropped) = parse(&text, Some(crate::store::now()), &active);
     let kept: String = reqs.iter().map(|s| format!("{}\n", s.line)).collect();
     use std::io::Write;
     let queued = if kept.is_empty() { Ok(()) } else { std::fs::OpenOptions::new().create(true).append(true).open(dir.join("requests.queue")).and_then(|mut f| f.write_all(kept.as_bytes())) };
@@ -342,6 +344,8 @@ pub fn queue_requests_in(paths: &Paths, dir: &std::path::Path) -> Option<bool> {
 /// acked as not done here.
 pub fn take_requests(paths: &Paths) -> Vec<Stamped> {
     queue_requests(paths);
+    // the active profile unknown (state.json unread): nothing is handed out or dropped, so no edit is lost to a stand-in
+    let Some(active) = crate::profile::try_active_name(paths) else { return vec![] };
     let _one = QUEUE.lock().unwrap_or_else(|e| e.into_inner());
     let mut folders = vec![dir(paths)];
     for (data, d) in EARLIER.lock().unwrap_or_else(|e| e.into_inner()).iter() {
@@ -358,7 +362,7 @@ pub fn take_requests(paths: &Paths) -> Vec<Stamped> {
         let had = |l: &&str| handed.iter().any(|(data, d, id)| *data == paths.data && *d == from && l.split('\t').next() == Some(id.as_str()));
         let fresh: String = text.lines().filter(|l| !had(l)).map(|l| format!("{l}\n")).collect();
         // aged when they were queued
-        let (reqs, dropped) = parse(&fresh, None, &crate::profile::active_name(paths));
+        let (reqs, dropped) = parse(&fresh, None, &active);
         write_acks(&from, &dropped);
         unqueue(&from, &dropped);
         handed.extend(reqs.iter().map(|s| (paths.data.clone(), from.clone(), s.id.clone())));
@@ -472,7 +476,10 @@ fn parse(text: &str, now: Option<u64>, active: &str) -> (Vec<Stamped>, Vec<Ack>)
     let (mut out, mut dropped): (Vec<Stamped>, Vec<Ack>) = (vec![], vec![]);
     for line in text.lines() {
         let mut parts = line.trim_end_matches('\r').splitn(4, '\t');
-        let (id, profile, action, arg) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""), parts.next().unwrap_or(""), parts.next().unwrap_or("").trim());
+        let (id, profile, action, raw) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""), parts.next().unwrap_or(""), parts.next().unwrap_or(""));
+        // a place or section keeps its empty fields (a section "" is the nameless break): trimmed, `place\t\tX` would
+        // read as mod X
+        let arg = if matches!(action, "place" | "section") { raw.trim_matches(' ') } else { raw.trim() };
         // `<at>-<seq>`: a request without its stamp can't be acked or aged, so it isn't one
         let Some(at) = id.split_once('-').filter(|(_, s)| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit())).and_then(|(a, _)| a.parse::<f64>().ok()).filter(|a| a.is_finite() && *a >= 0.0).map(|a| a as u64) else { continue };
         if profile.len() > 200 {
@@ -562,9 +569,12 @@ fn parse(text: &str, now: Option<u64>, active: &str) -> (Vec<Stamped>, Vec<Ack>)
             "section" => {
                 let mut f = arg.split('\t');
                 let (op, name, to) = (f.next().unwrap_or(""), f.next().unwrap_or(""), f.next().unwrap_or(""));
-                let ok = named(name)
+                // "": the nameless break (or the mods before any section); "Other" is a group really called Other
+                let ok = (named(name) || (name.is_empty() && op != "add"))
                     && match op {
-                        "add" | "rename" => named(to),
+                        // added under the nameless break (`to` ""), or under a group
+                        "add" => to.is_empty() || named(to),
+                        "rename" => named(to),
                         "remove" => to.is_empty(),
                         // before section `to`, or to the end
                         "move" => to.is_empty() || named(to),
@@ -575,7 +585,8 @@ fn parse(text: &str, now: Option<u64>, active: &str) -> (Vec<Stamped>, Vec<Ack>)
             "place" => {
                 let mut f = arg.split('\t');
                 let (id, section, before) = (f.next().unwrap_or(""), f.next().unwrap_or(""), f.next().unwrap_or(""));
-                (named(id) && named(section) && (before.is_empty() || named(before))).then(|| Request::Place {
+                // section "": the nameless break, or the mods before any section
+                (named(id) && (section.is_empty() || named(section)) && (before.is_empty() || named(before))).then(|| Request::Place {
                     id: id.into(),
                     section: section.into(),
                     before: (!before.is_empty()).then(|| before.into()),
@@ -867,6 +878,27 @@ mod tests {
     }
 
     #[test]
+    fn group_edits_wait_while_the_active_profile_is_unknown() {
+        let (_t, paths) = crate::store::tests::temp_paths();
+        let dir = paths.zomboid.join("Lua/pzmm");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&paths.data).unwrap();
+        std::fs::write(paths.data.join("state.json"), "{\"active\": \"Solo\"}").unwrap();
+        let now = crate::store::now();
+        std::fs::write(dir.join("requests.txt"), format!("{now}-1	Solo	section	add	Maps	Gameplay
+")).unwrap();
+        // state.json can't be read: "Default" standing in would drop Solo's edit for good
+        let state = paths.data.join("state.json");
+        std::fs::remove_file(&state).unwrap();
+        std::fs::create_dir(&state).unwrap();
+        assert_eq!(take_requests(&paths), vec![]);
+        assert!(!dir.join("acks.txt").exists(), "not refused");
+        std::fs::remove_dir(&state).unwrap();
+        std::fs::write(&state, "{\"active\": \"Solo\"}").unwrap();
+        assert_eq!(take_requests(&paths).len(), 1, "taken once it can be read");
+    }
+
+    #[test]
     fn queued_requests_wait_for_the_ui() {
         let (_t, paths) = crate::store::tests::temp_paths();
         let dir = paths.zomboid.join("Lua/pzmm");
@@ -941,6 +973,8 @@ mod tests {
             reqs("place\tA\tFrameworks & libraries\tB\nplace\t\tGameplay\nplace\tA\t\nplace\tA\tMaps\n"),
             vec![
                 Request::Place { id: "A".into(), section: "Frameworks & libraries".into(), before: Some("B".into()) },
+                // a section "" is the nameless break; a place without its mod is still refused
+                Request::Place { id: "A".into(), section: "".into(), before: None },
                 Request::Place { id: "A".into(), section: "Maps".into(), before: None },
             ]
         );
@@ -983,6 +1017,24 @@ mod tests {
     fn a_runaway_file_is_cut_short() {
         let text = (0..200).map(|i| format!("install\t{i}\n")).collect::<String>();
         assert_eq!(reqs(&text).len(), MAX);
+    }
+
+    #[test]
+    fn an_empty_section_name_is_the_nameless_break() {
+        let (reqs, dropped) = parse(
+            "100-1\tP\tplace\tModA\t\t\n100-2\tP\tplace\tModA\tOther\t\n100-3\tP\tsection\tremove\t\n100-4\tP\tsection\tadd\tNew\t\n100-5\tP\tsection\tadd\t\tNew\n100-6\tP\tsection\trename\t\tNew\n",
+            Some(100),
+            "P",
+        );
+        let got: Vec<Request> = reqs.iter().map(|s| s.req.clone()).collect();
+        assert_eq!(got, vec![
+            Request::Place { id: "ModA".into(), section: "".into(), before: None },
+            Request::Place { id: "ModA".into(), section: "Other".into(), before: None },
+            Request::Section { op: "remove".into(), name: "".into(), to: None },
+            Request::Section { op: "add".into(), name: "New".into(), to: None },
+            Request::Section { op: "rename".into(), name: "".into(), to: Some("New".into()) },
+        ]);
+        assert!(dropped.iter().any(|a| a.id == "100-5" && !a.ok), "a nameless group can't be added");
     }
 
     #[test]

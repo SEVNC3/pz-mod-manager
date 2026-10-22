@@ -384,6 +384,11 @@
         {/if}
         <button class="danger" onclick={() => onRemove(id)} disabled={busy || lock}><Icon name="trash" size={14} />{t("common.remove")}</button>
       </div>
+    {:else if mods.get(id)?.unsubscribed}
+      <p class="note">{t("modTable.sourceHint.unsubscribed")}</p>
+      <div class="actions owned">
+        <button class="danger" onclick={() => onRemove(id)} disabled={busy || lock}><Icon name="trash" size={14} />{t("common.remove")}</button>
+      </div>
     {:else if d.source.startsWith("steam:")}
       <p class="note">{t("details.steamNote")}</p>
       {#if source.url}
