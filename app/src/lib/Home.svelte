@@ -388,7 +388,7 @@
     { key: "moddingDiscord", url: "https://discord.gg/ghRTHUTc94", icon: "discord" },
     { key: "reddit", url: "https://www.reddit.com/r/projectzomboid/", icon: "share" },
     { key: "workshop", url: "https://steamcommunity.com/app/108600/workshop/", icon: "steam" },
-    { key: "pzmm", url: "https://discord.com/invite/6URUy6mNzu", icon: "pzmm" },
+    { key: "pzmm", url: "https://discord.com/invite/6zKZuZ5WWe", icon: "pzmm" },
   ];
 
   /** The play button's menu: a server's extras, switching profile, then options. */

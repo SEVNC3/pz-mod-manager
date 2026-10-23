@@ -153,7 +153,7 @@ K.LOGO = tex("logo")
 K.RELEASES_URL = "https://github.com/SEVNC3/pz-mod-manager/releases/latest"
 local LINKS = {
     { tex("link_github"), "https://github.com/SEVNC3/pz-mod-manager", "GitHub", "GitHub\nThe PZMM app: download it, read the source, report a bug." },
-    { tex("link_discord"), "https://discord.com/invite/6URUy6mNzu", "Discord", "Discord\nHelp, ideas and the PZMM community." },
+    { tex("link_discord"), "https://discord.com/invite/6zKZuZ5WWe", "Discord", "Discord\nHelp, ideas and the PZMM community." },
     { tex("link_kofi"), "https://ko-fi.com/sevnc3", "Ko-fi", "Ko-fi\nBuy the developer a coffee: PZMM is free." },
 }
 -- the app's top bar actions the game can do too: { id, icon, tooltip }
@@ -9150,7 +9150,7 @@ K.COMMUNITY = {
     { "PZ Modding Community Discord (unofficial)", "https://discord.gg/ghRTHUTc94", { 30, 173, 276, 38 } },
     { "r/projectzomboid on Reddit", "https://www.reddit.com/r/projectzomboid/", { 30, 211, 276, 21 } },
     { "Steam Workshop", "https://steamcommunity.com/app/108600/workshop/", { 30, 232, 276, 21 } },
-    { "PZMM Discord", "https://discord.com/invite/6URUy6mNzu", { 30, 253, 276, 21 } },
+    { "PZMM Discord", "https://discord.com/invite/6zKZuZ5WWe", { 30, 253, 276, 21 } },
 }
 K.NOTE_W, K.NOTE_H, K.NOTE_TILT = 332, 340, math.rad(-2) -- the paper before the tilt, and the tilt
 K.NOTE_HOVER = {}

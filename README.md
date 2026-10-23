@@ -6,7 +6,7 @@
 
 <p align="center">
   A free mod manager, server browser and server host for Project Zomboid. Windows and Linux.<br>
-  <a href="../../releases/latest"><b>Download</b></a> · <a href="#install">Install</a> · <a href="https://discord.com/invite/6URUy6mNzu">Discord</a> · <a href="docs/FEATURES.md">Everything it does</a>
+  <a href="../../releases/latest"><b>Download</b></a> · <a href="#install">Install</a> · <a href="https://discord.com/invite/6zKZuZ5WWe">Discord</a> · <a href="docs/FEATURES.md">Everything it does</a>
 </p>
 
 <p align="center"><a href="https://youtu.be/MpBnMMRV-tM"><img src="docs/media/hero.gif" alt="PZMM: sorting a load order, browsing the Workshop and setting up Project Viewpoint" width="900"></a><br><a href="https://youtu.be/MpBnMMRV-tM">Watch the 2-minute video</a></p>
@@ -60,11 +60,11 @@ One click downloads Viewpoint and [ZombieBuddy](https://github.com/zed-0xff/Zomb
 It finds your game itself, turns your current mods into a profile called Default, and updates itself with signed updates. It only ever deletes mods it installed, and it shows you every change before joining a server or setting up ZombieBuddy.
 
 > [!WARNING]
-> Early access, so back up your saves. Only download it from [GitHub Releases](https://github.com/SEVNC3/pz-mod-manager/releases). Bugs go on [Discord](https://discord.com/invite/6URUy6mNzu) or in [an issue](https://github.com/SEVNC3/pz-mod-manager/issues/new?template=bug_report.yml), with **Settings > About > Copy diagnostics** pasted in.
+> Early access, so back up your saves. Only download it from [GitHub Releases](https://github.com/SEVNC3/pz-mod-manager/releases). Bugs go on [Discord](https://discord.com/invite/6zKZuZ5WWe) or in [an issue](https://github.com/SEVNC3/pz-mod-manager/issues/new?template=bug_report.yml), with **Settings > About > Copy diagnostics** pasted in.
 
 <img src="docs/media/section-links.png" alt="Links">
 
-[Discord](https://discord.com/invite/6URUy6mNzu) for help and bugs · [Nexus Mods](https://www.nexusmods.com/profile/SEVNC3) and [GitHub](https://github.com/SEVNC3) for whatever else I'm making · [Release notes](docs/release-notes/)
+[Discord](https://discord.com/invite/6zKZuZ5WWe) for help and bugs · [Nexus Mods](https://www.nexusmods.com/profile/SEVNC3) and [GitHub](https://github.com/SEVNC3) for whatever else I'm making · [Release notes](docs/release-notes/)
 
 Free forever. If it saved you some time, there's a [Ko-fi](https://ko-fi.com/sevnc3).
 

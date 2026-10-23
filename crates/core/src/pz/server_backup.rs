@@ -125,13 +125,14 @@ fn stamp() -> u128 {
 
 /// A new backup's file in `dir`: `<unix ms>-<tag>.zip`.
 pub(crate) fn new_file(dir: &Path, tag: &str) -> PathBuf {
-    let mut file = dir.join(format!("{}-{tag}.zip", stamp()));
-    while file.exists() {
-        // two in the same millisecond
+    // a millisecond of its own, whatever the tag: two in the same one would sort by tag, not age
+    let taken = |ms: u128| fs::read_dir(dir).into_iter().flatten().flatten().any(|e| e.file_name().to_string_lossy().starts_with(&format!("{ms}-")));
+    let mut ms = stamp();
+    while taken(ms) {
         std::thread::sleep(std::time::Duration::from_millis(2));
-        file = dir.join(format!("{}-{tag}.zip", stamp()));
+        ms = stamp();
     }
-    file
+    dir.join(format!("{ms}-{tag}.zip"))
 }
 
 fn take(paths: &Paths, s: &Server, reason: &str) -> Result<Option<Backup>> {
