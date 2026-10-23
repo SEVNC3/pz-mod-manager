@@ -167,7 +167,7 @@ K.TAPE_L, K.TAPE_M, K.TAPE_R = tex("tape_l"), tex("tape_m"), tex("tape_r")
 -- the app's list icons, white, drawn tinted: grip dots, fold chevrons, the hover marker and the drop feather
 -- the app's toolbar icons (tb_<name>), white, drawn tinted
 local TB = {}
-for _, n in ipairs({ "layers", "filter", "sort", "plus", "pulse", "x", "undo", "redo", "check", "chev_up", "chev_down", "copy", "alert", "trash", "download", "play", "update", "overlap", "lock", "search", "tag", "folder", "star", "steam", "swap", "settings", "external", "link", "maximize", "minimize", "pencil", "eye", "eye_off", "server", "info", "unlock" }) do TB[n] = tex("tb_" .. n) end
+do (function() for _, n in ipairs({ "layers", "filter", "sort", "plus", "pulse", "x", "undo", "redo", "check", "chev_up", "chev_down", "copy", "alert", "trash", "download", "play", "update", "overlap", "lock", "search", "tag", "folder", "star", "steam", "swap", "settings", "external", "link", "maximize", "minimize", "pencil", "eye", "eye_off", "server", "info", "unlock" }) do TB[n] = tex("tb_" .. n) end end)() end
 K.GRIP, K.CHEV_DOWN, K.CHEV_RIGHT, K.SEL_MARK, K.FEATHER = tex("grip"), tex("chev_down"), tex("chev_right"), tex("marker"), tex("feather")
 K.CHEV_LEFT = tex("chev_left")
 local MARKER = (function()
@@ -1151,7 +1151,7 @@ local PAGES = {
     { "settings", T("tab_settings", "Settings"), T("tab_settings_tip", "Settings\nThis in-game mod manager's options, your own Workshop items, and the PZMM app."), "drawSettings" },
 }
 local PAGE = {}
-for _, pg in ipairs(PAGES) do PAGE[pg[1]] = pg end
+do (function() for _, pg in ipairs(PAGES) do PAGE[pg[1]] = pg end end)() end
 local TABS = { "All", "Enabled", "Disabled", "Problems", "Hidden" }
 K.TAB_TIPS = {
     All = T("filter_all_tip", "All\nEvery mod the game found."),
@@ -1520,7 +1520,7 @@ local function entryHeight(e, i) return e.head and (HEAD + (i > 1 and GAP or 0))
 function K.colH() return H_SMALL + 12 end
 K.COL_NAMES = { num = "#", mod = T("col_mod", "Mod"), size = T("col_size", "Size"), installed = T("col_installed", "Installed"),
     changed = T("col_changed", "Last changed"), ovl = T("col_overwrites", "Overwrites"), src = T("col_source", "Source") }
-for k, v in pairs(K.COL_NAMES) do K.COL_NAMES[k] = v:upper() end
+do (function() for k, v in pairs(K.COL_NAMES) do K.COL_NAMES[k] = v:upper() end end)() end
 -- in order, with the sort each one's header click picks (Overwrites and Source don't sort)
 K.HEADS = { { "num", "order" }, { "mod", "name" }, { "size", "size" }, { "installed", "installed" }, { "changed", "changed" }, { "ovl" }, { "src" } }
 --- The columns of a row at x, w wide: id -> { x0, x1 }. grip 22, checkbox 28, eye 26, lock 26, # 40, Mod the rest; from the
@@ -5524,9 +5524,9 @@ K.RULE_KEYS = {
 }
 -- "*": every rule key (Clear rules)
 K.ALL_RULE_KEYS = {}
-for _, set in pairs(K.RULE_KEYS) do
+do (function() for _, set in pairs(K.RULE_KEYS) do
     for k in pairs(set) do K.ALL_RULE_KEYS[k] = true end
-end
+end end)() end
 K.RULE_KEYS["*"] = K.ALL_RULE_KEYS
 
 --- Set one mod's rule line in sorting_rules.txt (`key`: loadAfter, loadBefore, incompatibleMods, loadFirst,
@@ -5884,7 +5884,7 @@ function PZMMMods:drawDetails(d, x, y, w, bottom)
     -- Steam says a newer version is waiting: the app's update box
     local stNew = self:steamOf(d)
     if stNew and stNew.state == "NeedsUpdate" then
-        local label = T("details_update_now", "Update now")
+        (function() local label = T("details_update_now", "Update now")
         local bw = width(label) + 48
         local lines = wrap(stNew.pzmm and K.PZMM_UPDATE[3]:gsub("^[^\n]*\n", "") or T("details_newer", "A newer version is on the Workshop."), w - bw - 36)
         local lh = #lines * (H_SMALL + 2)
@@ -5911,7 +5911,7 @@ function PZMMMods:drawDetails(d, x, y, w, bottom)
                 end
                 y = y + 8
             end
-        end
+        end end)()
     end
     pcall(function() field("Author", info:getAuthor()) end)
     pcall(function() field(T("details_mod_version", "Mod version"), info:getModVersion()) end)
@@ -6131,7 +6131,7 @@ end
 
 K.INK, K.INK_SOFT, K.BLOOD = hex("24211c"), hex("5d574c"), hex("6a0a0d")
 K.SCRAPS = {}
-for i = 1, 8 do K.SCRAPS[i] = tex("scrap_" .. i) end
+do (function() for i = 1, 8 do K.SCRAPS[i] = tex("scrap_" .. i) end end)() end
 local function inside(b, x, y) return b and x >= b.x and x < b.x + b.w and y >= b.y and y < b.y + b.h end
 K.ROWS = 2 -- rows of scraps on the board; the rest are in the history
 K.SHOWN_NOTES = 3 -- notes an open entry shows before "Show older"
@@ -8883,9 +8883,9 @@ local function readNotes(kind, label, file)
     return notes
 end
 K.NOTES = {}
-for _, n in ipairs({ readNotes("game", "In-game mod manager", "notes_game.txt"), readNotes("app", "Desktop app", "notes_app.txt") }) do
+do (function() for _, n in ipairs({ readNotes("game", "In-game mod manager", "notes_game.txt"), readNotes("app", "Desktop app", "notes_app.txt") }) do
     if n.version ~= "" then K.NOTES[#K.NOTES + 1] = n end
-end
+end end)() end
 K.RELEASES = "https://github.com/SEVNC3/pz-mod-manager/releases/latest"
 
 --- The patches whose notes you've opened (Zomboid/Lua/pzmm/seen.txt): lines of `<kind> <version>`.
@@ -9154,7 +9154,7 @@ K.COMMUNITY = {
 }
 K.NOTE_W, K.NOTE_H, K.NOTE_TILT = 332, 340, math.rad(-2) -- the paper before the tilt, and the tilt
 K.NOTE_HOVER = {}
-for i = 1, #K.COMMUNITY do K.NOTE_HOVER[i] = tex("scrap_note_" .. i) end
+do (function() for i = 1, #K.COMMUNITY do K.NOTE_HOVER[i] = tex("scrap_note_" .. i) end end)() end
 -- the hero per profile, as the app's: Project Zomboid's Steam art and logo, or Project Viewpoint's
 K.HERO_PZ, K.HERO_VP, K.LOGO_PZ, K.VIEWPOINT_LOGO = tex("hero_pz"), tex("hero_viewpoint"), tex("logo_pz"), tex("viewpoint_logo")
 K.NOTE = tex("scrap_note")
@@ -13433,7 +13433,7 @@ PZMMMods.listenInet = listen
 -- The PZMM list in a server's description ([PZMM:1:<len>:<crc>:<data>], the data deflated, URL-safe base64): the app
 -- keeps which mods are "server only" and which "optional" there. Arithmetic only (Kahlua has no bit operators).
 K.P2 = {}
-for i = 0, 24 do K.P2[i] = 2 ^ i end
+do (function() for i = 0, 24 do K.P2[i] = 2 ^ i end end)() end
 K.B64 = {}
 do
     local a = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
@@ -14295,7 +14295,7 @@ function PZMMMods:drawServerPanel(x, y, w, mx, my)
             end
         end
     elseif tab == "mods" then
-      if #ids > 0 then
+      (function() if #ids > 0 then
         local label = "Mods: " .. #ids .. (#missing > 0 and ("   " .. #missing .. " not installed") or "   you have them all")
         bold(self, label, ix, py, #missing > 0 and C.warn or C.ok)
         py = py + H_SMALL + 8
@@ -14339,7 +14339,7 @@ function PZMMMods:drawServerPanel(x, y, w, mx, my)
       for _, ml in ipairs(mlines) do
         text(self, ml[1], ix, py, ml[2])
         py = py + H_SMALL + 2
-      end
+      end end)()
     end
     for _, l in ipairs(plines) do
         text(self, l, ix, py, #missing > 0 and C.warn or C.muted)
@@ -14808,7 +14808,7 @@ function PZMMMods:drawServers(x, y, w, mx, my, top, bh)
 
     if cur == "favs" then
     -- your saved servers (the game's favourites): Join uses the account saved with it
-    local servers = {}
+    (function() local servers = {}
     pcall(function() servers = getServerList() or {} end)
     local nSaved = #servers
     do
@@ -14881,7 +14881,7 @@ function PZMMMods:drawServers(x, y, w, mx, my, top, bh)
             }, cols, x, ry2, w, rh, i == n, mx, my)
         end
         y = y + n * rh + 20
-    end
+    end end)()
     end
 
     if cur == "history" then

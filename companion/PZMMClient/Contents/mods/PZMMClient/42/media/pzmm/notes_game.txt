@@ -1,3 +1,6 @@
+# 0.2.5
+- Fixed: the in-game manager didn't open when the game ran with -debug. My bad.
+
 # 0.2.4
 - Thanks to yustin and Mittens The Feared for recent ideas and bug reports.
 - New group takes only the mods you picked, or the one you've selected. It used to swallow every mod below. The group goes at the end of the section they were in. Yagoyuki pointed this out on Discord, along with the rest of this list.
